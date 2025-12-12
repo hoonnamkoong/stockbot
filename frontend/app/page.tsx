@@ -299,28 +299,49 @@ export default function Home() {
             </AppShell.Navbar>
 
             <AppShell.Main>
-                <Group justify="space-between" mb="md">
-                    <Tabs value={activeTab} onChange={setActiveTab} style={{ flex: 1 }}>
-                        <Tabs.List>
-                            <Tabs.Tab value="ALL">전체 (ALL)</Tabs.Tab>
-                            <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
-                            <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
-                        </Tabs.List>
-                    </Tabs>
+                {/* Responsive Navigation Layout */}
+                {isMobile ? (
+                    <div className="flex flex-col gap-3 mb-4">
+                        <Tabs value={activeTab} onChange={setActiveTab}>
+                            <Tabs.List grow>
+                                <Tabs.Tab value="ALL">전체</Tabs.Tab>
+                                <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
+                                <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
+                            </Tabs.List>
+                        </Tabs>
+                        <SegmentedControl
+                            fullWidth
+                            size="sm"
+                            value={viewMode}
+                            onChange={(val: any) => setViewMode(val)}
+                            data={[
+                                { label: '카드형 (Card)', value: 'card' },
+                                { label: '표 (Table)', value: 'table' },
+                            ]}
+                        />
+                    </div>
+                ) : (
+                    <Group justify="space-between" mb="md">
+                        <Tabs value={activeTab} onChange={setActiveTab} style={{ flex: 1 }}>
+                            <Tabs.List>
+                                <Tabs.Tab value="ALL">전체 (ALL)</Tabs.Tab>
+                                <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
+                                <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
+                            </Tabs.List>
+                        </Tabs>
 
-                    {/* Publisher Toggle for Mobile */}
-                    {isMobile && (
+                        {/* Desktop View Toggle */}
                         <SegmentedControl
                             size="xs"
                             value={viewMode}
                             onChange={(val: any) => setViewMode(val)}
                             data={[
                                 { label: '카드형', value: 'card' },
-                                { label: '표(Table)', value: 'table' },
+                                { label: '표 (Table)', value: 'table' },
                             ]}
                         />
-                    )}
-                </Group>
+                    </Group>
+                )}
 
                 {(isMobile && viewMode === 'card') ? (
                     <div className="flex flex-col gap-3">

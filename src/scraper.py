@@ -237,17 +237,35 @@ def analyze_board(code, threshold=0):
     n_score = sum(1 for w in filtered_words if w in ['하한가', '폭락', '악재', '매도', '손절', '개미'])
     
     sentiment = "보통"
-    # Summary: Top 5 unique titles
+    # Summary: Top 5 unique titles (Weighted by keywords)
     unique_titles = []
     seen = set()
+    
+    # User Request V6.4: Prioritize analytical keywords
+    weighted_keywords = ['분석', '예상', '이유', '전망', '호재', '악재', '찌라시', '정보', '뉴스', '속보', '팩트']
+    
+    # Separate prioritized titles
+    high_priority = []
+    normal_priority = []
+    
     for t in collected_titles:
         cleaned = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', t).strip()
-        if len(cleaned) > 5 and cleaned not in seen:
-            seen.add(cleaned)
-            unique_titles.append(t)
-            if len(unique_titles) >= 5: break
+        if len(cleaned) < 5 or cleaned in seen: continue
+        
+        seen.add(cleaned)
+        
+        # Check weight
+        if any(wk in t for wk in weighted_keywords):
+            high_priority.append(t)
+        else:
+            normal_priority.append(t)
             
-    summary = " \\n ".join(unique_titles) if unique_titles else "No discussion."
+    # Combine (High priority first)
+    final_titles = high_priority[:5]
+    if len(final_titles) < 5:
+        final_titles.extend(normal_priority[:5 - len(final_titles)])
+            
+    summary = " \\n ".join(final_titles) if final_titles else "No discussion."
     
     if p_score > n_score: sentiment = "긍정"
     if n_score > p_score: sentiment = "부정"

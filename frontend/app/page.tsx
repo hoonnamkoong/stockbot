@@ -251,15 +251,32 @@ export default function Home() {
             <AppShell.Header>
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-                    <IconRobot size={30} color="#228be6" />
-                    <Title order={3}>StockBot V5.6 (Stable & Tables)</Title>
-                    <Group ml="auto">
-                        <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
-                            Control
-                        </Button>
-                        <Button variant="subtle" size="xs" onClick={fetchData} leftSection={<IconRefresh size={14} />}>
-                            Refresh
-                        </Button>
+                    <IconRobot size={isMobile ? 24 : 30} color="#228be6" />
+                    <Title order={3} size={isMobile ? 'h5' : 'h3'}>
+                        {isMobile ? 'StockBot V5.6' : 'StockBot V5.6 (Stable & Tables)'}
+                    </Title>
+                    <Group ml="auto" gap={isMobile ? 'xs' : 'md'}>
+                        {isMobile ? (
+                            /* Mobile: Icon Only Buttons */
+                            <>
+                                <ActionIcon variant="light" color="violet" size="lg" onClick={openControl}>
+                                    <IconRefresh size={18} />
+                                </ActionIcon>
+                                <ActionIcon variant="subtle" size="lg" onClick={fetchData}>
+                                    {loading ? '...' : <IconRefresh size={18} />}
+                                </ActionIcon>
+                            </>
+                        ) : (
+                            /* Desktop: Full Buttons */
+                            <>
+                                <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
+                                    Control
+                                </Button>
+                                <Button variant="subtle" size="xs" onClick={fetchData} leftSection={<IconRefresh size={14} />}>
+                                    {loading ? '...' : <IconRefresh />}
+                                </Button>
+                            </>
+                        )}
                     </Group>
                 </Group>
             </AppShell.Header>

@@ -403,97 +403,97 @@ export default function Home() {
                                     </Paper>
                                 ))}
                             </div>
-                        )}        </Table>
+                        )}
                     </ScrollArea>
                 )}
 
-            {/* DEBUG CONSOLE */}
-            <Paper withBorder p="md" mt="xl" bg="gray.0">
-                <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
-                <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
-                    <div style={{ padding: 10 }}>
-                        {systemLogs.length === 0 ? <Text c="dimmed" size="xs">로그 대기 중...</Text> :
-                            systemLogs.map((log, i) => (
-                                <Text key={i} c="green" size="xs" style={{ fontFamily: 'monospace' }}>{log}</Text>
-                            ))
-                        }
-                    </div>
-                </ScrollArea>
-            </Paper>
-        </AppShell.Main>
-
-            {/* Scraper Control Modal */ }
-    <Modal opened={controlOpened} onClose={closeControl} title="스크래퍼 제어 센터 (Scraper Control)" centered>
-        <PasswordInput
-            label="GitHub Personal Access Token (PAT)"
-            placeholder="ghp_..."
-            value={githubToken}
-            onChange={(e) => setGithubToken(e.target.value)}
-            description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
-            mb="md"
-        />
-        <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
-            지금 즉시 실행 (RUN NOW)
-        </Button>
-
-        <Paper withBorder p="sm" mt="md" bg="gray.1">
-            <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
-            <ScrollArea h={150}>
-                {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
-            </ScrollArea>
-        </Paper>
-    </Modal>
-
-    {/* Research List Modal */ }
-    <Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="xl">
-        {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
-            <div style={{ display: 'flex', gap: '20px', flexDirection: isMobile ? 'column' : 'row' }}>
-                {/* LEFT: Overall Summary */}
-                <Paper withBorder p="md" bg="blue.0" flex={1}>
-                    <Title order={4} mb="xs" c="blue.8">📊 오늘의 핵심 키워드</Title>
-                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                        {research[selectedResearchCategory].summary}
-                    </Text>
-                    <Text size="xs" c="dimmed" mt="xl">
-                        * 오늘 올라온 리포트들의 본문을 AI가 분석하여 추출한 핵심 키워드입니다.
-                    </Text>
+                {/* DEBUG CONSOLE */}
+                <Paper withBorder p="md" mt="xl" bg="gray.0">
+                    <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
+                    <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
+                        <div style={{ padding: 10 }}>
+                            {systemLogs.length === 0 ? <Text c="dimmed" size="xs">로그 대기 중...</Text> :
+                                systemLogs.map((log, i) => (
+                                    <Text key={i} c="green" size="xs" style={{ fontFamily: 'monospace' }}>{log}</Text>
+                                ))
+                            }
+                        </div>
+                    </ScrollArea>
                 </Paper>
+            </AppShell.Main>
 
-                {/* RIGHT: List */}
-                <ScrollArea h={500} flex={1.5}>
-                    {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                        <Paper key={idx} withBorder p="sm" mb="sm">
-                            <Text fw={700} size="sm">{item.title}</Text>
-                            <Group mt="xs" mb="xs">
-                                <Badge size="xs" color="gray" variant="outline">{item.date}</Badge>
-                                <Button component="a" href={item.link} target="_blank" size="compact-xs" variant="light">본문 보기</Button>
-                                {item.pdf_link && <Button component="a" href={item.pdf_link} target="_blank" size="compact-xs" color="red" variant="outline">PDF 원문</Button>}
-                            </Group>
-                            <Group grow gap="xs">
-                                <Popover width={300} position="bottom" withArrow shadow="md">
-                                    <Popover.Target>
-                                        <Button size="compact-xs" variant="subtle" color="gray">📝 게시물 요약</Button>
-                                    </Popover.Target>
-                                    <Popover.Dropdown>
-                                        <Text size="xs" fw={700} mb="xs">게시물 상세 요약</Text>
-                                        <Text size="xs" style={{ whiteSpace: 'pre-line' }}>
-                                            {item.body_summary || "요약 내용을 불러오지 못했습니다. (본문 보기 참조)"}
-                                        </Text>
-                                    </Popover.Dropdown>
-                                </Popover>
+            {/* Scraper Control Modal */}
+            <Modal opened={controlOpened} onClose={closeControl} title="스크래퍼 제어 센터 (Scraper Control)" centered>
+                <PasswordInput
+                    label="GitHub Personal Access Token (PAT)"
+                    placeholder="ghp_..."
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
+                    mb="md"
+                />
+                <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
+                    지금 즉시 실행 (RUN NOW)
+                </Button>
 
-                                <Tooltip label="PDF 파일 자동 분석은 준비 중입니다." withArrow>
-                                    <Button size="compact-xs" variant="subtle" color="gray">📂 PDF 요약</Button>
-                                </Tooltip>
-                            </Group>
+                <Paper withBorder p="sm" mt="md" bg="gray.1">
+                    <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
+                    <ScrollArea h={150}>
+                        {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
+                    </ScrollArea>
+                </Paper>
+            </Modal>
+
+            {/* Research List Modal */}
+            <Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="xl">
+                {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '20px', flexDirection: isMobile ? 'column' : 'row' }}>
+                        {/* LEFT: Overall Summary */}
+                        <Paper withBorder p="md" bg="blue.0" flex={1}>
+                            <Title order={4} mb="xs" c="blue.8">📊 오늘의 핵심 키워드</Title>
+                            <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                                {research[selectedResearchCategory].summary}
+                            </Text>
+                            <Text size="xs" c="dimmed" mt="xl">
+                                * 오늘 올라온 리포트들의 본문을 AI가 분석하여 추출한 핵심 키워드입니다.
+                            </Text>
                         </Paper>
-                    ))}
-                </ScrollArea>
-            </div>
-        ) : (
-            <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
-        )}
-    </Modal>
+
+                        {/* RIGHT: List */}
+                        <ScrollArea h={500} flex={1.5}>
+                            {research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                                <Paper key={idx} withBorder p="sm" mb="sm">
+                                    <Text fw={700} size="sm">{item.title}</Text>
+                                    <Group mt="xs" mb="xs">
+                                        <Badge size="xs" color="gray" variant="outline">{item.date}</Badge>
+                                        <Button component="a" href={item.link} target="_blank" size="compact-xs" variant="light">본문 보기</Button>
+                                        {item.pdf_link && <Button component="a" href={item.pdf_link} target="_blank" size="compact-xs" color="red" variant="outline">PDF 원문</Button>}
+                                    </Group>
+                                    <Group grow gap="xs">
+                                        <Popover width={300} position="bottom" withArrow shadow="md">
+                                            <Popover.Target>
+                                                <Button size="compact-xs" variant="subtle" color="gray">📝 게시물 요약</Button>
+                                            </Popover.Target>
+                                            <Popover.Dropdown>
+                                                <Text size="xs" fw={700} mb="xs">게시물 상세 요약</Text>
+                                                <Text size="xs" style={{ whiteSpace: 'pre-line' }}>
+                                                    {item.body_summary || "요약 내용을 불러오지 못했습니다. (본문 보기 참조)"}
+                                                </Text>
+                                            </Popover.Dropdown>
+                                        </Popover>
+
+                                        <Tooltip label="PDF 파일 자동 분석은 준비 중입니다." withArrow>
+                                            <Button size="compact-xs" variant="subtle" color="gray">📂 PDF 요약</Button>
+                                        </Tooltip>
+                                    </Group>
+                                </Paper>
+                            ))}
+                        </ScrollArea>
+                    </div>
+                ) : (
+                    <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
+                )}
+            </Modal>
         </AppShell >
     );
 }

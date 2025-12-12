@@ -12,6 +12,11 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
     if not token or not chat:
         print("[Telegram] Missing Token or Chat ID.")
         return False
+    
+    # Debug: Check token format (Masked)
+    print(f"[Telegram] Token Length: {len(token)}")
+    print(f"[Telegram] Token Starts with: {token[:4]}***")
+    print(f"[Telegram] Chat ID: {chat}")
         
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {

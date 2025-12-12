@@ -251,7 +251,7 @@ export default function Home() {
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                     <IconRobot size={30} color="#228be6" />
-                    <Title order={3}>StockBot V5.0 (Live Redesign)</Title>
+                    <Title order={3}>StockBot V5.1 (Live Redesign)</Title>
                     <Group ml="auto">
                         <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
                             Control
@@ -525,84 +525,63 @@ export default function Home() {
                         </div>
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', gap: '20px', flexDirection: isMobile ? 'column' : 'row' }}>
-                        {/* LEFT: Overall Summary (Daily Briefing) */}
-                        <Paper withBorder p="md" bg="blue.0" flex={1} style={{ height: 'fit-content' }}>
-                            <Title order={4} mb="sm" c="blue.9">📢 오늘의 시장 브리핑</Title>
-                            <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }} fw={500}>
-                                {research[selectedResearchCategory].summary}
-                            </Text>
-                            <Text size="xs" c="dimmed" mt="xl">
-                                * AI가 오늘 발행된 리포트들의 핵심 내용(매수의견, 목표주가 등)을 종합하여 작성했습니다.
-                            </Text>
-                        </Paper>
-
-                        {/* RIGHT: List with Visible Summary */}
-                        <ScrollArea h={600} flex={1.5}>
-                            {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                                <Paper key={idx} withBorder p="md" mb="md" shadow="sm">
-                                    <Group justify="space-between" mb="xs">
-                                        <Text fw={700} size="md" style={{ flex: 1 }}>{item.title}</Text>
-                                        <Badge size="sm" color="gray" variant="light">{item.date}</Badge>
-                                    </Group>
-
-                                    {/* Visible Body Summary (5 lines max) */}
-                                    <Text size="sm" c="dimmed" lineClamp={5} mb="sm" style={{ lineHeight: 1.5 }}>
-                                        {item.body_summary || "요약 내용이 없습니다."}
-                                    </Text>
-
-                                    <Group justify="flex-end">
-                                        <Button component="a" href={item.link} target="_blank" size="xs" variant="default">
-                                            본문 전체보기
-                                        </Button>
-
-                                        {item.pdf_analysis ? (
-                                            <Button size="xs" color="blue" variant="light" onClick={() => setPdfItem(item)}>
-                                                📄 PDF 심층 분석
-                                            </Button>
-                                        ) : (
-                                            item.pdf_link && (
-                                                <Button component="a" href={item.pdf_link} target="_blank" size="xs" color="red" variant="outline">
-                                                    PDF 원문
-                                                </Button>
-                                            )
-                                        )}
-                                    </Group>
-                                </Paper>
-                            ))}
-                        </ScrollArea>
-                    </div>
-                ) : (
-                <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
+                    <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
                 )}
             </Modal>
 
-            {/* PDF Analysis Detail Modal */}
-            <Modal opened={!!pdfItem} onClose={() => setPdfItem(null)} title="📄 리포트 심층 분석 (AI)" centered size="lg">
-                {pdfItem && pdfItem.pdf_analysis && (
-                    <ScrollArea h={500}>
-                        <Group mb="md" grow>
-                            <Paper withBorder p="sm" bg="gray.0">
-                                <Text size="xs" c="dimmed" ta="center">투자의견</Text>
-                                <Text fw={900} size="lg" ta="center" c={pdfItem.pdf_analysis.opinion === 'BUY' ? 'red' : 'gray'}>
-                                    {pdfItem.pdf_analysis.opinion}
-                                </Text>
-                            </Paper>
-                            <Paper withBorder p="sm" bg="gray.0">
-                                <Text size="xs" c="dimmed" ta="center">목표주가</Text>
-                                <Text fw={900} size="lg" ta="center">
-                                    {pdfItem.pdf_analysis.target_price}
-                                </Text>
-                            </Paper>
+            {/* PDF Analysis Modal */}
+            <Modal opened={!!pdfItem} onClose={() => setPdfItem(null)} title="AI 심층 리포트 분석" centered size="xl">
+                {pdfItem && (
+                    <div className="flex flex-col gap-4">
+                        <Group justify="space-between" align="center" style={{ borderBottom: '1px solid #eee', paddingBottom: 10 }}>
+                            <div>
+                                <Text fw={700} size="xl">{pdfItem.title}</Text>
+                                <Text size="sm" c="dimmed">발행일: {pdfItem.date}</Text>
+                            </div>
+                            <Group>
+                                <Badge size="lg" color={pdfItem.pdf_analysis?.opinion === 'BUY' ? 'red' : 'gray'}>
+                                    {pdfItem.pdf_analysis?.opinion || 'N/A'}
+                                </Badge>
+                                <Badge size="lg" variant="outline">
+                                    TP: {pdfItem.pdf_analysis?.target_price || 'N/A'}
+                                </Badge>
+                            </Group>
                         </Group>
 
-                        <Title order={5} mb="xs">💡 핵심 결론 & 투자 포인트</Title>
-                        <Paper withBorder p="md" mb="xl">
-                            <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                                {pdfItem.pdf_analysis.summary}
-                            </Text>
-                        </Paper>
-                    </ScrollArea>
+                        <div className="flex gap-4" style={{ height: '60vh' }}>
+                            {/* Left: Structured Analysis */}
+                            <ScrollArea className="w-1/2 bg-gray-50 p-4 rounded-md">
+                                <Text fw={700} size="lg" mb="md" c="violet.8">💡 핵심 투자 포인트</Text>
+                                <Text style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }} size="sm">
+                                    {pdfItem.pdf_analysis?.summary || "PDF 분석 데이터가 없습니다."}
+                                </Text>
+                            </ScrollArea>
+
+                            {/* Right: Context & Tables (Placeholder for now) */}
+                            <ScrollArea className="w-1/2 bg-white p-4 rounded-md border border-gray-200">
+                                <Text fw={700} size="lg" mb="md" c="teal.8">📊 주요 데이터 및 웹 요약</Text>
+
+                                <Paper withBorder p="sm" mb="md" bg="blue.0">
+                                    <Text size="xs" fw={700} c="blue.8" mb={1}>웹 게시글 요약 (Cross-Check)</Text>
+                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{pdfItem.body_summary || "웹 요약 없음"}</Text>
+                                </Paper>
+
+                                <Text fw={700} size="sm" mb="xs">📄 원문 발췌 (Snippet)</Text>
+                                <Paper withBorder p="sm" bg="gray.0">
+                                    <Text size="xs" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                                        {pdfItem.pdf_analysis?.raw_text_snippet || "원문 텍스트 없음"}
+                                    </Text>
+                                </Paper>
+                            </ScrollArea>
+                        </div>
+
+                        <Group justify="flex-end" mt="md">
+                            <Button component="a" href={pdfItem.pdf_link} target="_blank" variant="default">
+                                PDF 원본 열기
+                            </Button>
+                            <Button onClick={() => setPdfItem(null)} color="gray">닫기</Button>
+                        </Group>
+                    </div>
                 )}
             </Modal>
         </AppShell >

@@ -121,12 +121,41 @@ def fetch_report_details(link):
         res.encoding = 'EUC-KR'
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # Naver Research usually sends the user to a view page
-        # The content is often in <div class="view_con">
         view_con = soup.find('div', {'class': 'view_con'})
         if view_con:
-            text = view_con.get_text(separator=" ", strip=True)
-            return text[:400] + "..." if len(text) > 400 else text
+            raw_text = view_con.get_text(separator=" ", strip=True)
+            
+            # Simple Extractive Summarization Logic
+            # 1. Split into sentences
+            sentences = re.split(r'(?<=[.?!])\s+', raw_text)
+            
+            # 2. Keywords for scoring
+            keywords = ['전망', '기대', '상향', '하향', '유지', '매수', '실적', '개선', '성장', '감소', '증가', '판단', '결론', '요약']
+            
+            scored_sentences = []
+            for i, sent in enumerate(sentences):
+                score = 0
+                # Give weight to first and last sentences (often intro/conclusion)
+                if i == 0: score += 2
+                if i == len(sentences) - 1: score += 2
+                
+                # Check keywords
+                for k in keywords:
+                    if k in sent:
+                        score += 1
+                
+                # Penalize too short/long noise
+                if len(sent) < 10 or len(sent) > 150:
+                    score -= 5
+                    
+                scored_sentences.append((score, i, sent))
+            
+            # 3. Select top 3-5 sentences
+            scored_sentences.sort(key=lambda x: x[0], reverse=True)
+            top_sentences = sorted(scored_sentences[:5], key=lambda x: x[1]) # Restore original order
+            
+            summary = " ".join([s[2] for s in top_sentences])
+            return summary
             
         return ""
     except Exception as e:

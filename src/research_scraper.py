@@ -6,6 +6,7 @@ import os
 import re
 import collections
 from collections import Counter
+import pdf_analyzer
 
 NAVER_FINANCE_URL = "https://finance.naver.com"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -176,9 +177,6 @@ def fetch_all_research():
         today_items = [x for x in items if x['date'] == today_str]
         today_count = len(today_items)
         
-import pdf_analyzer
-
-# ... (inside fetch_all_research) ...
 
         # Fetch Details & PDF Analysis for Top 10 Today's Items
         print(f"   Fetching details & analyzing PDF for top {min(len(today_items), 10)} items...", flush=True)

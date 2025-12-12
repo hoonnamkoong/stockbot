@@ -52,6 +52,7 @@ export default function Home() {
     // Research Modal
     const [researchModalOpened, { open: openResearchModal, close: closeResearchModal }] = useDisclosure(false);
     const [selectedResearchCategory, setSelectedResearchCategory] = useState<string | null>(null);
+    const [pdfItem, setPdfItem] = useState<any>(null);
 
     useEffect(() => {
         fetchData();

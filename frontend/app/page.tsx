@@ -121,9 +121,9 @@ export default function Home() {
         let attempts = 0;
         const interval = setInterval(async () => {
             attempts++;
-            if (attempts > 30) {
+            if (attempts > 7200) { // Practically no limit (10 hours)
                 clearInterval(interval);
-                addLog("⚠️ 모니터링 시간 초과 (수동으로 확인해주세요)");
+                addLog("⚠️ 모니터링 자동 종료 (10시간 경과)");
                 setWorkflowStatus('idle');
                 return;
             }

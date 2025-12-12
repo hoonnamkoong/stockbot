@@ -8,8 +8,7 @@ import re
 NAVER_FINANCE_URL = "https://finance.naver.com"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-SECTIONS = {
-    'invest': '/research/pro_invest.naver', # 시황정보
+    'invest': '/research/invest_list.naver', # 투자정보 리포트
     'company': '/research/company_list.naver', # 종목분석
     'industry': '/research/industry_list.naver', # 산업분석
     'economy': '/research/economy_list.naver' # 경제분석

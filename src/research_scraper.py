@@ -87,7 +87,10 @@ def fetch_section_reports(section_key):
                              
                 if not title_node: continue
                 
-                link = f"{NAVER_FINANCE_URL}{title_node['href']}"
+                href = title_node['href']
+                if not href.startswith('/'):
+                    href = '/' + href
+                link = f"{NAVER_FINANCE_URL}{href}"
                 title = title_node.text.strip()
                 
                 # PDF Link

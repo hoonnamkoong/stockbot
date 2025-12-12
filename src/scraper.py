@@ -177,7 +177,7 @@ def analyze_board(code, threshold=0):
     page = 1
     stop_scraping = False
     
-    while page <= 10 and not stop_scraping: # Max 10 pages (~200 items)
+    while page <= 200 and not stop_scraping: # Max 200 pages (~4000 items)
         url = f"{base_url}&page={page}"
         try:
             res = requests.get(url, headers=get_headers())
@@ -210,7 +210,7 @@ def analyze_board(code, threshold=0):
                     continue # Skip invalid dates
                     
             page += 1
-            if len(collected_titles) > 300: # Safety break
+            if len(collected_titles) > 4000: # Safety break
                 break
 
         except Exception:

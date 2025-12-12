@@ -335,9 +335,16 @@ def main():
         try:
             from utils import send_telegram_message
             
-            # Split Messages (User Request V6.5: KOSPI, KOSDAQ, Link separately)
+            # Split Messages (User Request V6.6: Link FIRST, then Data)
             
-            # 1. KOSPI Message
+            # 1. Dashboard Link (FIRST PRIORITY)
+            dashboard_url = os.environ.get('DASHBOARD_URL', '')
+            if dashboard_url:
+                 msg_link = f"📊 <b>Dashboard Check</b>\n{dashboard_url}"
+                 send_telegram_message(msg_link)
+                 time.sleep(1)
+
+            # 2. KOSPI Message
             kospi_stocks = [s for s in final_results if s['market'] == 'KOSPI']
             if kospi_stocks:
                 msg_k = f"<b>📉 [KOSPI] ({len(kospi_stocks)} items)</b>\n"
@@ -346,20 +353,13 @@ def main():
                 send_telegram_message(msg_k)
                 time.sleep(1) # Prevent rate limit
 
-            # 2. KOSDAQ Message
+            # 3. KOSDAQ Message
             kosdaq_stocks = [s for s in final_results if s['market'] == 'KOSDAQ']
             if kosdaq_stocks:
                 msg_q = f"<b>📉 [KOSDAQ] ({len(kosdaq_stocks)} items)</b>\n"
                 for s in kosdaq_stocks[:10]:
                      msg_q += f"🔥 <b>{s['name']}</b>: {s['count_today']}글 | {s.get('change_rate','-')}\n"
                 send_telegram_message(msg_q)
-                time.sleep(1)
-
-            # 3. Dashboard Link (ALWAYS SENT SEPARATELY)
-            dashboard_url = os.environ.get('DASHBOARD_URL', '')
-            if dashboard_url:
-                 msg_link = f"📊 <b>Dashboard Check</b>\n{dashboard_url}"
-                 send_telegram_message(msg_link)
             
         except ImportError:
             print("Utils module not found or error importing.", flush=True)

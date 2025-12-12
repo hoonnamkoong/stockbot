@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
-import { IconRefresh, IconRobot, IconNews, IconCheck } from '@tabler/icons-react';
+import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { clsx } from 'clsx';
 
 // --- Types ---
@@ -21,12 +21,12 @@ type Stock = {
     summary: string;
     sentiment: string;
     is_consecutive: boolean;
+    [key: string]: any; // Index signature for sorting
 };
 
 // --- Constants ---
 const REPO_OWNER = "hoonnamkoong";
 const REPO_NAME = "stockbot";
-// Important: File name of workflow must match exactly.
 const WORKFLOW_ID = "daily_scrape.yml";
 
 export default function Home() {
@@ -36,6 +36,9 @@ export default function Home() {
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [activeTab, setActiveTab] = useState<string | null>('ALL');
+
+    // Sorting State
+    const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'asc' | 'desc' }>({ key: 'count_today', direction: 'desc' });
 
     // Scraper Control
     const [controlOpened, { open: openControl, close: closeControl }] = useDisclosure(false);
@@ -118,7 +121,7 @@ export default function Home() {
         let attempts = 0;
         const interval = setInterval(async () => {
             attempts++;
-            if (attempts > 30) { // Poll for ~2.5 mins
+            if (attempts > 30) {
                 clearInterval(interval);
                 addLog("⚠️ 모니터링 시간 초과 (수동으로 확인해주세요)");
                 setWorkflowStatus('idle');
@@ -141,7 +144,7 @@ export default function Home() {
                         addLog(run.conclusion === 'success' ? "✨ 실행 성공! 데이터를 갱신합니다." : "❌ 실행 실패. Actions 탭을 확인하세요.");
                         setWorkflowStatus(run.conclusion === 'success' ? 'success' : 'error');
                         if (run.conclusion === 'success') {
-                            setTimeout(fetchData, 3000); // Wait a bit for raw CDN update
+                            setTimeout(fetchData, 3000);
                         }
                     }
                 }
@@ -156,24 +159,64 @@ export default function Home() {
     };
 
 
-    // --- Sort Logic for Table ---
-    const [sortedStocks, setSortedStocks] = useState<Stock[]>([]);
+    // --- Sort Logic ---
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
-    // Default sorting / filtering state
-    useEffect(() => {
-        let filtered = activeTab === 'ALL'
-            ? stocks
-            : stocks.filter(s => s.market === activeTab);
+    const sortedStocks = [...stocks].filter(s => activeTab === 'ALL' ? true : s.market === activeTab).sort((a, b) => {
+        if (!sortConfig.key) return 0;
 
-        // Default sort: Count Today DESC
-        filtered.sort((a, b) => b.count_today - a.count_today);
-        setSortedStocks(filtered);
-    }, [stocks, activeTab]);
+        let valA = a[sortConfig.key];
+        let valB = b[sortConfig.key];
+
+        // Handle numeric strings (remove commas, %)
+        const parseValue = (v: any) => {
+            if (typeof v === 'string') {
+                // Check if it looks like a number (comma separated, percentage)
+                const cleaned = v.replace(/,/g, '').replace('%', '');
+                if (!isNaN(Number(cleaned)) && cleaned !== '') {
+                    return Number(cleaned);
+                }
+                return v.toLowerCase(); // String comparison
+            }
+            return v; // number or boolean
+        };
+
+        const parsedA = parseValue(valA);
+        const parsedB = parseValue(valB);
+
+        if (parsedA < parsedB) {
+            return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (parsedA > parsedB) {
+            return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+    });
 
     // Research Modal Logic
     const handleResearchClick = (key: string) => {
         setSelectedResearchCategory(key);
         openResearchModal();
+    };
+
+    // Helper for Sort Header
+    const ThSort = ({ children, sortKey }: { children: React.ReactNode, sortKey: string }) => {
+        const active = sortConfig.key === sortKey;
+        const Icon = sortConfig.direction === 'asc' ? IconChevronUp : IconChevronDown;
+        return (
+            <Table.Th onClick={() => handleSort(sortKey)} style={{ cursor: 'pointer' }}>
+                <Group justify="space-between" wrap="nowrap">
+                    <Text fw={700} size="sm">{children}</Text>
+                    {active ? <Icon size={14} /> : <IconSelector size={14} style={{ opacity: 0.3 }} />}
+                </Group>
+            </Table.Th>
+        );
     };
 
 
@@ -187,10 +230,10 @@ export default function Home() {
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                     <IconRobot size={30} color="#228be6" />
-                    <Title order={3}>StockBot V3.1 (Full UI)</Title>
+                    <Title order={3}>StockBot V3.2 (Sorting)</Title>
                     <Group ml="auto">
                         <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
-                            Scraper Control
+                            Control
                         </Button>
                         <Button variant="subtle" size="xs" onClick={fetchData} leftSection={<IconRefresh size={14} />}>
                             Refresh
@@ -250,16 +293,18 @@ export default function Home() {
                         <Table striped highlightOnHover withTableBorder>
                             <Table.Thead>
                                 <Table.Tr>
-                                    <Table.Th style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', zIndex: 1 }}>종목명 (코드)</Table.Th>
-                                    <Table.Th>현재가</Table.Th>
-                                    <Table.Th>어제가</Table.Th>
-                                    <Table.Th>등락률</Table.Th>
-                                    <Table.Th>거래량</Table.Th>
-                                    <Table.Th>토론글(오늘)</Table.Th>
-                                    <Table.Th>외인비율(현재)</Table.Th>
-                                    <Table.Th>외인비율(어제)</Table.Th>
-                                    <Table.Th>감성분석</Table.Th>
-                                    <Table.Th>연속</Table.Th>
+                                    <Table.Th style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', zIndex: 1, minWidth: 150 }}>
+                                        <UnstyledButton onClick={() => handleSort('name')} style={{ fontWeight: 700, fontSize: 14 }}>종목명 (코드)</UnstyledButton>
+                                    </Table.Th>
+                                    <ThSort sortKey="current_price">현재가</ThSort>
+                                    <ThSort sortKey="yesterday_close">어제가</ThSort>
+                                    <ThSort sortKey="change_rate">등락률</ThSort>
+                                    <ThSort sortKey="volume">거래량</ThSort>
+                                    <ThSort sortKey="count_today">토론글</ThSort>
+                                    <ThSort sortKey="foreign_ratio_today">외인비(현)</ThSort>
+                                    <ThSort sortKey="foreign_ratio_yesterday">외인비(전)</ThSort>
+                                    <ThSort sortKey="sentiment">감성</ThSort>
+                                    <ThSort sortKey="is_consecutive">연속</ThSort>
                                     <Table.Th>요약</Table.Th>
                                 </Table.Tr>
                             </Table.Thead>

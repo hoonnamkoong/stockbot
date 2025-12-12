@@ -275,19 +275,19 @@ def main():
         except Exception as e:
             print(f"Error processing {stock['name']}: {e}")
             
-    # 4. Save Results
+    # 4. Save Results (ALWAYS save, even if empty)
+    # Sort by Count DESC
+    final_results.sort(key=lambda x: x['count_today'], reverse=True)
+    
+    # Save JSON
+    os.makedirs("data", exist_ok=True)
+    with open("data/latest_stocks.json", "w", encoding="utf-8") as f:
+        json.dump(final_results, f, ensure_ascii=False, indent=2)
+        
+    print(f"Saved {len(final_results)} stocks to data/latest_stocks.json")
+    
+    # 5. Send Telegram Notification
     if final_results:
-        # Sort by Count DESC
-        final_results.sort(key=lambda x: x['count_today'], reverse=True)
-        
-        # Save JSON
-        os.makedirs("data", exist_ok=True)
-        with open("data/latest_stocks.json", "w", encoding="utf-8") as f:
-            json.dump(final_results, f, ensure_ascii=False, indent=2)
-            
-        print(f"Saved {len(final_results)} stocks to data/latest_stocks.json")
-        
-        # 5. Send Telegram Notification
         try:
             from utils import send_telegram_message
             
@@ -307,9 +307,8 @@ def main():
             
         except ImportError:
             print("Utils module not found or error importing.")
-            
     else:
-        print("No stocks met the criteria.")
+         print("No stocks met the criteria, but saved empty list.")
 
 if __name__ == "__main__":
     main()

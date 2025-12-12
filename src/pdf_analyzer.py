@@ -8,39 +8,63 @@ HEADER = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
 # Beginner Glossary
 GLOSSARY = {
-    'PER': '주가수익비율(PER)은 현재 주가가 1주당 순이익의 몇 배인가를 나타냅니다. 낮을수록 저평가되었다고 봅니다.',
-    'PBR': '주가순자산비율(PBR)은 주가가 순자산(자본)에 비해 몇 배로 거래되고 있는지를 보여줍니다.',
-    'ROE': '자기자본이익률(ROE)은 기업이 자기자본을 활용해 얼마만큼의 이익을 냈는지 보여주는 수익성 지표입니다.',
-    'TP': 'TP(Target Price)는 증권사가 예상하는 해당 주식의 목표 주가를 의미합니다.',
-    'Yoy': 'YoY(Year over Year)는 전년 동기 대비 증감율을 의미합니다.',
-    'Qoq': 'QoQ(Quarter over Quarter)는 직전 분기 대비 증감율을 의미합니다.'
+    'PER': '주가수익비율(PER) - 낮을수록 저평가 (이익 대비 주가)',
+    'PBR': '주가순자산비율(PBR) - 1 미만이면 자산가치보다 저평가',
+    'ROE': '자기자본이익률(ROE) - 높을수록 효율적인 경영 (내 돈으로 번 돈)',
+    'TP': 'TP(Target Price) - 증권사가 제시한 목표 주가',
+    'YoY': '전년 동기 대비 증감율',
+    'QoQ': '직전 분기 대비 증감율',
+    'OPM': '영업이익률 (매출 대비 영업이익 비중)'
 }
 
 def clean_pdf_text(text):
-    """ Cleans extracted text, removing headers/footers/disclaimers """
-    # Remove single characters standing alone (artifacts)
-    text = re.sub(r'\s+.\s+', ' ', text)
-    # Remove disclaimers
-    if "Compliance" in text:
-        text = text.split("Compliance")[0]
-    return text.strip()
+    """ 
+    Aggressive Cleaning for 'Insight Only' view.
+    Removes: Dates, Emails, Phones, URLs, Legal Disclaimers, Headers/Footers.
+    """
+    if not text: return ""
+
+    # 1. Boilerplate Removal (Compliance, Disclaimer)
+    # Truncate text after common disclaimer headers
+    disclaimers = ["Compliance Notice", "Compliance", "고객 여러분께", "투자 판단의 최종 책임", "본 조사분석자료", "Disclosures"]
+    for d in disclaimers:
+        if d in text:
+            text = text.split(d)[0] # Cut off everything after disclaimer start
+
+    # 2. Regex Cleaning
+    # Remove Emails
+    text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '', text)
+    # Remove Phone Numbers
+    text = re.sub(r'\d{2,3}[-)\.]\d{3,4}[-)\.]\d{4}', '', text)
+    # Remove Dates (YYYY.MM.DD or YYYY-MM-DD) - debatable, but user asked to remove "Article Date"
+    text = re.sub(r'\d{4}[\.-]\d{2}[\.-]\d{2}', '', text)
+    # Remove URLS
+    text = re.sub(r'http[s]?://\S+', '', text)
+    
+    # 3. Artifact/Spacing Cleaning
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
 
 def download_pdf(url):
     try:
-        res = requests.get(url, headers=HEADER)
+        res = requests.get(url, headers=HEADER, timeout=10)
         if res.status_code == 200:
             return io.BytesIO(res.content)
     except Exception as e:
         print(f"PDF Download Error: {e}")
     return None
 
-def analyze_pdf(pdf_url):
+def analyze_pdf(pdf_url, web_body_text=""):
+    """
+    Analyzes PDF and optionally merges insights with Web Body Text.
+    """
     stream = download_pdf(pdf_url)
     if not stream: return None
     
     try:
         reader = PdfReader(stream)
-        # Extract text from first 2 pages (usually sufficient for summary)
+        # Extract text from first 2 pages
         full_text = ""
         for i in range(min(2, len(reader.pages))):
             full_text += reader.pages[i].extract_text() + "\n"
@@ -49,73 +73,83 @@ def analyze_pdf(pdf_url):
             return {
                 "opinion": "N/A",
                 "target_price": "N/A",
-                "summary": "텍스트 추출 불가 (이미지 스캔본일 수 있음). OCR 처리가 필요합니다."
+                "summary": "텍스트 추출 불가 (이미지 스캔본일 수 있음). 우측 웹 요약을 참고해주세요."
             }
 
         # Parsing Logic
         cleaned_text = clean_pdf_text(full_text)
         
-        # 1. Opinion
+        # 1. Opinion & TP
         opinion = "N/A"
         match = re.search(r'(BUY|SELL|HOLD|Reduce|매수|중립|매도)', cleaned_text, re.IGNORECASE)
-        if match:
-            opinion = match.group(1).upper()
+        if match: opinion = match.group(1).upper()
             
-        # 2. Target Price
         tp = "N/A"
-        match_tp = re.search(r'(목표주가|Target Price|TP)\D{1,10}([\d,]+)', cleaned_text, re.IGNORECASE)
-        if match_tp:
-            tp = match_tp.group(2) + "원"
+        match_tp = re.search(r'(목표주가|Target Price|TP)\D{0,10}([\d,]+)', cleaned_text, re.IGNORECASE)
+        if match_tp: tp = match_tp.group(2) + "원"
 
-        # 3. Structure Extraction (Arguments)
+        # 2. Structure Extraction
         summary_points = []
         
-        # Look for headers
-        headers = ['투자포인트', 'Investment Point', '체크포인트', 'Key Charts', 'Valuation', '결론']
-        sentences = cleaned_text.split('\n')
+        # Priority Headers (Mapped to standard names)
+        header_map = {
+            '투자포인트': '💡 핵심 투자 포인트',
+            'Investment Point': '💡 핵심 투자 포인트',
+            '체크포인트': '💡 핵심 투자 포인트',
+            '결론': '📌 결론',
+            'Conclusion': '📌 결론',
+            'Valuation': '📊 밸류에이션',
+            '리스크': '⚠️ 리스크 요인'
+        }
         
-        capture_mode = False
-        captured_lines = []
+        sentences = cleaned_text.split('. ')
         
-        for line in sentences:
-            line = line.strip()
-            if not line: continue
+        current_section = None
+        captured_content = []
+        
+        # Simple extraction strategy: If a sentence contains a header keyword, start a section.
+        for sent in sentences:
+            sent = sent.strip()
+            if len(sent) < 10: continue
             
-            # Start capturing if header found
-            for h in headers:
-                if h in line:
-                    capture_mode = True
-                    summary_points.append(f"\n[{h}]") # Add header as section
+            # Check for header
+            found_header = False
+            for key, label in header_map.items():
+                if key in sent:
+                    current_section = label
+                    summary_points.append(f"\n{current_section}")
+                    found_header = True
                     break
             
-            if capture_mode:
-                if len(captured_lines) < 10: # Limit to 10 lines of key arguments
-                    captured_lines.append(line)
-                    summary_points.append(f"- {line}")
-            else:
-                # If no header found yet, maybe check for numbered lists (1. 2. )
-                if re.match(r'^[1-9]\.', line):
-                    summary_points.append(f"- {line}")
-        
+            if not found_header and current_section:
+                # Add to current section
+                summary_points.append(f"- {sent}.")
+                
+            if len(summary_points) > 15: break # Cap length
+            
         final_summary = "\n".join(summary_points)
-        if not final_summary:
-            # Fallback to first 500 chars if no structure found
-            final_summary = cleaned_text[:500] + "..."
+        
+        # Fallback: If no structure found, use Web Body or raw text
+        if not final_summary.strip():
+            if web_body_text:
+                final_summary = f"[웹 본문 기반 요약]\n{web_body_text[:500]}..."
+            else:
+                final_summary = cleaned_text[:500] + "..."
 
-        # 4. Inject Glossary
+        # 3. Inject Glossary
         used_glossary = []
         for term, desc in GLOSSARY.items():
-            if term in final_summary:
-                used_glossary.append(f"💡 {term}: {desc}")
+            if term in final_summary or term in cleaned_text:
+                used_glossary.append(f"❓ {term}: {desc}")
         
         if used_glossary:
-            final_summary += "\n\n[용어 설명]\n" + "\n".join(used_glossary)
+            final_summary += "\n\n" + "\n".join(used_glossary)
 
         return {
             "opinion": opinion,
             "target_price": tp,
             "summary": final_summary,
-            "raw_text_snippet": cleaned_text[:200]
+            "raw_text_snippet": cleaned_text[:300] + "..."
         }
 
     except Exception as e:

@@ -1,162 +1,74 @@
-[18:56:42] === StockBot Research Scraper Started ===
-[18:56:42] --- Processing Section: invest ---
-[18:56:42] [invest] Found 30 items, 10 from today.
-[18:56:42] Processing (1/10): 비상장기업 투자 동향 (2025-12) - 비상장 기업 투자 ..
-[18:56:42]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37224&page=1
-[18:56:43]    > Found Body Content (Length: 377)
-[18:56:43]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/63/20251212_invest_276330000.pdf
-[18:56:43]    > PDF Analysis Success
-[18:56:44] Processing (2/10): [ETF Spectrum] THE 2025 ETF Awards_미국편
-[18:56:44]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37223&page=1
-[18:56:44]    > Found Body Content (Length: 225)
-[18:56:44]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/18/20251212_invest_112063000.pdf
-[18:56:45]    > PDF Analysis Success
-[18:56:45] Processing (3/10): 12월 FTSE 정기변경
-[18:56:45]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37222&page=1
-[18:56:46]    > Found Body Content (Length: 322)
-[18:56:46]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/18/20251212_invest_27725000.pdf
-[18:56:46]    > PDF Analysis Success
-[18:56:47] Processing (4/10): [QWER] 12월 2주차 - 산타 랠리 스크리닝
-[18:56:47]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37221&page=1
-[18:56:47]    > Found Body Content (Length: 517)
-[18:56:47]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/18/20251212_invest_809026000.pdf
-[18:56:47]    > PDF Analysis Success
-[18:56:48] Processing (5/10): 오라클 실적 부진 영향으로 기술주 중심 하락마감
-[18:56:48]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37220&page=1
-[18:56:48]    > Found Body Content (Length: 891)
-[18:56:48]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/61/20251212_invest_221103000.pdf
-[18:56:49]    > PDF Analysis Success
-[18:56:49] Processing (6/10): 신한 Market Review & Insight: 한계기업 현황과 상장..
-[18:56:49]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37219&page=1
-[18:56:50]    > Found Body Content (Length: 447)
-[18:56:50] Processing (7/10): [IBKS Daily] Start with IBKS(2025.12.12) 오라클 어..
-[18:56:50]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37218&page=1
-[18:56:50]    > Found Body Content (Length: 439)
-[18:56:50]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/40/20251212_invest_278903000.pdf
-[18:56:51]    > PDF Analysis Success
-[18:56:51] Processing (8/10): 12/12, 미 증시, 오라클 폭락 여파에도, 전약후강 장..
-[18:56:51]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37217&page=1
-[18:56:52]    > Found Body Content (Length: 2078)
-[18:56:52]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/39/20251212_invest_1100000.pdf
-[18:56:52]    > PDF Analysis Success
-[18:56:53] Processing (9/10): 12/12 디지털자산 2단계 입법 정부안 발표 지연
-[18:56:53]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37216&page=1
-[18:56:53]    > Found Body Content (Length: 223)
-[18:56:53]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/39/20251212_invest_979558000.pdf
-[18:56:54]    > PDF Analysis Success
-[18:56:54] Processing (10/10): 12/12 달러, 주간 고용 부진에 하락
-[18:56:54]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37215&page=1
-[18:56:55]    > Found Body Content (Length: 397)
-[18:56:55]    > Analyzing PDF: https://stock.pstatic.net/stock-research/invest/39/20251212_invest_609427000.pdf
-[18:56:55]    > PDF Analysis Success
-[18:56:56] --- Processing Section: company ---
-[18:56:56] [company] Found 30 items, 9 from today.
-[18:56:56] Processing (1/9): HL만도
-[18:56:56]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=204320
-[18:56:57]    > WARNING: Could not extract body content.
-[18:56:57]    > Analyzing PDF: https://stock.pstatic.net/stock-research/company/57/20251212_company_894741000.pdf
-[18:56:57]    > PDF Analysis Success
-[18:56:58] Processing (2/9): HL만도
-[18:56:58]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=204320
-[18:56:58]    > WARNING: Could not extract body content.
-[18:56:58]    > Analyzing PDF: https://stock.pstatic.net/stock-research/company/16/20251212_company_869847000.pdf
-[18:56:59]    > PDF Analysis Success
-[18:57:00] Processing (3/9): 범한퓨얼셀
-[18:57:00]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=382900
-[18:57:00]    > WARNING: Could not extract body content.
-[18:57:01] Processing (4/9): 오아
-[18:57:01]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=342870
-[18:57:01]    > WARNING: Could not extract body content.
-[18:57:01]    > Analyzing PDF: https://stock.pstatic.net/stock-research/company/29/20251212_company_255689000.pdf
-[18:57:02]    > PDF Analysis Success
-[18:57:02] Processing (5/9): 지오엘리먼트
-[18:57:02]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=311320
-[18:57:03]    > WARNING: Could not extract body content.
-[18:57:03]    > Analyzing PDF: https://stock.pstatic.net/stock-research/company/74/20251212_company_269641000.pdf
-[18:57:04]    > PDF Analysis Success
-[18:57:04] Processing (6/9): 에임드바이오
-[18:57:04]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=0009K0
-[18:57:05]    > WARNING: Could not extract body content.
-[18:57:05] Processing (7/9): HL만도
-[18:57:05]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=204320
-[18:57:06]    > WARNING: Could not extract body content.
-[18:57:06]    > Analyzing PDF: https://stock.pstatic.net/stock-research/company/31/20251212_company_126206000.pdf
-[18:57:06]    > PDF Analysis Success
-[18:57:07] Processing (8/9): 라이콤
-[18:57:07]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=388790
-[18:57:07]    > WARNING: Could not extract body content.
-[18:57:07]    > Analyzing PDF: https://stock.pstatic.net/stock-research/company/40/20251212_company_675855000.pdf
-[18:57:08]    > PDF Analysis Success
-[18:57:08] Processing (9/9): 바이넥스
-[18:57:08]    > Fetching Detail: https://finance.naver.com/item/main.naver?code=053030
-[18:57:09]    > WARNING: Could not extract body content.
-[18:57:09]    > Analyzing PDF: https://stock.pstatic.net/stock-research/company/74/20251212_company_455995000.pdf
-[18:57:09]    > PDF Analysis Success
-[18:57:10] --- Processing Section: industry ---
-[18:57:10] [industry] Found 30 items, 9 from today.
-[18:57:10] Processing (1/9): 신한 자동차/철강금속 Weekly (2025.12.12)
-[18:57:10]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42727&page=1
-[18:57:11]    > Found Body Content (Length: 272)
-[18:57:11] Processing (2/9): 이젠 2026년을 봐야 합니다
-[18:57:11]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42726&page=1
-[18:57:11]    > Found Body Content (Length: 1864)
-[18:57:11]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/57/20251212_industry_219408000.pdf
-[18:57:12]    > PDF Analysis Success
-[18:57:13] Processing (3/9): 현대로템-페루 총괄합의서 체결과 시사점
-[18:57:13]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42725&page=1
-[18:57:13]    > Found Body Content (Length: 405)
-[18:57:13]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/1/20251212_industry_970265000.pdf
-[18:57:14]    > PDF Analysis Success
-[18:57:14] Processing (4/9): 동해안 HVDC 지연 리스크 해소 국면
-[18:57:14]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42724&page=1
-[18:57:15]    > Found Body Content (Length: 1278)
-[18:57:15]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/57/20251212_industry_622902000.pdf
-[18:57:15]    > PDF Analysis Success
-[18:57:16] Processing (5/9): 미국 리츠: 미국 리츠 현황 점검
-[18:57:16]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42723&page=1
-[18:57:16]    > Found Body Content (Length: 417)
-[18:57:16]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/1/20251212_industry_928354000.pdf
-[18:57:17]    > PDF Analysis Success
-[18:57:17] Processing (6/9): [Nov. 25] 대만 Tech 업종 동향
-[18:57:17]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42722&page=1
-[18:57:17]    > Found Body Content (Length: 266)
-[18:57:17]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/39/20251212_industry_223014000.pdf
-[18:57:19]    > PDF Analysis Success
-[18:57:19] Processing (7/9): Catch-up or Fall Behind
-[18:57:19]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42721&page=1
-[18:57:20]    > Found Body Content (Length: 466)
-[18:57:20]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/17/20251212_industry_5277000.pdf
-[18:57:20]    > PDF Analysis Success
-[18:57:21] Processing (8/9): 소비창조
-[18:57:21]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42720&page=1
-[18:57:21]    > Found Body Content (Length: 335)
-[18:57:21]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/1/20251212_industry_843357000.pdf
-[18:57:22]    > PDF Analysis Success
-[18:57:22] Processing (9/9): 거인의 틈, 한국 바이오의 생존 전략
-[18:57:22]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42719&page=1
-[18:57:23]    > Found Body Content (Length: 226)
-[18:57:23]    > Analyzing PDF: https://stock.pstatic.net/stock-research/industry/1/20251212_industry_160995000.pdf
-[18:57:23]    > PDF Analysis Success
-[18:57:24] --- Processing Section: economy ---
-[18:57:24] [economy] Found 30 items, 4 from today.
-[18:57:24] Processing (1/4): [IBKS Economy Monitor] Focus on Week: 12월 FOMC는 ..
-[18:57:24]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12752&page=1
-[18:57:25]    > Found Body Content (Length: 2160)
-[18:57:25]    > Analyzing PDF: https://stock.pstatic.net/stock-research/economy/40/20251212_economy_182612000.pdf
-[18:57:25]    > PDF Analysis Success
-[18:57:26] Processing (2/4): Market Weekly Check ME up!
-[18:57:26]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12751&page=1
-[18:57:26]    > Found Body Content (Length: 489)
-[18:57:26]    > Analyzing PDF: https://stock.pstatic.net/stock-research/economy/76/20251212_economy_919407000.pdf
-[18:57:27]    > PDF Analysis Success
-[18:57:27] Processing (3/4): 12/12, Kiwoom Morning Letter
-[18:57:27]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12750&page=1
-[18:57:27]    > Found Body Content (Length: 502)
-[18:57:27]    > Analyzing PDF: https://stock.pstatic.net/stock-research/economy/39/20251212_economy_708587000.pdf
-[18:57:28]    > PDF Analysis Success
-[18:57:29] Processing (4/4): 12/12 Weekly Macro, 12월 FOMC: 방향성 확인의 시간
-[18:57:29]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12749&page=1
-[18:57:29]    > Found Body Content (Length: 604)
-[18:57:29]    > Analyzing PDF: https://stock.pstatic.net/stock-research/economy/39/20251212_economy_207822000.pdf
-[18:57:29]    > PDF Analysis Success
-[18:57:30] === Scraper Completed Successfully ===
+[19:28:09] === StockBot Research Scraper Started (V2.0) ===
+[19:28:09] --- Section: invest ---
+[19:28:10] [invest] Today: 10 items
+[19:28:10]    Processing: 비상장기업 투자 동향 (2025-12) - 비상장 기업 투자 ..
+[19:28:10]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37224&page=1
+[19:28:11]    Processing: [ETF Spectrum] THE 2025 ETF Awards_미국편
+[19:28:11]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37223&page=1
+[19:28:12]    Processing: 12월 FTSE 정기변경
+[19:28:12]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37222&page=1
+[19:28:13]    Processing: [QWER] 12월 2주차 - 산타 랠리 스크리닝
+[19:28:13]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37221&page=1
+[19:28:14]    Processing: 오라클 실적 부진 영향으로 기술주 중심 하락마감
+[19:28:14]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37220&page=1
+[19:28:16]    Processing: 신한 Market Review & Insight: 한계기업 현황과 상장..
+[19:28:16]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37219&page=1
+[19:28:16]    Processing: [IBKS Daily] Start with IBKS(2025.12.12) 오라클 어..
+[19:28:16]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37218&page=1
+[19:28:17]    Processing: 12/12, 미 증시, 오라클 폭락 여파에도, 전약후강 장..
+[19:28:17]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37217&page=1
+[19:28:19]    Processing: 12/12 디지털자산 2단계 입법 정부안 발표 지연
+[19:28:19]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37216&page=1
+[19:28:20]    Processing: 12/12 달러, 주간 고용 부진에 하락
+[19:28:20]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37215&page=1
+[19:28:21] --- Section: company ---
+[19:28:21] [company] Today: 9 items
+[19:28:21]    Processing: CEO Investor Day에서 로봇 액츄에이터 사업..
+[19:28:21]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88711&page=1
+[19:28:23]    Processing: 2025 Investor Day Review - 나는 이제 ‘Int..
+[19:28:23]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88710&page=1
+[19:28:24]    Processing: K-잠수함 내러티브는 내년에도 계속된다.
+[19:28:24]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88709&page=1
+[19:28:24]    Processing: 숨겨진 '오아'시스
+[19:28:24]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88708&page=1
+[19:28:26]    Processing: 2026년 솔리드 캐니스터 양산 본격화 전망
+[19:28:26]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88707&page=1
+[19:28:27]    Processing: 빅파마가 선택한 ADC 유망주
+[19:28:27]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88706&page=1
+[19:28:28]    Processing: 로봇 엑추에이터에 대한 기대감은 컸지만, 20..
+[19:28:28]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88705&page=1
+[19:28:29]    Processing: 재도약의 전환점
+[19:28:29]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88704&page=1
+[19:28:30]    Processing: 임상 중심 CDMO에서 글로벌 상업 CDMO로, 체..
+[19:28:30]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88703&page=1
+[19:28:31] --- Section: industry ---
+[19:28:31] [industry] Today: 9 items
+[19:28:31]    Processing: 신한 자동차/철강금속 Weekly (2025.12.12)
+[19:28:31]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42727&page=1
+[19:28:32]    Processing: 이젠 2026년을 봐야 합니다
+[19:28:32]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42726&page=1
+[19:28:33]    Processing: 현대로템-페루 총괄합의서 체결과 시사점
+[19:28:33]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42725&page=1
+[19:28:34]    Processing: 동해안 HVDC 지연 리스크 해소 국면
+[19:28:34]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42724&page=1
+[19:28:36]    Processing: 미국 리츠: 미국 리츠 현황 점검
+[19:28:36]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42723&page=1
+[19:28:37]    Processing: [Nov. 25] 대만 Tech 업종 동향
+[19:28:37]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42722&page=1
+[19:28:38]    Processing: Catch-up or Fall Behind
+[19:28:38]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42721&page=1
+[19:28:39]    Processing: 소비창조
+[19:28:39]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42720&page=1
+[19:28:41]    Processing: 거인의 틈, 한국 바이오의 생존 전략
+[19:28:41]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42719&page=1
+[19:28:42] --- Section: economy ---
+[19:28:42] [economy] Today: 4 items
+[19:28:42]    Processing: [IBKS Economy Monitor] Focus on Week: 12월 FOMC는 ..
+[19:28:42]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12752&page=1
+[19:28:44]    Processing: Market Weekly Check ME up!
+[19:28:44]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12751&page=1
+[19:28:45]    Processing: 12/12, Kiwoom Morning Letter
+[19:28:45]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12750&page=1
+[19:28:46]    Processing: 12/12 Weekly Macro, 12월 FOMC: 방향성 확인의 시간
+[19:28:46]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12749&page=1
+[19:28:47] === Completed ===

@@ -3,118 +3,121 @@ import io
 import re
 from pypdf import PdfReader
 
+# User-Agent for download
+HEADER = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+
+# Beginner Glossary
+GLOSSARY = {
+    'PER': '주가수익비율(PER)은 현재 주가가 1주당 순이익의 몇 배인가를 나타냅니다. 낮을수록 저평가되었다고 봅니다.',
+    'PBR': '주가순자산비율(PBR)은 주가가 순자산(자본)에 비해 몇 배로 거래되고 있는지를 보여줍니다.',
+    'ROE': '자기자본이익률(ROE)은 기업이 자기자본을 활용해 얼마만큼의 이익을 냈는지 보여주는 수익성 지표입니다.',
+    'TP': 'TP(Target Price)는 증권사가 예상하는 해당 주식의 목표 주가를 의미합니다.',
+    'Yoy': 'YoY(Year over Year)는 전년 동기 대비 증감율을 의미합니다.',
+    'Qoq': 'QoQ(Quarter over Quarter)는 직전 분기 대비 증감율을 의미합니다.'
+}
+
+def clean_pdf_text(text):
+    """ Cleans extracted text, removing headers/footers/disclaimers """
+    # Remove single characters standing alone (artifacts)
+    text = re.sub(r'\s+.\s+', ' ', text)
+    # Remove disclaimers
+    if "Compliance" in text:
+        text = text.split("Compliance")[0]
+    return text.strip()
+
 def download_pdf(url):
-    """Downloads PDF from URL into memory."""
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        return io.BytesIO(response.content)
+        res = requests.get(url, headers=HEADER)
+        if res.status_code == 200:
+            return io.BytesIO(res.content)
     except Exception as e:
-        print(f"Failed to download PDF {url}: {e}")
-        return None
+        print(f"PDF Download Error: {e}")
+    return None
 
-def extract_text_from_pdf(pdf_file, max_pages=3):
-    """Extracts text from the first few pages of a PDF."""
-    if not pdf_file:
-        return ""
-    try:
-        reader = PdfReader(pdf_file)
-        text = ""
-        # Only read first few pages as the summary/opinion is usually there
-        for i in range(min(len(reader.pages), max_pages)):
-            page_text = reader.pages[i].extract_text()
-            if page_text:
-                text += page_text + "\n"
-        return text
-    except Exception as e:
-        print(f"Error extracting text from PDF: {e}")
-        return ""
-
-def analyze_pdf(url):
-    """
-    Downloads and analyzes a PDF report.
-    Returns a dict with:
-    - opinion: "BUY", "SELL", "HOLD" etc.
-    - target_price: Numeric string or "N/A"
-    - summary: Extracted conclusion/summary (approx 1 page text)
-    - key_points: Bullet points if found
-    """
-    if not url:
-        return None
-
-    pdf_file = download_pdf(url)
-    full_text = extract_text_from_pdf(pdf_file)
+def analyze_pdf(pdf_url):
+    stream = download_pdf(pdf_url)
+    if not stream: return None
     
-    if not full_text:
-        return None
+    try:
+        reader = PdfReader(stream)
+        # Extract text from first 2 pages (usually sufficient for summary)
+        full_text = ""
+        for i in range(min(2, len(reader.pages))):
+            full_text += reader.pages[i].extract_text() + "\n"
+            
+        if not full_text.strip():
+            return {
+                "opinion": "N/A",
+                "target_price": "N/A",
+                "summary": "텍스트 추출 불가 (이미지 스캔본일 수 있음). OCR 처리가 필요합니다."
+            }
 
-    # Helpers
-    def clean_text(t):
-        return re.sub(r'\s+', ' ', t).strip()
-
-    # 1. Extract Opinion
-    # Pattern: "투자의견:", "Rating", "Investment Rating", "BUY", "매수"
-    # This is tricky because it varies by securities firm.
-    # We look for common patterns near the start.
-    opinion = "N/A"
-    opinion_patterns = [
-        r'(?i)(?:투자의견|Rating|Investment Rating)[:\s]+(BUY|매수|Strong Buy|HOLD|중립|Marketperform|Outperform|비중확대)',
-        r'(?i)(BUY|매수|HOLD|중립)(?=\s+(?:목표주가|TP|Target Price))'
-    ]
-    for pat in opinion_patterns:
-        match = re.search(pat, full_text[:1000]) # Look in first 1000 chars
+        # Parsing Logic
+        cleaned_text = clean_pdf_text(full_text)
+        
+        # 1. Opinion
+        opinion = "N/A"
+        match = re.search(r'(BUY|SELL|HOLD|Reduce|매수|중립|매도)', cleaned_text, re.IGNORECASE)
         if match:
             opinion = match.group(1).upper()
-            if opinion == '매수': opinion = 'BUY'
-            if opinion == '중립': opinion = 'HOLD'
-            if opinion == '비중확대': opinion = 'OUTPERFORM'
-            break
-
-    # 2. Extract Target Price
-    # Pattern: "목표주가", "Target Price", "TP" followed by numbers
-    tp = "N/A"
-    tp_patterns = [
-        r'(?:목표주가|Target Price|TP)[:\s]+([\d,]+)(?:원)?',
-        r'(?:목표주가|TP)\s+([\d,]+)'
-    ]
-    for pat in tp_patterns:
-        match = re.search(pat, full_text[:1000])
-        if match:
-            tp = match.group(1) + "원"
-            break
-
-    # 3. Extract Summary / Conclusion (Heuristic)
-    # Look for headers like "Investment Points", "Key Check", "결론", "요약"
-    # Or just take the first meaningful block of text after the title info.
-    summary = ""
-    
-    # Try to find a section header
-    headers = [r'투자(?:\s*)포인트', r'투자(?:\s*)아이디어', r'Investment(?:\s*)Points?', r'Key(?:\s*)Charts?', r'Executive(?:\s*)Summary', r'체크(?:\s*)포인트', r'결론']
-    
-    start_idx = -1
-    for h in headers:
-        m = re.search(h, full_text, re.IGNORECASE)
-        if m:
-            start_idx = m.end()
-            break
             
-    if start_idx != -1:
-        # Extract next 500-1000 chars
-        snippet = full_text[start_idx:start_idx+1000]
-        summary = clean_text(snippet)
-    else:
-        # Fallback: Just take text from the middle of first page (skipping headers)
-        lines = full_text.split('\n')
-        # Skip likely header lines (short lines, dates, company names)
-        body_lines = [l for l in lines[:30] if len(l.strip()) > 30] 
-        summary = " ".join(body_lines[:8]) # First 8 meaningful lines
+        # 2. Target Price
+        tp = "N/A"
+        match_tp = re.search(r'(목표주가|Target Price|TP)\D{1,10}([\d,]+)', cleaned_text, re.IGNORECASE)
+        if match_tp:
+            tp = match_tp.group(2) + "원"
 
-    return {
-        'opinion': opinion,
-        'target_price': tp,
-        'summary': summary[:800] + "..." if len(summary) > 800 else summary,
-        'raw_text_snippet': full_text[:2000] # For debugging or advanced parsing
-    }
+        # 3. Structure Extraction (Arguments)
+        summary_points = []
+        
+        # Look for headers
+        headers = ['투자포인트', 'Investment Point', '체크포인트', 'Key Charts', 'Valuation', '결론']
+        sentences = cleaned_text.split('\n')
+        
+        capture_mode = False
+        captured_lines = []
+        
+        for line in sentences:
+            line = line.strip()
+            if not line: continue
+            
+            # Start capturing if header found
+            for h in headers:
+                if h in line:
+                    capture_mode = True
+                    summary_points.append(f"\n[{h}]") # Add header as section
+                    break
+            
+            if capture_mode:
+                if len(captured_lines) < 10: # Limit to 10 lines of key arguments
+                    captured_lines.append(line)
+                    summary_points.append(f"- {line}")
+            else:
+                # If no header found yet, maybe check for numbered lists (1. 2. )
+                if re.match(r'^[1-9]\.', line):
+                    summary_points.append(f"- {line}")
+        
+        final_summary = "\n".join(summary_points)
+        if not final_summary:
+            # Fallback to first 500 chars if no structure found
+            final_summary = cleaned_text[:500] + "..."
+
+        # 4. Inject Glossary
+        used_glossary = []
+        for term, desc in GLOSSARY.items():
+            if term in final_summary:
+                used_glossary.append(f"💡 {term}: {desc}")
+        
+        if used_glossary:
+            final_summary += "\n\n[용어 설명]\n" + "\n".join(used_glossary)
+
+        return {
+            "opinion": opinion,
+            "target_price": tp,
+            "summary": final_summary,
+            "raw_text_snippet": cleaned_text[:200]
+        }
+
+    except Exception as e:
+        print(f"PDF Parsing Error: {e}")
+        return None

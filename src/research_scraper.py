@@ -19,26 +19,33 @@ def get_headers():
     return {'User-Agent': USER_AGENT}
 
 def fetch_section_reports(section_key):
-    url = f"{NAVER_FINANCE_URL}{SECTIONS[section_key]}"
-    reports = []
-    
+    print(f"Fetching {url}", flush=True)
     try:
         res = requests.get(url, headers=get_headers())
-        res.encoding = 'EUC-KR' # Key Fix: Naver Finance uses EUC-KR
+        res.encoding = 'EUC-KR'
+        print(f"[{section_key}] Status: {res.status_code}", flush=True)
+        
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # Table parsing
-        # The structure is slightly different per section but generally 'table.type_1'
+        # Try finding table with class 'type_1' first, then any table
         table = soup.find('table', {'class': 'type_1'})
-        if not table: return []
-        
+        if not table:
+            print(f"[{section_key}] 'type_1' table not found. Searching all tables...", flush=True)
+            tables = soup.find_all('table')
+            if not tables:
+                print(f"[{section_key}] No tables found in HTML!", flush=True)
+                # print(res.text[:500], flush=True) # Debug HTML
+                return []
+            table = tables[0] # Use the first table as fallback
+            
         rows = table.find_all('tr')
         print(f"[{section_key}] Found {len(rows)} rows", flush=True)
         today_str = datetime.datetime.now().strftime("%y.%m.%d")
         
         for row in rows:
             cols = row.find_all('td')
-            if len(cols) < 3: continue
+            # Naver Research table usually has 2 empty tds for spacing, identifying real rows
+            if len(cols) < 2: continue
             
             try:
                 # Structure varies. Typically:

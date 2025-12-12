@@ -378,12 +378,24 @@ export default function Home() {
                         ))}
                     </div>
                 ) : (
-                    <ScrollArea>
-                        <Table striped highlightOnHover withTableBorder>
-                            <Table.Thead>
+                    <ScrollArea type="always" offsetScrollbars>
+                        <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}> {/* Ensure width for sticky behavior */}
+                            <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
                                 <Table.Tr>
-                                    {/* Headers */}
-                                    <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>종목명 (코드) {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                    {/* Sticky First Column Header */}
+                                    <Table.Th
+                                        onClick={() => handleSort('name')}
+                                        style={{
+                                            cursor: 'pointer',
+                                            position: 'sticky',
+                                            left: 0,
+                                            zIndex: 4,
+                                            backgroundColor: 'var(--mantine-color-body)',
+                                            boxShadow: '2px 0 5px rgba(0,0,0,0.1)'
+                                        }}
+                                    >
+                                        종목명 (코드) {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                    </Table.Th>
                                     <Table.Th onClick={() => handleSort('current_price')} style={{ cursor: 'pointer' }}>현재가 {sortConfig?.key === 'current_price' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                     <Table.Th>어제가</Table.Th>
                                     <Table.Th onClick={() => handleSort('change_rate')} style={{ cursor: 'pointer' }}>등락률 {sortConfig?.key === 'change_rate' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
@@ -393,13 +405,22 @@ export default function Home() {
                                     <Table.Th>외인비(전)</Table.Th>
                                     <Table.Th>감성</Table.Th>
                                     <Table.Th>연속</Table.Th>
-                                    <Table.Th>요약</Table.Th>
+                                    <Table.Th>요약 (Click)</Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
                                 {sortedStocks.map((stock) => (
                                     <Table.Tr key={stock.code}>
-                                        <Table.Td>
+                                        {/* Sticky First Column Data */}
+                                        <Table.Td
+                                            style={{
+                                                position: 'sticky',
+                                                left: 0,
+                                                backgroundColor: 'var(--mantine-color-body)',
+                                                zIndex: 2,
+                                                boxShadow: '2px 0 5px rgba(0,0,0,0.1)'
+                                            }}
+                                        >
                                             <Text fw={700}>{stock.name}</Text>
                                             <Text size="xs" c="dimmed">{stock.code}</Text>
                                         </Table.Td>
@@ -416,10 +437,17 @@ export default function Home() {
                                             </Badge>
                                         </Table.Td>
                                         <Table.Td>{stock.is_consecutive ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
-                                        <Table.Td style={{ maxWidth: 300 }}>
-                                            <Tooltip label={stock.summary} multiline w={300} withArrow transitionProps={{ duration: 200 }}>
-                                                <Text truncate style={{ cursor: 'help' }}>{stock.summary}</Text>
-                                            </Tooltip>
+                                        <Table.Td style={{ maxWidth: 200 }}>
+                                            <Popover width={300} position="bottom" withArrow shadow="md">
+                                                <Popover.Target>
+                                                    <Text truncate style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                                                        {stock.summary}
+                                                    </Text>
+                                                </Popover.Target>
+                                                <Popover.Dropdown>
+                                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.summary}</Text>
+                                                </Popover.Dropdown>
+                                            </Popover>
                                         </Table.Td>
                                     </Table.Tr>
                                 ))}

@@ -267,7 +267,8 @@ def main():
     print(f"Threshold: > {threshold} posts", flush=True)
     
     # 2. Fetch Base List
-    candidates = fetch_top_stocks(limit=2) 
+    # User Request V6.3: Fetch 30 KOSPI + 30 KOSDAQ = 60 Total
+    candidates = fetch_top_stocks(limit=60) 
     print(f"Candidates: {len(candidates)}", flush=True)
     
     final_results = []

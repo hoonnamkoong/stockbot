@@ -132,10 +132,39 @@ def analyze_pdf(pdf_url, web_body_text=""):
                 # Add to current section
                 summary_points.append(f"- {sent}.")
                 
-            if len(summary_points) > 15: break # Cap length
+            if len(summary_points) > 20: break # Cap length
             
         final_summary = "\n".join(summary_points)
         
+        # 3. Tables & Financial Data Extraction (Pseudo-OCR)
+        # Attempt to find financial summary lines (Year, P/E, ROE, Revenue)
+        # Pattern: Term followed by multiple numbers
+        financial_keywords = ['매출액', '영업이익', '순이익', 'PER', 'PBR', 'ROE', 'EPS', 'Revenue', 'Operating Profit', 'Net Income']
+        found_data_rows = []
+        
+        lines = cleaned_text.split('\n') # Use original lines if possible, but cleaned_text is joined.
+        # Retry splitting cleaned text by spacing is hard. Let's look for regex patterns in the big text block.
+        # Actually, split text on multiple spaces might work 
+        
+        # Simple Approach: Look for patterns in the raw full_text (before aggressive join) to find table rows
+        # But we only have cleaned_text here efficiently. Let's scan for keyword + numbers.
+        
+        table_md = ""
+        extracted_rows = []
+        for kw in financial_keywords:
+            # Regex: Keyword ... number ... number ... number
+            # e.g. "PER 10.5 12.3 9.8"
+            match = re.search(f"({kw})\s+([\d\.,\s]+)", cleaned_text)
+            if match:
+                val_str = match.group(2).strip()
+                # Check if it looks like a sequence of data
+                if len(val_str.split()) >= 2: 
+                     extracted_rows.append(f"| {kw} | {val_str} |")
+
+        if extracted_rows:
+            table_md = "\n\n### 📊 주요 재무 데이터 (추정)\n| 항목 | 데이터 (연도별 추이) |\n|---|---|\n" + "\n".join(extracted_rows)
+            final_summary += table_md
+
         # Fallback: If no structure found, use Web Body or raw text
         if not final_summary.strip():
             if web_body_text:
@@ -143,7 +172,7 @@ def analyze_pdf(pdf_url, web_body_text=""):
             else:
                 final_summary = cleaned_text[:500] + "..."
 
-        # 3. Inject Glossary
+        # 4. Inject Glossary
         used_glossary = []
         for term, desc in GLOSSARY.items():
             if term in final_summary or term in cleaned_text:

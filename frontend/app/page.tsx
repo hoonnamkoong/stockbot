@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { clsx } from 'clsx';
@@ -310,125 +310,190 @@ export default function Home() {
                     </div>
                 ) : (
                     <ScrollArea>
-                        <Table striped highlightOnHover withTableBorder>
-                            <Table.Thead>
-                                <Table.Tr>
-                                    <Table.Th style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', zIndex: 1, minWidth: 150 }}>
-                                        <UnstyledButton onClick={() => handleSort('name')} style={{ fontWeight: 700, fontSize: 14 }}>종목명 (코드)</UnstyledButton>
-                                    </Table.Th>
-                                    <ThSort sortKey="current_price">현재가</ThSort>
-                                    <ThSort sortKey="yesterday_close">어제가</ThSort>
-                                    <ThSort sortKey="change_rate">등락률</ThSort>
-                                    <ThSort sortKey="volume">거래량</ThSort>
-                                    <ThSort sortKey="count_today">토론글</ThSort>
-                                    <ThSort sortKey="foreign_ratio_today">외인비(현)</ThSort>
-                                    <ThSort sortKey="foreign_ratio_yesterday">외인비(전)</ThSort>
-                                    <ThSort sortKey="sentiment">감성</ThSort>
-                                    <ThSort sortKey="is_consecutive">연속</ThSort>
-                                    <Table.Th>요약</Table.Th>
-                                </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
+                        {!isMobile ? (
+                            <Table striped highlightOnHover withTableBorder>
+                                <Table.Thead>
+                                    <Table.Tr>
+                                        {/* Headers */}
+                                        <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>종목명 (코드) {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('current_price')} style={{ cursor: 'pointer' }}>현재가 {sortConfig?.key === 'current_price' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th>어제가</Table.Th>
+                                        <Table.Th onClick={() => handleSort('change_rate')} style={{ cursor: 'pointer' }}>등락률 {sortConfig?.key === 'change_rate' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('volume')} style={{ cursor: 'pointer' }}>거래량 {sortConfig?.key === 'volume' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('count_today')} style={{ cursor: 'pointer' }}>토론글 {sortConfig?.key === 'count_today' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th>외인비(현)</Table.Th>
+                                        <Table.Th>외인비(전)</Table.Th>
+                                        <Table.Th>감성</Table.Th>
+                                        <Table.Th>연속</Table.Th>
+                                        <Table.Th>요약</Table.Th>
+                                    </Table.Tr>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                    {sortedStocks.map((stock) => (
+                                        <Table.Tr key={stock.code}>
+                                            <Table.Td>
+                                                <Text fw={700}>{stock.name}</Text>
+                                                <Text size="xs" c="dimmed">{stock.code}</Text>
+                                            </Table.Td>
+                                            <Table.Td>{stock.current_price}</Table.Td>
+                                            <Table.Td>{stock.yesterday_close}</Table.Td>
+                                            <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
+                                            <Table.Td>{stock.volume}</Table.Td>
+                                            <Table.Td>{stock.count_today}</Table.Td>
+                                            <Table.Td>{stock.foreign_ratio_today}</Table.Td>
+                                            <Table.Td>{stock.foreign_ratio_yesterday}</Table.Td>
+                                            <Table.Td>
+                                                <Badge color={stock.sentiment === '긍정' ? 'green' : stock.sentiment === '부정' ? 'red' : 'gray'}>
+                                                    {stock.sentiment}
+                                                </Badge>
+                                            </Table.Td>
+                                            <Table.Td>{stock.is_consecutive ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
+                                            <Table.Td style={{ maxWidth: 300 }}>
+                                                <Tooltip label={stock.summary} multiline w={300} withArrow transitionProps={{ duration: 200 }}>
+                                                    <Text truncate style={{ cursor: 'help' }}>{stock.summary}</Text>
+                                                </Tooltip>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                    ))}
+                                </Table.Tbody>
+                            </Table>
+                        ) : (
+                            /* Mobile Card View */
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 {sortedStocks.map((stock) => (
-                                    <Table.Tr key={stock.code}>
-                                        <Table.Td style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', fontWeight: 'bold' }}>
-                                            {stock.name} <Text span c="dimmed" size="xs">({stock.code})</Text>
-                                        </Table.Td>
-                                        <Table.Td>{stock.current_price}</Table.Td>
-                                        <Table.Td>{stock.yesterday_close || '-'}</Table.Td>
-                                        <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
-                                        <Table.Td>{stock.volume || '-'}</Table.Td>
-                                        <Table.Td>{stock.count_today}</Table.Td>
-                                        <Table.Td>{stock.foreign_ratio_today}</Table.Td>
-                                        <Table.Td>{stock.foreign_ratio_yesterday || '-'}</Table.Td>
-                                        <Table.Td>
-                                            <Badge color={stock.sentiment === '긍정' ? 'teal' : stock.sentiment === '부정' ? 'pink' : 'gray'} variant="light">
+                                    <Paper key={stock.code} shadow="xs" p="md" withBorder>
+                                        <Group justify="space-between" mb="xs">
+                                            <div>
+                                                <Text fw={700} size="lg">{stock.name} <Text span size="xs" c="dimmed">({stock.code})</Text></Text>
+                                            </div>
+                                            <Badge color={stock.sentiment === '긍정' ? 'green' : stock.sentiment === '부정' ? 'red' : 'gray'}>
                                                 {stock.sentiment}
                                             </Badge>
-                                        </Table.Td>
-                                        <Table.Td>{stock.is_consecutive ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
-                                        <Table.Td style={{ maxWidth: 300 }}>
-                                            <Tooltip label={stock.summary} multiline w={300} withArrow transitionProps={{ duration: 200 }}>
-                                                <Text truncate style={{ cursor: 'help' }}>{stock.summary}</Text>
-                                            </Tooltip>
-                                        </Table.Td>
-                                    </Table.Tr>
+                                        </Group>
+
+                                        <Group grow mb="xs">
+                                            <div>
+                                                <Text size="xs" c="dimmed">현재가</Text>
+                                                <Text fw={700} size="lg" c={stock.change_rate.includes('+') ? 'red' : 'blue'}>
+                                                    {stock.current_price} ({stock.change_rate})
+                                                </Text>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <Text size="xs" c="dimmed">토론글</Text>
+                                                <Text fw={700}>{stock.count_today}개</Text>
+                                            </div>
+                                        </Group>
+
+                                        <Group gap="xl" mb="sm">
+                                            <div>
+                                                <Text size="xs" c="dimmed">거래량</Text>
+                                                <Text size="sm">{stock.volume}</Text>
+                                            </div>
+                                            <div>
+                                                <Text size="xs" c="dimmed">외인비</Text>
+                                                <Text size="sm">{stock.foreign_ratio_today}</Text>
+                                            </div>
+                                            {stock.is_consecutive && <Badge variant="outline" color="green" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
+                                        </Group>
+
+                                        <Paper bg="gray.0" p="xs" radius="md">
+                                            <Text size="xs" fw={700} mb={2}>🗣️ 토론 요약</Text>
+                                            <Text size="sm" lineClamp={2}>{stock.summary}</Text>
+                                        </Paper>
+                                    </Paper>
                                 ))}
-                            </Table.Tbody>
-                        </Table>
+                            </div>
+                        )}        </Table>
                     </ScrollArea>
                 )}
 
-                {/* DEBUG CONSOLE */}
-                <Paper withBorder p="md" mt="xl" bg="gray.0">
-                    <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
-                    <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
-                        <div style={{ padding: 10 }}>
-                            {systemLogs.length === 0 ? <Text c="dimmed" size="xs">로그 대기 중...</Text> :
-                                systemLogs.map((log, i) => (
-                                    <Text key={i} c="green" size="xs" style={{ fontFamily: 'monospace' }}>{log}</Text>
-                                ))
-                            }
-                        </div>
-                    </ScrollArea>
+            {/* DEBUG CONSOLE */}
+            <Paper withBorder p="md" mt="xl" bg="gray.0">
+                <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
+                <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
+                    <div style={{ padding: 10 }}>
+                        {systemLogs.length === 0 ? <Text c="dimmed" size="xs">로그 대기 중...</Text> :
+                            systemLogs.map((log, i) => (
+                                <Text key={i} c="green" size="xs" style={{ fontFamily: 'monospace' }}>{log}</Text>
+                            ))
+                        }
+                    </div>
+                </ScrollArea>
+            </Paper>
+        </AppShell.Main>
+
+            {/* Scraper Control Modal */ }
+    <Modal opened={controlOpened} onClose={closeControl} title="스크래퍼 제어 센터 (Scraper Control)" centered>
+        <PasswordInput
+            label="GitHub Personal Access Token (PAT)"
+            placeholder="ghp_..."
+            value={githubToken}
+            onChange={(e) => setGithubToken(e.target.value)}
+            description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
+            mb="md"
+        />
+        <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
+            지금 즉시 실행 (RUN NOW)
+        </Button>
+
+        <Paper withBorder p="sm" mt="md" bg="gray.1">
+            <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
+            <ScrollArea h={150}>
+                {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
+            </ScrollArea>
+        </Paper>
+    </Modal>
+
+    {/* Research List Modal */ }
+    <Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="xl">
+        {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
+            <div style={{ display: 'flex', gap: '20px', flexDirection: isMobile ? 'column' : 'row' }}>
+                {/* LEFT: Overall Summary */}
+                <Paper withBorder p="md" bg="blue.0" flex={1}>
+                    <Title order={4} mb="xs" c="blue.8">📊 오늘의 핵심 키워드</Title>
+                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                        {research[selectedResearchCategory].summary}
+                    </Text>
+                    <Text size="xs" c="dimmed" mt="xl">
+                        * 오늘 올라온 리포트들의 본문을 AI가 분석하여 추출한 핵심 키워드입니다.
+                    </Text>
                 </Paper>
-            </AppShell.Main>
 
-            {/* Scraper Control Modal */}
-            <Modal opened={controlOpened} onClose={closeControl} title="스크래퍼 제어 센터 (Scraper Control)" centered>
-                <PasswordInput
-                    label="GitHub Personal Access Token (PAT)"
-                    placeholder="ghp_..."
-                    value={githubToken}
-                    onChange={(e) => setGithubToken(e.target.value)}
-                    description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
-                    mb="md"
-                />
-                <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
-                    지금 즉시 실행 (RUN NOW)
-                </Button>
+                {/* RIGHT: List */}
+                <ScrollArea h={500} flex={1.5}>
+                    {research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                        <Paper key={idx} withBorder p="sm" mb="sm">
+                            <Text fw={700} size="sm">{item.title}</Text>
+                            <Group mt="xs" mb="xs">
+                                <Badge size="xs" color="gray" variant="outline">{item.date}</Badge>
+                                <Button component="a" href={item.link} target="_blank" size="compact-xs" variant="light">본문 보기</Button>
+                                {item.pdf_link && <Button component="a" href={item.pdf_link} target="_blank" size="compact-xs" color="red" variant="outline">PDF 원문</Button>}
+                            </Group>
+                            <Group grow gap="xs">
+                                <Popover width={300} position="bottom" withArrow shadow="md">
+                                    <Popover.Target>
+                                        <Button size="compact-xs" variant="subtle" color="gray">📝 게시물 요약</Button>
+                                    </Popover.Target>
+                                    <Popover.Dropdown>
+                                        <Text size="xs" fw={700} mb="xs">게시물 상세 요약</Text>
+                                        <Text size="xs" style={{ whiteSpace: 'pre-line' }}>
+                                            {item.body_summary || "요약 내용을 불러오지 못했습니다. (본문 보기 참조)"}
+                                        </Text>
+                                    </Popover.Dropdown>
+                                </Popover>
 
-                <Paper withBorder p="sm" mt="md" bg="gray.1">
-                    <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
-                    <ScrollArea h={150}>
-                        {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
-                    </ScrollArea>
-                </Paper>
-            </Modal>
-
-            {/* Research List Modal */}
-            <Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="lg">
-                {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
-                    <>
-                        <Paper withBorder p="md" mb="md" bg="blue.0">
-                            <Text fw={700} size="sm" c="blue.8">📊 오늘의 핵심 키워드 (AI 요약)</Text>
-                            <Text size="sm">{research[selectedResearchCategory].summary}</Text>
+                                <Tooltip label="PDF 파일 자동 분석은 준비 중입니다." withArrow>
+                                    <Button size="compact-xs" variant="subtle" color="gray">📂 PDF 요약</Button>
+                                </Tooltip>
+                            </Group>
                         </Paper>
-                        <ScrollArea h={400}>
-                            {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                                <Paper key={idx} withBorder p="sm" mb="sm">
-                                    <Text fw={700} size="sm">{item.title}</Text>
-                                    <Group mt="xs" mb="xs">
-                                        <Badge size="xs" color="gray" variant="outline">{item.date}</Badge>
-                                        <Button component="a" href={item.link} target="_blank" size="compact-xs" variant="light">본문 보기</Button>
-                                        {item.pdf_link && <Button component="a" href={item.pdf_link} target="_blank" size="compact-xs" color="red" variant="outline">PDF 원문</Button>}
-                                    </Group>
-                                    <Group grow gap="xs">
-                                        <Tooltip label="게시물 내용 자동 요약 (준비 중)" withArrow>
-                                            <Button size="compact-xs" variant="subtle" color="gray">📝 게시물 요약</Button>
-                                        </Tooltip>
-                                        <Tooltip label="첨부파일(PDF) 자동 분석 (준비 중)" withArrow>
-                                            <Button size="compact-xs" variant="subtle" color="gray">📂 PDF 요약</Button>
-                                        </Tooltip>
-                                    </Group>
-                                </Paper>
-                            ))}
-                        </ScrollArea>
-                    </>
-                ) : (
-                    <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
-                )}
-            </Modal>
-        </AppShell>
+                    ))}
+                </ScrollArea>
+            </div>
+        ) : (
+            <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
+        )}
+    </Modal>
+        </AppShell >
     );
 }

@@ -334,6 +334,7 @@ export default function Home() {
                                     <Text size="sm" c="dimmed">Posts: <b>{stock.count_today}</b></Text>
                                     <Text size="sm" c="dimmed">For.: {stock.foreign_ratio_today}</Text>
                                 </Group>
+                                {stock.is_consecutive && <Badge variant="outline" mb="xs" color="green" size="sm" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
                                 <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.summary}</Text>
                             </Card>
                         ))}
@@ -359,180 +360,167 @@ export default function Home() {
                             </Table.Thead>
                             <Table.Tbody>
                                 {sortedStocks.map((stock) => (
-                                    <Text fw={700} size="lg">{stock.name} <Text span size="xs" c="dimmed">({stock.code})</Text></Text>
-                                            </div>
-                            <Badge color={stock.sentiment === '긍정' ? 'green' : stock.sentiment === '부정' ? 'red' : 'gray'}>
-                                {stock.sentiment}
-                            </Badge>
-                        </Group>
+                                    <Table.Tr key={stock.code}>
+                                        <Table.Td>
+                                            <Text fw={700}>{stock.name}</Text>
+                                            <Text size="xs" c="dimmed">{stock.code}</Text>
+                                        </Table.Td>
+                                        <Table.Td>{stock.current_price}</Table.Td>
+                                        <Table.Td>{stock.yesterday_close}</Table.Td>
+                                        <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
+                                        <Table.Td>{stock.volume}</Table.Td>
+                                        <Table.Td>{stock.count_today}</Table.Td>
+                                        <Table.Td>{stock.foreign_ratio_today}</Table.Td>
+                                        <Table.Td>{stock.foreign_ratio_yesterday}</Table.Td>
+                                        <Table.Td>
+                                            <Badge color={stock.sentiment === '긍정' ? 'green' : stock.sentiment === '부정' ? 'red' : 'gray'}>
+                                                {stock.sentiment}
+                                            </Badge>
+                                        </Table.Td>
+                                        <Table.Td>{stock.is_consecutive ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
+                                        <Table.Td style={{ maxWidth: 300 }}>
+                                            <Tooltip label={stock.summary} multiline w={300} withArrow transitionProps={{ duration: 200 }}>
+                                                <Text truncate style={{ cursor: 'help' }}>{stock.summary}</Text>
+                                            </Tooltip>
+                                        </Table.Td>
+                                    </Table.Tr>
+                                ))}
+                            </Table.Tbody>
+                        </Table>
+                    </ScrollArea>
+                )}
+            </AppShell.Main>
 
-                        <Group grow mb="xs">
-                            <div>
-                                <Text size="xs" c="dimmed">현재가</Text>
-                                <Text fw={700} size="lg" c={stock.change_rate.includes('+') ? 'red' : 'blue'}>
-                                    {stock.current_price} ({stock.change_rate})
-                                </Text>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                                <Text size="xs" c="dimmed">토론글</Text>
-                                <Text fw={700}>{stock.count_today}개</Text>
-                            </div>
-                        </Group>
-
-                        <Group gap="xl" mb="sm">
-                            <div>
-                                <Text size="xs" c="dimmed">거래량</Text>
-                                <Text size="sm">{stock.volume}</Text>
-                            </div>
-                            <div>
-                                <Text size="xs" c="dimmed">외인비</Text>
-                                <Text size="sm">{stock.foreign_ratio_today}</Text>
-                            </div>
-                            {stock.is_consecutive && <Badge variant="outline" color="green" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
-                        </Group>
-
-                        <Paper bg="gray.0" p="xs" radius="md">
-                            <Text size="xs" fw={700} mb={2}>🗣️ 토론 요약</Text>
-                            <Text size="sm" lineClamp={2}>{stock.summary}</Text>
-                        </Paper>
-                    </Paper>
-                ))}
-            </div>
-                        )}
-        </ScrollArea>
-    )
-}
-
-{/* DEBUG CONSOLE */ }
-<Paper withBorder p="md" mt="xl" bg="gray.0">
-    <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
-    <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
-        <div style={{ padding: 10 }}>
-            {systemLogs.length === 0 ? <Text c="dimmed" size="xs">로그 대기 중...</Text> :
-                systemLogs.map((log, i) => (
-                    <Text key={i} c="green" size="xs" style={{ fontFamily: 'monospace' }}>{log}</Text>
-                ))
-            }
-        </div>
-    </ScrollArea>
-</Paper>
-            </AppShell.Main >
+            {/* DEBUG CONSOLE */}
+            <Paper withBorder p="md" mt="xl" bg="gray.0">
+                <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
+                <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
+                    <div style={{ padding: 10 }}>
+                        {systemLogs.length === 0 ? <Text c="dimmed" size="xs">로그 대기 중...</Text> :
+                            systemLogs.map((log, i) => (
+                                <Text key={i} c="green" size="xs" style={{ fontFamily: 'monospace' }}>{log}</Text>
+                            ))
+                        }
+                    </div>
+                </ScrollArea>
+            </Paper>
+        </AppShell.Main >
 
     {/* Scraper Control Modal */ }
-    < Modal opened = { controlOpened } onClose = { closeControl } title = "스크래퍼 제어 센터 (Scraper Control)" centered >
-                <PasswordInput
-                    label="GitHub Personal Access Token (PAT)"
-                    placeholder="ghp_..."
-                    value={githubToken}
-                    onChange={(e) => setGithubToken(e.target.value)}
-                    description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
-                    mb="md"
-                />
-                <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
-                    지금 즉시 실행 (RUN NOW)
-                </Button>
+    < Modal opened={controlOpened} onClose={closeControl} title="스크래퍼 제어 센터 (Scraper Control)" centered >
+        <PasswordInput
+            label="GitHub Personal Access Token (PAT)"
+            placeholder="ghp_..."
+            value={githubToken}
+            onChange={(e) => setGithubToken(e.target.value)}
+            description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
+            mb="md"
+        />
+        <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
+            지금 즉시 실행 (RUN NOW)
+        </Button>
 
-                <Paper withBorder p="sm" mt="md" bg="gray.1">
-                    <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
-                    <ScrollArea h={150}>
-                        {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
-                    </ScrollArea>
-                </Paper>
-            </Modal >
+        <Paper withBorder p="sm" mt="md" bg="gray.1">
+            <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
+            <ScrollArea h={150}>
+                {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
+            </ScrollArea>
+        </Paper>
+    </Modal >
 
     {/* Research List Modal */ }
-    < Modal opened = { researchModalOpened } onClose = { closeResearchModal } title = {`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size = "90%" styles = {{ body: { height: '80vh', overflow: 'hidden' } }}>
-        { selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
-        <Grid h="90%" gutter="xl">
-            {/* LEFT: Daily Briefing (Expanded) */}
-            <Grid.Col span={4}>
-                <Paper withBorder p="md" bg="blue.0" h="100%" radius="md">
-                    <Group mb="md">
-                        <IconNews size={24} color="#228be6" />
-                        <Text fw={700} size="lg" c="blue.8">오늘의 시장 인사이트</Text>
-                    </Group>
-                    <ScrollArea h="65vh" offsetScrollbars>
-                        <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                            {research[selectedResearchCategory].summary}
-                        </Text>
-                        <Text size="xs" c="dimmed" mt="xl" pt="xl">
-                            * AI가 오늘 발행된 리포트들의 핵심 내용(매수의견, 목표주가, 산업동향)을 종합하여 도출한 인사이트입니다.
-                        </Text>
+    < Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="90%" styles={{ body: { height: '80vh', overflow: 'hidden' } }}>
+        {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
+            <Grid h="90%" gutter="xl">
+                {/* LEFT: Daily Briefing (Expanded) */}
+                <Grid.Col span={4}>
+                    <Paper withBorder p="md" bg="blue.0" h="100%" radius="md">
+                        <Group mb="md">
+                            <IconNews size={24} color="#228be6" />
+                            <Text fw={700} size="lg" c="blue.8">오늘의 시장 인사이트</Text>
+                        </Group>
+                        <ScrollArea h="65vh" offsetScrollbars>
+                            <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                                {research[selectedResearchCategory].summary}
+                            </Text>
+                            <Text size="xs" c="dimmed" mt="xl" pt="xl">
+                                * AI가 오늘 발행된 리포트들의 핵심 내용(매수의견, 목표주가, 산업동향)을 종합하여 도출한 인사이트입니다.
+                            </Text>
+                        </ScrollArea>
+                    </Paper>
+                </Grid.Col>
+
+                {/* RIGHT: List (Scrollable) */}
+                <Grid.Col span={8}>
+                    <ScrollArea h="75vh" offsetScrollbars>
+                        {research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                            <Card key={idx} shadow="sm" padding="lg" radius="md" withBorder mb="md">
+                                <Group justify="space-between" mb="xs">
+                                    <div style={{ flex: 1 }}>
+                                        <Text fw={700} size="md" mb={4}>{item.title}</Text>
+                                        <Group gap="xs">
+                                            <Badge color="gray" size="sm">{item.date}</Badge>
+                                            {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
+                                                <Badge color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
+                                                    {item.pdf_analysis.opinion}
+                                                </Badge>
+                                            )}
+                                            {item.pdf_analysis?.target_price && item.pdf_analysis.target_price !== 'N/A' && (
+                                                <Badge variant="outline" color="gray">
+                                                    TP: {item.pdf_analysis.target_price}
+                                                </Badge>
+                                            )}
+                                        </Group>
+                                    </div>
+                                </Group>
+
+                                {/* 6-line Summary Area */}
+                                <Paper bg="gray.1" p="sm" radius="sm" mb="sm">
+                                    {item.body_summary ? (
+                                        <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }} lineClamp={6}>
+                                            {item.body_summary}
+                                        </Text>
+                                    ) : (
+                                        <Text size="sm" c="dimmed">요약 내용이 없습니다.</Text>
+                                    )}
+                                </Paper>
+
+                                <Group>
+                                    <Button variant="light" size="xs" component="a" href={item.link} target="_blank">
+                                        본문 전체보기
+                                    </Button>
+                                    {item.pdf_link && (
+                                        <>
+                                            <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">
+                                                PDF 원문
+                                            </Button>
+                                            <Button
+                                                variant="filled"
+                                                color="violet"
+                                                size="xs"
+                                                leftSection={<IconRobot size={14} />}
+                                                onClick={() => {
+                                                    setPdfItem(item);
+                                                }}
+                                            >
+                                                PDF 심층 분석
+                                            </Button>
+                                        </>
+                                    )}
+                                </Group>
+                            </Card>
+                        ))}
                     </ScrollArea>
-                </Paper>
-            </Grid.Col>
-
-            {/* RIGHT: List (Scrollable) */}
-            <Grid.Col span={8}>
-                <ScrollArea h="75vh" offsetScrollbars>
-                    {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                        <Card key={idx} shadow="sm" padding="lg" radius="md" withBorder mb="md">
-                            <Group justify="space-between" mb="xs">
-                                <div style={{ flex: 1 }}>
-                                    <Text fw={700} size="md" mb={4}>{item.title}</Text>
-                                    <Group gap="xs">
-                                        <Badge color="gray" size="sm">{item.date}</Badge>
-                                        {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
-                                            <Badge color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
-                                                {item.pdf_analysis.opinion}
-                                            </Badge>
-                                        )}
-                                        {item.pdf_analysis?.target_price && item.pdf_analysis.target_price !== 'N/A' && (
-                                            <Badge variant="outline" color="gray">
-                                                TP: {item.pdf_analysis.target_price}
-                                            </Badge>
-                                        )}
-                                    </Group>
-                                </div>
-                            </Group>
-
-                            {/* 6-line Summary Area */}
-                            <Paper bg="gray.1" p="sm" radius="sm" mb="sm">
-                                {item.body_summary ? (
-                                    <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }} lineClamp={6}>
-                                        {item.body_summary}
-                                    </Text>
-                                ) : (
-                                    <Text size="sm" c="dimmed">요약 내용이 없습니다.</Text>
-                                )}
-                            </Paper>
-
-                            <Group>
-                                <Button variant="light" size="xs" component="a" href={item.link} target="_blank">
-                                    본문 전체보기
-                                </Button>
-                                {item.pdf_link && (
-                                    <>
-                                        <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">
-                                            PDF 원문
-                                        </Button>
-                                        <Button
-                                            variant="filled"
-                                            color="violet"
-                                            size="xs"
-                                            leftSection={<IconRobot size={14} />}
-                                            onClick={() => {
-                                                setPdfItem(item);
-                                            }}
-                                        >
-                                            PDF 심층 분석
-                                        </Button>
-                                    </>
-                                )}
-                            </Group>
-                        </Card>
-                    ))}
-                </ScrollArea>
-            </Grid.Col>
-        </Grid>
-    ) : (
-        <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
-    )}
-            </Modal >
+                </Grid.Col>
+            </Grid>
+        ) : (
+            <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
+        )}
+    </Modal >
 
     {/* PDF Analysis Modal */ }
-    < Modal opened = {!!pdfItem} onClose = {() => setPdfItem(null)} title = "AI 심층 리포트 분석" centered size = "xl" >
-        { pdfItem && (
+    < Modal opened={!!pdfItem} onClose={() => setPdfItem(null)} title="AI 심층 리포트 분석" centered size="xl" >
+        {pdfItem && (
             <div className="flex flex-col gap-4">
                 <Group justify="space-between" align="center" style={{ borderBottom: '1px solid #eee', paddingBottom: 10 }}>
                     <div>
@@ -584,7 +572,7 @@ export default function Home() {
                 </Group>
             </div>
         )}
-            </Modal >
+    </Modal >
         </AppShell >
     );
 }

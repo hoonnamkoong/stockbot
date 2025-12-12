@@ -36,8 +36,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
-          python src/scraper.py
           python src/research_scraper.py
+          python src/scraper.py
           
       - name: Commit & Push Data
         run: |

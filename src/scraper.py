@@ -255,7 +255,7 @@ def main():
     print(f"Threshold: > {threshold} posts", flush=True)
     
     # 2. Fetch Base List
-    candidates = fetch_top_stocks(limit=40) 
+    candidates = fetch_top_stocks(limit=4) 
     print(f"Candidates: {len(candidates)}", flush=True)
     
     final_results = []

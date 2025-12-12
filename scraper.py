@@ -445,22 +445,34 @@ if __name__ == "__main__":
             import os
             
             # Format message
-            msg = f"📉 [주식 토론방 알림] {now.strftime('%H:%M')} 기준\n"
-            msg += f"필터링: {threshold}개 이상 댓글\n"
-            msg += f"KOSPI: {len([x for x in all_data if x['market']=='KOSPI'])}개, "
-            msg += f"KOSDAQ: {len([x for x in all_data if x['market']=='KOSDAQ'])}개\n\n"
+            # Split Messages (User Request V6.6: Link FIRST, then Data)
             
-            # Add Top 5 stocks by post count
-            sorted_data = sorted(all_data, key=lambda x: x['recent_posts_count'], reverse=True)[:5]
-            for s in sorted_data:
-                msg += f"🔥 {s['name']} ({s['recent_posts_count']}글): {s['price']}원 ({s['change_rate']})\n"
-            
-            # Dashboard URL if exists
+            # 1. Dashboard Link (FIRST PRIORITY)
             dashboard_url = os.environ.get('DASHBOARD_URL', '')
             if dashboard_url:
-                msg += f"\n📊 대시보드: {dashboard_url}"
+                 telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check</b>\n{dashboard_url}")
+                 time.sleep(1)
+
+            # 2. KOSPI Message
+            kospi_stocks = [x for x in all_data if x['market']=='KOSPI']
+            if kospi_stocks:
+                sorted_k = sorted(kospi_stocks, key=lambda x: x['recent_posts_count'], reverse=True)
+                msg_k = f"📉 [KOSPI] ({len(kospi_stocks)} items)\n"
+                for s in sorted_k[:10]: # Top 10 only per message
+                     msg_k += f"🔥 <b>{s['name']}</b>: {s['recent_posts_count']}글 | {s.get('change_rate','-')}\n"
                 
-            telegram_plugin.send_telegram_message(msg)
+                # Check message length safety (optional, but good practice)
+                telegram_plugin.send_telegram_message(msg_k)
+                time.sleep(1)
+
+            # 3. KOSDAQ Message
+            kosdaq_stocks = [x for x in all_data if x['market']=='KOSDAQ']
+            if kosdaq_stocks:
+                sorted_q = sorted(kosdaq_stocks, key=lambda x: x['recent_posts_count'], reverse=True)
+                msg_q = f"📉 [KOSDAQ] ({len(kosdaq_stocks)} items)\n"
+                for s in sorted_q[:10]:
+                     msg_q += f"🔥 <b>{s['name']}</b>: {s['recent_posts_count']}글 | {s.get('change_rate','-')}\n"
+                telegram_plugin.send_telegram_message(msg_q)
             
         except ImportError:
             pass

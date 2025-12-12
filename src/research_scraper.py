@@ -147,41 +147,53 @@ def fetch_all_research():
         today_items = [x for x in items if x['date'] == today_str]
         today_count = len(today_items)
         
-        # Fetch Details for Top 15 Today's Items (to save time)
-        print(f"   Fetching details for top {min(len(today_items), 15)} items...", flush=True)
+import pdf_analyzer
+
+# ... (inside fetch_all_research) ...
+
+        # Fetch Details & PDF Analysis for Top 10 Today's Items
+        print(f"   Fetching details & analyzing PDF for top {min(len(today_items), 10)} items...", flush=True)
         detailed_text_for_summary = []
+        pdf_summaries = []
         
         for i, item in enumerate(today_items):
-            if i < 15:
-                # Fetch body content
+            if i < 10:
+                # 1. Fetch HTML Body (for Quick Look)
                 body = fetch_report_details(item['link'])
                 item['body_summary'] = body
                 if body:
                     detailed_text_for_summary.append(body)
+                
+                # 2. Analyze PDF (for Deep Dive)
+                if item.get('pdf_link'):
+                    print(f"     Analyzing PDF for {item['title']}...", flush=True)
+                    pdf_result = pdf_analyzer.analyze_pdf(item['pdf_link'])
+                    if pdf_result:
+                        item['pdf_analysis'] = pdf_result
+                        # Add to daily briefing context
+                        if pdf_result['opinion'] != 'N/A':
+                            pdf_summaries.append(f"{item['title']}({pdf_result['opinion']}, TP:{pdf_result['target_price']})")
             else:
                 item['body_summary'] = "요약 없음 (시간 제한)"
         
-        # Improved Keyword Extraction from BODY text
-        all_text = " ".join([x['title'] for x in today_items] + detailed_text_for_summary)
-        # Extract nouns (simple regex for 2+ char hangul/english)
-        words = re.findall(r'[가-힣a-zA-Z]{2,}', all_text)
-        
-        # Stopwords
-        stops = ['리포트', '투자의견', '목표가', '유지', '상향', '하향', '매수', '전망', '분석', '기준', '대비', '지속', '가능성', '예상', '실적', '증권', '투자', '발행']
-        
-        counter = collections.Counter(words)
-        top_keywords = [k for k, v in counter.most_common(10) if k not in stops]
-        summary_text = ", ".join(top_keywords[:7]) if top_keywords else "특이사항 없음"
+        # Improved "Daily Briefing" Generation (Sentence)
+        if pdf_summaries:
+            summary_text = f"오늘의 주요 리포트 분석: {', '.join(pdf_summaries[:3])} 등이 주목받고 있습니다."
+            if len(pdf_summaries) > 3:
+                summary_text += f" 외 {len(pdf_summaries)-3}건의 리포트가 더 있습니다."
+        else:
+            # Fallback to keyword summary if no PDF analysis worked
+            all_text = " ".join([x['title'] for x in today_items] + detailed_text_for_summary)
+            words = re.findall(r'[가-힣a-zA-Z]{2,}', all_text)
+            stops = ['리포트', '투자의견', '목표가', '유지', '상향', '하향', '매수', '전망', '분석', '기준', '대비', '지속', '가능성', '예상', '실적', '증권', '투자', '발행']
+            counter = collections.Counter(words)
+            top_keywords = [k for k, v in counter.most_common(10) if k not in stops]
+            summary_text = f"오늘의 시장 키워드: {', '.join(top_keywords[:7])} 등"
 
-        # Update items in the main list
-        # We need to make sure 'items' list actually has the 'body_summary' updated.
-        # Since 'today_items' are references to dicts in 'items', modifying them works, 
-        # BUT 'items' contains all rows. We only modified the 'today' ones.
-        
         all_data[key] = {
             'today_count': today_count,
             'summary': summary_text,
-            'items': items[:40] # Return top 40 items total
+            'items': items[:40] 
         }
         
     return all_data

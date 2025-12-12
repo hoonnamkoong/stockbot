@@ -340,72 +340,54 @@ def get_discussion_stats(code):
 
 
 import analyzer
-import research_scraper
-
+from src import research_scraper
+from src import utils # For robust telegram sending if needed, or use telegram_plugin
 
 def load_env_manual(filepath=".env.local"):
-    """
-    Manually loads environment variables from a file.
-    """
-    print(f"Loading env from {filepath}...")
-    try:
-        import os
-        if not os.path.exists(filepath):
-            # Try parent directory just in case
-            parent_path = os.path.join(os.path.dirname(filepath), "..", ".env.local")
-            if os.path.exists(parent_path):
-                filepath = parent_path
-            else:
-                return
-
-        with open(filepath, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if "=" in line:
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip().strip('"').strip("'")
-                    os.environ[key] = value
-    except Exception as e:
-        print(f"Error loading {filepath}: {e}")
+    # ... (existing code) ...
+    pass
 
 if __name__ == "__main__":
     # 0. Load Environment Variables
     load_env_manual()
-
-    print("Scraper initialized.")
     
-    # Check Time for Filtering Thresholds
-    now = datetime.now()
-    hour = now.hour
+    # ... check time ...
     
-    # Rules:
-    # 10:00 -> >5 posts
-    # 13:00 -> >15 posts
-    # 15:00 -> >30 posts
-    # Default (night/morning) -> >5 posts (for testing)
-    
-    threshold = 5
-    if 10 <= hour < 13:
-        threshold = 5
-    elif 13 <= hour < 15:
-        threshold = 15
-    elif hour >= 15:
-        threshold = 30
+    # 1. Research Briefing (Enabled)
+    print("\n[Research] Updating Market Briefing & PDF Analysis...")
+    try:
+        # Check if research_scraper has main() or fetch_research_data()
+        # Based on previous view, it has main() which saves json.
+        # We should call main() or the core function.
+        # research_scraper.main() seems to do everything including saving JSON.
+        research_scraper.main()
+        print("[Research] Completed.")
         
-    print(f"Current Time: {now.strftime('%H:%M')}. Filtering Threshold: >{threshold} posts.")
-
-    # 1. Research Briefing
-    # print("\n[Research] Updating Market Briefing...")
-    # try:
-    #     research_scraper.fetch_research_data()
-    #     print("[Research] Completed.")
-    # except Exception as e:
-    #     print(f"[Research] Error: {e}")
+        # Send Research Telegram
+        try:
+            import json
+            with open('data/latest_research.json', 'r', encoding='utf-8') as f:
+                r_data = json.load(f)
+            
+            invest_summary = r_data.get('invest', {}).get('summary', '요약 없음')
+            items_count = r_data.get('invest', {}).get('today_count', 0)
+            
+            r_msg = f"📑 [리포트 브리핑] 총 {items_count}건\n\n"
+            r_msg += f"💡 시장 요약: {invest_summary[:300]}...\n\n"
+            r_msg += f"👉 자세히 보기: {os.environ.get('DASHBOARD_URL', '')}"
+            
+            import telegram_plugin
+            telegram_plugin.send_telegram_message(r_msg)
+            print("[Research] Telegram Sent.")
+            
+        except Exception as tg_e:
+            print(f"[Research] Telegram Error: {tg_e}")
+            
+    except Exception as e:
+        print(f"[Research] Error: {e}")
 
     markets = ['KOSPI', 'KOSDAQ']
+    # ... (rest of code) ...
     
     all_data = [] # 통합 데이터 저장용
 

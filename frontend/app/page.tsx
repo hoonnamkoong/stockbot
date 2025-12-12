@@ -252,7 +252,7 @@ export default function Home() {
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                     <IconRobot size={30} color="#228be6" />
-                    <Title order={3}>StockBot V5.3 (Toss & Mobile)</Title>
+                    <Title order={3}>StockBot V5.5 (PDF Tables & Fixes)</Title>
                     <Group ml="auto">
                         <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
                             Control

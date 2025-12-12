@@ -41,16 +41,19 @@ def clean_text(text):
     return re.sub(r'\s+', ' ', text).strip()
 
 # --- 1. Fetch Trending Stocks (Volume Top) ---
-def fetch_top_stocks(limit=100):
-    """Fetches Top N stocks by volume from KOSPI & KOSDAQ."""
+def fetch_top_stocks(limit=60):
+    """Fetches Top N stocks by volume from KOSPI & KOSDAQ (Excluding ETFs/ETNs/SPACs)."""
     stocks = []
     # Using 'sise_quant.naver' for Volume Top
     urls = {
         'KOSPI': f"{NAVER_FINANCE_URL}/sise/sise_quant.naver?sosok=0",
         'KOSDAQ': f"{NAVER_FINANCE_URL}/sise/sise_quant.naver?sosok=1"
     }
+    
+    # Filter keywords for ETFs, ETNs, SPACs
+    EXCLUDE_KEYWORDS = ['KODEX', 'TIGER', 'KBSTAR', 'ACE', 'SOL', 'KOSEF', 'HANARO', 'ARIRANG', 'TIMEFOLIO', 'WOORI', 'FOCUS', 'ETN', '스팩', '인버스', '레버리지']
 
-    print(f"Fetching Top {limit} stocks...", flush=True)
+    print(f"Fetching Top {limit} stocks (excluding ETFs)...", flush=True)
 
     for market, url in urls.items():
         try:
@@ -76,6 +79,12 @@ def fetch_top_stocks(limit=100):
                     code = name_node['href'].split('code=')[-1]
                     name = name_node.text.strip()
                     
+                    # --- FILTER CHECK ---
+                    is_excluded = any(k in name for k in EXCLUDE_KEYWORDS)
+                    if is_excluded:
+                        continue
+                    # --------------------
+                    
                     price = cols[2].text.strip().replace(',', '')
                     prev_price_raw = cols[3].text.strip().replace(',', '') # Check logic
                     rate = cols[4].text.strip()
@@ -90,7 +99,7 @@ def fetch_top_stocks(limit=100):
                         'volume': volume
                     })
                     count += 1
-                    if count >= limit // 2: # ~50 per market
+                    if count >= limit // 2: 
                         break
 
                 except Exception as e:
@@ -246,8 +255,7 @@ def main():
     print(f"Threshold: > {threshold} posts", flush=True)
     
     # 2. Fetch Base List
-    # Limit to 100 for faster check, can increase later
-    candidates = fetch_top_stocks(limit=100) 
+    candidates = fetch_top_stocks(limit=60) 
     print(f"Candidates: {len(candidates)}", flush=True)
     
     final_results = []

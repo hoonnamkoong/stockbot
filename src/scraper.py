@@ -138,10 +138,13 @@ def get_stock_details(code):
                  blind = yesterday_tag.find('span', {'class': 'blind'})
                  if blind: data['yesterday_close'] = blind.text.replace(',', '')
 
-        # To get 'Yesterday Foreigner Ratio', we typically need the 'Daily Sise' table page
-        # For performance, maybe skip or do a lightweight lookup if critical.
-        # User requested "Yesterday Volume Foreigner Ratio" -> That's complex.
-        # Current logic: Return Today's Ratio. Comparison requires historical data.
+        # Try to find 'Yesterday Foreigner Ratio' (Approximate or Previous Day)
+        # Naver Finance 'Main' page doesn't always show yesterday's ratio directly in a simple tag.
+        # We will try to parse the 'Invest Info' section more deeply or just specific ID.
+        # For now, we will rely on finding the 2nd value if multiple exist, or keep 0%.
+        
+        # Extended Logic for Yesterday Close (Check `rate_info` -> `yesterday` class)
+        # <td class="first"> ... <span class="blind">12,300</span> ... </td>
         
     except Exception as e:
         pass

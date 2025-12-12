@@ -7,229 +7,248 @@ import re
 import collections
 from collections import Counter
 import pdf_analyzer
+import time
 
+# --- CONSTANTS ---
 NAVER_FINANCE_URL = "https://finance.naver.com"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 SECTIONS = {
-    'invest': '/research/invest_list.naver', # 투자정보 리포트
-    'company': '/research/company_list.naver', # 종목분석
-    'industry': '/research/industry_list.naver', # 산업분석
-    'economy': '/research/economy_list.naver' # 경제분석
+    'invest': '/research/invest_list.naver',
+    'company': '/research/company_list.naver',
+    'industry': '/research/industry_list.naver',
+    'economy': '/research/economy_list.naver'
 }
+
+DEBUG_LOG = []
+
+def log(msg):
+    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+    entry = f"[{timestamp}] {msg}"
+    print(entry, flush=True)
+    DEBUG_LOG.append(entry)
 
 def get_headers():
     return {'User-Agent': USER_AGENT}
 
+def robust_fetch_body(link):
+    """
+    Fetches the detail page and extracts body text using a heuristic approach.
+    Strategy: Find the Title (th.view_sbj), then finding the largest text block in the same container.
+    """
+    try:
+        log(f"   > Fetching Detail: {link}")
+        res = requests.get(link, headers=get_headers())
+        res.encoding = 'EUC-KR'
+        soup = BeautifulSoup(res.text, 'html.parser')
+
+        # Strategy 1: Find the 'view_sbj' TH, then look for the table, then the largest TD
+        subject_th = soup.find('th', class_='view_sbj')
+        if subject_th:
+            # Go up to the table
+            table = subject_th.find_parent('table')
+            if table:
+                # Find all TDs in this table
+                tds = table.find_all('td')
+                # Sort by text length, descending
+                tds_sorted = sorted(tds, key=lambda x: len(x.get_text(strip=True)), reverse=True)
+                
+                if tds_sorted:
+                    # The longest TD is likely the body content
+                    best_match = tds_sorted[0]
+                    text = best_match.get_text(separator=" ", strip=True)
+                    log(f"   > Found Body Content (Length: {len(text)})")
+                    return text
+        
+        # Strategy 2: Fallback to common classes (if strategy 1 fails)
+        candidates = ['view_con', 'view_content', 'scr01']
+        for cls in candidates:
+            div = soup.find('div', class_=cls)
+            if div:
+                text = div.get_text(separator=" ", strip=True)
+                log(f"   > Found Body Content via class '{cls}' (Length: {len(text)})")
+                return text
+                
+        log("   > WARNING: Could not extract body content.")
+        return ""
+
+    except Exception as e:
+        log(f"   > ERROR fetching detail: {e}")
+        return ""
+
+def summarize_text(text):
+    """
+    Simple extractive summarization:
+    - Split into sentences.
+    - Select top 5 sentences based on length and keywords.
+    """
+    if not text: return ""
+    
+    # Clean text
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Split sentences (naive)
+    sentences = re.split(r'(?<=[.?!])\s+', text)
+    
+    unique_sentences = []
+    seen = set()
+    for s in sentences:
+        s_clean = s.strip()
+        if len(s_clean) > 20 and s_clean not in seen:
+            unique_sentences.append(s_clean)
+            seen.add(s_clean)
+            
+    # Take up to 5 sentences
+    summary = " ".join(unique_sentences[:5])
+    return summary
+
 def fetch_section_reports(section_key):
-    url = f"{NAVER_FINANCE_URL}{SECTIONS[section_key]}" # Define url here
-    reports = [] # Initialize reports list
-    print(f"Fetching {url}", flush=True)
+    url = f"{NAVER_FINANCE_URL}{SECTIONS[section_key]}"
+    log(f"--- Processing Section: {section_key} ---")
+    
+    reports = []
     try:
         res = requests.get(url, headers=get_headers())
         res.encoding = 'EUC-KR'
-        print(f"[{section_key}] Status: {res.status_code}", flush=True)
-        
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # Try finding table with class 'type_1' first, then any table
-        table = soup.find('table', {'class': 'type_1'})
+        table = soup.find('table', class_='type_1')
         if not table:
-            print(f"[{section_key}] 'type_1' table not found. Searching all tables...", flush=True)
-            tables = soup.find_all('table')
-            if not tables:
-                print(f"[{section_key}] No tables found in HTML!", flush=True)
-                # print(res.text[:500], flush=True) # Debug HTML
-                return []
-            table = tables[0] # Use the first table as fallback
+            log(f"ERROR: No table found for {section_key}")
+            return []
             
         rows = table.find_all('tr')
-        print(f"[{section_key}] Found {len(rows)} rows", flush=True)
         today_str = datetime.datetime.now().strftime("%y.%m.%d")
         
         for row in rows:
             cols = row.find_all('td')
-            # Naver Research table usually has 2 empty tds for spacing, identifying real rows
             if len(cols) < 2: continue
             
-            try:
-                # Structure varies. Typically:
-                # Company: [Company] Title | Writer | Source | PDF | Date
-                # Economy: Title | Writer | Source | PDF | Date
+            # Extract Date
+            date_text = ""
+            for col in cols:
+                txt = col.get_text(strip=True)
+                if re.match(r'^\d{2}\.\d{2}\.\d{2}$', txt):
+                    date_text = txt
+                    break
+            
+            # Extract Title & Link
+            title_node = row.find('a', href=True)
+            if not title_node: continue
+            
+            title = title_node.get_text(strip=True)
+            link_href = title_node['href']
+            
+            # Normalize Link
+            if link_href.startswith('/'):
+                link = f"{NAVER_FINANCE_URL}{link_href}"
+            else:
+                link = f"{NAVER_FINANCE_URL}/research/{link_href}" # Fallback
                 
-                # Find Date Column (Robust Search)
-                date_text = ""
-                for col in cols:
-                    txt = col.text.strip()
-                    # Match format 24.12.12
-                    if re.match(r'^\d{2}\.\d{2}\.\d{2}$', txt):
-                        date_text = txt
-                        print(f"  Extracted date: {date_text}", flush=True) # Debugging log
-                        break
-                
-                if not date_text:
-                    # Fallback: Check if valid date is in the last column (sometimes)
-                    # print(f"  [Skip] No date found in row", flush=True)
-                    continue
-                
-                # Naver date format: 25.12.12
-                # If we want ONLY today's reports:
-                # if date_text != today_str: continue 
-                
-                # Title & Link
-                title_node = row.find('a', {'href': True})
-                # Sometimes title is in 2nd column
-                if not title_node: 
-                    # Try finding in specific columns
-                    for c in cols:
-                         t = c.find('a', {'href': True})
-                         if t and 'research' in t['href']:
-                             title_node = t
-                             break
-                             
-                if not title_node: continue
-                
-                href = title_node['href']
-                if not href.startswith('/'):
-                    href = '/' + href
-                link = f"{NAVER_FINANCE_URL}{href}"
-                title = title_node.text.strip()
-                
-                # PDF Link
-                pdf_node = row.find('a', {'class': 'file'})
-                pdf_link = ""
-                if pdf_node:
-                    pdf_link = pdf_node['href']
-                    
-                reports.append({
-                    'title': title,
-                    'link': link,
-                    'date': date_text,
-                    'pdf_link': pdf_link,
-                    'section': section_key
-                })
-                
-            except Exception:
-                continue
-                
+            # Extract PDF Link (CORRECTED SELECTOR)
+            pdf_link = ""
+            file_td = row.find('td', class_='file')
+            if file_td:
+                pdf_a = file_td.find('a', href=True)
+                if pdf_a:
+                    pdf_link = pdf_a['href']
+            
+            reports.append({
+                'title': title,
+                'link': link,
+                'date': date_text,
+                'pdf_link': pdf_link,
+                'section': section_key
+            })
+            
     except Exception as e:
-        print(f"Error fetching {section_key}: {e}")
+        log(f"Error scraping {section_key}: {e}")
         
     return reports
 
-def fetch_report_details(link):
-    try:
-        res = requests.get(link, headers=get_headers())
-        res.encoding = 'EUC-KR'
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        view_con = soup.find('div', {'class': 'view_con'})
-        if view_con:
-            raw_text = view_con.get_text(separator=" ", strip=True)
-            
-            # Simple Extractive Summarization Logic
-            # 1. Split into sentences
-            sentences = re.split(r'(?<=[.?!])\s+', raw_text)
-            
-            # 2. Keywords for scoring
-            keywords = ['전망', '기대', '상향', '하향', '유지', '매수', '실적', '개선', '성장', '감소', '증가', '판단', '결론', '요약']
-            
-            scored_sentences = []
-            for i, sent in enumerate(sentences):
-                score = 0
-                # Give weight to first and last sentences (often intro/conclusion)
-                if i == 0: score += 2
-                if i == len(sentences) - 1: score += 2
-                
-                # Check keywords
-                for k in keywords:
-                    if k in sent:
-                        score += 1
-                
-                # Penalize too short/long noise
-                if len(sent) < 10 or len(sent) > 150:
-                    score -= 5
-                    
-                scored_sentences.append((score, i, sent))
-            
-            # 3. Select top 3-5 sentences
-            scored_sentences.sort(key=lambda x: x[0], reverse=True)
-            top_sentences = sorted(scored_sentences[:5], key=lambda x: x[1]) # Restore original order
-            
-            summary = " ".join([s[2] for s in top_sentences])
-            return summary
-            
-        return ""
-    except Exception as e:
-        print(f"Error fetching details for {link}: {e}")
-        return ""
-
-def fetch_all_research():
-    print("Fetching Research Reports...")
-    all_data = {}
+def main():
+    log("=== StockBot Research Scraper Started ===")
     
+    all_data = {}
     today_str = datetime.datetime.now().strftime("%y.%m.%d")
     
+    # 1. Collect Valid Items
     for key in SECTIONS:
-        print(f" - {key}...")
         items = fetch_section_reports(key)
         
-        # Filter Today's items
+        # Filter Today
         today_items = [x for x in items if x['date'] == today_str]
-        today_count = len(today_items)
+        log(f"[{key}] Found {len(items)} items, {len(today_items)} from today.")
         
-
-        # Fetch Details & PDF Analysis for Top 10 Today's Items
-        print(f"   Fetching details & analyzing PDF for top {min(len(today_items), 10)} items...", flush=True)
-        detailed_text_for_summary = []
-        pdf_summaries = []
+        # Process Today's Items (Limit to top 10 for performance)
+        processed_items = []
+        full_texts_for_briefing = []
         
-        for i, item in enumerate(today_items):
-            if i < 10:
-                # 1. Fetch HTML Body (for Quick Look)
-                body = fetch_report_details(item['link'])
-                item['body_summary'] = body
-                if body:
-                    detailed_text_for_summary.append(body)
-                
-                # 2. Analyze PDF (for Deep Dive)
-                if item.get('pdf_link'):
-                    print(f"     Analyzing PDF for {item['title']}...", flush=True)
+        for i, item in enumerate(today_items[:10]):
+            log(f"Processing ({i+1}/{len(today_items[:10])}): {item['title']}")
+            
+            # Fetch Body
+            body = robust_fetch_body(item['link'])
+            item['body_summary'] = summarize_text(body)
+            if body:
+                full_texts_for_briefing.append(body)
+            
+            # PDF Analysis
+            if item.get('pdf_link'):
+                log(f"   > Analyzing PDF: {item['pdf_link']}")
+                try:
+                    # Assuming pdf_analyzer.analyze_pdf works or returns None
                     pdf_result = pdf_analyzer.analyze_pdf(item['pdf_link'])
                     if pdf_result:
                         item['pdf_analysis'] = pdf_result
-                        # Add to daily briefing context
-                        if pdf_result['opinion'] != 'N/A':
-                            pdf_summaries.append(f"{item['title']}({pdf_result['opinion']}, TP:{pdf_result['target_price']})")
-            else:
-                item['body_summary'] = "요약 없음 (시간 제한)"
+                        log("   > PDF Analysis Success")
+                    else:
+                        log("   > PDF Analysis Returned Empty")
+                except Exception as e:
+                    log(f"   > PDF Analysis Failed: {e}")
+            
+            processed_items.append(item)
+            time.sleep(0.5) # Polite delay
+            
+        # Create Section Summary (Contextual)
+        section_summary = f"오늘의 시장 키워드: {', '.join(extract_keywords(full_texts_for_briefing))}"
         
-        # Improved "Daily Briefing" Generation (Sentence)
-        if pdf_summaries:
-            summary_text = f"오늘의 주요 리포트 분석: {', '.join(pdf_summaries[:3])} 등이 주목받고 있습니다."
-            if len(pdf_summaries) > 3:
-                summary_text += f" 외 {len(pdf_summaries)-3}건의 리포트가 더 있습니다."
-        else:
-            # Fallback to keyword summary if no PDF analysis worked
-            all_text = " ".join([x['title'] for x in today_items] + detailed_text_for_summary)
-            words = re.findall(r'[가-힣a-zA-Z]{2,}', all_text)
-            stops = ['리포트', '투자의견', '목표가', '유지', '상향', '하향', '매수', '전망', '분석', '기준', '대비', '지속', '가능성', '예상', '실적', '증권', '투자', '발행']
-            counter = collections.Counter(words)
-            top_keywords = [k for k, v in counter.most_common(10) if k not in stops]
-            summary_text = f"오늘의 시장 키워드: {', '.join(top_keywords[:7])} 등"
-
         all_data[key] = {
-            'today_count': today_count,
-            'summary': summary_text,
-            'items': items[:40] 
+            'today_count': len(today_items),
+            'summary': section_summary,
+            'items': processed_items # Save processed items
         }
+
+    # Save to JSON
+    # Ensure directory exists
+    os.makedirs('data', exist_ok=True)
+    
+    with open('data/latest_research.json', 'w', encoding='utf-8') as f:
+        json.dump(all_data, f, ensure_ascii=False, indent=2)
         
-    return all_data
+    log("=== Scraper Completed Successfully ===")
+    
+    # Save Log
+    with open('data/scraper_debug.log', 'w', encoding='utf-8') as f:
+        f.write("\n".join(DEBUG_LOG))
+
+def extract_keywords(text_list):
+    """ Simple keyword extraction from a list of texts """
+    if not text_list: return ["데이터 없음"]
+    
+    combined = " ".join(text_list)
+    words = re.findall(r'\w{2,}', combined)
+    
+    # Filter common stopwords
+    stop_words = set(['대한', '위해', '통해', '있는', '가장', '경우', '있다', '것으로', '한다', '지난', '같은'])
+    words = [w for w in words if w not in stop_words]
+    
+    counter = Counter(words)
+    return [stat[0] for stat in counter.most_common(7)]
 
 if __name__ == "__main__":
-    data = fetch_all_research()
-    
-    os.makedirs("data", exist_ok=True)
-    with open("data/latest_research.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        
-    print("Saved research data.")
+    try:
+        main()
+    except Exception as e:
+        log(f"CRITICAL MAIN ERROR: {e}")
+        # Print log before crashing
+        for l in DEBUG_LOG: print(l)

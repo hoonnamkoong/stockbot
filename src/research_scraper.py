@@ -249,14 +249,14 @@ def main():
             body = robust_fetch_body(item['link'])
             item['body_summary'] = summarize_text(body)
             
-            # PDF Analysis
-            if item.get('pdf_link'):
-                try:
-                    pdf_result = pdf_analyzer.analyze_pdf(item['pdf_link'])
-                    if pdf_result:
-                        item['pdf_analysis'] = pdf_result
-                except Exception as e:
-                    log(f"     PDF Error: {e}")
+            # PDF Analysis (DISABLED per user request V6.0)
+            # if item.get('pdf_link'):
+            #     try:
+            #         pdf_result = pdf_analyzer.analyze_pdf(item['pdf_link'])
+            #         if pdf_result:
+            #             item['pdf_analysis'] = pdf_result
+            #     except Exception as e:
+            #         log(f"     PDF Error: {e}")
             
             processed_items.append(item)
             time.sleep(0.3)

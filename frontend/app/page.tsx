@@ -397,24 +397,37 @@ export default function Home() {
             </Modal>
 
             {/* Research List Modal */}
-            <Modal opened={researchModalOpened} onClose={closeResearchModal} title="리포트 목록 (오늘)" centered size="lg">
-                <ScrollArea h={400}>
-                    {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
-                        research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                            <Paper key={idx} withBorder p="sm" mb="sm">
-                                <Text fw={700} size="sm">{item.title}</Text>
-                                <Group mt="xs">
-                                    <Text size="xs" c="dimmed">{item.date}</Text>
-                                    <Button component="a" href={item.link} target="_blank" size="compact-xs" variant="light">Naver View</Button>
-                                    {item.pdf_link && <Button component="a" href={item.pdf_link} target="_blank" size="compact-xs" color="red" variant="outline">PDF</Button>}
-                                    <Button size="compact-xs" color="grape" variant="subtle" onClick={() => alert("AI 요약 기능은 준비 중입니다.")}>AI 요약</Button>
-                                </Group>
-                            </Paper>
-                        ))
-                    ) : (
-                        <Text ta="center" c="dimmed" py="xl">오늘 올라온 리포트가 없습니다.</Text>
-                    )}
-                </ScrollArea>
+            <Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="lg">
+                {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
+                    <>
+                        <Paper withBorder p="md" mb="md" bg="blue.0">
+                            <Text fw={700} size="sm" c="blue.8">📊 오늘의 핵심 키워드 (AI 요약)</Text>
+                            <Text size="sm">{research[selectedResearchCategory].summary}</Text>
+                        </Paper>
+                        <ScrollArea h={400}>
+                            {research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                                <Paper key={idx} withBorder p="sm" mb="sm">
+                                    <Text fw={700} size="sm">{item.title}</Text>
+                                    <Group mt="xs" mb="xs">
+                                        <Badge size="xs" color="gray" variant="outline">{item.date}</Badge>
+                                        <Button component="a" href={item.link} target="_blank" size="compact-xs" variant="light">본문 보기</Button>
+                                        {item.pdf_link && <Button component="a" href={item.pdf_link} target="_blank" size="compact-xs" color="red" variant="outline">PDF 원문</Button>}
+                                    </Group>
+                                    <Group grow gap="xs">
+                                        <Tooltip label="게시물 내용 자동 요약 (준비 중)" withArrow>
+                                            <Button size="compact-xs" variant="subtle" color="gray">📝 게시물 요약</Button>
+                                        </Tooltip>
+                                        <Tooltip label="첨부파일(PDF) 자동 분석 (준비 중)" withArrow>
+                                            <Button size="compact-xs" variant="subtle" color="gray">📂 PDF 요약</Button>
+                                        </Tooltip>
+                                    </Group>
+                                </Paper>
+                            ))}
+                        </ScrollArea>
+                    </>
+                ) : (
+                    <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
+                )}
             </Modal>
         </AppShell>
     );

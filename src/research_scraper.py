@@ -4,10 +4,12 @@ import datetime
 import json
 import os
 import re
+import collections
+from collections import Counter
 
 NAVER_FINANCE_URL = "https://finance.naver.com"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
+SECTIONS = {
     'invest': '/research/invest_list.naver', # 투자정보 리포트
     'company': '/research/company_list.naver', # 종목분석
     'industry': '/research/industry_list.naver', # 산업분석
@@ -18,6 +20,8 @@ def get_headers():
     return {'User-Agent': USER_AGENT}
 
 def fetch_section_reports(section_key):
+    url = f"{NAVER_FINANCE_URL}{SECTIONS[section_key]}" # Define url here
+    reports = [] # Initialize reports list
     print(f"Fetching {url}", flush=True)
     try:
         res = requests.get(url, headers=get_headers())
@@ -107,12 +111,21 @@ def fetch_all_research():
         print(f" - {key}...")
         items = fetch_section_reports(key)
         
-        # Count today's items
-        today_count = sum(1 for x in items if x['date'] == today_str)
+        # Count today's items & Extract Keywords
+        today_items = [x for x in items if x['date'] == today_str]
+        today_count = len(today_items)
         
+        # Simple Keyword Extraction for "Overall Summary"
+        all_text = " ".join([x['title'] for x in today_items])
+        words = re.findall(r'[가-힣a-zA-Z]{2,}', all_text)
+        counter = collections.Counter(words)
+        top_keywords = [k for k, v in counter.most_common(5) if k not in ['리포트', '투자의견', '목표가', '유지', '상향', '하향']]
+        summary_text = ", ".join(top_keywords) if top_keywords else "특이사항 없음"
+
         all_data[key] = {
             'today_count': today_count,
-            'items': items[:20] # Store top 20 latest
+            'summary': summary_text,
+            'items': items[:30] # Top 30
         }
         
     return all_data

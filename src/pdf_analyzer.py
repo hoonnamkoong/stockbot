@@ -115,40 +115,87 @@ def analyze_pdf(pdf_url, web_body_text=""):
     try:
         reader = PdfReader(stream_for_pypdf)
         for i in range(min(2, len(reader.pages))):
-            match = re.search(f"({kw})\s+([\d\.,\s]+)", cleaned_text)
-            if match:
-                val_str = match.group(2).strip()
-                # Check if it looks like a sequence of data
-                if len(val_str.split()) >= 2: 
-                     extracted_rows.append(f"| {kw} | {val_str} |")
+            extracted = reader.pages[i].extract_text()
+            if extracted: full_text += extracted + "\n"
+    except Exception as e:
+        print(f"PyPDF Error: {e}")
 
-        if extracted_rows:
-            table_md = "\n\n### 📊 주요 재무 데이터 (추정)\n| 항목 | 데이터 (연도별 추이) |\n|---|---|\n" + "\n".join(extracted_rows)
-            final_summary += table_md
-
-        # Fallback: If no structure found, use Web Body or raw text
-        if not final_summary.strip():
-            if web_body_text:
-                final_summary = f"[웹 본문 기반 요약]\n{web_body_text[:500]}..."
-            else:
-                final_summary = cleaned_text[:500] + "..."
-
-        # 4. Inject Glossary
-        used_glossary = []
-        for term, desc in GLOSSARY.items():
-            if term in final_summary or term in cleaned_text:
-                used_glossary.append(f"❓ {term}: {desc}")
-        
-        if used_glossary:
-            final_summary += "\n\n" + "\n".join(used_glossary)
-
-        return {
-            "opinion": opinion,
-            "target_price": tp,
-            "summary": final_summary,
-            "raw_text_snippet": cleaned_text[:300] + "..."
+    # 2. Table Extraction (pdfplumber - Visuals)
+    extracted_tables = extract_tables_from_pdf(stream_for_plumber)
+    
+    if not full_text.strip():
+         return {
+            "opinion": "N/A",
+            "target_price": "N/A",
+            "summary": "텍스트 추출 불가 (이미지 스캔본일 수 있음). 우측 웹 요약을 참고해주세요.",
+            "tables": []
         }
 
-    except Exception as e:
-        print(f"PDF Parsing Error: {e}")
-        return None
+    # Parsing Logic
+    cleaned_text = clean_pdf_text(full_text)
+    
+    # ... (Rest of parsing logic for Opinion/TP/Structure) ...
+    opinion = "N/A"
+    match = re.search(r'(BUY|SELL|HOLD|Reduce|매수|중립|매도)', cleaned_text, re.IGNORECASE)
+    if match: opinion = match.group(1).upper()
+        
+    tp = "N/A"
+    match_tp = re.search(r'(목표주가|Target Price|TP)\D{0,10}([\d,]+)', cleaned_text, re.IGNORECASE)
+    if match_tp: tp = match_tp.group(2) + "원"
+
+    # Structure Extraction
+    summary_points = []
+    header_map = {
+        '투자포인트': '💡 핵심 투자 포인트',
+        'Investment Point': '💡 핵심 투자 포인트',
+        '체크포인트': '💡 핵심 투자 포인트',
+        '결론': '📌 결론',
+        'Conclusion': '📌 결론',
+        'Valuation': '📊 밸류에이션',
+        '리스크': '⚠️ 리스크 요인'
+    }
+    
+    sentences = cleaned_text.split('. ')
+    current_section = None
+    
+    for sent in sentences:
+        sent = sent.strip()
+        if len(sent) < 10: continue
+        
+        found_header = False
+        for key, label in header_map.items():
+            if key in sent:
+                current_section = label
+                summary_points.append(f"\n{current_section}")
+                found_header = True
+                break
+        
+        if not found_header and current_section:
+            summary_points.append(f"- {sent}.")
+            
+        if len(summary_points) > 15: break
+        
+    final_summary = "\n".join(summary_points)
+    
+    if not final_summary.strip():
+        if web_body_text:
+            final_summary = f"[웹 본문 기반 요약]\n{web_body_text[:500]}..."
+        else:
+            final_summary = cleaned_text[:500] + "..."
+
+    # Inject Glossary
+    used_glossary = []
+    for term, desc in GLOSSARY.items():
+        if term in final_summary or term in cleaned_text:
+            used_glossary.append(f"❓ {term}: {desc}")
+            
+    if used_glossary:
+        final_summary += "\n\n📚 용어 설명:\n" + "\n".join(used_glossary)
+
+    return {
+        "opinion": opinion,
+        "target_price": tp,
+        "summary": final_summary,
+        "tables": extracted_tables,
+        "raw_text_snippet": cleaned_text[:300] + "..."
+    }

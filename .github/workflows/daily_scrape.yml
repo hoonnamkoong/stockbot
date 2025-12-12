@@ -1,0 +1,54 @@
+name: Daily Stock Scrape
+
+on:
+  schedule:
+    # KST is UTC+9.
+    # 10:00 KST -> 01:00 UTC
+    # 13:00 KST -> 04:00 UTC
+    # 15:00 KST -> 06:00 UTC
+    - cron: '0 1 * * 1-5'
+    - cron: '0 4 * * 1-5'
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Important for pushing data back
+      
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          
+      - name: Run Scraper
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          python src/scraper.py
+          python src/research_scraper.py
+          
+      - name: Commit & Push Data
+        run: |
+          git config --global user.name "StockBot"
+          git config --global user.email "bot@example.com"
+          
+          git add data/latest_stocks.json data/latest_research.json
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "data: Update stocks and research"
+            git push
+          fi

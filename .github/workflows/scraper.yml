@@ -1,0 +1,55 @@
+name: Stock Scraper Schedule
+
+on:
+  schedule:
+    # UTC Times: KST - 9 hours
+    # 10:00 KST -> 01:00 UTC
+    # 13:00 KST -> 04:00 UTC
+    # 15:00 KST -> 06:00 UTC
+    - cron: '0 1 * * 1-5'
+    - cron: '0 4 * * 1-5'
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  scrape-and-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout content
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install openpyxl
+
+      - name: Run Scraper
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Dashboard URL for the notification link
+          DASHBOARD_URL: "https://your-vercel-app-url.vercel.app" 
+        run: |
+          python scraper.py
+
+      - name: Commit and Push Data
+        run: |
+          git config --global user.name "StockBot"
+          git config --global user.email "bot@example.com"
+          git add research_latest.json trending_*.csv
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "data: Update stock data and research reports"
+            git push
+          fi

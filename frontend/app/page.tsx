@@ -429,7 +429,7 @@ export default function Home() {
                 )}
 
 
-                {/* DEBUG CONSOLE */}
+                {/* DEBUG CONSOLE (Hidden by User Request V6.3)
                 <Paper withBorder p="md" mt="xl" bg="gray.0">
                     <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
                     <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
@@ -442,6 +442,7 @@ export default function Home() {
                         </div>
                     </ScrollArea>
                 </Paper>
+                */}
             </AppShell.Main >
 
             {/* Scraper Control Modal */}

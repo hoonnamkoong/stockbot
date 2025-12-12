@@ -347,6 +347,11 @@ def main():
             if len(final_results) > 5:
                 msg += f"\n...and {len(final_results)-5} more."
                 
+            # Dashboard URL
+            dashboard_url = os.environ.get('DASHBOARD_URL', '')
+            if dashboard_url:
+                 msg += f"\n\n📊 Dashboard: {dashboard_url}"
+                
             send_telegram_message(msg)
             
         except ImportError:

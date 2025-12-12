@@ -237,6 +237,18 @@ def analyze_board(code, threshold=0):
     n_score = sum(1 for w in filtered_words if w in ['하한가', '폭락', '악재', '매도', '손절', '개미'])
     
     sentiment = "보통"
+    # Summary: Top 5 unique titles
+    unique_titles = []
+    seen = set()
+    for t in collected_titles:
+        cleaned = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', t).strip()
+        if len(cleaned) > 5 and cleaned not in seen:
+            seen.add(cleaned)
+            unique_titles.append(t)
+            if len(unique_titles) >= 5: break
+            
+    summary = " \\n ".join(unique_titles) if unique_titles else "No discussion."
+    
     if p_score > n_score: sentiment = "긍정"
     if n_score > p_score: sentiment = "부정"
 
@@ -255,7 +267,7 @@ def main():
     print(f"Threshold: > {threshold} posts", flush=True)
     
     # 2. Fetch Base List
-    candidates = fetch_top_stocks(limit=4) 
+    candidates = fetch_top_stocks(limit=2) 
     print(f"Candidates: {len(candidates)}", flush=True)
     
     final_results = []

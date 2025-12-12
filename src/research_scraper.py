@@ -55,9 +55,20 @@ def fetch_section_reports(section_key):
                 # Company: [Company] Title | Writer | Source | PDF | Date
                 # Economy: Title | Writer | Source | PDF | Date
                 
-                # Check Date Column (usually last or second last)
-                date_node = cols[-1] # Sometimes view count is last? No, usually date.
-                date_text = date_node.text.strip()
+                # Find Date Column (Robust Search)
+                date_text = ""
+                for col in cols:
+                    txt = col.text.strip()
+                    # Match format 24.12.12
+                    if re.match(r'^\d{2}\.\d{2}\.\d{2}$', txt):
+                        date_text = txt
+                        print(f"  Extracted date: {date_text}", flush=True) # Debugging log
+                        break
+                
+                if not date_text:
+                    # Fallback: Check if valid date is in the last column (sometimes)
+                    # print(f"  [Skip] No date found in row", flush=True)
+                    continue
                 
                 # Naver date format: 25.12.12
                 # If we want ONLY today's reports:

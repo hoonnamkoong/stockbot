@@ -112,6 +112,24 @@ def fetch_section_reports(section_key):
         
     return reports
 
+def fetch_report_details(link):
+    try:
+        res = requests.get(link, headers=get_headers())
+        res.encoding = 'EUC-KR'
+        soup = BeautifulSoup(res.text, 'html.parser')
+        
+        # Naver Research usually sends the user to a view page
+        # The content is often in <div class="view_con">
+        view_con = soup.find('div', {'class': 'view_con'})
+        if view_con:
+            text = view_con.get_text(separator=" ", strip=True)
+            return text[:400] + "..." if len(text) > 400 else text
+            
+        return ""
+    except Exception as e:
+        print(f"Error fetching details for {link}: {e}")
+        return ""
+
 def fetch_all_research():
     print("Fetching Research Reports...")
     all_data = {}
@@ -122,21 +140,45 @@ def fetch_all_research():
         print(f" - {key}...")
         items = fetch_section_reports(key)
         
-        # Count today's items & Extract Keywords
+        # Filter Today's items
         today_items = [x for x in items if x['date'] == today_str]
         today_count = len(today_items)
         
-        # Simple Keyword Extraction for "Overall Summary"
-        all_text = " ".join([x['title'] for x in today_items])
+        # Fetch Details for Top 15 Today's Items (to save time)
+        print(f"   Fetching details for top {min(len(today_items), 15)} items...", flush=True)
+        detailed_text_for_summary = []
+        
+        for i, item in enumerate(today_items):
+            if i < 15:
+                # Fetch body content
+                body = fetch_report_details(item['link'])
+                item['body_summary'] = body
+                if body:
+                    detailed_text_for_summary.append(body)
+            else:
+                item['body_summary'] = "요약 없음 (시간 제한)"
+        
+        # Improved Keyword Extraction from BODY text
+        all_text = " ".join([x['title'] for x in today_items] + detailed_text_for_summary)
+        # Extract nouns (simple regex for 2+ char hangul/english)
         words = re.findall(r'[가-힣a-zA-Z]{2,}', all_text)
+        
+        # Stopwords
+        stops = ['리포트', '투자의견', '목표가', '유지', '상향', '하향', '매수', '전망', '분석', '기준', '대비', '지속', '가능성', '예상', '실적', '증권', '투자', '발행']
+        
         counter = collections.Counter(words)
-        top_keywords = [k for k, v in counter.most_common(5) if k not in ['리포트', '투자의견', '목표가', '유지', '상향', '하향']]
-        summary_text = ", ".join(top_keywords) if top_keywords else "특이사항 없음"
+        top_keywords = [k for k, v in counter.most_common(10) if k not in stops]
+        summary_text = ", ".join(top_keywords[:7]) if top_keywords else "특이사항 없음"
 
+        # Update items in the main list
+        # We need to make sure 'items' list actually has the 'body_summary' updated.
+        # Since 'today_items' are references to dicts in 'items', modifying them works, 
+        # BUT 'items' contains all rows. We only modified the 'today' ones.
+        
         all_data[key] = {
             'today_count': today_count,
             'summary': summary_text,
-            'items': items[:30] # Top 30
+            'items': items[:40] # Return top 40 items total
         }
         
     return all_data

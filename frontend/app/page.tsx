@@ -1,261 +1,327 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import {
-    AppShell, Burger, Group, Title, Button, Table, ScrollArea,
-    Card, Text, Badge, Modal, Stack, Grid, Box, ActionIcon,
-    useMantineTheme
-} from '@mantine/core';
+import { useState, useEffect } from 'react';
+import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
-import { IconRefresh, IconArrowUp, IconArrowDown, IconFileDescription, IconRobot } from '@tabler/icons-react';
+import { IconRefresh, IconRobot, IconNews } from '@tabler/icons-react';
+import { clsx } from 'clsx';
 
-// --- Data Types ---
-interface Stock {
+// --- Types ---
+type Stock = {
     market: string;
     code: string;
     name: string;
     current_price: string;
+    yesterday_close?: string;
     change_rate: string;
+    volume?: string;
     count_today: number;
+    foreign_ratio_today: string;
     summary: string;
     sentiment: string;
-    foreign_ratio_today: string;
     is_consecutive: boolean;
-}
+};
 
-interface ResearchItem {
-    title: string;
-    link: string;
-    date: string;
-    pdf_link: string;
-    section: string;
-}
-
-// --- Icons ---
+// --- Constants ---
+const REPO_OWNER = "hoonnamkoong";
+const REPO_NAME = "stockbot";
+// Important: File name of workflow must match exactly.
+const WORKFLOW_ID = "daily_scrape.yml";
 
 export default function Home() {
-    const [opened, { toggle }] = useDisclosure(); // Sidebar toggle
-    const isMobile = useMediaQuery('(max-width: 768px)');
-
+    const [opened, { toggle }] = useDisclosure();
     const [stocks, setStocks] = useState<Stock[]>([]);
-    const [research, setResearch] = useState<any>({});
+    const [research, setResearch] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<string>('');
+    const [activeTab, setActiveTab] = useState<string | null>('ALL');
 
-    const [sortKey, setSortKey] = useState<keyof Stock>('count_today');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    // Scraper Control
+    const [controlOpened, { open: openControl, close: closeControl }] = useDisclosure(false);
+    const [githubToken, setGithubToken] = useState('');
+    const [workflowStatus, setWorkflowStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+    const [workflowLogs, setWorkflowLogs] = useState<string[]>([]);
 
-    // Load Data (Simulated fetch from committed JSON)
-    // In production, this would fetch from specific URL or relative path if SSG copies it.
-    // For Vercel Static, we assume data is generated into `public/data` or fetched from GitHub Raw.
-    // OR just fetch local relative path assuming 'cron' commits build the site? 
-    // User asked for "Vercel as Frontend", implying data is external.
-    // Let's use a PLACEHOLDER URL for now, or relative '/data/latest.json' expecting it to be in public.
+    const theme = useMantineTheme();
+    const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
-    const fetchData = async () => {
-        try {
-            // Fetch raw data directly from GitHub (Bypasses Vercel build time limitation)
-            // Cache-busting with timestamp to ensure fresh data
-            const ts = new Date().getTime();
-
-            const resStocks = await fetch(`https://raw.githubusercontent.com/hoonnamkoong/stockbot/main/data/latest_stocks.json?t=${ts}`);
-            if (resStocks.ok) {
-                setStocks(await resStocks.json());
-            }
-
-            const resResearch = await fetch(`https://raw.githubusercontent.com/hoonnamkoong/stockbot/main/data/latest_research.json?t=${ts}`);
-            if (resResearch.ok) {
-                setResearch(await resResearch.json());
-            }
-        } catch (e) {
-            console.error("Failed to load data", e);
-        }
-    };
+    // Research Modal
+    const [researchModalOpened, { open: openResearchModal, close: closeResearchModal }] = useDisclosure(false);
+    const [selectedResearchCategory, setSelectedResearchCategory] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
+        const storedToken = localStorage.getItem('github_pat');
+        if (storedToken) setGithubToken(storedToken);
     }, []);
 
-    // --- Sorting ---
-    const sortedStocks = useMemo(() => {
-        return [...stocks].sort((a, b) => {
-            let valA = a[sortKey];
-            let valB = b[sortKey];
-
-            // Number parsing
-            // 숫자 변환 (콤마 제거)
-            if (typeof valA === 'string' && valA.replace(/,/g, '').match(/^-?\d+(\.\d+)?$/)) {
-                const numA = parseFloat(valA.replace(/,/g, ''));
-                const numB = typeof valB === 'string' ? parseFloat(valB.replace(/,/g, '')) : Number(valB);
-                if (!isNaN(numA) && !isNaN(numB)) {
-                    valA = numA;
-                    valB = numB;
-                }
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const timeMap = new Date().getTime();
+            // Fetch Stocks
+            const resStocks = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/latest_stocks.json?t=${timeMap}`);
+            if (resStocks.ok) {
+                const data = await resStocks.json();
+                setStocks(data);
             }
+            // Fetch Research
+            const resResearch = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/latest_research.json?t=${timeMap}`);
+            if (resResearch.ok) {
+                const data = await resResearch.json();
+                setResearch(data);
+            }
+            setLastUpdated(new Date().toLocaleTimeString());
+        } catch (e) {
+            console.error(e);
+        }
+        setLoading(false);
+    };
 
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [stocks, sortKey, sortOrder]);
+    // --- Scraper Trigger Logic ---
+    const runScraper = async () => {
+        if (!githubToken) {
+            alert("GitHub Personal Access Token (PAT)을 먼저 입력해주세요.");
+            return;
+        }
+        localStorage.setItem('github_pat', githubToken);
+        setWorkflowStatus('running');
+        setWorkflowLogs([]); // Reset logs
+        addLog("🚀 워크플로우 실행 요청 중...");
 
-    const handleSort = (key: keyof Stock) => {
-        if (sortKey === key) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortKey(key);
-            setSortOrder('desc');
+        try {
+            const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_ID}/dispatches`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                },
+                body: JSON.stringify({ ref: 'main' })
+            });
+
+            if (res.ok) {
+                addLog("✅ 요청 전송 성공! 실행 대기 중...");
+                addLog("(GitHub Actions가 켜질 때까지 약 10~20초 소요됩니다)");
+                monitorWorkflow(); // Start polling
+            } else {
+                addLog(`❌ 요청 실패: ${res.status} ${res.statusText}`);
+                setWorkflowStatus('error');
+            }
+        } catch (e: any) {
+            addLog(`❌ 에러 발생: ${e.message}`);
+            setWorkflowStatus('error');
         }
     };
 
-    // --- Research Modal ---
-    const [researchSection, setResearchSection] = useState<string | null>(null);
+    const monitorWorkflow = async () => {
+        let attempts = 0;
+        const interval = setInterval(async () => {
+            attempts++;
+            if (attempts > 30) { // Poll for ~2.5 mins
+                clearInterval(interval);
+                addLog("⚠️ 모니터링 시간 초과 (수동으로 확인해주세요)");
+                setWorkflowStatus('idle');
+                return;
+            }
 
-    // --- Components ---
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?per_page=1`, {
+                    headers: { 'Authorization': `Bearer ${githubToken}` }
+                });
+                if (!res.ok) return;
 
-    const ResearchButton = ({ section, label, color }: any) => {
-        const count = research[section]?.today_count || 0;
-        return (
-            <Button
-                variant="light" color={color || 'blue'}
-                fullWidth
-                rightSection={<Badge color="red" size="sm" circle>{count}</Badge>}
-                onClick={() => setResearchSection(section)}
-            >
-                {label}
-            </Button>
-        )
+                const data = await res.json();
+                if (data.workflow_runs && data.workflow_runs.length > 0) {
+                    const run = data.workflow_runs[0];
+                    addLog(`🔄 상태: ${run.status} (${run.conclusion || 'Running'}) - ${new Date().toLocaleTimeString()}`);
+
+                    if (run.status === 'completed') {
+                        clearInterval(interval);
+                        addLog(run.conclusion === 'success' ? "✨ 실행 성공! 데이터를 갱신합니다." : "❌ 실행 실패. Actions 탭을 확인하세요.");
+                        setWorkflowStatus(run.conclusion === 'success' ? 'success' : 'error');
+                        if (run.conclusion === 'success') {
+                            setTimeout(fetchData, 3000); // Wait a bit for raw CDN update
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }, 5000);
     };
+
+    const addLog = (msg: string) => {
+        setWorkflowLogs(prev => [...prev, msg]);
+    };
+
+
+    // --- Sort Logic for Table ---
+    const [sortedStocks, setSortedStocks] = useState<Stock[]>([]);
+
+    // Default sorting / filtering state
+    useEffect(() => {
+        let filtered = activeTab === 'ALL'
+            ? stocks
+            : stocks.filter(s => s.market === activeTab);
+
+        // Default sort: Count Today DESC
+        filtered.sort((a, b) => b.count_today - a.count_today);
+        setSortedStocks(filtered);
+    }, [stocks, activeTab]);
+
+    // Research Modal Logic
+    const handleResearchClick = (key: string) => {
+        setSelectedResearchCategory(key);
+        openResearchModal();
+    };
+
 
     return (
         <AppShell
             header={{ height: 60 }}
-            navbar={{ width: 250, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+            navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
             padding="md"
         >
             <AppShell.Header>
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                     <IconRobot size={30} color="#228be6" />
-                    <Title order={3}>StockBot Dashboard 2.1 (NEW)</Title>
-                    <Button variant="subtle" size="xs" onClick={fetchData} leftSection={<IconRefresh size={14} />}>
-                        Refresh
-                    </Button>
+                    <Title order={3}>StockBot V3.0</Title>
+                    <Group ml="auto">
+                        <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
+                            Scraper Control
+                        </Button>
+                        <Button variant="subtle" size="xs" onClick={fetchData} leftSection={<IconRefresh size={14} />}>
+                            Refresh
+                        </Button>
+                    </Group>
                 </Group>
             </AppShell.Header>
 
             <AppShell.Navbar p="md">
-                <Stack>
-                    <Text size="sm" fw={500} c="dimmed">Research Reports</Text>
-                    <ResearchButton section="invest" label="투자정보" color="grape" />
-                    <ResearchButton section="company" label="종목분석" color="indigo" />
-                    <ResearchButton section="industry" label="산업분석" color="cyan" />
-                    <ResearchButton section="economy" label="경제분석" color="teal" />
-
-                    <Text size="sm" fw={500} c="dimmed" mt="xl">Control</Text>
-                    <Button variant="outline" color="gray" component="a" href="https://github.com/USER/REPO/actions">
-                        GitHub Actions Link
-                    </Button>
-                </Stack>
+                <Text fw={700} mb="sm">Research Reports</Text>
+                {['invest', 'company', 'industry', 'economy'].map((key) => {
+                    const count = research?.[key]?.today_count || 0;
+                    const labelMap: any = { invest: '투자정보', company: '종목분석', industry: '산업분석', economy: '경제분석' };
+                    return (
+                        <Button
+                            key={key}
+                            fullWidth
+                            variant="light"
+                            mb="xs"
+                            justify="space-between"
+                            onClick={() => handleResearchClick(key)}
+                            rightSection={<Badge color="red" size="sm" circle>{count}</Badge>}
+                        >
+                            {labelMap[key]}
+                        </Button>
+                    );
+                })}
             </AppShell.Navbar>
 
             <AppShell.Main>
-                {/* Mobile Card View */}
-                <Box hiddenFrom="sm">
-                    <Stack>
-                        {sortedStocks.map((s: Stock, i: number) => (
-                            <Card key={i} withBorder shadow="sm" radius="md">
+                <Tabs value={activeTab} onChange={setActiveTab} mb="md">
+                    <Tabs.List>
+                        <Tabs.Tab value="ALL">전체 (ALL)</Tabs.Tab>
+                        <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
+                        <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
+                    </Tabs.List>
+                </Tabs>
+
+                {isMobile ? (
+                    <div className="flex flex-col gap-3">
+                        {sortedStocks.map((stock) => (
+                            <Card key={stock.code} shadow="sm" padding="lg" radius="md" withBorder>
                                 <Group justify="space-between" mb="xs">
-                                    <Text fw={700} size="lg">{s.name}</Text>
-                                    <Badge color={s.count_today >= 60 ? 'red' : 'blue'}>{s.count_today} posts</Badge>
+                                    <Text fw={500}>{stock.name}</Text>
+                                    <Badge color={stock.change_rate.includes('+') ? 'red' : 'blue'}>{stock.change_rate}</Badge>
                                 </Group>
-                                <Group grow gap="xs">
-                                    <Stack gap={0}>
-                                        <Text size="xs" c="dimmed">Current</Text>
-                                        <Text fw={500}>{s.current_price}</Text>
-                                    </Stack>
-                                    <Stack gap={0}>
-                                        <Text size="xs" c="dimmed">Foreigner</Text>
-                                        <Text fw={500}>{s.foreign_ratio_today}</Text>
-                                    </Stack>
+                                <Group gap="xs" mb="xs">
+                                    <Text size="sm" c="dimmed">Posts: <b>{stock.count_today}</b></Text>
+                                    <Text size="sm" c="dimmed">For.: {stock.foreign_ratio_today}</Text>
                                 </Group>
-                                <Text size="sm" mt="sm" lineClamp={2}>{s.summary}</Text>
+                                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.summary}</Text>
                             </Card>
                         ))}
-                    </Stack>
-                </Box>
-
-                {/* Desktop Table View */}
-                <Box visibleFrom="sm">
-                    <ScrollArea type="auto">
+                    </div>
+                ) : (
+                    <ScrollArea>
                         <Table striped highlightOnHover withTableBorder>
                             <Table.Thead>
                                 <Table.Tr>
-                                    <Table.Th
-                                        style={{ position: 'sticky', left: 0, zIndex: 2, background: 'var(--mantine-color-body)' }}
-                                    >
-                                        Name
-                                    </Table.Th>
-                                    <Table.Th onClick={() => handleSort('current_price')}>Price</Table.Th>
-                                    <Table.Th onClick={() => handleSort('change_rate')}>Rate</Table.Th>
-                                    <Table.Th onClick={() => handleSort('count_today')}>Posts (Today)</Table.Th>
-                                    <Table.Th>Foreigner %</Table.Th>
-                                    <Table.Th>Sentiment</Table.Th>
-                                    <Table.Th>Summary</Table.Th>
+                                    <Table.Th style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', zIndex: 1 }}>종목명</Table.Th>
+                                    <Table.Th>현재가</Table.Th>
+                                    <Table.Th>등락률</Table.Th>
+                                    <Table.Th>토론글(오늘)</Table.Th>
+                                    <Table.Th>거래량</Table.Th>
+                                    <Table.Th>외인비율</Table.Th>
+                                    <Table.Th>감성분석</Table.Th>
+                                    <Table.Th>요약</Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
-                                {sortedStocks.map((s: Stock, i: number) => (
-                                    <Table.Tr key={i}>
-                                        <Table.Td
-                                            fw={700}
-                                            style={{ position: 'sticky', left: 0, zIndex: 1, background: 'var(--mantine-color-body)', borderRight: '1px solid #dee2e6' }}
-                                        >
-                                            {s.name}
+                                {sortedStocks.map((stock) => (
+                                    <Table.Tr key={stock.code}>
+                                        <Table.Td style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', fontWeight: 'bold' }}>
+                                            {stock.name} ({stock.code})
                                         </Table.Td>
-                                        <Table.Td>{s.current_price}</Table.Td>
-                                        <Table.Td c={s.change_rate.includes('-') ? 'blue' : 'red'}>{s.change_rate}</Table.Td>
-                                        <Table.Td fw={700}>{s.count_today}</Table.Td>
-                                        <Table.Td>{s.foreign_ratio_today}</Table.Td>
-                                        <Table.Td>
-                                            <Badge color={s.sentiment === '긍정' ? 'green' : s.sentiment === '부정' ? 'red' : 'gray'} variant="light">
-                                                {s.sentiment}
-                                            </Badge>
-                                        </Table.Td>
-                                        <Table.Td style={{ minWidth: 300 }}><Text size="sm" lineClamp={1}>{s.summary}</Text></Table.Td>
+                                        <Table.Td>{stock.current_price}</Table.Td>
+                                        <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
+                                        <Table.Td>{stock.count_today}</Table.Td>
+                                        <Table.Td>{stock.volume || '-'}</Table.Td>
+                                        <Table.Td>{stock.foreign_ratio_today}</Table.Td>
+                                        <Table.Td>{stock.sentiment}</Table.Td>
+                                        <Table.Td style={{ maxWidth: 300 }}><Text truncate>{stock.summary}</Text></Table.Td>
                                     </Table.Tr>
                                 ))}
                             </Table.Tbody>
                         </Table>
                     </ScrollArea>
-                </Box>
-
-                {/* Research Modal */}
-                <Modal
-                    opened={!!researchSection}
-                    onClose={() => setResearchSection(null)}
-                    title="Research Reports"
-                    fullScreen={isMobile}
-                    size="lg"
-                >
-                    <Stack>
-                        {research[researchSection!]?.items?.map((item: any, i: number) => (
-                            <Card key={i} withBorder padding="sm">
-                                <Text fw={700} size="sm">{item.title}</Text>
-                                <Group justify="end" mt="xs">
-                                    {item.pdf_link && (
-                                        <Button size="xs" variant="light" leftSection={<IconRobot size={14} />}>
-                                            AI Summary
-                                        </Button>
-                                    )}
-                                    <Button component="a" href={item.link} target="_blank" size="xs" variant="default">
-                                        View
-                                    </Button>
-                                </Group>
-                            </Card>
-                        ))}
-                    </Stack>
-                </Modal>
-
+                )}
             </AppShell.Main>
+
+            {/* Scraper Control Modal */}
+            <Modal opened={controlOpened} onClose={closeControl} title="스크래퍼 제어 센터 (Scraper Control)" centered>
+                <PasswordInput
+                    label="GitHub Personal Access Token (PAT)"
+                    placeholder="ghp_..."
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
+                    mb="md"
+                />
+                <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
+                    지금 즉시 실행 (RUN NOW)
+                </Button>
+
+                <Paper withBorder p="sm" mt="md" bg="gray.1">
+                    <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
+                    <ScrollArea h={150}>
+                        {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
+                    </ScrollArea>
+                </Paper>
+            </Modal>
+
+            {/* Research List Modal */}
+            <Modal opened={researchModalOpened} onClose={closeResearchModal} title="리포트 목록 (오늘)" centered size="lg">
+                <ScrollArea h={400}>
+                    {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
+                        research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                            <Paper key={idx} withBorder p="sm" mb="sm">
+                                <Text fw={700} size="sm">{item.title}</Text>
+                                <Group mt="xs">
+                                    <Text size="xs" c="dimmed">{item.date}</Text>
+                                    <Button component="a" href={item.link} target="_blank" size="compact-xs" variant="light">Naver View</Button>
+                                    {item.pdf_link && <Button component="a" href={item.pdf_link} target="_blank" size="compact-xs" color="red" variant="outline">PDF</Button>}
+                                    <Button size="compact-xs" color="grape" variant="subtle" onClick={() => alert("AI 요약 기능은 준비 중입니다.")}>AI 요약</Button>
+                                </Group>
+                            </Paper>
+                        ))
+                    ) : (
+                        <Text align="center" c="dimmed" py="xl">오늘 올라온 리포트가 없습니다.</Text>
+                    )}
+                </ScrollArea>
+            </Modal>
         </AppShell>
     );
 }

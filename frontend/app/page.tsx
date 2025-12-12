@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
-import { IconRefresh, IconRobot, IconNews } from '@tabler/icons-react';
+import { IconRefresh, IconRobot, IconNews, IconCheck } from '@tabler/icons-react';
 import { clsx } from 'clsx';
 
 // --- Types ---
@@ -17,6 +17,7 @@ type Stock = {
     volume?: string;
     count_today: number;
     foreign_ratio_today: string;
+    foreign_ratio_yesterday?: string;
     summary: string;
     sentiment: string;
     is_consecutive: boolean;
@@ -186,7 +187,7 @@ export default function Home() {
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                     <IconRobot size={30} color="#228be6" />
-                    <Title order={3}>StockBot V3.0</Title>
+                    <Title order={3}>StockBot V3.1 (Full UI)</Title>
                     <Group ml="auto">
                         <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
                             Scraper Control
@@ -249,13 +250,16 @@ export default function Home() {
                         <Table striped highlightOnHover withTableBorder>
                             <Table.Thead>
                                 <Table.Tr>
-                                    <Table.Th style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', zIndex: 1 }}>종목명</Table.Th>
+                                    <Table.Th style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', zIndex: 1 }}>종목명 (코드)</Table.Th>
                                     <Table.Th>현재가</Table.Th>
+                                    <Table.Th>어제가</Table.Th>
                                     <Table.Th>등락률</Table.Th>
-                                    <Table.Th>토론글(오늘)</Table.Th>
                                     <Table.Th>거래량</Table.Th>
-                                    <Table.Th>외인비율</Table.Th>
+                                    <Table.Th>토론글(오늘)</Table.Th>
+                                    <Table.Th>외인비율(현재)</Table.Th>
+                                    <Table.Th>외인비율(어제)</Table.Th>
                                     <Table.Th>감성분석</Table.Th>
+                                    <Table.Th>연속</Table.Th>
                                     <Table.Th>요약</Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
@@ -263,14 +267,21 @@ export default function Home() {
                                 {sortedStocks.map((stock) => (
                                     <Table.Tr key={stock.code}>
                                         <Table.Td style={{ position: 'sticky', left: 0, background: 'var(--mantine-color-body)', fontWeight: 'bold' }}>
-                                            {stock.name} ({stock.code})
+                                            {stock.name} <Text span c="dimmed" size="xs">({stock.code})</Text>
                                         </Table.Td>
                                         <Table.Td>{stock.current_price}</Table.Td>
+                                        <Table.Td>{stock.yesterday_close || '-'}</Table.Td>
                                         <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
-                                        <Table.Td>{stock.count_today}</Table.Td>
                                         <Table.Td>{stock.volume || '-'}</Table.Td>
+                                        <Table.Td>{stock.count_today}</Table.Td>
                                         <Table.Td>{stock.foreign_ratio_today}</Table.Td>
-                                        <Table.Td>{stock.sentiment}</Table.Td>
+                                        <Table.Td>{stock.foreign_ratio_yesterday || '-'}</Table.Td>
+                                        <Table.Td>
+                                            <Badge color={stock.sentiment === '긍정' ? 'teal' : stock.sentiment === '부정' ? 'pink' : 'gray'} variant="light">
+                                                {stock.sentiment}
+                                            </Badge>
+                                        </Table.Td>
+                                        <Table.Td>{stock.is_consecutive ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
                                         <Table.Td style={{ maxWidth: 300 }}><Text truncate>{stock.summary}</Text></Table.Td>
                                     </Table.Tr>
                                 ))}
@@ -318,7 +329,7 @@ export default function Home() {
                             </Paper>
                         ))
                     ) : (
-                        <Text align="center" c="dimmed" py="xl">오늘 올라온 리포트가 없습니다.</Text>
+                        <Text ta="center" c="dimmed" py="xl">오늘 올라온 리포트가 없습니다.</Text>
                     )}
                 </ScrollArea>
             </Modal>

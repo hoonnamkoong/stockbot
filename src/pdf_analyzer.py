@@ -1,7 +1,8 @@
 import requests
-import io
+from io import BytesIO
 import re
 from pypdf import PdfReader
+import pdfplumber
 
 # User-Agent for download
 HEADER = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -57,10 +58,43 @@ def download_pdf(url):
     try:
         res = requests.get(url, headers=HEADER, timeout=10)
         if res.status_code == 200:
-            return io.BytesIO(res.content)
+            return BytesIO(res.content)
     except Exception as e:
         print(f"PDF Download Error: {e}")
     return None
+
+def extract_tables_from_pdf(pdf_stream):
+    """
+    Extracts tables from the first 2 pages of the PDF using pdfplumber.
+    Returns a list of Markdown-formatted tables.
+    """
+    markdown_tables = []
+    try:
+        with pdfplumber.open(pdf_stream) as pdf:
+            for i, page in enumerate(pdf.pages[:2]): # Limit to first 2 pages
+                tables = page.extract_tables()
+                for table in tables:
+                    # Filter out small/empty tables
+                    if not table or len(table) < 2 or len(table[0]) < 2:
+                        continue
+                        
+                    # Clean None values
+                    cleaned_table = [[str(cell).strip() if cell else "" for cell in row] for row in table]
+                    
+                    # Convert to Markdown
+                    # Header
+                    header = "| " + " | ".join(cleaned_table[0]) + " |"
+                    separator = "| " + " | ".join(["---"] * len(cleaned_table[0])) + " |"
+                    body = ""
+                    for row in cleaned_table[1:]:
+                        body += "| " + " | ".join(row) + " |\n"
+                        
+                    md_table = f"{header}\n{separator}\n{body}"
+                    markdown_tables.append(md_table)
+    except Exception as e:
+        print(f"Table Extraction Error: {e}")
+        
+    return markdown_tables
 
 def analyze_pdf(pdf_url, web_body_text=""):
     """
@@ -69,91 +103,18 @@ def analyze_pdf(pdf_url, web_body_text=""):
     stream = download_pdf(pdf_url)
     if not stream: return None
     
+    # Store stream content for reuse (pdfplumber closes it?)
+    # Better to create a fresh bytes object for pdfplumber since it needs a file-like object
+    stream.seek(0)
+    pdf_bytes = stream.read()
+    stream_for_pypdf = BytesIO(pdf_bytes)
+    stream_for_plumber = BytesIO(pdf_bytes)
+
+    # 1. Text Extraction (PyPDF - Faster for text)
+    full_text = ""
     try:
-        reader = PdfReader(stream)
-        # Extract text from first 2 pages
-        full_text = ""
+        reader = PdfReader(stream_for_pypdf)
         for i in range(min(2, len(reader.pages))):
-            full_text += reader.pages[i].extract_text() + "\n"
-            
-        if not full_text.strip():
-            return {
-                "opinion": "N/A",
-                "target_price": "N/A",
-                "summary": "텍스트 추출 불가 (이미지 스캔본일 수 있음). 우측 웹 요약을 참고해주세요."
-            }
-
-        # Parsing Logic
-        cleaned_text = clean_pdf_text(full_text)
-        
-        # 1. Opinion & TP
-        opinion = "N/A"
-        match = re.search(r'(BUY|SELL|HOLD|Reduce|매수|중립|매도)', cleaned_text, re.IGNORECASE)
-        if match: opinion = match.group(1).upper()
-            
-        tp = "N/A"
-        match_tp = re.search(r'(목표주가|Target Price|TP)\D{0,10}([\d,]+)', cleaned_text, re.IGNORECASE)
-        if match_tp: tp = match_tp.group(2) + "원"
-
-        # 2. Structure Extraction
-        summary_points = []
-        
-        # Priority Headers (Mapped to standard names)
-        header_map = {
-            '투자포인트': '💡 핵심 투자 포인트',
-            'Investment Point': '💡 핵심 투자 포인트',
-            '체크포인트': '💡 핵심 투자 포인트',
-            '결론': '📌 결론',
-            'Conclusion': '📌 결론',
-            'Valuation': '📊 밸류에이션',
-            '리스크': '⚠️ 리스크 요인'
-        }
-        
-        sentences = cleaned_text.split('. ')
-        
-        current_section = None
-        captured_content = []
-        
-        # Simple extraction strategy: If a sentence contains a header keyword, start a section.
-        for sent in sentences:
-            sent = sent.strip()
-            if len(sent) < 10: continue
-            
-            # Check for header
-            found_header = False
-            for key, label in header_map.items():
-                if key in sent:
-                    current_section = label
-                    summary_points.append(f"\n{current_section}")
-                    found_header = True
-                    break
-            
-            if not found_header and current_section:
-                # Add to current section
-                summary_points.append(f"- {sent}.")
-                
-            if len(summary_points) > 20: break # Cap length
-            
-        final_summary = "\n".join(summary_points)
-        
-        # 3. Tables & Financial Data Extraction (Pseudo-OCR)
-        # Attempt to find financial summary lines (Year, P/E, ROE, Revenue)
-        # Pattern: Term followed by multiple numbers
-        financial_keywords = ['매출액', '영업이익', '순이익', 'PER', 'PBR', 'ROE', 'EPS', 'Revenue', 'Operating Profit', 'Net Income']
-        found_data_rows = []
-        
-        lines = cleaned_text.split('\n') # Use original lines if possible, but cleaned_text is joined.
-        # Retry splitting cleaned text by spacing is hard. Let's look for regex patterns in the big text block.
-        # Actually, split text on multiple spaces might work 
-        
-        # Simple Approach: Look for patterns in the raw full_text (before aggressive join) to find table rows
-        # But we only have cleaned_text here efficiently. Let's scan for keyword + numbers.
-        
-        table_md = ""
-        extracted_rows = []
-        for kw in financial_keywords:
-            # Regex: Keyword ... number ... number ... number
-            # e.g. "PER 10.5 12.3 9.8"
             match = re.search(f"({kw})\s+([\d\.,\s]+)", cleaned_text)
             if match:
                 val_str = match.group(2).strip()

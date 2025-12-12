@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover, Grid, Flex, SegmentedControl } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover, Grid, Flex, SegmentedControl, Divider } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { clsx } from 'clsx';
@@ -546,9 +546,29 @@ export default function Home() {
                                 </Text>
                             </ScrollArea>
 
-                            {/* Right: Context & Tables (Placeholder for now) */}
+                            {/* Right: Context & Tables */}
                             <ScrollArea className="w-1/2 bg-white p-4 rounded-md border border-gray-200">
-                                <Text fw={700} size="lg" mb="md" c="teal.8">📊 주요 데이터 및 웹 요약</Text>
+                                <Text fw={700} size="lg" mb="md" c="teal.8">📊 핵심 재무 데이터 (Table)</Text>
+
+                                {/* PDF Tables (New) */}
+                                {pdfItem.pdf_analysis?.tables && pdfItem.pdf_analysis.tables.length > 0 ? (
+                                    <div className="flex flex-col gap-4 mb-6">
+                                        {pdfItem.pdf_analysis.tables.map((table: string, i: number) => (
+                                            <Paper key={i} withBorder p="xs" bg="gray.1">
+                                                <Text size="xs" fw={700} mb={1} c="dimmed">Table {i + 1}</Text>
+                                                <ScrollArea>
+                                                    <div style={{ whiteSpace: 'pre', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.2 }}>
+                                                        {table}
+                                                    </div>
+                                                </ScrollArea>
+                                            </Paper>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <Text size="sm" c="dimmed" mb="md">PDF에서 추출된 표가 없습니다.</Text>
+                                )}
+
+                                <Divider my="sm" />
 
                                 <Paper withBorder p="sm" mb="md" bg="blue.0">
                                     <Text size="xs" fw={700} c="blue.8" mb={1}>웹 게시글 요약 (Cross-Check)</Text>

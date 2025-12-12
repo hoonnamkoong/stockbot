@@ -5,6 +5,7 @@ import datetime
 import time
 import os
 import re
+import json
 import collections
 
 # --- Constants ---
@@ -40,7 +41,7 @@ def clean_text(text):
     return re.sub(r'\s+', ' ', text).strip()
 
 # --- 1. Fetch Trending Stocks (Volume Top) ---
-def fetch_top_stocks(limit=200):
+def fetch_top_stocks(limit=100):
     """Fetches Top N stocks by volume from KOSPI & KOSDAQ."""
     stocks = []
     # Using 'sise_quant.naver' for Volume Top
@@ -49,7 +50,7 @@ def fetch_top_stocks(limit=200):
         'KOSDAQ': f"{NAVER_FINANCE_URL}/sise/sise_quant.naver?sosok=1"
     }
 
-    print(f"Fetching Top {limit} stocks...")
+    print(f"Fetching Top {limit} stocks...", flush=True)
 
     for market, url in urls.items():
         try:
@@ -89,13 +90,13 @@ def fetch_top_stocks(limit=200):
                         'volume': volume
                     })
                     count += 1
-                    if count >= limit // 2: # ~100 per market
+                    if count >= limit // 2: # ~50 per market
                         break
 
                 except Exception as e:
                      continue
         except Exception as e:
-            print(f"Error fetching {market}: {e}")
+            print(f"Error fetching {market}: {e}", flush=True)
             
     return stocks
 
@@ -234,19 +235,20 @@ def analyze_board(code, threshold=0):
 
 # --- Main Execution ---
 def main():
-    print("Starting Stock Scraper...")
+    print("Starting Stock Scraper...", flush=True)
     
     # 1. Time Check
     now_kst = get_current_kst_time()
     current_hour = now_kst.hour
     threshold = get_threshold_by_time(current_hour)
     
-    print(f"Time (KST): {now_kst.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Threshold: > {threshold} posts")
+    print(f"Time (KST): {now_kst.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+    print(f"Threshold: > {threshold} posts", flush=True)
     
     # 2. Fetch Base List
-    candidates = fetch_top_stocks(limit=250) # Scan enough candidates
-    print(f"Candidates: {len(candidates)}")
+    # Limit to 100 for faster check, can increase later
+    candidates = fetch_top_stocks(limit=100) 
+    print(f"Candidates: {len(candidates)}", flush=True)
     
     final_results = []
     
@@ -270,13 +272,13 @@ def main():
                 stock['is_consecutive'] = False 
                 
                 final_results.append(stock)
-                print(f" [PASS] {stock['name']} ({count} posts)")
+                print(f" [PASS] {stock['name']} ({count} posts)", flush=True)
             else:
                 pass
                 # print(f" [FAIL] {stock['name']} ({count} posts)")
                 
         except Exception as e:
-            print(f"Error processing {stock['name']}: {e}")
+            print(f"Error processing {stock['name']}: {e}", flush=True)
             
     # 4. Save Results (ALWAYS save, even if empty)
     # Sort by Count DESC
@@ -287,7 +289,7 @@ def main():
     with open("data/latest_stocks.json", "w", encoding="utf-8") as f:
         json.dump(final_results, f, ensure_ascii=False, indent=2)
         
-    print(f"Saved {len(final_results)} stocks to data/latest_stocks.json")
+    print(f"Saved {len(final_results)} stocks to data/latest_stocks.json", flush=True)
     
     # 5. Send Telegram Notification
     if final_results:
@@ -309,9 +311,9 @@ def main():
             send_telegram_message(msg)
             
         except ImportError:
-            print("Utils module not found or error importing.")
+            print("Utils module not found or error importing.", flush=True)
     else:
-         print("No stocks met the criteria, but saved empty list.")
+         print("No stocks met the criteria, but saved empty list.", flush=True)
 
 if __name__ == "__main__":
     main()

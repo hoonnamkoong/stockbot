@@ -38,9 +38,16 @@ def clean_pdf_text(text):
     text = re.sub(r'\d{2,3}[-)\.]\d{3,4}[-)\.]\d{4}', '', text)
     # Remove Dates (YYYY.MM.DD or YYYY-MM-DD) - debatable, but user asked to remove "Article Date"
     text = re.sub(r'\d{4}[\.-]\d{2}[\.-]\d{2}', '', text)
+    # Remove Korean Dates (e.g., 2025년 12월 12일)
+    text = re.sub(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', '', text)
+    
     # Remove URLS
     text = re.sub(r'http[s]?://\S+', '', text)
     
+    # Remove Chart Axis Garbage (Sequence of numbers like "0 10 20 30 40")
+    # Pattern: 2+ digits, space, 2+ digits, space, 2+ digits... repeated
+    text = re.sub(r'(\b\d{1,4}\s+){3,}\d{1,4}', '', text)
+
     # 3. Artifact/Spacing Cleaning
     text = re.sub(r'\s+', ' ', text).strip()
     

@@ -335,24 +335,31 @@ def main():
         try:
             from utils import send_telegram_message
             
-            msg = f"<b>📈 Stock Scraper Report ({now_kst.strftime('%H:%M')})</b>\n"
-            msg += f"Threshold: {threshold}+\n"
-            msg += f"Found: {len(final_results)} stocks\n\n"
+            # Split Messages (User Request V6.5: KOSPI, KOSDAQ, Link separately)
             
-            # Top 5 Summary
-            for s in final_results[:5]:
-                msg += f"🔥 <b>{s['name']}</b>: {s['count_today']} posts\n"
-                msg += f"   (Price: {s['current_price']} | {s['change_rate']})\n"
-            
-            if len(final_results) > 5:
-                msg += f"\n...and {len(final_results)-5} more."
-                
-            # Dashboard URL
+            # 1. KOSPI Message
+            kospi_stocks = [s for s in final_results if s['market'] == 'KOSPI']
+            if kospi_stocks:
+                msg_k = f"<b>📉 [KOSPI] ({len(kospi_stocks)} items)</b>\n"
+                for s in kospi_stocks[:10]: # Top 10 only per message to be safe
+                     msg_k += f"🔥 <b>{s['name']}</b>: {s['count_today']}글 | {s.get('change_rate','-')}\n"
+                send_telegram_message(msg_k)
+                time.sleep(1) # Prevent rate limit
+
+            # 2. KOSDAQ Message
+            kosdaq_stocks = [s for s in final_results if s['market'] == 'KOSDAQ']
+            if kosdaq_stocks:
+                msg_q = f"<b>📉 [KOSDAQ] ({len(kosdaq_stocks)} items)</b>\n"
+                for s in kosdaq_stocks[:10]:
+                     msg_q += f"🔥 <b>{s['name']}</b>: {s['count_today']}글 | {s.get('change_rate','-')}\n"
+                send_telegram_message(msg_q)
+                time.sleep(1)
+
+            # 3. Dashboard Link (ALWAYS SENT SEPARATELY)
             dashboard_url = os.environ.get('DASHBOARD_URL', '')
             if dashboard_url:
-                 msg += f"\n\n📊 Dashboard: {dashboard_url}"
-                
-            send_telegram_message(msg)
+                 msg_link = f"📊 <b>Dashboard Check</b>\n{dashboard_url}"
+                 send_telegram_message(msg_link)
             
         except ImportError:
             print("Utils module not found or error importing.", flush=True)

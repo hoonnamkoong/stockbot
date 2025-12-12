@@ -481,6 +481,27 @@ if __name__ == "__main__":
 
     else:
         print("No data collected meeting the threshold.")
+        # User Request: Send notification even if empty, so we know it ran.
+        try:
+            import telegram_plugin
+            import os
+            
+            dashboard_url = os.environ.get('DASHBOARD_URL', '')
+            
+            # 1. Dashboard Link (Checking Alive)
+            if dashboard_url:
+                 telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check (No Data)</b>\n{dashboard_url}")
+                 time.sleep(1)
+                 
+            # 2. Status Message
+            msg = f"📉 [Report] {datetime.now().strftime('%H:%M')}\n"
+            msg += f"Threshold: {threshold} posts\n"
+            msg += "Info: 조건에 맞는 급상승 종목이 없습니다. (No stocks found)"
+            
+            telegram_plugin.send_telegram_message(msg)
+            
+        except Exception as e:
+            print(f"Failed to send empty notification: {e}")
 
 
 

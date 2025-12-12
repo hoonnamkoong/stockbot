@@ -24,6 +24,7 @@ def fetch_section_reports(section_key):
     
     try:
         res = requests.get(url, headers=get_headers())
+        res.encoding = 'EUC-KR' # Key Fix: Naver Finance uses EUC-KR
         soup = BeautifulSoup(res.text, 'html.parser')
         
         # Table parsing
@@ -32,6 +33,7 @@ def fetch_section_reports(section_key):
         if not table: return []
         
         rows = table.find_all('tr')
+        print(f"[{section_key}] Found {len(rows)} rows", flush=True)
         today_str = datetime.datetime.now().strftime("%y.%m.%d")
         
         for row in rows:

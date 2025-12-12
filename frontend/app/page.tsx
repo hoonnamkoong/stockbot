@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { clsx } from 'clsx';
@@ -347,7 +347,11 @@ export default function Home() {
                                             </Badge>
                                         </Table.Td>
                                         <Table.Td>{stock.is_consecutive ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
-                                        <Table.Td style={{ maxWidth: 300 }}><Text truncate>{stock.summary}</Text></Table.Td>
+                                        <Table.Td style={{ maxWidth: 300 }}>
+                                            <Tooltip label={stock.summary} multiline w={300} withArrow transitionProps={{ duration: 200 }}>
+                                                <Text truncate style={{ cursor: 'help' }}>{stock.summary}</Text>
+                                            </Tooltip>
+                                        </Table.Td>
                                     </Table.Tr>
                                 ))}
                             </Table.Tbody>

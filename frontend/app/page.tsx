@@ -498,88 +498,144 @@ export default function Home() {
             {/* Research List Modal */}
             < Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="90%" styles={{ body: { height: '80vh', overflow: 'hidden' } }}>
                 {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
-                    <Grid h="90%" gutter="xl">
-                        {/* LEFT: Daily Briefing (Expanded) */}
-                        <Grid.Col span={4}>
-                            <Paper withBorder p="md" bg="blue.0" h="100%" radius="md">
-                                <Group mb="md">
-                                    <IconNews size={24} color="#228be6" />
-                                    <Text fw={700} size="lg" c="blue.8">오늘의 시장 인사이트</Text>
+                    isMobile ? (
+                        // --- Mobile View (Stacked) ---
+                        <div className="flex flex-col gap-4">
+                            {/* Insight Summary Top */}
+                            <Paper withBorder p="sm" bg="blue.0" radius="md">
+                                <Group mb="xs">
+                                    <IconNews size={20} color="#228be6" />
+                                    <Text fw={700} size="md" c="blue.8">오늘의 시장 인사이트</Text>
                                 </Group>
-                                <ScrollArea h="65vh" offsetScrollbars>
-                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                                <ScrollArea h={150}>
+                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
                                         {research[selectedResearchCategory].summary}
-                                    </Text>
-                                    <Text size="xs" c="dimmed" mt="xl" pt="xl">
-                                        * AI가 오늘 발행된 리포트들의 핵심 내용(매수의견, 목표주가, 산업동향)을 종합하여 도출한 인사이트입니다.
                                     </Text>
                                 </ScrollArea>
                             </Paper>
-                        </Grid.Col>
 
-                        {/* RIGHT: List (Scrollable) */}
-                        <Grid.Col span={8}>
-                            <ScrollArea h="75vh" offsetScrollbars>
+                            {/* List Area */}
+                            <div className="flex flex-col gap-3">
                                 {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                                    <Card key={idx} shadow="sm" padding="lg" radius="md" withBorder mb="md">
-                                        <Group justify="space-between" mb="xs">
-                                            <div style={{ flex: 1 }}>
-                                                <Text fw={700} size="md" mb={4}>{item.title}</Text>
-                                                <Group gap="xs">
-                                                    <Badge color="gray" size="sm">{item.date}</Badge>
-                                                    {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
-                                                        <Badge color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
-                                                            {item.pdf_analysis.opinion}
-                                                        </Badge>
-                                                    )}
-                                                    {item.pdf_analysis?.target_price && item.pdf_analysis.target_price !== 'N/A' && (
-                                                        <Badge variant="outline" color="gray">
-                                                            TP: {item.pdf_analysis.target_price}
-                                                        </Badge>
-                                                    )}
-                                                </Group>
-                                            </div>
+                                    <Card key={idx} shadow="sm" padding="md" radius="md" withBorder>
+                                        <Text fw={700} size="md" mb="xs">{item.title}</Text>
+
+                                        {/* Tags */}
+                                        <Group gap={6} mb="sm">
+                                            <Badge color="gray" size="xs">{item.date}</Badge>
+                                            {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
+                                                <Badge size="xs" color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
+                                                    {item.pdf_analysis.opinion}
+                                                </Badge>
+                                            )}
                                         </Group>
 
-                                        {/* 6-line Summary Area */}
-                                        <Paper bg="gray.1" p="sm" radius="sm" mb="sm">
-                                            {item.body_summary ? (
-                                                <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }} lineClamp={6}>
-                                                    {item.body_summary}
-                                                </Text>
-                                            ) : (
-                                                <Text size="sm" c="dimmed">요약 내용이 없습니다.</Text>
-                                            )}
+                                        {/* Summary */}
+                                        <Paper bg="gray.1" p="xs" radius="sm" mb="sm">
+                                            <Text size="xs" c="dimmed" lineClamp={4}>
+                                                {item.body_summary || "요약 내용이 없습니다."}
+                                            </Text>
                                         </Paper>
 
-                                        <Group>
-                                            <Button variant="light" size="xs" component="a" href={item.link} target="_blank">
-                                                본문 전체보기
-                                            </Button>
+                                        {/* Buttons */}
+                                        <Group justify="end" gap="xs">
+                                            <Button variant="light" size="xs" component="a" href={item.link} target="_blank">본문</Button>
                                             {item.pdf_link && (
                                                 <>
-                                                    <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">
-                                                        PDF 원문
-                                                    </Button>
-                                                    <Button
-                                                        variant="filled"
-                                                        color="violet"
-                                                        size="xs"
-                                                        leftSection={<IconRobot size={14} />}
-                                                        onClick={() => {
-                                                            setPdfItem(item);
-                                                        }}
-                                                    >
-                                                        PDF 심층 분석
-                                                    </Button>
+                                                    <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">PDF</Button>
+                                                    <Button variant="filled" color="violet" size="xs" onClick={() => setPdfItem(item)}>분석</Button>
                                                 </>
                                             )}
                                         </Group>
                                     </Card>
                                 ))}
-                            </ScrollArea>
-                        </Grid.Col>
-                    </Grid>
+                            </div>
+                        </div>
+                    ) : (
+                        // --- Desktop View (Grid) ---
+                        <Grid h="90%" gutter="xl">
+                            {/* LEFT: Daily Briefing (Expanded) */}
+                            <Grid.Col span={4}>
+                                <Paper withBorder p="md" bg="blue.0" h="100%" radius="md">
+                                    <Group mb="md">
+                                        <IconNews size={24} color="#228be6" />
+                                        <Text fw={700} size="lg" c="blue.8">오늘의 시장 인사이트</Text>
+                                    </Group>
+                                    <ScrollArea h="65vh" offsetScrollbars>
+                                        <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                                            {research[selectedResearchCategory].summary}
+                                        </Text>
+                                        <Text size="xs" c="dimmed" mt="xl" pt="xl">
+                                            * AI가 오늘 발행된 리포트들의 핵심 내용(매수의견, 목표주가, 산업동향)을 종합하여 도출한 인사이트입니다.
+                                        </Text>
+                                    </ScrollArea>
+                                </Paper>
+                            </Grid.Col>
+
+                            {/* RIGHT: List (Scrollable) */}
+                            <Grid.Col span={8}>
+                                <ScrollArea h="75vh" offsetScrollbars>
+                                    {research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                                        <Card key={idx} shadow="sm" padding="lg" radius="md" withBorder mb="md">
+                                            <Group justify="space-between" mb="xs">
+                                                <div style={{ flex: 1 }}>
+                                                    <Text fw={700} size="md" mb={4}>{item.title}</Text>
+                                                    <Group gap="xs">
+                                                        <Badge color="gray" size="sm">{item.date}</Badge>
+                                                        {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
+                                                            <Badge color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
+                                                                {item.pdf_analysis.opinion}
+                                                            </Badge>
+                                                        )}
+                                                        {item.pdf_analysis?.target_price && item.pdf_analysis.target_price !== 'N/A' && (
+                                                            <Badge variant="outline" color="gray">
+                                                                TP: {item.pdf_analysis.target_price}
+                                                            </Badge>
+                                                        )}
+                                                    </Group>
+                                                </div>
+                                            </Group>
+
+                                            {/* 6-line Summary Area */}
+                                            <Paper bg="gray.1" p="sm" radius="sm" mb="sm">
+                                                {item.body_summary ? (
+                                                    <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }} lineClamp={6}>
+                                                        {item.body_summary}
+                                                    </Text>
+                                                ) : (
+                                                    <Text size="sm" c="dimmed">요약 내용이 없습니다.</Text>
+                                                )}
+                                            </Paper>
+
+                                            <Group>
+                                                <Button variant="light" size="xs" component="a" href={item.link} target="_blank">
+                                                    본문 전체보기
+                                                </Button>
+                                                {item.pdf_link && (
+                                                    <>
+                                                        <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">
+                                                            PDF 원문
+                                                        </Button>
+                                                        <Button
+                                                            variant="filled"
+                                                            color="violet"
+                                                            size="xs"
+                                                            leftSection={<IconRobot size={14} />}
+                                                            onClick={() => {
+                                                                setPdfItem(item);
+                                                            }}
+                                                        >
+                                                            PDF 심층 분석
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </Group>
+                                        </Card>
+                                    ))}
+                                </ScrollArea>
+                            </Grid.Col>
+                        </Grid>
+                    )
                 ) : (
                     <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
                 )}

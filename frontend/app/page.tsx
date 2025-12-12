@@ -81,9 +81,14 @@ export default function Home() {
             let valB = b[sortKey];
 
             // Number parsing
-            if (typeof valA === 'string' && valA.replace(/,/g, '').match(/^\d/)) {
-                valA = parseFloat(valA.replace(/,/g, ''));
-                valB = parseFloat(valB.replace(/,/g, ''));
+            // 숫자 변환 (콤마 제거)
+            if (typeof valA === 'string' && valA.replace(/,/g, '').match(/^-?\d+(\.\d+)?$/)) {
+                const numA = parseFloat(valA.replace(/,/g, ''));
+                const numB = typeof valB === 'string' ? parseFloat(valB.replace(/,/g, '')) : Number(valB);
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    valA = numA;
+                    valB = numB;
+                }
             }
 
             if (valA < valB) return sortOrder === 'asc' ? -1 : 1;

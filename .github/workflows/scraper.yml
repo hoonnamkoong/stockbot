@@ -35,8 +35,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # Dashboard URL for the notification link
-          DASHBOARD_URL: "https://your-vercel-app-url.vercel.app" 
+          DASHBOARD_URL: "https://stockbot-phi.vercel.app" 
         run: |
           python scraper.py
 

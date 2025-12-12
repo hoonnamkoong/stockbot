@@ -405,8 +405,8 @@ if __name__ == "__main__":
         count_collected = 0
         
         for i, stock in enumerate(trending_stocks):
-            # Performance safety
-            if i >= 100: break 
+            # Performance safety / Limit (User Request V6.2: 30 stocks)
+            if i >= 30: break 
             
             # 1. 상세 정보 (전일종가, 외국인)
             details = get_stock_details(stock['code'])

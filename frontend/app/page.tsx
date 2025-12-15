@@ -27,7 +27,7 @@ type Stock = {
 // --- Constants ---
 const REPO_OWNER = "hoonnamkoong";
 const REPO_NAME = "stockbot";
-const WORKFLOW_ID = "daily_scrape.yml";
+const WORKFLOW_ID = "scraper.yml";
 
 export default function Home() {
     const [opened, { toggle }] = useDisclosure();

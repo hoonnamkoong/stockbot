@@ -396,17 +396,8 @@ if __name__ == "__main__":
     print(f"[System] Threshold determined: {threshold} posts (based on hour {current_hour})")
 
     # --- 0. Dashboard Link (ALWAYS FIRST) ---
-    try:
-        from src.telegram_manager import TelegramManager
-        # Initialize (Token loaded from env inside class)
-        tg_manager = TelegramManager()
-        
-        print(f"[System] Sending Dashboard Link first... (v7.0)")
-        tg_manager.send_dashboard_link()
-        time.sleep(1) 
-        
-    except Exception as e:
-        print(f"[System] Failed to send Dashboard Link: {e}")
+    # --- 0. Dashboard Link (MOVED TO END) ---
+    # pass
     
     # 2. Research Briefing (Enabled)
     print("\n[Research] Updating Market Briefing & PDF Analysis...")
@@ -457,8 +448,8 @@ if __name__ == "__main__":
         count_collected = 0
         
         for i, stock in enumerate(trending_stocks):
-            # Performance safety / Limit (User Request V6.2: 30 stocks)
-            if i >= 30: break 
+            # Performance safety / Limit (User Request V7.0: 20 stocks)
+            if i >= 20: break 
             
             # 1. 상세 정보 (전일종가, 외국인)
             details = get_stock_details(stock['code'])
@@ -522,10 +513,27 @@ if __name__ == "__main__":
                 
             if kosdaq_items:
                 tg_manager.send_market_report('KOSDAQ', kosdaq_items)
-                
+                time.sleep(1)
+
+            # 2. Dashboard Link (Checking V7.0 Requirement: Last Message)
+            print(f"[System] Sending Dashboard Link last... (v7.0)")
+            tg_manager.send_dashboard_link()
+
         else:
             print("No data collected meeting the threshold.")
             tg_manager.send_no_data_alert(threshold)
+            
+        # Save Status JSON for Frontend
+        import json
+        status_data = {
+            "last_updated": now_kst.strftime('%Y-%m-%d %H:%M:%S'),
+            "message": "Data updated successfully"
+        }
+        with open('data/status.json', 'w', encoding='utf-8') as f:
+            json.dump(status_data, f, ensure_ascii=False, indent=2)
+
+    except Exception as e:
+        print(f"Failed to send notification (v7.0): {e}")
 
     except Exception as e:
         print(f"Failed to send notification (v7.0): {e}")

@@ -193,13 +193,49 @@ def compare_with_history(current_df):
             current_df['is_last_captured'] = False
             return current_df
             
-        # 가장 최신 파일 찾기
-        files.sort(reverse=True)
-        last_file = files[0] # 이미 현재 파일(방금 저장하려는 것)이 생성 전이라면 이게 이전 파일.
+        # 가장 최신 파일 찾기 (User Request: "어제 마지막 데이터"와 비교)
+        # 파일명 형식: trending_stocks_YYYYMMDD_HHMMSS.csv
+        # 날짜 파싱 -> 오늘 날짜와 비교 -> 어제(또는 그 이전) 중 가장 최신 파일 선택
+        
+        files.sort(reverse=True) # 최신순 정렬
+        
+        today_str = datetime.now().strftime("%Y%m%d")
+        target_file = None
+        
+        for f in files:
+            # 파일명에서 날짜 추출 (trending_stocks_20240501_120000.csv)
+            try:
+                parts = f.split('_') # ['trending', 'stocks', '20240501', '120000.csv']
+                if len(parts) >= 3:
+                    file_date = parts[2]
+                    # 오늘 날짜보다 작은 것 중 가장 먼저 나오는 것 (정렬되어 있으므로)
+                    if file_date < today_str:
+                        target_file = f
+                        break
+            except:
+                continue
+        
+        # 만약 어제 데이터가 없으면? (오늘 첫 실행인데 어제 데이터 없으면 그냥 가장 최신 파일이라도 비교? 아니면 False?)
+        # 사용자 의도: "새로운 데이터와 비교" -> 보통 연속성은 "바로 직전"보다는 "이전 사이클"의 의미가 강함.
+        # 일단 어제 데이터 없으면, 전체 중 두번째 파일(오늘 이전 실행)이라도 가져옴.
+        if not target_file and len(files) > 1:
+             # 오늘 실행된 것 중 이전에 실행된 것
+             # 현재 생성될 파일은 아직 리스트에 없으므로, files[0]이 바로 직전 파일임.
+             target_file = files[0]
+
+        if not target_file:
+             current_df['is_last_captured'] = False
+             return current_df
+             
+        last_file = target_file
         # 주의: 이 함수는 save_to_csv 호출 '전'에 불려야 함.
         
         print(f"Comparing with history file: {last_file}")
-        history_df = pd.read_csv(last_file)
+        try:
+             history_df = pd.read_csv(last_file)
+        except:
+             # 빈 파일 등 에러 처리
+             history_df = pd.DataFrame(columns=['code'])
         
         # 과거에 존재했던 종목 코드 집합
         prev_codes = set(history_df['code'].astype(str))

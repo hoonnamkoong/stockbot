@@ -512,7 +512,7 @@ if __name__ == "__main__":
             kospi_items.sort(key=lambda x: x.get('당일_게시글수', 0), reverse=True) # Sort by posts
             
             if kospi_items:
-                msg_k = f"📉 [KOSPI] Top 5 (토론 급등)\n\n"
+                msg_k = f"📉 [KOSPI] Top 5 (토론 급등) (v6.10)\n\n"
                 for s in kospi_items[:5]:
                     name = s.get('종목명', 'Unknown')
                     price = s.get('현재가', 0)
@@ -534,7 +534,7 @@ if __name__ == "__main__":
             kosdaq_items.sort(key=lambda x: x.get('당일_게시글수', 0), reverse=True)
             
             if kosdaq_items:
-                msg_q = f"📉 [KOSDAQ] Top 5 (토론 급등)\n\n"
+                msg_q = f"📉 [KOSDAQ] Top 5 (토론 급등) (v6.10)\n\n"
                 for s in kosdaq_items[:5]:
                     name = s.get('종목명', 'Unknown')
                     price = s.get('현재가', 0)

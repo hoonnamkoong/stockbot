@@ -395,10 +395,14 @@ if __name__ == "__main__":
         
     print(f"[System] Threshold determined: {threshold} posts (based on hour {current_hour})")
 
-    # --- 0. Dashboard Link (ALWAYS FIRST) ---
-    # --- 0. Dashboard Link (MOVED TO END) ---
-    # pass
-    
+    # --- 0. Initialize Telegram Manager (V7.0) ---
+    try:
+        from src.telegram_manager import TelegramManager
+        tg_manager = TelegramManager()
+        # Dashboard Link moved to end
+    except Exception as e:
+        print(f"[System] Failed to initialize TelegramManager: {e}")
+        tg_manager = None
     # 2. Research Briefing (Enabled)
     print("\n[Research] Updating Market Briefing & PDF Analysis...")
     try:

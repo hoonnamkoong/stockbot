@@ -357,15 +357,15 @@ def get_current_kst_time():
 
 def get_threshold_by_time(hour):
     """Returns the comment count threshold based on the hour (KST)."""
-    # 10:00 run (covers 09:00 ~ 10:XX) -> Threshold 20
+    # 10:00 run (covers 09:00 ~ 10:XX) -> Threshold 40 (Stricter)
     if 9 <= hour < 12:
-        return 20
-    # 13:00 run (covers 09:00 ~ 13:XX) -> Threshold 40
-    elif 12 <= hour < 14:
         return 40
-    # 15:00 run (covers 09:00 ~ 15:XX) -> Threshold 60
-    elif 14 <= hour < 24:
+    # 13:00 run (covers 09:00 ~ 13:XX) -> Threshold 60
+    elif 12 <= hour < 14:
         return 60
+    # 15:00 run (covers 09:00 ~ 15:XX) -> Threshold 100
+    elif 14 <= hour < 24:
+        return 100
     return 10 # Default fallback
 
 if __name__ == "__main__":

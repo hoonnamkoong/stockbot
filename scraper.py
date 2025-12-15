@@ -411,12 +411,14 @@ if __name__ == "__main__":
     # 2. Research Briefing (Enabled)
     print("\n[Research] Updating Market Briefing & PDF Analysis...")
     try:
+        from src import research_scraper # Ensure import
         research_scraper.main()
         print("[Research] Completed.")
         
         # Send Research Telegram
         try:
             import json
+            # Correct path matches research_scraper.py output (data/latest_research.json)
             with open('data/latest_research.json', 'r', encoding='utf-8') as f:
                 r_data = json.load(f)
             

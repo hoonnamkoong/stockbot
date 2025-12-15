@@ -45,7 +45,7 @@ jobs:
         run: |
           git config --global user.name "StockBot"
           git config --global user.email "bot@example.com"
-          git add research_latest.json trending_*.csv
+          git add data/
           
           # Check if there are changes to commit
           if git diff --staged --quiet; then

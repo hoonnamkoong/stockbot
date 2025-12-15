@@ -404,7 +404,7 @@ if __name__ == "__main__":
         
         if dashboard_url:
             print(f"[System] Sending Dashboard Link first... ({dashboard_url})")
-            telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check</b>\n{dashboard_url}")
+            telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check (v6.10)</b>\n{dashboard_url}")
             time.sleep(1) # Ensure order
     except Exception as e:
         print(f"[System] Failed to send Dashboard Link: {e}")

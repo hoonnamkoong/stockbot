@@ -11,7 +11,7 @@ def send_telegram_message(message):
     chat_id = os.environ.get('TELEGRAM_CHAT_ID')
 
     if not token or not chat_id:
-        print("[Telegram] Skipping notification: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not found.")
+        print(f"[Telegram][SQ_FAIL] Missing Config. Token exists? {bool(token)}, ChatID exists? {bool(chat_id)}")
         return
 
     # Telegram limit is 4096 chars. careful split.
@@ -23,26 +23,27 @@ def send_telegram_message(message):
         payload = {
             "chat_id": chat_id,
             "text": msg_chunk,
-            "parse_mode": "Markdown" 
+            "parse_mode": "HTML" # Changed to HTML for better stability with simple tags like <b>
         }
 
+        print(f"\n[Telegram][SQ_Probe] Sending Chunk {i+1} (Len: {len(msg_chunk)})")
+        print(f"[Telegram][SQ_Payload_Preview] {msg_chunk[:200]}...") 
+
         try:
-            print(f"[Telegram] Sending chunk {i+1}/{len(messages)}...")
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
-            print(f"[Telegram] Chunk {i+1} sent successfully (Markdown).")
+            print(f"[Telegram][SQ_Success] Chunk {i+1} sent. Status: {response.status_code}")
         except Exception as e:
-            print(f"[Telegram] Markdown send failed for chunk {i+1}: {e}. Retrying as Plain Text...")
+            print(f"[Telegram][SQ_Error] HTML send failed: {e}. Retrying as Plain Text...")
             try:
-                # Remove parse_mode and retry
                 del payload['parse_mode']
                 response = requests.post(url, json=payload, timeout=10)
                 response.raise_for_status()
-                print(f"[Telegram] Chunk {i+1} sent successfully (Plain Text).")
+                print(f"[Telegram][SQ_Success] Chunk {i+1} sent (Plain Text).")
             except Exception as e2:
-                 print(f"[Telegram] Failed to send chunk {i+1} (Plain Text): {e2}")
+                 print(f"[Telegram][SQ_CRITICAL] Failed to send chunk {i+1}: {e2}")
                  if 'response' in locals():
-                     print(f"[Telegram] Response: {response.text}")
+                     print(f"[Telegram][SQ_Response_Body] {response.text}")
 
 if __name__ == "__main__":
     # Test

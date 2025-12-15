@@ -397,25 +397,20 @@ if __name__ == "__main__":
 
     # --- 0. Dashboard Link (ALWAYS FIRST) ---
     try:
-        import telegram_plugin
-        import os
-        # User explicitly requested this URL. Using it as default fallback.
-        dashboard_url = os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app/')
+        from src.telegram_manager import TelegramManager
+        # Initialize (Token loaded from env inside class)
+        tg_manager = TelegramManager()
         
-        if dashboard_url:
-            print(f"[System] Sending Dashboard Link first... ({dashboard_url})")
-            telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check (v6.10)</b>\n{dashboard_url}")
-            time.sleep(1) # Ensure order
+        print(f"[System] Sending Dashboard Link first... (v7.0)")
+        tg_manager.send_dashboard_link()
+        time.sleep(1) 
+        
     except Exception as e:
         print(f"[System] Failed to send Dashboard Link: {e}")
     
     # 2. Research Briefing (Enabled)
     print("\n[Research] Updating Market Briefing & PDF Analysis...")
     try:
-        # Check if research_scraper has main() or fetch_research_data()
-        # Based on previous view, it has main() which saves json.
-        # We should call main() or the core function.
-        # research_scraper.main() seems to do everything including saving JSON.
         research_scraper.main()
         print("[Research] Completed.")
         
@@ -428,13 +423,12 @@ if __name__ == "__main__":
             invest_summary = r_data.get('invest', {}).get('summary', '요약 없음')
             items_count = r_data.get('invest', {}).get('today_count', 0)
             
-            r_msg = f"📑 [리포트 브리핑] 총 {items_count}건\n\n"
+            r_msg = f"📑 <b>[리포트 브리핑] 총 {items_count}건</b>\n\n"
             r_msg += f"💡 시장 요약: {invest_summary[:300]}...\n\n"
             r_msg += f"👉 자세히 보기: {os.environ.get('DASHBOARD_URL', '')}"
             
-            import telegram_plugin
-            telegram_plugin.send_telegram_message(r_msg)
-            print("[Research] Telegram Sent.")
+            tg_manager.send_message(r_msg)
+            print("[Research] Telegram Sent (via Manager).")
             
         except Exception as tg_e:
             print(f"[Research] Telegram Error: {tg_e}")

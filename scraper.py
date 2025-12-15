@@ -460,41 +460,37 @@ if __name__ == "__main__":
 
         print(f"Collected {count_collected} items from {market} meeting criteria.")
 
-    if all_data:
-        print(f"\nAnalyzing total {len(all_data)} items...")
-        result_df = analyzer.analyze_discussion_trend(all_data)
+    # --- 5. Telegram Notification (Refactored V6.8) ---
+    try:
+        import telegram_plugin
+        import os
         
-        # 통합 파일로 저장
-        filename = f"trending_integrated"
-        analyzer.save_to_csv(result_df, filename_prefix=filename)
-
-        # Telegram Notification
-        try:
-            import telegram_plugin
-            import os
+        # 1. Dashboard Link (ALWAYS FIRST & UNCONDITIONAL)
+        dashboard_url = os.environ.get('DASHBOARD_URL', '')
+        if dashboard_url:
+             telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check</b>\n{dashboard_url}")
+             time.sleep(1)
+        
+        # 2. Stock Data Report
+        if all_data:
+            print(f"\nAnalyzing total {len(all_data)} items...")
+            result_df = analyzer.analyze_discussion_trend(all_data)
             
-            # Format message
-            # Split Messages (User Request V6.6: Link FIRST, then Data)
+            # Save CSV
+            filename = f"trending_integrated"
+            analyzer.save_to_csv(result_df, filename_prefix=filename)
             
-            # 1. Dashboard Link (FIRST PRIORITY)
-            dashboard_url = os.environ.get('DASHBOARD_URL', '')
-            if dashboard_url:
-                 telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check</b>\n{dashboard_url}")
-                 time.sleep(1)
-
-            # 2. KOSPI Message
+            # KOSPI Message
             kospi_stocks = [x for x in all_data if x['market']=='KOSPI']
             if kospi_stocks:
                 sorted_k = sorted(kospi_stocks, key=lambda x: x['recent_posts_count'], reverse=True)
                 msg_k = f"📉 [KOSPI] ({len(kospi_stocks)} items)\n"
-                for s in sorted_k[:10]: # Top 10 only per message
+                for s in sorted_k[:10]: 
                      msg_k += f"🔥 <b>{s['name']}</b>: {s['recent_posts_count']}글 | {s.get('change_rate','-')}\n"
-                
-                # Check message length safety (optional, but good practice)
                 telegram_plugin.send_telegram_message(msg_k)
                 time.sleep(1)
 
-            # 3. KOSDAQ Message
+            # KOSDAQ Message
             kosdaq_stocks = [x for x in all_data if x['market']=='KOSDAQ']
             if kosdaq_stocks:
                 sorted_q = sorted(kosdaq_stocks, key=lambda x: x['recent_posts_count'], reverse=True)
@@ -502,35 +498,17 @@ if __name__ == "__main__":
                 for s in sorted_q[:10]:
                      msg_q += f"🔥 <b>{s['name']}</b>: {s['recent_posts_count']}글 | {s.get('change_rate','-')}\n"
                 telegram_plugin.send_telegram_message(msg_q)
-            
-        except ImportError:
-            pass
-        except Exception as e:
-            print(f"Failed to send finish notification: {e}")
-
-    else:
-        print("No data collected meeting the threshold.")
-        # User Request: Send notification even if empty, so we know it ran.
-        try:
-            import telegram_plugin
-            import os
-            
-            dashboard_url = os.environ.get('DASHBOARD_URL', '')
-            
-            # 1. Dashboard Link (Checking Alive)
-            if dashboard_url:
-                 telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check (No Data)</b>\n{dashboard_url}")
-                 time.sleep(1)
-                 
-            # 2. Status Message
+                
+        else:
+            print("No data collected meeting the threshold.")
+            # Status Message only (Link already sent above)
             msg = f"📉 [Report] {datetime.now().strftime('%H:%M')}\n"
             msg += f"Threshold: {threshold} posts\n"
             msg += "Info: 조건에 맞는 급상승 종목이 없습니다. (No stocks found)"
-            
             telegram_plugin.send_telegram_message(msg)
-            
-        except Exception as e:
-            print(f"Failed to send empty notification: {e}")
+
+    except Exception as e:
+        print(f"Failed to send notification: {e}")
 
 
 

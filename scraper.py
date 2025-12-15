@@ -341,7 +341,7 @@ def get_discussion_stats(code):
 
 import analyzer
 from src import research_scraper
-from src import utils # For robust telegram sending if needed, or use telegram_plugin
+        # from src import utils # Removed V7.0 (Legacy)
 
 def load_env_manual(filepath=".env.local"):
     # ... (existing code) ...

@@ -380,6 +380,19 @@ if __name__ == "__main__":
     now = now_kst # Sync variable name for later use
     
     print(f"[System] Time (KST): {now_kst.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # --- Market Holiday Check (V6.8) ---
+    import holidays
+    kr_holidays = holidays.KR()
+    
+    is_weekend = now_kst.weekday() >= 5 # 5=Sat, 6=Sun
+    is_holiday = now_kst.strftime('%Y-%m-%d') in kr_holidays
+    
+    if is_weekend or is_holiday:
+        reason = "Weekend" if is_weekend else f"Holiday ({kr_holidays.get(now_kst.strftime('%Y-%m-%d'))})"
+        print(f"[System] Market Closed Today ({reason}). Skipping execution.")
+        sys.exit(0) # Exit cleanly, no Telegram sent.
+        
     print(f"[System] Threshold determined: {threshold} posts (based on hour {current_hour})")
     
     # 2. Research Briefing (Enabled)

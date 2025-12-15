@@ -394,6 +394,18 @@ if __name__ == "__main__":
         sys.exit(0) # Exit cleanly, no Telegram sent.
         
     print(f"[System] Threshold determined: {threshold} posts (based on hour {current_hour})")
+
+    # --- 0. Dashboard Link (ALWAYS FIRST) ---
+    try:
+        import telegram_plugin
+        import os
+        dashboard_url = os.environ.get('DASHBOARD_URL', '')
+        if dashboard_url:
+            print("[System] Sending Dashboard Link first...")
+            telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check</b>\n{dashboard_url}")
+            time.sleep(1) # Ensure order
+    except Exception as e:
+        print(f"[System] Failed to send Dashboard Link: {e}")
     
     # 2. Research Briefing (Enabled)
     print("\n[Research] Updating Market Briefing & PDF Analysis...")
@@ -477,12 +489,6 @@ if __name__ == "__main__":
     try:
         import telegram_plugin
         import os
-        
-        # 1. Dashboard Link (ALWAYS FIRST & UNCONDITIONAL)
-        dashboard_url = os.environ.get('DASHBOARD_URL', '')
-        if dashboard_url:
-             telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check</b>\n{dashboard_url}")
-             time.sleep(1)
         
         # 2. Stock Data Report
         if all_data:

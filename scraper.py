@@ -347,13 +347,42 @@ def load_env_manual(filepath=".env.local"):
     # ... (existing code) ...
     pass
 
+# --- Helper Functions (Added for V6.7 Fix) ---
+def get_current_kst_time():
+    """Returns current time in KST (UTC+9)."""
+    # UTC time from GitHub Actions (or local system)
+    now_utc = datetime.utcnow()
+    now_kst = now_utc + timedelta(hours=9)
+    return now_kst
+
+def get_threshold_by_time(hour):
+    """Returns the comment count threshold based on the hour (KST)."""
+    # 10:00 run (covers 09:00 ~ 10:XX) -> Threshold 20
+    if 9 <= hour < 12:
+        return 20
+    # 13:00 run (covers 09:00 ~ 13:XX) -> Threshold 40
+    elif 12 <= hour < 14:
+        return 40
+    # 15:00 run (covers 09:00 ~ 15:XX) -> Threshold 60
+    elif 14 <= hour < 24:
+        return 60
+    return 10 # Default fallback
+
 if __name__ == "__main__":
     # 0. Load Environment Variables
     load_env_manual()
     
-    # ... check time ...
+    # 1. Initialize Time & Threshold (CRITICAL FIX V6.7)
+    now_kst = get_current_kst_time()
+    current_hour = now_kst.hour
+    threshold = get_threshold_by_time(current_hour)
     
-    # 1. Research Briefing (Enabled)
+    now = now_kst # Sync variable name for later use
+    
+    print(f"[System] Time (KST): {now_kst.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"[System] Threshold determined: {threshold} posts (based on hour {current_hour})")
+    
+    # 2. Research Briefing (Enabled)
     print("\n[Research] Updating Market Briefing & PDF Analysis...")
     try:
         # Check if research_scraper has main() or fetch_research_data()

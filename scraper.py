@@ -487,12 +487,22 @@ if __name__ == "__main__":
 
         print(f"Collected {count_collected} items from {market} meeting criteria.")
 
-    # --- 5. Telegram Notification (Refactored V6.8) ---
+    # --- 5. Telegram Notification (Refactored V7.0 - Zero Base) ---
     try:
-        import telegram_plugin
-        import os
+        from src.telegram_manager import TelegramManager
         
-        # 2. Stock Data Report
+        # Initialize Manager
+        tg_manager = TelegramManager()
+        
+        # 1. Dashboard Link (ALWAYS FIRST) -> Moved here or keep at top? 
+        # User wants it FIRST. We already did it at step 0. 
+        # But let's verify if we should keep it there.
+        # Yes, keep step 0 separate logic or integrate? 
+        # Let's clean up step 0 to use Manager too, but since we are replacing the end block, 
+        # let's just focus on the end block first.
+        
+        # Actually, let's look at the "Stock Data Report" part.
+        
         if all_data:
             print(f"\nAnalyzing total {len(all_data)} items...")
             result_df = analyzer.analyze_discussion_trend(all_data)
@@ -501,65 +511,28 @@ if __name__ == "__main__":
             filename = f"trending_integrated"
             analyzer.save_to_csv(result_df, filename_prefix=filename)
             
-            # KOSPI Message (Top 5 Rich Data)
-            # result_df has Korean columns: '시장구분', '종목명', '현재가', '등락률', '당일_게시글수', '게시물_요약'
-            
-            # Convert DF to list of dicts for easier handling
+            # Prepare Data for Telegram
+            # result_df has Korean columns
             records = result_df.to_dict('records')
             
-            # Filter KOSPI
+            # Filter Lists
             kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
-            kospi_items.sort(key=lambda x: x.get('당일_게시글수', 0), reverse=True) # Sort by posts
-            
-            if kospi_items:
-                msg_k = f"📉 [KOSPI] Top 5 (토론 급등) (v6.10)\n\n"
-                for s in kospi_items[:5]:
-                    name = s.get('종목명', 'Unknown')
-                    price = s.get('현재가', 0)
-                    if isinstance(price, (int, float)):
-                        price = f"{price:,}"
-                    rate = s.get('등락률', '0%')
-                    posts = s.get('당일_게시글수', 0)
-                    summary = s.get('게시물_요약', '') # This is the missing piece!
-                    
-                    msg_k += f"🔥 <b>{name}</b> ({price}원 | {rate})\n"
-                    msg_k += f"💬 {posts}개 의견\n"
-                    msg_k += f"📝 {summary[:80]}...\n\n" # Limit summary length
-                
-                telegram_plugin.send_telegram_message(msg_k)
-                time.sleep(1)
-
-            # KOSDAQ Message (Top 5 Rich Data)
             kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
-            kosdaq_items.sort(key=lambda x: x.get('당일_게시글수', 0), reverse=True)
             
+            # Send Reports
+            if kospi_items:
+                tg_manager.send_market_report('KOSPI', kospi_items)
+                time.sleep(1)
+                
             if kosdaq_items:
-                msg_q = f"📉 [KOSDAQ] Top 5 (토론 급등) (v6.10)\n\n"
-                for s in kosdaq_items[:5]:
-                    name = s.get('종목명', 'Unknown')
-                    price = s.get('현재가', 0)
-                    if isinstance(price, (int, float)):
-                        price = f"{price:,}"
-                    rate = s.get('등락률', '0%')
-                    posts = s.get('당일_게시글수', 0)
-                    summary = s.get('게시물_요약', '')
-                    
-                    msg_q += f"🔥 <b>{name}</b> ({price}원 | {rate})\n"
-                    msg_q += f"💬 {posts}개 의견\n"
-                    msg_q += f"📝 {summary[:80]}...\n\n"
-
-                telegram_plugin.send_telegram_message(msg_q)
+                tg_manager.send_market_report('KOSDAQ', kosdaq_items)
                 
         else:
             print("No data collected meeting the threshold.")
-            # Status Message only (Link already sent above)
-            msg = f"📉 [Report] {datetime.now().strftime('%H:%M')}\n"
-            msg += f"Threshold: {threshold} posts\n"
-            msg += "Info: 조건에 맞는 급상승 종목이 없습니다. (No stocks found)"
-            telegram_plugin.send_telegram_message(msg)
+            tg_manager.send_no_data_alert(threshold)
 
     except Exception as e:
-        print(f"Failed to send notification: {e}")
+        print(f"Failed to send notification (v7.0): {e}")
 
 
 

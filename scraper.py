@@ -399,9 +399,11 @@ if __name__ == "__main__":
     try:
         import telegram_plugin
         import os
-        dashboard_url = os.environ.get('DASHBOARD_URL', '')
+        # User explicitly requested this URL. Using it as default fallback.
+        dashboard_url = os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app/')
+        
         if dashboard_url:
-            print("[System] Sending Dashboard Link first...")
+            print(f"[System] Sending Dashboard Link first... ({dashboard_url})")
             telegram_plugin.send_telegram_message(f"📊 <b>Dashboard Check</b>\n{dashboard_url}")
             time.sleep(1) # Ensure order
     except Exception as e:

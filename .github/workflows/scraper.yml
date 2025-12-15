@@ -45,12 +45,16 @@ jobs:
         run: |
           git config --global user.name "StockBot"
           git config --global user.email "bot@example.com"
-          git add data/
+          
+          # Fix: Add both data folder (JSONs) and root CSVs
+          git add data/ trending_*.csv
           
           # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
             git commit -m "data: Update stock data and research reports"
+            # Fix: Pull remote changes (rebase) before pushing to avoid rejection
+            git pull --rebase origin main
             git push
           fi

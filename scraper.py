@@ -501,23 +501,53 @@ if __name__ == "__main__":
             filename = f"trending_integrated"
             analyzer.save_to_csv(result_df, filename_prefix=filename)
             
-            # KOSPI Message
-            kospi_stocks = [x for x in all_data if x['market']=='KOSPI']
-            if kospi_stocks:
-                sorted_k = sorted(kospi_stocks, key=lambda x: x['recent_posts_count'], reverse=True)
-                msg_k = f"📉 [KOSPI] ({len(kospi_stocks)} items)\n"
-                for s in sorted_k[:10]: 
-                     msg_k += f"🔥 <b>{s['name']}</b>: {s['recent_posts_count']}글 | {s.get('change_rate','-')}\n"
+            # KOSPI Message (Top 5 Rich Data)
+            # result_df has Korean columns: '시장구분', '종목명', '현재가', '등락률', '당일_게시글수', '게시물_요약'
+            
+            # Convert DF to list of dicts for easier handling
+            records = result_df.to_dict('records')
+            
+            # Filter KOSPI
+            kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
+            kospi_items.sort(key=lambda x: x.get('당일_게시글수', 0), reverse=True) # Sort by posts
+            
+            if kospi_items:
+                msg_k = f"📉 [KOSPI] Top 5 (토론 급등)\n\n"
+                for s in kospi_items[:5]:
+                    name = s.get('종목명', 'Unknown')
+                    price = s.get('현재가', 0)
+                    if isinstance(price, (int, float)):
+                        price = f"{price:,}"
+                    rate = s.get('등락률', '0%')
+                    posts = s.get('당일_게시글수', 0)
+                    summary = s.get('게시물_요약', '') # This is the missing piece!
+                    
+                    msg_k += f"🔥 <b>{name}</b> ({price}원 | {rate})\n"
+                    msg_k += f"💬 {posts}개 의견\n"
+                    msg_k += f"📝 {summary[:80]}...\n\n" # Limit summary length
+                
                 telegram_plugin.send_telegram_message(msg_k)
                 time.sleep(1)
 
-            # KOSDAQ Message
-            kosdaq_stocks = [x for x in all_data if x['market']=='KOSDAQ']
-            if kosdaq_stocks:
-                sorted_q = sorted(kosdaq_stocks, key=lambda x: x['recent_posts_count'], reverse=True)
-                msg_q = f"📉 [KOSDAQ] ({len(kosdaq_stocks)} items)\n"
-                for s in sorted_q[:10]:
-                     msg_q += f"🔥 <b>{s['name']}</b>: {s['recent_posts_count']}글 | {s.get('change_rate','-')}\n"
+            # KOSDAQ Message (Top 5 Rich Data)
+            kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
+            kosdaq_items.sort(key=lambda x: x.get('당일_게시글수', 0), reverse=True)
+            
+            if kosdaq_items:
+                msg_q = f"📉 [KOSDAQ] Top 5 (토론 급등)\n\n"
+                for s in kosdaq_items[:5]:
+                    name = s.get('종목명', 'Unknown')
+                    price = s.get('현재가', 0)
+                    if isinstance(price, (int, float)):
+                        price = f"{price:,}"
+                    rate = s.get('등락률', '0%')
+                    posts = s.get('당일_게시글수', 0)
+                    summary = s.get('게시물_요약', '')
+                    
+                    msg_q += f"🔥 <b>{name}</b> ({price}원 | {rate})\n"
+                    msg_q += f"💬 {posts}개 의견\n"
+                    msg_q += f"📝 {summary[:80]}...\n\n"
+
                 telegram_plugin.send_telegram_message(msg_q)
                 
         else:

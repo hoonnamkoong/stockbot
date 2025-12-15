@@ -1,6 +1,8 @@
 name: Stock Scraper Schedule
 
 on:
+  push:
+    branches: [ "main" ]
   schedule:
     # UTC Times: KST - 9 hours
     # 10:00 KST -> 01:00 UTC

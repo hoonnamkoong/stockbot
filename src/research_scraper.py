@@ -6,7 +6,7 @@ import os
 import re
 import collections
 from collections import Counter
-import pdf_analyzer
+# import pdf_analyzer # Disabled to prevent EasyOCR dependency error
 import time
 import random
 

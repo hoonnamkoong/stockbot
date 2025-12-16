@@ -1,0 +1,31 @@
+name: Weekly Stock Report
+
+on:
+  schedule:
+    # Friday 16:30 KST -> 07:30 UTC
+    - cron: '30 7 * * 5'
+  workflow_dispatch:
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout content
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          
+      - name: Generate and Send Report
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: |
+          python src/weekly_reporter.py

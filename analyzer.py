@@ -67,7 +67,7 @@ def analyze_discussion_trend(data_list):
     print("\n[Analysis Result] Top Trending Stocks")
     print(df_result.head(10))
 
-    return df_result
+    return df_result, df_final[final_cols]
 
 
 

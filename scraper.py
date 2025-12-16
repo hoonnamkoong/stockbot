@@ -409,8 +409,8 @@ if __name__ == "__main__":
             r_msg += f"💡 시장 요약: {invest_summary[:300]}...\n\n"
             r_msg += f"👉 자세히 보기: {os.environ.get('DASHBOARD_URL', '')}"
             
-            tg_manager.send_message(r_msg)
-            print("[Research] Telegram Sent (via Manager).")
+            # tg_manager.send_message(r_msg) # User requested to disable Research Briefing (V7.1)
+            print("[Research] Telegram Sent (Disabled by User Request).")
             
         except Exception as tg_e:
             print(f"[Research] Telegram Error: {tg_e}")

@@ -438,8 +438,10 @@ export default function Home() {
                                                     boxShadow: '2px 0 5px rgba(0,0,0,0.1)'
                                                 }}
                                             >
-                                                <Text fw={700} component="a" href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" style={{ color: 'inherit', textDecoration: 'none' }}>
-                                                    {stock.name} 🔗
+                                                <Text fw={700}>
+                                                    <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                                                        {stock.name} 🔗
+                                                    </a>
                                                 </Text>
                                                 <Text size="xs" c="dimmed">{stock.code}</Text>
                                             </Table.Td>

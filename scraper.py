@@ -261,43 +261,18 @@ def get_discussion_stats(code):
             
             # Chunk 2: Update analysis call
             
-            if all_data:
-            print(f"\nAnalyzing total {len(all_data)} items...")
-            # Unpack English and Korean dataframes
-            result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
-            
-            # Save CSV (Korean)
-            filename = f"trending_integrated"
-            analyzer.save_to_csv(result_df_kr, filename_prefix=filename)
-            
-            # Save JSON for Frontend (English)
-            import json
-            # Ensure data folder exists
-            os.makedirs('data', exist_ok=True)
-            
-            json_records = result_df_en.to_dict('records')
-            with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
-                json.dump(json_records, f, ensure_ascii=False, indent=2)
-            print(f"Data saved to data/latest_stocks.json (for Dashboard)")
-            
-            # Prepare Data for Telegram (Korean)
-            records = result_df_kr.to_dict('records')
-            
-            # Filter Lists
-            kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
-            kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
-            # ...
-            response = requests.get(url, headers=headers, timeout=10)
-            # BS4 자동 감지 맡김
-
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            table = soup.select_one('table.type2')
-            if not table:
+            # 게시글 없으면 종료
+            if not rows: 
                 break
                 
-            rows = table.select('tr')
-            # 게시글 없으면 종료
+            # Max 800 check (User Request)
+            if len(collected_posts) >= 800:
+                stop_collecting = True
+                break
+                
+            found_post_in_page = False
+            
+            for row in rows:
             if not rows: 
                 break
                 

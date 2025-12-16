@@ -3,8 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 from datetime import datetime, timedelta
 import time
-
-
+import os
 import sys
 
 # sys.stdout.reconfigure 제거 (Next.js 환경변수 제어)

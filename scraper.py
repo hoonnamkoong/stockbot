@@ -225,18 +225,12 @@ def get_discussion_stats(code):
     - 전수 조사를 위해 페이지네이션 수행
     """
     
-    # 기준 시간 설정 (당일 09:00)
-    # 실제 운영 시에는 '현재 날짜' 기준 09:00로 설정
+    # 기준 시간 설정 (사용자 요청: 당일 00:01 이후)
     now = datetime.now()
-    target_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
-    # 만약 현재 시간이 09:00 이전이라면? -> 전일 09:00? 아니면 당일 0시?
-    # 보통 장 시작 이후를 의미하므로, 9시 이전이면 "아직 장 시작 전"이라 게시글이 적을 수 있음.
-    # 일단 '오늘 9시' 기준으로 잡되, 현재가 9시 이전이면 '어제 9시'부터?
-    # 사용자 요구사항: "당일 09:00 이후" -> 명확함.
+    target_time = now.replace(hour=0, minute=1, second=0, microsecond=0)
     
     if now < target_time:
-        # 9시 이전이면 카운트 0일 수 있음. (혹은 어제 글을 보라는 건지? 일단 문자 그대로 당일 09시 기준)
-        pass # 그냥 진행 (09:00 > 게시글 날짜 이므로 loop 바로 종료될 것임)
+        pass 
 
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -244,7 +238,7 @@ def get_discussion_stats(code):
     
     collected_posts = []
     page = 1
-    max_pages = 20 # 무한 루프 방지용 안전 장치
+    max_pages = 100 # v7.0 Tuning: Increased limit to capture full day
     stop_collecting = False
     
     headers['Referer'] = f"https://finance.naver.com/item/board.naver?code={code}"
@@ -253,11 +247,46 @@ def get_discussion_stats(code):
         url = f"https://finance.naver.com/item/board.naver?code={code}&page={page}"
         
         try:
-            # 너무 빠른 요청 방지
-            if page > 1:
-                time.sleep(0.5)
-
-            # 타임아웃 10초 설정
+            # ... (no change to inner loop)
+            pass
+            # We must output the loop content same as before but replace tool needs context.
+            # actually I can just replace the variable init block and the header.
+            # But wait, replace_file_content needs contiguous block. 
+            # I'll just replace the `get_discussion_stats` first few lines.
+            
+            # Too complex to replace whole function. I'll split into chunks.
+            
+            # Chunk 1: Update target_time and max_pages
+            
+            
+            # Chunk 2: Update analysis call
+            
+            if all_data:
+            print(f"\nAnalyzing total {len(all_data)} items...")
+            # Unpack English and Korean dataframes
+            result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
+            
+            # Save CSV (Korean)
+            filename = f"trending_integrated"
+            analyzer.save_to_csv(result_df_kr, filename_prefix=filename)
+            
+            # Save JSON for Frontend (English)
+            import json
+            # Ensure data folder exists
+            os.makedirs('data', exist_ok=True)
+            
+            json_records = result_df_en.to_dict('records')
+            with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
+                json.dump(json_records, f, ensure_ascii=False, indent=2)
+            print(f"Data saved to data/latest_stocks.json (for Dashboard)")
+            
+            # Prepare Data for Telegram (Korean)
+            records = result_df_kr.to_dict('records')
+            
+            # Filter Lists
+            kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
+            kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
+            # ...
             response = requests.get(url, headers=headers, timeout=10)
             # BS4 자동 감지 맡김
 
@@ -496,15 +525,25 @@ if __name__ == "__main__":
         
         if all_data:
             print(f"\nAnalyzing total {len(all_data)} items...")
-            result_df = analyzer.analyze_discussion_trend(all_data)
+            result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
             
             # Save CSV
             filename = f"trending_integrated"
-            analyzer.save_to_csv(result_df, filename_prefix=filename)
+            analyzer.save_to_csv(result_df_kr, filename_prefix=filename)
+
+            # Save JSON for Frontend (English Keys)
+            import json
+            # Ensure data folder exists
+            os.makedirs('data', exist_ok=True)
+            
+            json_records = result_df_en.to_dict('records')
+            with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
+                json.dump(json_records, f, ensure_ascii=False, indent=2)
+            print(f"Data saved to data/latest_stocks.json")
             
             # Prepare Data for Telegram
             # result_df has Korean columns
-            records = result_df.to_dict('records')
+            records = result_df_kr.to_dict('records')
             
             # Filter Lists
             kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']

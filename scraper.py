@@ -221,8 +221,8 @@ def get_stock_details(code):
 def get_discussion_stats(code):
     """
     특정 종목 토론실의 게시글 정보를 분석합니다.
-    - 당일 09:00 이후 게시글 정밀 카운팅
-    - 전수 조사를 위해 페이지네이션 수행
+    - 당일 00:01 이후 게시글 정밀 카운팅
+    - 최대 800개 제한
     """
     
     # 기준 시간 설정 (사용자 요청: 당일 00:01 이후)
@@ -238,7 +238,7 @@ def get_discussion_stats(code):
     
     collected_posts = []
     page = 1
-    max_pages = 50 # Limit for ~1000 posts (User Request: Max 800)
+    max_pages = 50 # v7.0 Tuning: Limit to ~1000 posts (User Request: 800)
     stop_collecting = False
     
     headers['Referer'] = f"https://finance.naver.com/item/board.naver?code={code}"
@@ -247,21 +247,17 @@ def get_discussion_stats(code):
         url = f"https://finance.naver.com/item/board.naver?code={code}&page={page}"
         
         try:
-            # ... (no change to inner loop)
-            pass
-            # We must output the loop content same as before but replace tool needs context.
-            # actually I can just replace the variable init block and the header.
-            # But wait, replace_file_content needs contiguous block. 
-            # I'll just replace the `get_discussion_stats` first few lines.
+            if page > 1:
+                time.sleep(0.5)
+
+            response = requests.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Too complex to replace whole function. I'll split into chunks.
-            
-            # Chunk 1: Update target_time and max_pages
-            
-            
-            # Chunk 2: Update analysis call
-            
-            # 게시글 없으면 종료
+            table = soup.select_one('table.type2')
+            if not table:
+                break
+                
+            rows = table.select('tr')
             if not rows: 
                 break
                 
@@ -273,26 +269,17 @@ def get_discussion_stats(code):
             found_post_in_page = False
             
             for row in rows:
-            if not rows: 
-                break
-                
-            found_post_in_page = False
-            
-            for row in rows:
                 cols = row.select('td')
                 if len(cols) < 5:
                     continue
                 
                 try:
-                    # 날짜 확인
-                    # 네이버 금융 날짜 포맷: "2024.05.21 14:30"
+                    # 날짜 확인 "2024.05.21 14:30"
                     date_text = cols[0].get_text(strip=True)
                     
-                    # 날짜 형식이 맞는지 확인 (가끔 공지사항 등이 섞일 수 있음)
                     try:
                         post_date = datetime.strptime(date_text, "%Y.%m.%d %H:%M")
                     except ValueError:
-                        # 날짜 파싱 실패 시 무시 (헤더나 공지일 수 있음)
                         continue
                         
                     found_post_in_page = True
@@ -300,7 +287,7 @@ def get_discussion_stats(code):
                     # 기준 시간 체크
                     if post_date < target_time:
                         stop_collecting = True
-                        break # 더 이상 볼 필요 없음 (과거 글)
+                        break # 과거 글
                     
                     # 수집 대상
                     title = ""
@@ -315,17 +302,12 @@ def get_discussion_stats(code):
 
                     collected_posts.append({
                         'title': title,
-                        'date': date_text, # 원본 텍스트 유지 (표시용)
+                        'date': date_text,
                         'views': views
                     })
                     
                 except Exception:
                     continue
-            
-            # 페이지에 유효한 게시글 태그가 하나도 없었다면? (구조 변경 등) -> 다음 페이지 가봐야 함?
-            # 아니면 그냥 종료?
-            # 일단 found_post_in_page가 False여도(공지사항만 있거나) 다음 페이지 시도할 수 있음.
-            # 하지만 보통 1페이지에 없으면 데이터가 없는 것.
             
             page += 1
             
@@ -335,9 +317,9 @@ def get_discussion_stats(code):
             
     return {
         'code': code,
-        'recent_posts_count': len(collected_posts), # 정밀 카운팅 된 숫자
-        'latest_posts': collected_posts[:5], # 분석용으로는 전체가 필요할 수 있으나, 리턴은 일부만 (Analyzer에는 전체 전달 필요하면 구조 수정)
-        'all_posts_titles': [p['title'] for p in collected_posts] # 감성 분석용 전체 제목 리스트
+        'recent_posts_count': len(collected_posts),
+        'latest_posts': collected_posts[:5], 
+        'all_posts_titles': [p['title'] for p in collected_posts] 
     }
 
 

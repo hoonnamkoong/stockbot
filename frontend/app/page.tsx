@@ -11,16 +11,23 @@ type Stock = {
     market: string;
     code: string;
     name: string;
-    price: string;
+    price?: string;
+    current_price?: string; // Legacy fallback
     prev_close?: string;
+    yesterday_close?: string; // Legacy fallback
     change_rate: string;
     volume?: string;
-    recent_posts_count: number;
-    foreign_rate: string;
+    recent_posts_count?: number;
+    count_today?: number; // Legacy fallback
+    foreign_rate?: string;
+    foreign_ratio_today?: string; // Legacy fallback
     prev_foreign_rate?: string;
-    posts_summary: string;
+    foreign_ratio_yesterday?: string; // Legacy fallback
+    posts_summary?: string;
+    summary?: string; // Legacy fallback
     sentiment: string;
-    is_last_captured: boolean;
+    is_last_captured?: boolean;
+    is_consecutive?: boolean; // Legacy fallback
     [key: string]: any; // Index signature for sorting
 };
 
@@ -389,11 +396,11 @@ export default function Home() {
                                         <Badge color={stock.change_rate.includes('+') ? 'red' : 'blue'}>{stock.change_rate}</Badge>
                                     </Group>
                                     <Group gap="xs" mb="xs">
-                                        <Text size="sm" c="dimmed">Posts: <b>{stock.recent_posts_count}</b></Text>
-                                        <Text size="sm" c="dimmed">For.: {stock.foreign_rate}</Text>
+                                        <Text size="sm" c="dimmed">Posts: <b>{stock.recent_posts_count || stock.count_today}</b></Text>
+                                        <Text size="sm" c="dimmed">For.: {stock.foreign_rate || stock.foreign_ratio_today}</Text>
                                     </Group>
-                                    {stock.is_last_captured && <Badge variant="outline" mb="xs" color="green" size="sm" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
-                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary}</Text>
+                                    {(stock.is_last_captured || stock.is_consecutive) && <Badge variant="outline" mb="xs" color="green" size="sm" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
+                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary || stock.summary}</Text>
                                 </Card>
                             ))}
                         </div>
@@ -448,28 +455,28 @@ export default function Home() {
                                                 </Text>
                                                 <Text size="xs" c="dimmed">{stock.code}</Text>
                                             </Table.Td>
-                                            <Table.Td>{stock.price}</Table.Td>
-                                            <Table.Td>{stock.prev_close}</Table.Td>
+                                            <Table.Td>{stock.price || stock.current_price}</Table.Td>
+                                            <Table.Td>{stock.prev_close || stock.yesterday_close}</Table.Td>
                                             <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
                                             <Table.Td>{stock.volume}</Table.Td>
-                                            <Table.Td>{stock.recent_posts_count}</Table.Td>
-                                            <Table.Td>{stock.foreign_rate}</Table.Td>
-                                            <Table.Td>{stock.prev_foreign_rate}</Table.Td>
+                                            <Table.Td>{stock.recent_posts_count || stock.count_today}</Table.Td>
+                                            <Table.Td>{stock.foreign_rate || stock.foreign_ratio_today}</Table.Td>
+                                            <Table.Td>{stock.prev_foreign_rate || stock.foreign_ratio_yesterday}</Table.Td>
                                             <Table.Td>
                                                 <Badge color={stock.sentiment === '긍정' ? 'green' : stock.sentiment === '부정' ? 'red' : 'gray'}>
                                                     {stock.sentiment}
                                                 </Badge>
                                             </Table.Td>
-                                            <Table.Td>{stock.is_last_captured ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
+                                            <Table.Td>{(stock.is_last_captured || stock.is_consecutive) ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
                                             <Table.Td style={{ maxWidth: 200 }}>
                                                 <Popover width={300} position="bottom" withArrow shadow="md">
                                                     <Popover.Target>
                                                         <Text truncate style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-                                                            {stock.posts_summary}
+                                                            {stock.posts_summary || stock.summary}
                                                         </Text>
                                                     </Popover.Target>
                                                     <Popover.Dropdown>
-                                                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary}</Text>
+                                                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary || stock.summary}</Text>
                                                     </Popover.Dropdown>
                                                 </Popover>
                                             </Table.Td>

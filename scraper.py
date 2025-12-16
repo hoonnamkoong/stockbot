@@ -238,7 +238,7 @@ def get_discussion_stats(code):
     
     collected_posts = []
     page = 1
-    max_pages = 100 # v7.0 Tuning: Increased limit to capture full day
+    max_pages = 50 # Limit for ~1000 posts (User Request: Max 800)
     stop_collecting = False
     
     headers['Referer'] = f"https://finance.naver.com/item/board.naver?code={code}"

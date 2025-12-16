@@ -471,6 +471,10 @@ if __name__ == "__main__":
         # Initialize Manager
         tg_manager = TelegramManager()
         
+        # DEBUG: Check credentials
+        print(f"[DEBUG] Telegram Token Loaded: {bool(tg_manager.token)}")
+        print(f"[DEBUG] Telegram Chat ID Loaded: {bool(tg_manager.chat_id)}")
+        
         # 1. Dashboard Link (ALWAYS FIRST) -> Moved here or keep at top? 
         # User wants it FIRST. We already did it at step 0. 
         # But let's verify if we should keep it there.

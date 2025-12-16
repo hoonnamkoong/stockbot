@@ -331,6 +331,9 @@ export default function Home() {
                 {/* Responsive Navigation Layout */}
                 {isMobile ? (
                     <div className="flex flex-col gap-3 mb-4">
+                        <Group justify="space-between" align="center" mb={-5}>
+                            <Text size="xs" c="dimmed">🕒 Update: {lastUpdated}</Text>
+                        </Group>
                         <Tabs value={activeTab} onChange={setActiveTab}>
                             <Tabs.List grow>
                                 <Tabs.Tab value="ALL">전체</Tabs.Tab>
@@ -518,64 +521,64 @@ export default function Home() {
             </Modal >
 
             {/* Research List Modal */}
-            < Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="90%" styles={{ body: { height: '80vh', overflow: 'hidden' } }}>
+            < Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="90%" styles={{ body: { height: '80vh', overflow: 'hidden', padding: 0 } }}>
                 {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
                     isMobile ? (
                         // --- Mobile View (Stacked) ---
-                        <div className="flex flex-col gap-4">
-                            {/* Insight Summary Top */}
-                            <Paper withBorder p="sm" bg="blue.0" radius="md">
-                                <Group mb="xs">
-                                    <IconNews size={20} color="#228be6" />
-                                    <Text fw={700} size="md" c="blue.8">오늘의 시장 인사이트</Text>
-                                </Group>
-                                <ScrollArea h={150}>
+                        <ScrollArea h="100%" p="md">
+                            <div className="flex flex-col gap-4">
+                                {/* Insight Summary Top */}
+                                <Paper withBorder p="sm" bg="blue.0" radius="md">
+                                    <Group mb="xs">
+                                        <IconNews size={20} color="#228be6" />
+                                        <Text fw={700} size="md" c="blue.8">오늘의 시장 인사이트</Text>
+                                    </Group>
                                     <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
                                         {research[selectedResearchCategory].summary}
                                     </Text>
-                                </ScrollArea>
-                            </Paper>
+                                </Paper>
 
-                            {/* List Area */}
-                            <div className="flex flex-col gap-3">
-                                {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                                    <Card key={idx} shadow="sm" padding="md" radius="md" withBorder>
-                                        <Text fw={700} size="md" mb="xs">{item.title}</Text>
+                                {/* List Area */}
+                                <div className="flex flex-col gap-3">
+                                    {research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                                        <Card key={idx} shadow="sm" padding="md" radius="md" withBorder>
+                                            <Text fw={700} size="md" mb="xs">{item.title}</Text>
 
-                                        {/* Tags */}
-                                        <Group gap={6} mb="sm">
-                                            <Badge color="gray" size="xs">{item.date}</Badge>
-                                            {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
-                                                <Badge size="xs" color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
-                                                    {item.pdf_analysis.opinion}
-                                                </Badge>
-                                            )}
-                                        </Group>
+                                            {/* Tags */}
+                                            <Group gap={6} mb="sm">
+                                                <Badge color="gray" size="xs">{item.date}</Badge>
+                                                {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
+                                                    <Badge size="xs" color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
+                                                        {item.pdf_analysis.opinion}
+                                                    </Badge>
+                                                )}
+                                            </Group>
 
-                                        {/* Summary */}
-                                        <Paper bg="gray.1" p="xs" radius="sm" mb="sm">
-                                            <Text size="xs" c="dimmed" lineClamp={4}>
-                                                {item.body_summary || "요약 내용이 없습니다."}
-                                            </Text>
-                                        </Paper>
+                                            {/* Summary */}
+                                            <Paper bg="gray.1" p="xs" radius="sm" mb="sm">
+                                                <Text size="xs" c="dimmed" lineClamp={4}>
+                                                    {item.body_summary || "요약 내용이 없습니다."}
+                                                </Text>
+                                            </Paper>
 
-                                        {/* Buttons */}
-                                        <Group justify="end" gap="xs">
-                                            <Button variant="light" size="xs" component="a" href={item.link} target="_blank">본문</Button>
-                                            {item.pdf_link && (
-                                                <>
-                                                    <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">PDF</Button>
-                                                    <Button variant="filled" color="violet" size="xs" onClick={() => setPdfItem(item)}>분석</Button>
-                                                </>
-                                            )}
-                                        </Group>
-                                    </Card>
-                                ))}
+                                            {/* Buttons */}
+                                            <Group justify="end" gap="xs">
+                                                <Button variant="light" size="xs" component="a" href={item.link} target="_blank">본문</Button>
+                                                {item.pdf_link && (
+                                                    <>
+                                                        <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">PDF</Button>
+                                                        <Button variant="filled" color="violet" size="xs" onClick={() => setPdfItem(item)}>분석</Button>
+                                                    </>
+                                                )}
+                                            </Group>
+                                        </Card>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        </ScrollArea>
                     ) : (
                         // --- Desktop View (Grid) ---
-                        <Grid h="90%" gutter="xl">
+                        <Grid h="90%" gutter="xl" p="md">
                             {/* LEFT: Daily Briefing (Expanded) */}
                             <Grid.Col span={4}>
                                 <Paper withBorder p="md" bg="blue.0" h="100%" radius="md">

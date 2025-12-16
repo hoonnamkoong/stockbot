@@ -202,6 +202,13 @@ def fetch_section_reports(section_key):
             if not title_node: continue
 
             title = title_node.get_text(strip=True)
+            
+            # [User Request V7.2] Prepend Stock Name (e.g., "Company Name Report Title")
+            if section_key == 'company' and len(cols) > 1:
+                stock_name = cols[0].get_text(strip=True)
+                if stock_name and stock_name not in title:
+                     title = f"[{stock_name}] {title}"
+
             link_href = title_node['href']
             
             if link_href.startswith('/'):

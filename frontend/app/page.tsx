@@ -11,16 +11,16 @@ type Stock = {
     market: string;
     code: string;
     name: string;
-    current_price: string;
-    yesterday_close?: string;
+    price: string;
+    prev_close?: string;
     change_rate: string;
     volume?: string;
-    count_today: number;
-    foreign_ratio_today: string;
-    foreign_ratio_yesterday?: string;
-    summary: string;
+    recent_posts_count: number;
+    foreign_rate: string;
+    prev_foreign_rate?: string;
+    posts_summary: string;
     sentiment: string;
-    is_consecutive: boolean;
+    is_last_captured: boolean;
     [key: string]: any; // Index signature for sorting
 };
 
@@ -39,7 +39,7 @@ export default function Home() {
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card'); // 'card' or 'table'
 
     // Sorting State
-    const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'asc' | 'desc' }>({ key: 'count_today', direction: 'desc' });
+    const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'asc' | 'desc' }>({ key: 'recent_posts_count', direction: 'desc' });
 
     // Scraper Control
     const [controlOpened, { open: openControl, close: closeControl }] = useDisclosure(false);
@@ -386,11 +386,11 @@ export default function Home() {
                                         <Badge color={stock.change_rate.includes('+') ? 'red' : 'blue'}>{stock.change_rate}</Badge>
                                     </Group>
                                     <Group gap="xs" mb="xs">
-                                        <Text size="sm" c="dimmed">Posts: <b>{stock.count_today}</b></Text>
-                                        <Text size="sm" c="dimmed">For.: {stock.foreign_ratio_today}</Text>
+                                        <Text size="sm" c="dimmed">Posts: <b>{stock.recent_posts_count}</b></Text>
+                                        <Text size="sm" c="dimmed">For.: {stock.foreign_rate}</Text>
                                     </Group>
-                                    {stock.is_consecutive && <Badge variant="outline" mb="xs" color="green" size="sm" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
-                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.summary}</Text>
+                                    {stock.is_last_captured && <Badge variant="outline" mb="xs" color="green" size="sm" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
+                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary}</Text>
                                 </Card>
                             ))}
                         </div>
@@ -413,11 +413,11 @@ export default function Home() {
                                         >
                                             종목명 (코드) {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
                                         </Table.Th>
-                                        <Table.Th onClick={() => handleSort('current_price')} style={{ cursor: 'pointer' }}>현재가 {sortConfig?.key === 'current_price' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('price')} style={{ cursor: 'pointer' }}>현재가 {sortConfig?.key === 'price' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                         <Table.Th>어제가</Table.Th>
                                         <Table.Th onClick={() => handleSort('change_rate')} style={{ cursor: 'pointer' }}>등락률 {sortConfig?.key === 'change_rate' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                         <Table.Th onClick={() => handleSort('volume')} style={{ cursor: 'pointer' }}>거래량 {sortConfig?.key === 'volume' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th onClick={() => handleSort('count_today')} style={{ cursor: 'pointer' }}>토론글 {sortConfig?.key === 'count_today' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('recent_posts_count')} style={{ cursor: 'pointer' }}>토론글 {sortConfig?.key === 'recent_posts_count' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                         <Table.Th>외인비(현)</Table.Th>
                                         <Table.Th>외인비(전)</Table.Th>
                                         <Table.Th>감성</Table.Th>
@@ -441,28 +441,28 @@ export default function Home() {
                                                 <Text fw={700}>{stock.name}</Text>
                                                 <Text size="xs" c="dimmed">{stock.code}</Text>
                                             </Table.Td>
-                                            <Table.Td>{stock.current_price}</Table.Td>
-                                            <Table.Td>{stock.yesterday_close}</Table.Td>
+                                            <Table.Td>{stock.price}</Table.Td>
+                                            <Table.Td>{stock.prev_close}</Table.Td>
                                             <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
                                             <Table.Td>{stock.volume}</Table.Td>
-                                            <Table.Td>{stock.count_today}</Table.Td>
-                                            <Table.Td>{stock.foreign_ratio_today}</Table.Td>
-                                            <Table.Td>{stock.foreign_ratio_yesterday}</Table.Td>
+                                            <Table.Td>{stock.recent_posts_count}</Table.Td>
+                                            <Table.Td>{stock.foreign_rate}</Table.Td>
+                                            <Table.Td>{stock.prev_foreign_rate}</Table.Td>
                                             <Table.Td>
                                                 <Badge color={stock.sentiment === '긍정' ? 'green' : stock.sentiment === '부정' ? 'red' : 'gray'}>
                                                     {stock.sentiment}
                                                 </Badge>
                                             </Table.Td>
-                                            <Table.Td>{stock.is_consecutive ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
+                                            <Table.Td>{stock.is_last_captured ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
                                             <Table.Td style={{ maxWidth: 200 }}>
                                                 <Popover width={300} position="bottom" withArrow shadow="md">
                                                     <Popover.Target>
                                                         <Text truncate style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-                                                            {stock.summary}
+                                                            {stock.posts_summary}
                                                         </Text>
                                                     </Popover.Target>
                                                     <Popover.Dropdown>
-                                                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.summary}</Text>
+                                                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary}</Text>
                                                     </Popover.Dropdown>
                                                 </Popover>
                                             </Table.Td>

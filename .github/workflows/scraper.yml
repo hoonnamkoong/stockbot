@@ -46,5 +46,6 @@ jobs:
           git config --global user.name "StockBot"
           git config --global user.email "bot@stockbot.com"
           git add data/ trending_*.csv
-            git push
-          fi
+          git commit -m "data: Update stock data and research reports" || exit 0
+          git pull --rebase -Xtheirs origin main
+          git push

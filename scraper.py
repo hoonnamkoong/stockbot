@@ -466,23 +466,15 @@ if __name__ == "__main__":
     # --- 5. Telegram Notification (Refactored V7.0 - Zero Base) ---
     try:
         from src.telegram_manager import TelegramManager
-        
-        # Initialize Manager
-        tg_manager = TelegramManager()
-        
-        # DEBUG: Check credentials
-        print(f"[DEBUG] Telegram Token Loaded: {bool(tg_manager.token)}")
-        print(f"[DEBUG] Telegram Chat ID Loaded: {bool(tg_manager.chat_id)}")
-        
-        # 1. Dashboard Link (ALWAYS FIRST) -> Moved here or keep at top? 
-        # User wants it FIRST. We already did it at step 0. 
-        # But let's verify if we should keep it there.
-        # Yes, keep step 0 separate logic or integrate? 
-        # Let's clean up step 0 to use Manager too, but since we are replacing the end block, 
-        # let's just focus on the end block first.
-        
-        # Actually, let's look at the "Stock Data Report" part.
-        
+        try:
+            tg_manager = TelegramManager()
+            # DEBUG: Check credentials
+            print(f"[DEBUG] Telegram Token Loaded: {bool(tg_manager.token)}")
+            print(f"[DEBUG] Telegram Chat ID Loaded: {bool(tg_manager.chat_id)}")
+        except Exception as e:
+            print(f"[WARNING] Failed to initialize TelegramManager: {e}")
+            tg_manager = None
+
         if all_data:
             print(f"\nAnalyzing total {len(all_data)} items...")
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
@@ -493,7 +485,6 @@ if __name__ == "__main__":
 
             # Save JSON for Frontend (English Keys)
             import json
-            # Ensure data folder exists
             os.makedirs('data', exist_ok=True)
             
             json_records = result_df_en.to_dict('records')
@@ -501,42 +492,52 @@ if __name__ == "__main__":
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
             print(f"Data saved to data/latest_stocks.json")
             
-            # Prepare Data for Telegram
-            # result_df has Korean columns
-            records = result_df_kr.to_dict('records')
-            
-            # Filter Lists
-            kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
-            kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
-            
-            # Send Reports
-            if kospi_items:
-                tg_manager.send_market_report('KOSPI', kospi_items)
-                time.sleep(1)
-                
-            if kosdaq_items:
-                tg_manager.send_market_report('KOSDAQ', kosdaq_items)
-                time.sleep(1)
+            # Send Reports (Safe Mode)
+            if tg_manager:
+                try:
+                    # Filter Lists
+                    records = result_df_kr.to_dict('records')
+                    kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
+                    kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
+                    
+                    if kospi_items:
+                        tg_manager.send_market_report('KOSPI', kospi_items)
+                        time.sleep(1)
+                        
+                    if kosdaq_items:
+                        tg_manager.send_market_report('KOSDAQ', kosdaq_items)
+                        time.sleep(1)
 
-            # 2. Dashboard Link (Checking V7.0 Requirement: Last Message)
-            print(f"[System] Sending Dashboard Link last... (v7.0)")
-            tg_manager.send_dashboard_link()
+                    # 2. Dashboard Link
+                    print(f"[System] Sending Dashboard Link last... (v7.0)")
+                    tg_manager.send_dashboard_link()
+                except Exception as send_err:
+                    print(f"[ERROR] details sending Telegram: {send_err}")
+            else:
+                 print("[System] TelegramManager not available. Skipping notifications.")
 
         else:
             print("No data collected meeting the threshold.")
-            tg_manager.send_no_data_alert(threshold)
-            
-        # Save Status JSON for Frontend
-        import json
-        status_data = {
-            "last_updated": now_kst.strftime('%Y-%m-%d %H:%M:%S'),
-            "message": "Data updated successfully"
-        }
-        with open('data/status.json', 'w', encoding='utf-8') as f:
-            json.dump(status_data, f, ensure_ascii=False, indent=2)
+            if tg_manager:
+                tg_manager.send_no_data_alert(threshold)
 
     except Exception as e:
-        print(f"Failed to send notification (v7.0): {e}")
+        print(f"Failed in notification/saving section: {e}")
+
+    finally:
+        # Save Status JSON for Frontend (ALWAYS RUN)
+        try:
+            import json
+            status_data = {
+                "last_updated": now_kst.strftime('%Y-%m-%d %H:%M:%S'),
+                "message": "Data updated successfully" if all_data else "No data collected",
+                "count": len(all_data) if 'all_data' in locals() else 0
+            }
+            with open('data/status.json', 'w', encoding='utf-8') as f:
+                json.dump(status_data, f, ensure_ascii=False, indent=2)
+            print(f"[System] status.json updated at {status_data['last_updated']}")
+        except Exception as status_e:
+            print(f"[ERROR] Failed to save status.json: {status_e}")
 
     except Exception as e:
         print(f"Failed to send notification (v7.0): {e}")

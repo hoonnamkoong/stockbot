@@ -491,6 +491,18 @@ if __name__ == "__main__":
             with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
             print(f"Data saved to data/latest_stocks.json")
+
+            # [User Request V7.3] Save Time-Specific Snapshot
+            # Map current hour to slot (10:00, 13:00, 15:00)
+            snapshot_name = None
+            if 9 <= hour <= 10: snapshot_name = "stocks_1000.json"
+            elif 12 <= hour <= 13: snapshot_name = "stocks_1300.json"
+            elif 14 <= hour <= 16: snapshot_name = "stocks_1500.json" # Covers 15:xx and 16:xx
+
+            if snapshot_name:
+                with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
+                    json.dump(json_records, f, ensure_ascii=False, indent=2)
+                print(f"Snapshot saved: data/{snapshot_name}")
             
             # Send Reports (Safe Mode)
             if tg_manager:

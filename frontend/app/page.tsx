@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover, Grid, Flex, SegmentedControl, Divider, ActionIcon } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
-import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
+import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown, IconSettings } from '@tabler/icons-react';
 import { clsx } from 'clsx';
 
 // --- Types ---
@@ -317,14 +317,23 @@ export default function Home() {
                             </>
                         ) : (
                             /* Desktop: Full Buttons */
-                            <>
-                                <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
-                                    Control
+                            <Group gap="xs">
+                                <Button
+                                    variant="light"
+                                    color="violet"
+                                    onClick={openControl}
+                                    leftSection={<IconSettings size={16} />}
+                                >
+                                    스크래퍼 제어
                                 </Button>
-                                <Button variant="subtle" size="xs" onClick={() => fetchData()} leftSection={<IconRefresh size={14} />}>
-                                    {loading ? '...' : <IconRefresh />}
+                                <Button
+                                    variant="default"
+                                    onClick={() => fetchData()}
+                                    leftSection={<IconRefresh size={16} className={loading ? 'animate-spin' : ''} />}
+                                >
+                                    데이터 갱신
                                 </Button>
-                            </>
+                            </Group>
                         )}
                     </Group>
                 </Group>

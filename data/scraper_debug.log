@@ -1,60 +1,60 @@
-[10:11:12] === StockBot Research Scraper Started (V2.0) ===
-[10:11:12] --- Section: invest ---
-[10:11:14] [invest] Today: 7 items
-[10:11:14]    Processing: 4000p는 PER 10배, 적정은 11배 예상
-[10:11:14]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37283&page=1
-[10:11:15]    Processing: KOSPI 4,000 선 지지력 확인, 든든한 반도체
-[10:11:15]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37282&page=1
-[10:11:16]    Processing: 12/18, 미 증시, 오라클 데이터센터 쇼크 속 기술주 ..
-[10:11:16]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37281&page=1
-[10:11:18]    Processing: [IBKS Daily]Start with IBKS (2025.12.18) 코스피 4,..
-[10:11:18]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37280&page=1
-[10:11:19]    Processing: Embodied AI의 핵심소재, Rare Earth Elements 희토류..
-[10:11:19]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37279&page=1
-[10:11:20]    Processing: 12/18 달러, 안전자산 수요에 상승
-[10:11:20]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37278&page=1
-[10:11:22]    Processing: [중국은 지금] 11월 실물 지표: 둔화 확인. 정책 대응..
-[10:11:22]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37277&page=1
-[10:11:23] --- Section: company ---
-[10:11:24] [company] Today: 28 items
-[10:11:24]    Processing: [미스토홀딩스] 자사주 전량 소각으로 기업가치 제고
-[10:11:24]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88785&page=1
-[10:11:25]    Processing: [미투온] 소셜카지노에서 종합 엔터테인먼트 IP 그룹으..
-[10:11:25]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88784&page=1
-[10:11:27]    Processing: [KT밀리의서재] 전자책에서 스토리 엔터테인먼트 플랫폼으로 ..
-[10:11:27]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88783&page=1
-[10:11:28]    Processing: [더핑크퐁컴퍼니] 핵심 IP 성숙기 이후, 새로운 성장 사이클 진..
-[10:11:28]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88782&page=1
-[10:11:29]    Processing: [노머스] 중국 진출 앞둔 점진적 성장 구간 진입
-[10:11:29]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88781&page=1
-[10:11:31]    Processing: [디앤씨미디어] 나혼렙 이후의 그림: 다중 IP 사이클이 열린..
-[10:11:31]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88780&page=1
-[10:11:32]    Processing: [SAMG엔터] IP 확장과 라이선스 비중 상승으로 체질 개선..
-[10:11:32]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88779&page=1
-[10:11:33]    Processing: [삼성바이오로직스] 성장 스토리는 여전히 유효
-[10:11:33]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88778&page=1
-[10:11:34]    Processing: [스튜디오드래곤] 반격의 2026년
-[10:11:34]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88777&page=1
-[10:11:36]    Processing: [티에프이] 메모리, 비메모리 모두 맑음
-[10:11:36]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88776&page=1
-[10:11:37] --- Section: industry ---
-[10:11:38] [industry] Today: 5 items
-[10:11:38]    Processing: 물량 저성장을 판가-원가 Spread 확대로 만회..
-[10:11:38]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42776&page=1
-[10:11:40]    Processing: 유통/의류 세미나
-[10:11:40]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42775&page=1
-[10:11:41]    Processing: K-IP 산업 심층분석 글로벌 IP 패권 경쟁 속 ..
-[10:11:41]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42774&page=1
-[10:11:42]    Processing: [Micron technology] 26년 1분기 실적 리뷰
-[10:11:42]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42773&page=1
-[10:11:43]    Processing: [IBKS Daily] 인터넷/게임
-[10:11:43]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42772&page=1
-[10:11:45] --- Section: economy ---
-[10:11:46] [economy] Today: 3 items
-[10:11:46]    Processing: [Global Macro Alert] 9월 FOMC: 점도표와 기자회견의..
-[10:11:46]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12772&page=1
-[10:11:47]    Processing: 12/18, Kiwoom Morning Letter
-[10:11:47]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12771&page=1
-[10:11:48]    Processing: 빨라진 중국 경기 둔화, 중국만의 문제가 아니다
-[10:11:48]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12770&page=1
-[10:11:49] === Completed ===
+[10:28:18] === StockBot Research Scraper Started (V2.0) ===
+[10:28:18] --- Section: invest ---
+[10:28:19] [invest] Today: 7 items
+[10:28:19]    Processing: 4000p는 PER 10배, 적정은 11배 예상
+[10:28:19]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37283&page=1
+[10:28:20]    Processing: KOSPI 4,000 선 지지력 확인, 든든한 반도체
+[10:28:20]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37282&page=1
+[10:28:21]    Processing: 12/18, 미 증시, 오라클 데이터센터 쇼크 속 기술주 ..
+[10:28:21]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37281&page=1
+[10:28:22]    Processing: [IBKS Daily]Start with IBKS (2025.12.18) 코스피 4,..
+[10:28:22]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37280&page=1
+[10:28:23]    Processing: Embodied AI의 핵심소재, Rare Earth Elements 희토류..
+[10:28:23]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37279&page=1
+[10:28:24]    Processing: 12/18 달러, 안전자산 수요에 상승
+[10:28:24]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37278&page=1
+[10:28:25]    Processing: [중국은 지금] 11월 실물 지표: 둔화 확인. 정책 대응..
+[10:28:25]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37277&page=1
+[10:28:27] --- Section: company ---
+[10:28:27] [company] Today: 28 items
+[10:28:27]    Processing: [미스토홀딩스] 자사주 전량 소각으로 기업가치 제고
+[10:28:27]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88785&page=1
+[10:28:28]    Processing: [미투온] 소셜카지노에서 종합 엔터테인먼트 IP 그룹으..
+[10:28:28]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88784&page=1
+[10:28:29]    Processing: [KT밀리의서재] 전자책에서 스토리 엔터테인먼트 플랫폼으로 ..
+[10:28:29]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88783&page=1
+[10:28:30]    Processing: [더핑크퐁컴퍼니] 핵심 IP 성숙기 이후, 새로운 성장 사이클 진..
+[10:28:30]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88782&page=1
+[10:28:31]    Processing: [노머스] 중국 진출 앞둔 점진적 성장 구간 진입
+[10:28:31]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88781&page=1
+[10:28:33]    Processing: [디앤씨미디어] 나혼렙 이후의 그림: 다중 IP 사이클이 열린..
+[10:28:33]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88780&page=1
+[10:28:34]    Processing: [SAMG엔터] IP 확장과 라이선스 비중 상승으로 체질 개선..
+[10:28:34]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88779&page=1
+[10:28:35]    Processing: [삼성바이오로직스] 성장 스토리는 여전히 유효
+[10:28:35]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88778&page=1
+[10:28:36]    Processing: [스튜디오드래곤] 반격의 2026년
+[10:28:36]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88777&page=1
+[10:28:37]    Processing: [티에프이] 메모리, 비메모리 모두 맑음
+[10:28:37]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88776&page=1
+[10:28:38] --- Section: industry ---
+[10:28:39] [industry] Today: 5 items
+[10:28:39]    Processing: 물량 저성장을 판가-원가 Spread 확대로 만회..
+[10:28:39]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42776&page=1
+[10:28:40]    Processing: 유통/의류 세미나
+[10:28:40]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42775&page=1
+[10:28:41]    Processing: K-IP 산업 심층분석 글로벌 IP 패권 경쟁 속 ..
+[10:28:41]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42774&page=1
+[10:28:42]    Processing: [Micron technology] 26년 1분기 실적 리뷰
+[10:28:42]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42773&page=1
+[10:28:43]    Processing: [IBKS Daily] 인터넷/게임
+[10:28:43]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42772&page=1
+[10:28:44] --- Section: economy ---
+[10:28:44] [economy] Today: 3 items
+[10:28:44]    Processing: [Global Macro Alert] 9월 FOMC: 점도표와 기자회견의..
+[10:28:44]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12772&page=1
+[10:28:45]    Processing: 12/18, Kiwoom Morning Letter
+[10:28:45]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12771&page=1
+[10:28:47]    Processing: 빨라진 중국 경기 둔화, 중국만의 문제가 아니다
+[10:28:47]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12770&page=1
+[10:28:48] === Completed ===

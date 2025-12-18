@@ -475,36 +475,41 @@ if __name__ == "__main__":
             print(f"[WARNING] Failed to initialize TelegramManager: {e}")
             tg_manager = None
 
+        # Prepare Data for Saving (Always, even if empty)
+        import json
+        os.makedirs('data', exist_ok=True)
+        
         if all_data:
             print(f"\nAnalyzing total {len(all_data)} items...")
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
+            json_records = result_df_en.to_dict('records')
             
-            # Save CSV
+            # Save CSV (History)
             filename = f"trending_integrated"
             analyzer.save_to_csv(result_df_kr, filename_prefix=filename)
+        else:
+            print(f"\n[System] No data collected (all below threshold {threshold}). Saving empty records.")
+            json_records = []
+            result_df_kr = None
 
-            # Save JSON for Frontend (English Keys)
-            import json
-            os.makedirs('data', exist_ok=True)
-            
-            json_records = result_df_en.to_dict('records')
-            with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
+        # Save JSON for Frontend (latest_stocks.json) - ALWAYS
+        with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
+            json.dump(json_records, f, ensure_ascii=False, indent=2)
+        print(f"Data saved to data/latest_stocks.json (Count: {len(json_records)})")
+
+        # [User Request V7.3] Save Time-Specific Snapshot - ALWAYS
+        snapshot_name = None
+        if 9 <= hour <= 10: snapshot_name = "stocks_1000.json"
+        elif 12 <= hour <= 13: snapshot_name = "stocks_1300.json"
+        elif 14 <= hour <= 16: snapshot_name = "stocks_1500.json"
+        
+        if snapshot_name:
+            with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
-            print(f"Data saved to data/latest_stocks.json")
+            print(f"Snapshot saved: data/{snapshot_name} (Count: {len(json_records)})")
 
-            # [User Request V7.3] Save Time-Specific Snapshot
-            # Map current hour to slot (10:00, 13:00, 15:00)
-            snapshot_name = None
-            if 9 <= hour <= 10: snapshot_name = "stocks_1000.json"
-            elif 12 <= hour <= 13: snapshot_name = "stocks_1300.json"
-            elif 14 <= hour <= 16: snapshot_name = "stocks_1500.json" # Covers 15:xx and 16:xx
-
-            if snapshot_name:
-                with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
-                    json.dump(json_records, f, ensure_ascii=False, indent=2)
-                print(f"Snapshot saved: data/{snapshot_name}")
-            
-            # Send Reports (Safe Mode)
+        # Telegram Notifications
+        if all_data:
             if tg_manager:
                 try:
                     # Filter Lists
@@ -527,11 +532,14 @@ if __name__ == "__main__":
                     print(f"[ERROR] details sending Telegram: {send_err}")
             else:
                  print("[System] TelegramManager not available. Skipping notifications.")
-
         else:
             print("No data collected meeting the threshold.")
             if tg_manager:
-                tg_manager.send_no_data_alert(threshold)
+                print(f"[System] Sending No Data Alert (Threshold: {threshold})")
+                try:
+                    tg_manager.send_no_data_alert(threshold)
+                except Exception as e:
+                    print(f"[ERROR] Failed to send No Data Alert: {e}")
 
     except Exception as e:
         print(f"Failed in notification/saving section: {e}")

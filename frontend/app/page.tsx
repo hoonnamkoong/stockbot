@@ -62,11 +62,20 @@ export default function Home() {
     const [selectedResearchCategory, setSelectedResearchCategory] = useState<string | null>(null);
     const [pdfItem, setPdfItem] = useState<any>(null);
 
+    // [User Request V7.3] Time Slot Filtering
+    const [timeSlot, setTimeSlot] = useState<string>('latest');
+    const TIME_SLOTS = [
+        { label: '최신 (Latest)', value: 'latest' },
+        { label: '10:00', value: '1000' },
+        { label: '13:00', value: '1300' },
+        { label: '15:00', value: '1500' },
+    ];
+
     useEffect(() => {
-        fetchData();
+        fetchData(timeSlot);
         const storedToken = localStorage.getItem('github_pat');
         if (storedToken) setGithubToken(storedToken);
-    }, []);
+    }, [timeSlot]);
 
     const [systemLogs, setSystemLogs] = useState<string[]>([]);
 
@@ -74,12 +83,18 @@ export default function Home() {
         setSystemLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
     };
 
-    const fetchData = async () => {
+    const fetchData = async (slot: string = 'latest') => {
         setLoading(true);
         addSystemLog("🔄 데이터 새로고침 시작...");
         try {
             const timeMap = new Date().getTime();
-            const stockUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/latest_stocks.json?t=${timeMap}`;
+            // Mapping slot to filename
+            let filename = 'latest_stocks.json';
+            if (slot !== 'latest') {
+                filename = `stocks_${slot}.json`;
+            }
+
+            const stockUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/${filename}?t=${timeMap}`;
 
             addSystemLog(`📡 Fetching Stocks: ${stockUrl}`);
 
@@ -91,11 +106,16 @@ export default function Home() {
                 addSystemLog(`✅ Stocks Loaded: ${data.length} items`);
                 setStocks(data);
             } else {
+                if (slot !== 'latest') {
+                    alert(`해당 시간대(${slot})의 데이터가 아직 없습니다.`);
+                    setTimeSlot('latest'); // Revert logic handled by effect? No, manual revert safest.
+                }
                 const text = await resStocks.text();
                 addSystemLog(`❌ Stocks Fetch Failed: ${text.slice(0, 100)}`);
             }
 
-            // Fetch Research
+            // Fetch Research (Always latest for now, or match slot?) 
+            // Keep latest for research as it's daily.
             const resResearch = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/latest_research.json?t=${timeMap}`, { cache: 'no-store' });
             if (resResearch.ok) {
                 const data = await resResearch.json();

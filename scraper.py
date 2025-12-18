@@ -6,7 +6,7 @@ import time
 import os
 import sys
 
-# sys.stdout.reconfigure 제거 (Next.js 환경변수 제어)
+
 
 def get_top_trending_stocks(market_type='KOSPI'):
 
@@ -331,11 +331,16 @@ def get_discussion_stats(code):
 
 import analyzer
 from src import research_scraper
-        # from src import utils # Removed V7.0 (Legacy)
+# from src import utils # Removed V7.0 (Legacy)
 
 def load_env_manual(filepath=".env.local"):
-    # ... (existing code) ...
-    pass
+    # Local .env support
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip() and not line.startswith('#'):
+                    key, val = line.strip().split('=', 1)
+                    os.environ[key] = val
 
 # --- Helper Functions (Added for V6.7 Fix) ---
 def get_current_kst_time():
@@ -493,9 +498,37 @@ if __name__ == "__main__":
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
             json_records = result_df_en.to_dict('records')
             
-            # Save CSV (History)
-            filename = f"trending_integrated"
-            analyzer.save_to_csv(result_df_kr, filename_prefix=filename)
+            # Save CSV & Excel (History)
+            filename_prefix = f"trending_integrated"
+            saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix)
+            
+            # --- Update Reports Index (reports.json) ---
+            if 'excel' in saved_files:
+                report_entry = {
+                    "date": now_kst.strftime('%Y-%m-%d %H:%M'),
+                    "filename": os.path.basename(saved_files['excel']),
+                    "count": len(all_data),
+                    "timestamp": datetime.now().timestamp()
+                }
+                
+                reports_file = 'data/reports.json'
+                current_reports = []
+                if os.path.exists(reports_file):
+                    try:
+                        with open(reports_file, 'r', encoding='utf-8') as f:
+                            current_reports = json.load(f)
+                    except:
+                        pass
+                
+                # Prepend new report (Latest first)
+                current_reports.insert(0, report_entry)
+                # Keep last 50
+                current_reports = current_reports[:50]
+                
+                with open(reports_file, 'w', encoding='utf-8') as f:
+                    json.dump(current_reports, f, ensure_ascii=False, indent=2)
+                print(f"[System] Updated reports index: {reports_file}")
+                
         else:
             print(f"\n[System] No data collected (all below threshold {threshold}). Saving empty records.")
             json_records = []

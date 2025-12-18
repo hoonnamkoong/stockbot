@@ -61,6 +61,7 @@ export default function Home() {
     const [researchModalOpened, { open: openResearchModal, close: closeResearchModal }] = useDisclosure(false);
     const [selectedResearchCategory, setSelectedResearchCategory] = useState<string | null>(null);
     const [pdfItem, setPdfItem] = useState<any>(null);
+    const [reports, setReports] = useState<any[]>([]);
 
     // [User Request V7.3] Time Slot Filtering
     const [timeSlot, setTimeSlot] = useState<string>('latest');
@@ -135,6 +136,15 @@ export default function Home() {
             } catch (e) {
                 setLastUpdated(new Date().toLocaleTimeString());
             }
+
+            // Fetch Reports Index
+            try {
+                const resReports = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/reports.json?t=${timeMap}`, { cache: 'no-store' });
+                if (resReports.ok) {
+                    const data = await resReports.json();
+                    setReports(data.slice(0, 5)); // Top 5
+                }
+            } catch (e) { console.error(e); }
 
         } catch (e: any) {
             console.error(e);
@@ -340,18 +350,44 @@ export default function Home() {
                     );
                 })}
 
+
+
+
                 <Text fw={700} mt="md" mb="sm">News Feed</Text>
                 <Button
                     fullWidth
-                    variant="default" // distinct from Research
+                    variant="default"
                     leftSection={<IconNews size={16} />}
                     justify="flex-start"
                     component="a"
                     href="https://www.tossinvest.com/feed/news"
                     target="_blank"
+                    mb="md"
                 >
                     토스증권 뉴스 (Toss)
                 </Button>
+
+                <Text fw={700} mb="sm">Downloads (Excel)</Text>
+                <div className="flex flex-col gap-2">
+                    {reports.length > 0 ? reports.map((rpt, idx) => (
+                        <Button
+                            key={idx}
+                            fullWidth
+                            variant="subtle"
+                            size="xs"
+                            justify="flex-start"
+                            component="a"
+                            href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/main/${rpt.filename}`}
+                            target="_blank"
+                            leftSection={<IconRefresh size={14} />} // IconDownload replacement if not imported
+                            color="gray"
+                        >
+                            {rpt.date.split(' ')[1]} 리포트 ({rpt.count}건)
+                        </Button>
+                    )) : (
+                        <Text size="xs" c="dimmed">리포트 없음</Text>
+                    )}
+                </div>
             </AppShell.Navbar>
 
             <AppShell.Main>

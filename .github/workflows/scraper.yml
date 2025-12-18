@@ -9,8 +9,8 @@ on:
     # 13:00 KST -> 04:00 UTC
     # 15:00 KST -> 06:00 UTC
     - cron: '5 1 * * 1-5'  # 10:05 KST
-    - cron: '5 4 * * 1-5'  # 13:05 KST
-    - cron: '5 6 * * 1-5'  # 15:05 KST
+    - cron: '5 3 * * 1-5'  # 12:05 KST
+    - cron: '5 5 * * 1-5'  # 14:05 KST
   workflow_dispatch: # Allow manual trigger
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
         run: |
           git config --global user.name "StockBot"
           git config --global user.email "bot@stockbot.com"
-          git add data/ trending_*.csv
+          git add data/ trending_*.csv trending_*.xlsx
           git commit -m "data: Update stock data and research reports" || exit 0
           git pull --rebase -Xtheirs origin main
           git push

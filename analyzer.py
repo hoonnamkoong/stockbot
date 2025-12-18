@@ -74,24 +74,40 @@ def analyze_discussion_trend(data_list):
     return df_sorted
 
 
-def save_to_csv(df, filename_prefix="trending_stocks"):
+def save_data(df, filename_prefix="trending_stocks"):
     """
-    DataFrame을 CSV 파일로 저장합니다.
+    DataFrame을 CSV 및 Excel 파일로 저장합니다.
     파일명에 타임스탬프를 포함합니다.
+    저장된 파일명의 딕셔너리를 반환합니다.
     """
     if df.empty:
         print("No data to save.")
-        return
+        return {}
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{filename_prefix}_{timestamp}.csv"
+    base_name = f"{filename_prefix}_{timestamp}"
+    csv_filename = f"{base_name}.csv"
+    xlsx_filename = f"{base_name}.xlsx"
     
-    # 인코딩: 엑셀에서 열 때 깨짐 방지를 위해 utf-8-sig 사용
+    saved_files = {}
+
+    # 1. Save CSV
     try:
-        df.to_csv(filename, index=False, encoding='utf-8-sig')
-        print(f"\nData saved to {os.path.abspath(filename)}")
+        df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
+        print(f"\nData saved to CSV: {os.path.abspath(csv_filename)}")
+        saved_files['csv'] = csv_filename
     except Exception as e:
         print(f"Error saving to CSV: {e}")
+
+    # 2. Save Excel
+    try:
+        df.to_excel(xlsx_filename, index=False, engine='openpyxl')
+        print(f"Data saved to Excel: {os.path.abspath(xlsx_filename)}")
+        saved_files['excel'] = xlsx_filename
+    except Exception as e:
+        print(f"Error saving to Excel: {e}")
+        
+    return saved_files
 
 
 def analyze_sentiment(df):

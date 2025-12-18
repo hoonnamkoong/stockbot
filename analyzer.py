@@ -143,7 +143,7 @@ def analyze_sentiment(df):
                     p['views_int'] = 0
             
             sorted_posts = sorted(latest_posts, key=lambda x: x['views_int'], reverse=True)
-            top_posts = sorted_posts[:3]
+            top_posts = sorted_posts[:6]
             summary_text = " / ".join([p['title'] for p in top_posts])
             
         posts_summaries.append(summary_text)

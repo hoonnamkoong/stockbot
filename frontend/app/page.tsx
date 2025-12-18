@@ -301,7 +301,7 @@ export default function Home() {
                                 <ActionIcon variant="light" color="violet" size="lg" onClick={openControl}>
                                     <IconRefresh size={18} />
                                 </ActionIcon>
-                                <ActionIcon variant="subtle" size="lg" onClick={fetchData}>
+                                <ActionIcon variant="subtle" size="lg" onClick={() => fetchData()}>
                                     {loading ? '...' : <IconRefresh size={18} />}
                                 </ActionIcon>
                             </>
@@ -311,7 +311,7 @@ export default function Home() {
                                 <Button variant="light" color="violet" onClick={openControl} leftSection={<IconRefresh size={16} />}>
                                     Control
                                 </Button>
-                                <Button variant="subtle" size="xs" onClick={fetchData} leftSection={<IconRefresh size={14} />}>
+                                <Button variant="subtle" size="xs" onClick={() => fetchData()} leftSection={<IconRefresh size={14} />}>
                                     {loading ? '...' : <IconRefresh />}
                                 </Button>
                             </>

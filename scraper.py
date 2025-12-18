@@ -322,7 +322,7 @@ def get_discussion_stats(code):
     return {
         'code': code,
         'recent_posts_count': len(collected_posts),
-        'latest_posts': collected_posts[:5], 
+        'latest_posts': collected_posts[:15], 
         'all_posts_titles': [p['title'] for p in collected_posts] 
     }
 

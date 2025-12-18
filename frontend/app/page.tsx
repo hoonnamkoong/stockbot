@@ -66,10 +66,10 @@ export default function Home() {
     // [User Request V7.3] Time Slot Filtering
     const [timeSlot, setTimeSlot] = useState<string>('latest');
     const TIME_SLOTS = [
-        { label: '최신 (Latest)', value: 'latest' },
-        { label: '10:00', value: '1000' },
-        { label: '13:00', value: '1300' },
-        { label: '15:00', value: '1500' },
+        { label: '🔴 실시간 (Live)', value: 'latest' },
+        { label: '🕙 10:00', value: '1000' },
+        { label: '🕐 13:00', value: '1300' },
+        { label: '🕒 15:00 (마감)', value: '1500' },
     ];
 
     useEffect(() => {
@@ -406,14 +406,17 @@ export default function Home() {
                         </Tabs>
 
                         {/* Time Slot Selector (Mobile) */}
-                        <SegmentedControl
-                            size="xs"
-                            color="blue"
-                            value={timeSlot}
-                            onChange={(val) => setTimeSlot(val)}
-                            data={TIME_SLOTS}
-                            mb="xs"
-                        />
+                        <div className="flex flex-col gap-1 mb-2">
+                            <Text size="xs" fw={700} c="dimmed">🕒 타임슬립 (과거 시점 조회)</Text>
+                            <SegmentedControl
+                                size="xs"
+                                color="blue"
+                                value={timeSlot}
+                                onChange={(val) => setTimeSlot(val)}
+                                data={TIME_SLOTS}
+                                mb="xs"
+                            />
+                        </div>
 
                         <SegmentedControl
                             fullWidth
@@ -442,14 +445,16 @@ export default function Home() {
 
                         <Group>
                             {/* Time Slot Selector (Desktop) */}
-                            <SegmentedControl
-                                size="xs"
-                                color="blue"
-                                value={timeSlot}
-                                onChange={(val) => setTimeSlot(val)}
-                                data={TIME_SLOTS}
-                                mr="md"
-                            />
+                            <Group gap="xs" mr="xl" bg="gray.0" p={4} style={{ borderRadius: 8, border: '1px solid #eee' }}>
+                                <Text size="xs" fw={700} c="dimmed" ml="xs">🕒 타임슬립:</Text>
+                                <SegmentedControl
+                                    size="xs"
+                                    color="blue"
+                                    value={timeSlot}
+                                    onChange={(val) => setTimeSlot(val)}
+                                    data={TIME_SLOTS}
+                                />
+                            </Group>
 
                             {/* Desktop View Toggle */}
                             <SegmentedControl

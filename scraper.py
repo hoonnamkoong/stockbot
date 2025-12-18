@@ -551,8 +551,7 @@ if __name__ == "__main__":
         except Exception as status_e:
             print(f"[ERROR] Failed to save status.json: {status_e}")
 
-    except Exception as e:
-        print(f"Failed to send notification (v7.0): {e}")
+
 
 
 

@@ -502,9 +502,9 @@ if __name__ == "__main__":
 
         # [User Request V7.3] Save Time-Specific Snapshot - ALWAYS
         snapshot_name = None
-        if 9 <= hour <= 10: snapshot_name = "stocks_1000.json"
-        elif 12 <= hour <= 13: snapshot_name = "stocks_1300.json"
-        elif 14 <= hour <= 16: snapshot_name = "stocks_1500.json"
+        if 9 <= current_hour <= 10: snapshot_name = "stocks_1000.json"
+        elif 12 <= current_hour <= 13: snapshot_name = "stocks_1300.json"
+        elif 14 <= current_hour <= 23: snapshot_name = "stocks_1500.json" # Covers 14:00 ~ Midnight (Closing Data)
         
         if snapshot_name:
             with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:

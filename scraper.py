@@ -21,7 +21,7 @@ def get_top_trending_stocks(market_type='KOSPI'):
         'Referer': 'https://finance.naver.com/',
         'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
     }
-    }
+
     
     exclude_keywords = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
     

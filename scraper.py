@@ -31,7 +31,9 @@ def get_top_trending_stocks(market_type='KOSPI'):
         else:
              print(f"[DEBUG] Fetching KOSDAQ trending stocks...", flush=True)
 
+        print(f"[DEBUG] Sending request to {url}...", flush=True)
         response = requests.get(url, headers=headers, timeout=10)
+        print(f"[DEBUG] Response Received. Status: {response.status_code}", flush=True)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content.decode('euc-kr', 'replace'), 'html.parser')
@@ -427,6 +429,10 @@ if __name__ == "__main__":
     all_data = [] # 통합 데이터 저장용
 
     for market in markets:
+        if market == 'KOSDAQ':
+            print("Wait 5 seconds before KOSDAQ...", flush=True)
+            time.sleep(5)
+
         print(f"\n[{market}] Starting collection...")
         # Get MORE stocks to ensure we find enough active ones (Top 100 instead of 20)
         trending_stocks = get_top_trending_stocks(market)

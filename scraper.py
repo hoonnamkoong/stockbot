@@ -106,7 +106,7 @@ def get_top_trending_stocks(market_type='KOSPI'):
                 except Exception as e:
                     continue
             
-            return data[:50] # 상위 50개로 축소 (User Request V7.4)
+            return data[:30] # 상위 30개로 축소 (Top 30 Focus - User Request V7.5)
         else:
             print(f"Stock table NOT found for {market_type}")
             return []
@@ -307,7 +307,10 @@ def get_discussion_stats(code):
                     collected_posts.append({
                         'title': title,
                         'date': date_text,
-                        'views': views
+                        'views': views,
+                        'likes': cols[4].get_text(strip=True) if len(cols) > 4 else '0',
+                        'dislikes': cols[5].get_text(strip=True) if len(cols) > 5 else '0',
+                        'link': title_tag['href'] if title_tag else ""
                     })
                     
                 except Exception:
@@ -319,12 +322,42 @@ def get_discussion_stats(code):
             print(f"Error fetching page {page} for {code}: {e}")
             break
             
+    # Sort by Likes (Recomm) initially to pick candidates for Deep Dive
+    collected_posts.sort(key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
+
     return {
         'code': code,
         'recent_posts_count': len(collected_posts),
-        'latest_posts': collected_posts[:15], 
+        'latest_posts': collected_posts, # Return ALL collected (will filter top 10 in main)
         'all_posts_titles': [p['title'] for p in collected_posts] 
     }
+
+def fetch_post_body(link_suffix):
+    """
+    게시글 본문을 가져옵니다. (Deep Dive Analysis)
+    link_suffix: /item/board_read.naver?code=...&nid=...
+    """
+    try:
+        url = f"https://finance.naver.com{link_suffix}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://finance.naver.com/'
+        }
+        # Random sleep to be polite/safe
+        time.sleep(0.3) 
+        
+        response = requests.get(url, headers=headers, timeout=5)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Naver Finance Board Body Selector
+        # specific ID or class might vary, usually 'div#body' or 'div.view_se'
+        body_tag = soup.select_one('#body') or soup.select_one('.view_se') or soup.select_one('.scr01')
+        
+        if body_tag:
+            return body_tag.get_text("\n", strip=True)
+        return ""
+    except Exception:
+        return ""
 
 
 
@@ -547,7 +580,22 @@ if __name__ == "__main__":
             # FILTER HERE
             if recent_count >= threshold:
                 stock['recent_posts_count'] = recent_count
-                stock['latest_posts'] = stats.get('latest_posts', [])
+                
+                # [Deep Dive V7.5] Analyze Top 10 Liked Posts
+                raw_latest = stats.get('latest_posts', [])
+                # Take Top 10 (Already sorted by likes in get_discussion_stats? No, we need to ensure int sort there or here)
+                # Ensure sort by likes descending
+                raw_latest.sort(key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
+                candidates = raw_latest[:10]
+                
+                print(f"   [Deep Dive] Fetching body for {len(candidates)} posts...")
+                for post in candidates:
+                    if post.get('link'):
+                        post['body'] = fetch_post_body(post['link'])
+                    else:
+                        post['body'] = ""
+                
+                stock['latest_posts'] = candidates # Assign enriched posts
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
                 
                 # Consecutive Flag

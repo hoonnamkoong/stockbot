@@ -128,23 +128,46 @@ def analyze_sentiment(df):
         titles = row.get('all_posts_titles', [])
         latest_posts = row.get('latest_posts', [])
         
-        # 3. 게시글 요약 (조회수 상위 3개 제목 병합)
-        # latest_posts 딕셔너리 리스트 활용, views를 숫자로 변환하여 정렬
+        # 3. 게시글 요약 (Deep Dive Weighted Scoring V7.5)
         summary_text = ""
         if isinstance(latest_posts, list) and latest_posts:
-            # views 문자열 처리 ('1,234' -> 1234)
+            # Score Calculation
             for p in latest_posts:
-                if isinstance(p.get('views'), str):
-                     try:
-                        p['views_int'] = int(p['views'].replace(',', ''))
-                     except:
-                        p['views_int'] = 0
-                else:
-                    p['views_int'] = 0
+                # 1. Base Score (Views + Likes*30)
+                try:
+                    views = int(p.get('views', '0').replace(',', ''))
+                except:
+                    views = 0
+                try:
+                    likes = int(p.get('likes', '0'))
+                except:
+                    likes = 0
+                
+                score = views + (likes * 30)
+
+                # 2. Body Analysis (Length Penalty & Prediction Bonus)
+                body = p.get('body', '')
+                if body:
+                    # Penalty: Short Content (<= 2 lines or < 50 chars)
+                    if len(body) < 50 or len(body.split('\n')) <= 2:
+                        score *= 0.2
+                    
+                    # Bonus: Prediction Keywords
+                    prediction_keywords = ['목표', '예상', '전망', '된다', '간다', '분석', '이유']
+                    if any(kw in body for kw in prediction_keywords):
+                        score += 2000
+                else: 
+                     # No body (maybe scrape failed or not top 10) -> Default penalty or neutral?
+                     # If these are top 10 recommended, they should have body. 
+                     # If not in top 10, they keep base score.
+                     pass
+
+                p['score'] = score
             
-            sorted_posts = sorted(latest_posts, key=lambda x: x['views_int'], reverse=True)
-            top_posts = sorted_posts[:6]
-            summary_text = " / ".join([p['title'] for p in top_posts])
+            # Sort by Score Descending
+            sorted_posts = sorted(latest_posts, key=lambda x: x.get('score', 0), reverse=True)
+            top_posts = sorted_posts[:4] # Top 4 Weighted Summaries
+            summary_text = " / ".join([p.get('title', '') for p in top_posts])
             
         posts_summaries.append(summary_text)
 

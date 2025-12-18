@@ -106,7 +106,7 @@ def get_top_trending_stocks(market_type='KOSPI'):
                 except Exception as e:
                     continue
             
-            return data[:100] # 상위 100개로 확대
+            return data[:50] # 상위 50개로 축소 (User Request V7.4)
         else:
             print(f"Stock table NOT found for {market_type}")
             return []
@@ -229,9 +229,9 @@ def get_discussion_stats(code):
     - 최대 800개 제한
     """
     
-    # 기준 시간 설정 (사용자 요청: 당일 00:01 이후)
+    # 기준 시간 설정 (사용자 요청 V7.4: 당일 08:00 이후)
     now = datetime.now()
-    target_time = now.replace(hour=0, minute=1, second=0, microsecond=0)
+    target_time = now.replace(hour=8, minute=0, second=0, microsecond=0)
     
     if now < target_time:
         pass 
@@ -363,6 +363,77 @@ def get_threshold_by_time(hour):
         return 100
     return 10 # Default fallback
 
+def get_yesterday_last_stocks():
+    """
+    reports.json을 분석하여 '어제' 날짜 중 가장 마지막 스냅샷(또는 리포트)의 종목 코드를 가져옵니다.
+    """
+    try:
+        reports_file = 'data/reports.json'
+        if not os.path.exists(reports_file):
+            return set()
+
+        import json
+        with open(reports_file, 'r', encoding='utf-8') as f:
+            reports = json.load(f)
+        
+        # 오늘 날짜 (KST 기준)
+        now_kst = get_current_kst_time()
+        today_str = now_kst.strftime('%Y-%m-%d')
+        
+        # 어제 날짜
+        yesterday = now_kst - timedelta(days=1)
+        yesterday_str = yesterday.strftime('%Y-%m-%d')
+        
+        # 1. reports.json에서 어제 날짜인 것들 필터링
+        # report['date'] 형식: "2024-05-21 15:00"
+        yesterday_reports = [
+            r for r in reports 
+            if r['date'].startswith(yesterday_str)
+        ]
+        
+        if not yesterday_reports:
+            # 어제 리포트가 없다면, 그 전이라도 가져와야 하나? 
+            # 사용자 요청: "어제 수집한 가장 마지막 데이터"
+            # 어제가 휴일일 수 있음 -> 주말/휴일 제외 로직이 있다면 데이터가 없을 수 있음.
+            # 일단 '어제'가 캘린더상 어제인지, 직전 영업일인지 모호하나 "어제"로 구현.
+            # 직전 영업일로 하려면 복잡해짐. 일단 캘린더 어제로 시도.
+            return set()
+            
+        # 2. 개중 가장 마지막 것 (reports.json은 최신순 정렬되어 있다고 가정, 혹은 timestamp 확인)
+        # reports.json은 insert(0, entry) 하므로 0번 인덱스가 최신.
+        # yesterday_reports도 순서 유지된다면 0번이 가장 늦은 시간.
+        last_report = yesterday_reports[0]
+        filename = last_report['filename'] # trending_integrated_20240520_150000.xlsx
+        
+        # 3. 파일 로드 (Excel)
+        file_path = f"data/{filename}" # analyzer.save_data saves to current dir, usually root or relative?
+        # scraper.py 실행 위치 기준. saved_files['excel']은 보통 상대경로(파일명)만 리턴함 (analyzer.py 확인 필요)
+        # analyzer.save_data: xlsx_filename = f"{base_name}.xlsx" -> 현재 디렉토리.
+        
+        if not os.path.exists(filename):
+            # 혹시 data/ 폴더 안에 있을 수도? (코드는 현재 디렉토리에 저장함)
+            # scraper.py: saved_files = analyzer.save_data(...) -> saved_files['excel'] returns filename.
+            pass
+            
+        import pandas as pd
+        if filename.endswith('.xlsx'):
+            df = pd.read_excel(filename)
+        elif filename.endswith('.csv'):
+            df = pd.read_csv(filename)
+        else:
+            return set()
+            
+        # 'code' or '종목코드' 컬럼 추출
+        # analyzer.py result_df_kr 컬럼: '종목코드'
+        if '종목코드' in df.columns:
+            return set(df['종목코드'].astype(str).str.zfill(6).tolist())
+        
+        return set()
+        
+    except Exception as e:
+        print(f"[Warning] Failed to get yesterday's stocks: {e}")
+        return set()
+
 if __name__ == "__main__":
     # 0. Load Environment Variables
     load_env_manual()
@@ -433,15 +504,25 @@ if __name__ == "__main__":
     
     all_data = [] # 통합 데이터 저장용
 
+    today_consecutive_check_done = False
+    yesterday_codes = set()
+    
+    # [Consecutive Check V7.4]
+    try:
+        yesterday_codes = get_yesterday_last_stocks()
+        print(f"[System] Loaded {len(yesterday_codes)} stocks from yesterday for consecutive check.")
+    except Exception as e:
+        print(f"[System] Consecutive check setup failed: {e}")
+
     for market in markets:
         if market == 'KOSDAQ':
-            print("Wait 5 seconds before KOSDAQ...", flush=True)
-            time.sleep(5)
+             print("Wait 5 seconds before KOSDAQ...", flush=True)
+             time.sleep(5)
 
         print(f"\n[{market}] Starting collection...")
-        # Get MORE stocks to ensure we find enough active ones (Top 100 instead of 20)
+        # Get MORE stocks to ensure we find enough active ones (Top 50)
         trending_stocks = get_top_trending_stocks(market)
-        # Limit to top 100 for performance (get_top_trending_stocks needs update to return more)
+        # Limit to top 50 (Apply function limit)
         # Assuming get_top_trending_stocks returns whatever it finds on page (usually 100 if not sliced)
         
         # In this edited version, we'll slice larger
@@ -463,11 +544,20 @@ if __name__ == "__main__":
             recent_count = stats.get('recent_posts_count', 0)
             
             # FILTER HERE
+            # FILTER HERE
             if recent_count >= threshold:
                 stock['recent_posts_count'] = recent_count
                 stock['latest_posts'] = stats.get('latest_posts', [])
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
                 
+                # Consecutive Flag
+                if stock['code'] in yesterday_codes:
+                    stock['is_consecutive'] = True
+                    # Legacy 'summary' field update for frontend display if needed
+                    # stock['posts_summary'] = "[연속] " + stock.get('posts_summary', '') 
+                else:
+                    stock['is_consecutive'] = False
+
                 all_data.append(stock)
                 count_collected += 1
                 print(f" [KEEP] {stock['name']}: {recent_count} posts (Threshold {threshold})")

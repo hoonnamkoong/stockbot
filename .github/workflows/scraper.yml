@@ -2,10 +2,10 @@ name: Stock Scraper Schedule
 
 on:
   schedule:
-    # 10:10 KST -> 01:10 UTC
-    # 12:10 KST -> 03:10 UTC
-    # 14:10 KST -> 05:10 UTC
-    - cron: '10 1,3,5 * * 1-5'
+    # 09:55 KST -> 00:55 UTC
+    # 11:55 KST -> 02:55 UTC
+    # 13:55 KST -> 04:55 UTC
+    - cron: '55 0,2,4 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:

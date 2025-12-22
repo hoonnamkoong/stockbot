@@ -1,6 +1,14 @@
 name: Stock Scraper Schedule
 
 on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - 'data/**'
+      - 'trending_*.csv'
+      - 'trending_*.xlsx'
+      - 'reports.json'
+      - '*.md'
   schedule:
     # 09:55 KST -> 00:55 UTC
     # 11:55 KST -> 02:55 UTC

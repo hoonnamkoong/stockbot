@@ -65,12 +65,56 @@ export default function Home() {
 
     // [User Request V7.3] Time Slot Filtering
     const [timeSlot, setTimeSlot] = useState<string>('latest');
-    const TIME_SLOTS = [
+    const [timeSlots, setTimeSlots] = useState([
         { label: '🔴 실시간 (Live)', value: 'latest' },
         { label: '🕙 10:00', value: '1000' },
         { label: '🕐 13:00', value: '1300' },
         { label: '🕒 15:00 (마감)', value: '1500' },
-    ];
+    ]);
+
+    // Update Time Slots labels based on actual reports
+    useEffect(() => {
+        if (reports.length > 0) {
+            const newSlots = [
+                { label: '🔴 실시간 (Live)', value: 'latest' },
+                { label: '🕙 10:00', value: '1000' },
+                { label: '🕐 13:00', value: '1300' },
+                { label: '🕒 15:00 (마감)', value: '1500' },
+            ];
+
+            const parseReportDate = (dateStr: string) => {
+                try {
+                    const timePart = dateStr.split(' ')[1]; // "2024-12-24 10:42" -> "10:42"
+                    const [hour] = timePart.split(':').map(Number);
+                    return { hour, timeStr: timePart };
+                } catch (e) { return { hour: -1, timeStr: '' }; }
+            };
+
+            // Find latest report for each slot category
+            // 10:00 Slot (09:00 - 10:59)
+            const slot10 = reports.find(r => {
+                const { hour } = parseReportDate(r.date);
+                return hour >= 9 && hour <= 10;
+            });
+            if (slot10) newSlots[1].label = `🕙 ${slot10.date.split(' ')[1]}`;
+
+            // 13:00 Slot (11:00 - 13:59) - Covers new 11:30 and 13:30 schedules
+            const slot13 = reports.find(r => {
+                const { hour } = parseReportDate(r.date);
+                return hour >= 11 && hour <= 13;
+            });
+            if (slot13) newSlots[2].label = `🕐 ${slot13.date.split(' ')[1]}`;
+
+            // 15:00 Slot (14:00+)
+            const slot15 = reports.find(r => {
+                const { hour } = parseReportDate(r.date);
+                return hour >= 14;
+            });
+            if (slot15) newSlots[3].label = `🕒 ${slot15.date.split(' ')[1]}`;
+
+            setTimeSlots(newSlots);
+        }
+    }, [reports]);
 
     useEffect(() => {
         fetchData(timeSlot);
@@ -422,7 +466,7 @@ export default function Home() {
                                 color="blue"
                                 value={timeSlot}
                                 onChange={(val) => setTimeSlot(val)}
-                                data={TIME_SLOTS}
+                                data={timeSlots}
                                 mb="xs"
                             />
                         </div>
@@ -461,7 +505,7 @@ export default function Home() {
                                     color="blue"
                                     value={timeSlot}
                                     onChange={(val) => setTimeSlot(val)}
-                                    data={TIME_SLOTS}
+                                    data={timeSlots}
                                 />
                             </Group>
 

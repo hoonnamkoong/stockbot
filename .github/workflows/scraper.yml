@@ -9,11 +9,6 @@ on:
       - 'trending_*.xlsx'
       - 'reports.json'
       - '*.md'
-  schedule:
-    # 09:55 KST -> 00:55 UTC
-    # 11:55 KST -> 02:55 UTC
-    # 13:55 KST -> 04:55 UTC
-    - cron: '55 0,2,4 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:

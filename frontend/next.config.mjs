@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    output: 'export', // Static Export for Vercel Backend-less
+    // output: 'export', // Removed to enable Serverless API Routes for Cron
     images: { unoptimized: true }
 };
 

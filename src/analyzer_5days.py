@@ -207,6 +207,7 @@ def analyze_cumulative(days=5):
                     is_consecutive_broken = True
                 posts_list.append(0)
                 change_rates.append(0.0)
+                prices.append(0) # Ensure list length consistency
         
         if not latest_meta:
             continue
@@ -217,24 +218,33 @@ def analyze_cumulative(days=5):
         else:
             std_dev = 0
             
+        # Filter out 0s for stats
+        valid_prices = [p for p in prices if p > 0]
+        price_start = valid_prices[-1] if valid_prices else 0
+        
+        # Calculate period change using OLDEST VALID price
+        period_change = 0
+        if valid_prices:
+             period_change = round((safe_int(latest_meta.get('price')) - valid_prices[-1]) / valid_prices[-1] * 100, 2)
+
         record = {
             'code': code,
             'name': latest_meta.get('name'),
             'market': latest_meta.get('market'),
             'price': safe_int(latest_meta.get('price')),
             'change_rate': latest_meta.get('change_rate'),
-            'period_change_rate': round((safe_int(latest_meta.get('price')) - (prices[-1] if prices else 0)) / (prices[-1] if prices else 1) * 100, 2) if prices and prices[-1] != 0 else 0,
+            'period_change_rate': period_change,
             'consecutive_days': consecutive_days,
             'total_posts': total_posts,
             'avg_posts': round(avg_posts, 1),
             'std_dev': round(std_dev, 1),
-            'price_start': prices[-1] if prices else 0,
+            'price_start': price_start,
             # Price Trend (Value)
-            'sparkline_price': prices[::-1], # Oldest to Newest
+            'sparkline_price': prices[::-1], # Oldest to Newest (may contain 0s)
             'price_stats': {
-                 'min': min(prices) if prices else 0,
-                 'max': max(prices) if prices else 0,
-                 'avg': int(sum(prices)/len(prices)) if prices else 0
+                 'min': min(valid_prices) if valid_prices else 0,
+                 'max': max(valid_prices) if valid_prices else 0,
+                 'avg': int(sum(valid_prices)/len(valid_prices)) if valid_prices else 0
             },
             # Post Trend (Value)
             'sparkline_posts': posts_list[::-1], # Oldest to Newest

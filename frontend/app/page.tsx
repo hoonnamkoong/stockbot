@@ -730,7 +730,7 @@ export default function Home() {
                                                             <Sparkline data={stock.sparkline_price || []} />
                                                             <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
                                                                 {(stock.sparkline_price || []).map((v, i) => (
-                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{(v / 1000).toFixed(1)}</Text>
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{v > 0 ? (v / 1000).toFixed(1) : '-'}</Text>
                                                                 ))}
                                                             </Group>
                                                         </Table.Td>

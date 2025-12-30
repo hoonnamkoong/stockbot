@@ -714,20 +714,18 @@ export default function Home() {
                                                             </Text>
                                                         </Table.Td>
                                                         <Table.Td>
-                                                            <Group gap={4} mb={4}>
-                                                                <Text size="xs" c="red">Max: {stock.price_stats?.max?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="dimmed">Avg: {stock.price_stats?.avg?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="blue">Min: {stock.price_stats?.min?.toLocaleString()}</Text>
-                                                            </Group>
                                                             <Sparkline data={stock.sparkline_price || []} />
+                                                            <Group gap={4} mt={4} justify="space-between">
+                                                                <Text size="xs" c="blue">Min: {stock.price_stats?.min?.toLocaleString()}</Text>
+                                                                <Text size="xs" c="red">Max: {stock.price_stats?.max?.toLocaleString()}</Text>
+                                                            </Group>
                                                         </Table.Td>
                                                         <Table.Td>
-                                                            <Group gap={4} mb={4}>
-                                                                <Text size="xs" c="red">Max: {stock.post_stats?.max?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="dimmed">Avg: {stock.post_stats?.avg}</Text>
-                                                                <Text size="xs" c="blue">Min: {stock.post_stats?.min?.toLocaleString()}</Text>
-                                                            </Group>
                                                             <Sparkline data={stock.sparkline_posts || []} />
+                                                            <Group gap={4} mt={4} justify="space-between">
+                                                                <Text size="xs" c="blue">Min: {stock.post_stats?.min?.toLocaleString()}</Text>
+                                                                <Text size="xs" c="red">Max: {stock.post_stats?.max?.toLocaleString()}</Text>
+                                                            </Group>
                                                         </Table.Td>
                                                     </Table.Tr>
                                                 ))}
@@ -790,20 +788,18 @@ export default function Home() {
                                                             </Text>
                                                         </Table.Td>
                                                         <Table.Td>
-                                                            <Group gap={4} mb={4}>
-                                                                <Text size="xs" c="red">Max: {stock.price_stats?.max?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="dimmed">Avg: {stock.price_stats?.avg?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="blue">Min: {stock.price_stats?.min?.toLocaleString()}</Text>
-                                                            </Group>
                                                             <Sparkline data={stock.sparkline_price || []} />
+                                                            <Group gap={4} mt={4} justify="space-between">
+                                                                <Text size="xs" c="blue">Min: {stock.price_stats?.min?.toLocaleString()}</Text>
+                                                                <Text size="xs" c="red">Max: {stock.price_stats?.max?.toLocaleString()}</Text>
+                                                            </Group>
                                                         </Table.Td>
                                                         <Table.Td>
-                                                            <Group gap={4} mb={4}>
-                                                                <Text size="xs" c="red">Max: {stock.post_stats?.max?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="dimmed">Avg: {stock.post_stats?.avg}</Text>
-                                                                <Text size="xs" c="blue">Min: {stock.post_stats?.min?.toLocaleString()}</Text>
-                                                            </Group>
                                                             <Sparkline data={stock.sparkline_posts || []} />
+                                                            <Group gap={4} mt={4} justify="space-between">
+                                                                <Text size="xs" c="blue">Min: {stock.post_stats?.min?.toLocaleString()}</Text>
+                                                                <Text size="xs" c="red">Max: {stock.post_stats?.max?.toLocaleString()}</Text>
+                                                            </Group>
                                                         </Table.Td>
                                                     </Table.Tr>
                                                 ))}

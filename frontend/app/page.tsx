@@ -267,7 +267,12 @@ export default function Home() {
                 const res5 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/analysis_5days.json?t=${timeMap}`, { cache: 'no-store' });
                 if (res5.ok) {
                     const data = await res5.json();
-                    setFiveDayData(data);
+                    // Enforce consistency: Calculate registered days from sparkline data
+                    const fixedData = data.map((item: any) => ({
+                        ...item,
+                        consecutive_days: item.sparkline_price ? item.sparkline_price.filter((p: number) => p > 0).length : item.consecutive_days
+                    }));
+                    setFiveDayData(fixedData);
                 }
             } catch (e) { console.error(e); }
 
@@ -276,7 +281,12 @@ export default function Home() {
                 const res3 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/analysis_3days.json?t=${timeMap}`, { cache: 'no-store' });
                 if (res3.ok) {
                     const data = await res3.json();
-                    setThreeDayData(data);
+                    // Enforce consistency here too
+                    const fixedData = data.map((item: any) => ({
+                        ...item,
+                        consecutive_days: item.sparkline_price ? item.sparkline_price.filter((p: number) => p > 0).length : item.consecutive_days
+                    }));
+                    setThreeDayData(fixedData);
                 }
             } catch (e) { console.error(e); }
 

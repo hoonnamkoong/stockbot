@@ -189,8 +189,8 @@ def analyze_cumulative(days=5):
                             'code': code
                         }
                     
-                    if not is_consecutive_broken:
-                        consecutive_days += 1
+                    # Count TOTAL registered days (appearance count)
+                    consecutive_days += 1
                         
                     p_count = safe_int(data.get('recent_posts_count'))
                     total_posts += p_count
@@ -203,8 +203,7 @@ def analyze_cumulative(days=5):
                     prices.append(p_price)
                         
             if not found_row:
-                if not is_consecutive_broken:
-                    is_consecutive_broken = True
+                # Missing day
                 posts_list.append(0)
                 change_rates.append(0.0)
                 prices.append(0) # Ensure list length consistency

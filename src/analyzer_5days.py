@@ -223,6 +223,7 @@ def analyze_cumulative(days=5):
             'market': latest_meta.get('market'),
             'price': safe_int(latest_meta.get('price')),
             'change_rate': latest_meta.get('change_rate'),
+            'period_change_rate': round((safe_int(latest_meta.get('price')) - (prices[-1] if prices else 0)) / (prices[-1] if prices else 1) * 100, 2) if prices and prices[-1] != 0 else 0,
             'consecutive_days': consecutive_days,
             'total_posts': total_posts,
             'avg_posts': round(avg_posts, 1),

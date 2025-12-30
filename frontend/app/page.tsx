@@ -37,6 +37,7 @@ type FiveDayStock = {
     market: string;
     price: string | number;
     change_rate: string;
+    period_change_rate?: number;
     consecutive_days: number;
     total_posts: number;
     avg_posts: number;

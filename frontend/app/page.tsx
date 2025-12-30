@@ -92,8 +92,7 @@ export default function Home() {
     const [opened, { toggle }] = useDisclosure();
     const [stocks, setStocks] = useState<Stock[]>([]);
     const [fiveDayData, setFiveDayData] = useState<FiveDayStock[]>([]);
-    const [threeDayData, setThreeDayData] = useState<FiveDayStock[]>([]); // 3-Day State
-    const [threeDayData, setThreeDayData] = useState<FiveDayStock[]>([]); // New State for 3 Days (Reuse FiveDayStock type)
+    const [threeDayData, setThreeDayData] = useState<FiveDayStock[]>([]); // 3-Day State (Fixed duplicate)
     const [research, setResearch] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<string>('');

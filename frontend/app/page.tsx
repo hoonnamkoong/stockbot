@@ -42,6 +42,8 @@ type FiveDayStock = {
     avg_posts: number;
     std_dev: number;
     sparkline: number[];
+    price_start: number;
+    trend_stats: { min: number; max: number; avg: number; };
     [key: string]: any;
 };
 
@@ -384,7 +386,6 @@ export default function Home() {
     const sortedFiveDayData = [...fiveDayData].sort((a, b) => {
         if (!sortConfig.key) return 0; // Default sort logic in backend (consecutive desc)
         // But if user clicks header...
-        // Default sort is handled by initialization or backend.
         // If sortConfig matches a 5-day key, sort it.
 
         const key = sortConfig.key;
@@ -584,7 +585,7 @@ export default function Home() {
                             <Tabs value={activeTab} onChange={setActiveTab}>
                                 <Tabs.List>
                                     <Tabs.Tab value="ALL">전체 (ALL)</Tabs.Tab>
-                                    <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
+                                    <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tabs.Tab>
                                     <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
                                     <Tabs.Tab value="5DAYS">📅 5일 누적 (Trends)</Tabs.Tab>
                                 </Tabs.List>
@@ -622,45 +623,70 @@ export default function Home() {
                 {
                     activeTab === '5DAYS' ? (
                         <ScrollArea type="always" offsetScrollbars>
-                            <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}>
-                                <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
-                                    <Table.Tr>
-                                        <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
-                                            종목명 {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
-                                        </Table.Th>
-                                        <Table.Th onClick={() => handleSort('consecutive_days')} style={{ cursor: 'pointer' }}>연속 등록일 {sortConfig?.key === 'consecutive_days' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th onClick={() => handleSort('total_posts')} style={{ cursor: 'pointer' }}>누적 토론글 {sortConfig?.key === 'total_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th onClick={() => handleSort('avg_posts')} style={{ cursor: 'pointer' }}>평균 글수 {sortConfig?.key === 'avg_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th>현재가</Table.Th>
-                                        <Table.Th>추세 (등락률 5일)</Table.Th>
-                                    </Table.Tr>
-                                </Table.Thead>
-                                <Table.Tbody>
-                                    {sortedFiveDayData.length > 0 ? sortedFiveDayData.map((stock) => (
-                                        <Table.Tr key={stock.code}>
-                                            <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
-                                                <Text fw={700}>
-                                                    <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
-                                                        {stock.name} 🔗
-                                                    </a>
-                                                </Text>
-                                                <Badge size="xs" variant="light">{stock.market}</Badge>
-                                            </Table.Td>
-                                            <Table.Td align="center"><Badge color={stock.consecutive_days >= 3 ? 'red' : 'gray'}>{stock.consecutive_days}일</Badge></Table.Td>
-                                            <Table.Td>{stock.total_posts.toLocaleString()}</Table.Td>
-                                            <Table.Td>{stock.avg_posts}</Table.Td>
-                                            <Table.Td>{stock.std_dev}</Table.Td>
-                                            <Table.Td>{stock.price}</Table.Td>
-                                            <Table.Td>
-                                                <Sparkline data={stock.sparkline} />
-                                            </Table.Td>
-                                        </Table.Tr>
-                                    )) : (
-                                        <Table.Tr><Table.Td colSpan={7} align="center" py="xl">데이터가 없습니다.</Table.Td></Table.Tr>
-                                    )}
-                                </Table.Tbody>
-                            </Table>
+                            {/* Split KOSPI and KOSDAQ Tables */}
+                            {['KOSPI', 'KOSDAQ'].map((marketType) => {
+                                const marketData = sortedFiveDayData.filter(s => s.market === marketType);
+                                if (marketData.length === 0) return null;
+
+                                return (
+                                    <div key={marketType} style={{ marginBottom: 40 }}>
+                                        <Text fw={700} size="xl" mb="md" c="blue.7">{marketType} (5일 누적)</Text>
+                                        <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}>
+                                            <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
+                                                <Table.Tr>
+                                                    <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                        종목명 {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                                    </Table.Th>
+                                                    <Table.Th onClick={() => handleSort('consecutive_days')} style={{ cursor: 'pointer' }}>연속 등록일 {sortConfig?.key === 'consecutive_days' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th onClick={() => handleSort('total_posts')} style={{ cursor: 'pointer' }}>누적 토론글 {sortConfig?.key === 'total_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th onClick={() => handleSort('avg_posts')} style={{ cursor: 'pointer' }}>평균 글수 {sortConfig?.key === 'avg_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th>5일 전 주가</Table.Th>
+                                                    <Table.Th>현재가</Table.Th>
+                                                    <Table.Th>추세 (등락률 5일)</Table.Th>
+                                                </Table.Tr>
+                                            </Table.Thead>
+                                            <Table.Tbody>
+                                                {marketData.map((stock) => (
+                                                    <Table.Tr key={stock.code}>
+                                                        <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                            <Text fw={700}>
+                                                                <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                                                                    {stock.name} 🔗
+                                                                </a>
+                                                            </Text>
+                                                            <Text size="xs" c="dimmed">{stock.code}</Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Badge color="red" variant="filled">{stock.consecutive_days}일</Badge>
+                                                        </Table.Td>
+                                                        <Table.Td>{stock.total_posts.toLocaleString()}</Table.Td>
+                                                        <Table.Td>{stock.avg_posts}</Table.Td>
+                                                        <Table.Td>{stock.std_dev}</Table.Td>
+                                                        <Table.Td>
+                                                            <Text size="sm" fw={500} c="dimmed">{stock.price_start?.toLocaleString() || '-'}</Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Text fw={700}>{stock.price.toLocaleString()}</Text>
+                                                            <Text size="xs" c={stock.change_rate.includes('-') ? 'blue' : 'red'}>
+                                                                {stock.change_rate}
+                                                            </Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Group gap={4} mb={4}>
+                                                                <Text size="xs" c="red">Max: {stock.trend_stats?.max}%</Text>
+                                                                <Text size="xs" c="dimmed">Avg: {stock.trend_stats?.avg}%</Text>
+                                                                <Text size="xs" c="blue">Min: {stock.trend_stats?.min}%</Text>
+                                                            </Group>
+                                                            <Sparkline data={stock.sparkline} />
+                                                        </Table.Td>
+                                                    </Table.Tr>
+                                                ))}
+                                            </Table.Tbody>
+                                        </Table>
+                                    </div>
+                                );
+                            })}
                         </ScrollArea>
                     ) : (isMobile && viewMode === 'card') ? (
                         <div className="flex flex-col gap-3">

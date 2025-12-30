@@ -227,7 +227,13 @@ def analyze_5days():
             'total_posts': total_posts,
             'avg_posts': round(avg_posts, 1),
             'std_dev': round(std_dev, 1),
-            'sparkline': change_rates[::-1] 
+            'sparkline': change_rates[::-1],
+            'price_start': prices[-1] if prices else 0, # Price from 5 days ago (or oldest in window)
+            'trend_stats': {
+                'min': round(min(change_rates), 2) if change_rates else 0,
+                'max': round(max(change_rates), 2) if change_rates else 0,
+                'avg': round(sum(change_rates)/len(change_rates), 2) if change_rates else 0
+            }
         }
         records.append(record)
         

@@ -158,11 +158,10 @@ def analyze_5days():
                     
                     # Capture meta if it's the first time we see it (Most recent data)
                     if not latest_meta:
-                        latest_meta = {
-                            'name': data.get('name', ''),
-                            'market': data.get('market', ''), # or 시장구분
-                            'price': data.get('price', 0),
-                            'change_rate': data.get('change_rate', '0%'),
+                            'name': data.get('name') or data.get('종목명', ''),
+                            'market': data.get('market') or data.get('시장구분', ''), 
+                            'price': data.get('price') or data.get('현재가', 0),
+                            'change_rate': data.get('change_rate') or data.get('등락률', '0%'),
                             'code': code
                         }
                     
@@ -174,17 +173,17 @@ def analyze_5days():
                         consecutive_days += 1
                         
                     # Stats
-                    p_count = int(data.get('recent_posts_count', 0))
+                    p_count = int(data.get('recent_posts_count') or data.get('당일_게시글수', 0))
                     total_posts += p_count
                     posts_list.append(p_count)
                     
-                    c_rate = str(data.get('change_rate', '0%')).replace('%', '')
+                    c_rate = str(data.get('change_rate') or data.get('등락률', '0%')).replace('%', '')
                     try:
                         change_rates.append(float(c_rate))
                     except:
                         change_rates.append(0.0)
                         
-                    p_price = str(data.get('price', '0')).replace(',', '')
+                    p_price = str(data.get('price') or data.get('현재가', '0')).replace(',', '')
                     prices.append(p_price)
                         
                 else:

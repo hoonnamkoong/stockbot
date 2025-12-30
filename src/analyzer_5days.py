@@ -15,7 +15,8 @@ def get_recent_working_days(count=5):
     working_days = []
     
     # Start from today (KST)
-    current_date = datetime.now() + timedelta(hours=9) 
+    # Use UTC to safe add 9 hours regardless of server location
+    current_date = datetime.utcnow() + timedelta(hours=9) 
     
     check_date = current_date
     

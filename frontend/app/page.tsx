@@ -31,6 +31,56 @@ type Stock = {
     [key: string]: any; // Index signature for sorting
 };
 
+type FiveDayStock = {
+    code: string;
+    name: string;
+    market: string;
+    price: string | number;
+    change_rate: string;
+    consecutive_days: number;
+    total_posts: number;
+    avg_posts: number;
+    std_dev: number;
+    sparkline: number[];
+    [key: string]: any;
+};
+
+const Sparkline = ({ data }: { data: number[] }) => {
+    if (!data || data.length === 0) return null;
+    const width = 100;
+    const height = 30;
+    const max = Math.max(...data, 1); // Avoid div by zero
+    const min = Math.min(...data, -1);
+    const range = max - min;
+
+    // Scale points
+    const points = data.map((val, idx) => {
+        const x = (idx / (data.length - 1)) * width;
+        const y = height - ((val - min) / range) * height;
+        return `${x},${y}`;
+    }).join(' ');
+
+    return (
+        <svg width={width} height={height} style={{ overflow: 'visible' }}>
+            <polyline
+                fill="none"
+                stroke={data[data.length - 1] >= 0 ? 'red' : 'blue'}
+                strokeWidth="2"
+                points={points}
+            />
+            {/* Zero line */}
+            <line
+                x1="0"
+                y1={height - ((0 - min) / range) * height}
+                x2={width}
+                y2={height - ((0 - min) / range) * height}
+                stroke="#ddd"
+                strokeDasharray="2"
+            />
+        </svg>
+    );
+};
+
 // --- Constants ---
 const REPO_OWNER = "hoonnamkoong";
 const REPO_NAME = "stockbot";
@@ -39,6 +89,7 @@ const WORKFLOW_ID = "scraper.yml";
 export default function Home() {
     const [opened, { toggle }] = useDisclosure();
     const [stocks, setStocks] = useState<Stock[]>([]);
+    const [fiveDayData, setFiveDayData] = useState<FiveDayStock[]>([]); // New State
     const [research, setResearch] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<string>('');
@@ -190,6 +241,15 @@ export default function Home() {
                 }
             } catch (e) { console.error(e); }
 
+            // Fetch 5-Day Analysis
+            try {
+                const res5 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/analysis_5days.json?t=${timeMap}`, { cache: 'no-store' });
+                if (res5.ok) {
+                    const data = await res5.json();
+                    setFiveDayData(data);
+                }
+            } catch (e) { console.error(e); }
+
         } catch (e: any) {
             console.error(e);
             addSystemLog(`❌ CRITICAL ERROR: ${e.message}`);
@@ -277,8 +337,17 @@ export default function Home() {
     // --- Sort Logic ---
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+        // Toggle direction if clicking same key, else default desc for numbers usually?
+        // Let's stick to toggle.
+        if (sortConfig.key === key && sortConfig.direction === 'desc') {
+            direction = 'asc';
+        } else if (sortConfig.key === key && sortConfig.direction === 'asc') {
             direction = 'desc';
+        } else {
+            // Default for new numeric keys -> desc
+            if (['recent_posts_count', 'consecutive_days', 'total_posts', 'change_rate'].includes(key)) {
+                direction = 'desc';
+            }
         }
         setSortConfig({ key, direction });
     };
@@ -308,9 +377,34 @@ export default function Home() {
         if (parsedA < parsedB) {
             return sortConfig.direction === 'asc' ? -1 : 1;
         }
-        if (parsedA > parsedB) {
-            return sortConfig.direction === 'asc' ? 1 : -1;
-        }
+        if (parsedA > parsedB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const sortedFiveDayData = [...fiveDayData].sort((a, b) => {
+        if (!sortConfig.key) return 0; // Default sort logic in backend (consecutive desc)
+        // But if user clicks header...
+        // Default sort is handled by initialization or backend.
+        // If sortConfig matches a 5-day key, sort it.
+
+        const key = sortConfig.key;
+        let valA = a[key];
+        let valB = b[key];
+
+        const parseValue = (v: any) => {
+            if (typeof v === 'string') {
+                const cleaned = v.replace(/,/g, '').replace('%', '');
+                if (!isNaN(Number(cleaned)) && cleaned !== '') return Number(cleaned);
+                return v.toLowerCase();
+            }
+            return v;
+        };
+
+        valA = parseValue(valA);
+        valB = parseValue(valB);
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
     });
 
@@ -455,6 +549,7 @@ export default function Home() {
                                 <Tabs.Tab value="ALL">전체</Tabs.Tab>
                                 <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
                                 <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
+                                <Tabs.Tab value="5DAYS">📅 5일 누적</Tabs.Tab>
                             </Tabs.List>
                         </Tabs>
 
@@ -491,6 +586,7 @@ export default function Home() {
                                     <Tabs.Tab value="ALL">전체 (ALL)</Tabs.Tab>
                                     <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
                                     <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
+                                    <Tabs.Tab value="5DAYS">📅 5일 누적 (Trends)</Tabs.Tab>
                                 </Tabs.List>
                             </Tabs>
                             {lastUpdated && <Text size="xs" c="dimmed" ml="md">🕒 Update: {lastUpdated}</Text>}
@@ -521,11 +617,52 @@ export default function Home() {
                             />
                         </Group>
                     </Group >
-                )
-                }
+                )}
 
                 {
-                    (isMobile && viewMode === 'card') ? (
+                    activeTab === '5DAYS' ? (
+                        <ScrollArea type="always" offsetScrollbars>
+                            <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}>
+                                <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
+                                    <Table.Tr>
+                                        <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                            종목명 {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                        </Table.Th>
+                                        <Table.Th onClick={() => handleSort('consecutive_days')} style={{ cursor: 'pointer' }}>연속 등록일 {sortConfig?.key === 'consecutive_days' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('total_posts')} style={{ cursor: 'pointer' }}>누적 토론글 {sortConfig?.key === 'total_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('avg_posts')} style={{ cursor: 'pointer' }}>평균 글수 {sortConfig?.key === 'avg_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                        <Table.Th>현재가</Table.Th>
+                                        <Table.Th>추세 (등락률 5일)</Table.Th>
+                                    </Table.Tr>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                    {sortedFiveDayData.length > 0 ? sortedFiveDayData.map((stock) => (
+                                        <Table.Tr key={stock.code}>
+                                            <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                <Text fw={700}>
+                                                    <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                                                        {stock.name} 🔗
+                                                    </a>
+                                                </Text>
+                                                <Badge size="xs" variant="light">{stock.market}</Badge>
+                                            </Table.Td>
+                                            <Table.Td align="center"><Badge color={stock.consecutive_days >= 3 ? 'red' : 'gray'}>{stock.consecutive_days}일</Badge></Table.Td>
+                                            <Table.Td>{stock.total_posts.toLocaleString()}</Table.Td>
+                                            <Table.Td>{stock.avg_posts}</Table.Td>
+                                            <Table.Td>{stock.std_dev}</Table.Td>
+                                            <Table.Td>{stock.price}</Table.Td>
+                                            <Table.Td>
+                                                <Sparkline data={stock.sparkline} />
+                                            </Table.Td>
+                                        </Table.Tr>
+                                    )) : (
+                                        <Table.Tr><Table.Td colSpan={7} align="center" py="xl">데이터가 없습니다.</Table.Td></Table.Tr>
+                                    )}
+                                </Table.Tbody>
+                            </Table>
+                        </ScrollArea>
+                    ) : (isMobile && viewMode === 'card') ? (
                         <div className="flex flex-col gap-3">
                             {sortedStocks.map((stock) => (
                                 <Card key={stock.code} shadow="sm" padding="lg" radius="md" withBorder>
@@ -711,8 +848,10 @@ export default function Home() {
                                                 <Button variant="light" size="xs" component="a" href={item.link} target="_blank">본문</Button>
                                                 {item.pdf_link && (
                                                     <>
-                                                        <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">PDF</Button>
-                                                        <Button variant="filled" color="violet" size="xs" onClick={() => setPdfItem(item)}>분석</Button>
+                                                        <Button variant="light" size="xs" color="grape" onClick={() => {
+                                                            setPdfItem(item);
+                                                        }}>AI 분석</Button>
+                                                        <Button variant="outline" size="xs" component="a" href={item.pdf_link} target="_blank">PDF</Button>
                                                     </>
                                                 )}
                                             </Group>
@@ -722,94 +861,73 @@ export default function Home() {
                             </div>
                         </ScrollArea>
                     ) : (
-                        // --- Desktop View (Grid) ---
-                        <Grid h="90%" gutter="xl" p="md">
-                            {/* LEFT: Daily Briefing (Expanded) */}
-                            <Grid.Col span={4}>
-                                <Paper withBorder p="md" bg="blue.0" h="100%" radius="md">
-                                    <Group mb="md">
-                                        <IconNews size={24} color="#228be6" />
-                                        <Text fw={700} size="lg" c="blue.8">오늘의 시장 인사이트</Text>
-                                    </Group>
-                                    <ScrollArea h="65vh" offsetScrollbars>
-                                        <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                        // --- Desktop View (Split) ---
+                        <Grid h="100%" gutter={0}>
+                            {/* Left: List */}
+                            <Grid.Col span={4} style={{ borderRight: '1px solid #eee', height: '100%' }}>
+                                <ScrollArea h="100%" p="md">
+                                    {/* Insight Summary */}
+                                    <Paper withBorder p="sm" bg="blue.0" radius="md" mb="md">
+                                        <Group mb="xs">
+                                            <IconNews size={20} color="#228be6" />
+                                            <Text fw={700} size="sm" c="blue.8">오늘의 시장 인사이트</Text>
+                                        </Group>
+                                        <Text size="xs" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
                                             {research[selectedResearchCategory].summary}
                                         </Text>
-                                        <Text size="xs" c="dimmed" mt="xl" pt="xl">
-                                            * AI가 오늘 발행된 리포트들의 핵심 내용(매수의견, 목표주가, 산업동향)을 종합하여 도출한 인사이트입니다.
-                                        </Text>
-                                    </ScrollArea>
-                                </Paper>
-                            </Grid.Col>
+                                    </Paper>
 
-                            {/* RIGHT: List (Scrollable) */}
-                            <Grid.Col span={8}>
-                                <ScrollArea h="75vh" offsetScrollbars>
-                                    {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                                        <Card key={idx} shadow="sm" padding="lg" radius="md" withBorder mb="md">
-                                            <Group justify="space-between" mb="xs">
-                                                <div style={{ flex: 1 }}>
-                                                    <Text fw={700} size="md" mb={4}>{item.title}</Text>
-                                                    <Group gap="xs">
-                                                        <Badge color="gray" size="sm">{item.date}</Badge>
-                                                        {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
-                                                            <Badge color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
-                                                                {item.pdf_analysis.opinion}
-                                                            </Badge>
-                                                        )}
-                                                        {item.pdf_analysis?.target_price && item.pdf_analysis.target_price !== 'N/A' && (
-                                                            <Badge variant="outline" color="gray">
-                                                                TP: {item.pdf_analysis.target_price}
-                                                            </Badge>
-                                                        )}
-                                                    </Group>
-                                                </div>
-                                            </Group>
-
-                                            {/* 6-line Summary Area */}
-                                            <Paper bg="gray.1" p="sm" radius="sm" mb="sm">
-                                                {item.body_summary ? (
-                                                    <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }} lineClamp={6}>
-                                                        {item.body_summary}
-                                                    </Text>
-                                                ) : (
-                                                    <Text size="sm" c="dimmed">요약 내용이 없습니다.</Text>
-                                                )}
-                                            </Paper>
-
-                                            <Group>
-                                                <Button variant="light" size="xs" component="a" href={item.link} target="_blank">
-                                                    본문 전체보기
-                                                </Button>
-                                                {item.pdf_link && (
-                                                    <>
-                                                        <Button variant="default" size="xs" component="a" href={item.pdf_link} target="_blank">
-                                                            PDF 원문
-                                                        </Button>
-                                                        <Button
-                                                            variant="filled"
-                                                            color="violet"
-                                                            size="xs"
-                                                            leftSection={<IconRobot size={14} />}
-                                                            onClick={() => {
-                                                                setPdfItem(item);
-                                                            }}
-                                                        >
-                                                            PDF 심층 분석
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </Group>
-                                        </Card>
-                                    ))}
+                                    <div className="flex flex-col gap-2">
+                                        {research[selectedResearchCategory].items.map((item: any, idx: number) => (
+                                            <UnstyledButton
+                                                key={idx}
+                                                onClick={() => {
+                                                    if (item.pdf_link) {
+                                                        setPdfItem(item);
+                                                    } else {
+                                                        window.open(item.link, '_blank');
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: '12px',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #eee',
+                                                    backgroundColor: 'white',
+                                                    transition: 'all 0.2s',
+                                                }}
+                                                className="hover:bg-gray-50 hover:shadow-sm"
+                                            >
+                                                <Text fw={600} size="sm" mb={4} lineClamp={1}>{item.title}</Text>
+                                                <Group gap={4} mb={4}>
+                                                    <Badge size="xs" variant="dot" color="gray">{item.date}</Badge>
+                                                    {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
+                                                        <Badge size="xs" variant="light" color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
+                                                            {item.pdf_analysis.opinion}
+                                                        </Badge>
+                                                    )}
+                                                </Group>
+                                                <Text size="xs" c="dimmed" lineClamp={2}>{item.body_summary}</Text>
+                                            </UnstyledButton>
+                                        ))}
+                                    </div>
                                 </ScrollArea>
+                            </Grid.Col>
+                            {/* Right: PDF Viewer or Placeholder */}
+                            <Grid.Col span={8} h="100%" bg="gray.0">
+                                <Center h="100%">
+                                    <div className="text-center text-gray-400">
+                                        <IconNews size={48} className="mx-auto mb-2 opacity-50" />
+                                        <Text>왼쪽 리스트에서 리포트를 선택하세요</Text>
+                                    </div>
+                                </Center>
                             </Grid.Col>
                         </Grid>
                     )
                 ) : (
-                    <Text ta="center" c="dimmed" py="xl">데이터를 불러오는 중이거나 휴장일입니다.</Text>
+                    <Center h="100%"><Text c="dimmed">등록된 리포트가 없습니다.</Text></Center>
                 )}
-            </Modal >
+            </Modal>
+
 
             {/* PDF Analysis Modal */}
             < Modal opened={!!pdfItem} onClose={() => setPdfItem(null)} title="AI 심층 리포트 분석" centered size="xl" >

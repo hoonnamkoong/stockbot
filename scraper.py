@@ -636,9 +636,25 @@ if __name__ == "__main__":
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
             json_records = result_df_en.to_dict('records')
             
-            # Save CSV & Excel (History)
+            # [Feature: 5-Day Cumulative Analysis]
+            extra_sheets = {}
+            try:
+                from src import analyzer_5days
+                df_5days = analyzer_5days.analyze_5days()
+                if not df_5days.empty:
+                    # Save JSON for Frontend
+                    with open('data/analysis_5days.json', 'w', encoding='utf-8') as f:
+                        f.write(df_5days.to_json(orient='records', force_ascii=False))
+                    print(f"[System] Saved 5-Day Analysis JSON (Count: {len(df_5days)})")
+                    
+                    # Add to Excel Sheets
+                    extra_sheets['5Day_Analysis'] = df_5days
+            except Exception as e:
+                print(f"[Warning] 5-Day Analysis Failed: {e}")
+            
+            # Save CSV & Excel (History) with Extra Sheets
             filename_prefix = f"trending_integrated"
-            saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix)
+            saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
             
             # --- Update Reports Index (reports.json) ---
             if 'excel' in saved_files:

@@ -74,10 +74,11 @@ def analyze_discussion_trend(data_list):
     return df_sorted
 
 
-def save_data(df, filename_prefix="trending_stocks"):
+def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
     """
     DataFrame을 CSV 및 Excel 파일로 저장합니다.
     파일명에 타임스탬프를 포함합니다.
+    extra_sheets: { 'SheetName': DataFrame } 형태의 추가 시트 데이터
     저장된 파일명의 딕셔너리를 반환합니다.
     """
     if df.empty:
@@ -91,7 +92,7 @@ def save_data(df, filename_prefix="trending_stocks"):
     
     saved_files = {}
 
-    # 1. Save CSV
+    # 1. Save CSV (Main Data Only)
     try:
         df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
         print(f"\nData saved to CSV: {os.path.abspath(csv_filename)}")
@@ -99,9 +100,18 @@ def save_data(df, filename_prefix="trending_stocks"):
     except Exception as e:
         print(f"Error saving to CSV: {e}")
 
-    # 2. Save Excel
+    # 2. Save Excel (Multi-sheet support)
     try:
-        df.to_excel(xlsx_filename, index=False, engine='openpyxl')
+        with pd.ExcelWriter(xlsx_filename, engine='openpyxl') as writer:
+            # Main Sheet
+            df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
+            
+            # Extra Sheets
+            if extra_sheets:
+                for sheet_name, sheet_df in extra_sheets.items():
+                    if not sheet_df.empty:
+                        sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                        
         print(f"Data saved to Excel: {os.path.abspath(xlsx_filename)}")
         saved_files['excel'] = xlsx_filename
     except Exception as e:

@@ -92,6 +92,7 @@ export default function Home() {
     const [opened, { toggle }] = useDisclosure();
     const [stocks, setStocks] = useState<Stock[]>([]);
     const [fiveDayData, setFiveDayData] = useState<FiveDayStock[]>([]);
+    const [threeDayData, setThreeDayData] = useState<FiveDayStock[]>([]); // 3-Day State
     const [threeDayData, setThreeDayData] = useState<FiveDayStock[]>([]); // New State for 3 Days (Reuse FiveDayStock type)
     const [research, setResearch] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -253,6 +254,15 @@ export default function Home() {
                 }
             } catch (e) { console.error(e); }
 
+            // Fetch 3-Day Analysis
+            try {
+                const res3 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/analysis_3days.json?t=${timeMap}`, { cache: 'no-store' });
+                if (res3.ok) {
+                    const data = await res3.json();
+                    setThreeDayData(data);
+                }
+            } catch (e) { console.error(e); }
+
         } catch (e: any) {
             console.error(e);
             addSystemLog(`❌ CRITICAL ERROR: ${e.message}`);
@@ -407,6 +417,29 @@ export default function Home() {
 
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const sortedThreeDayData = [...threeDayData].sort((a, b) => {
+        if (!sortConfig.key) return 0;
+        const key = sortConfig.key;
+        let valA = a[key];
+        let valB = b[key];
+
+        const parseValue = (v: any) => {
+            if (typeof v === 'string') {
+                const cleaned = v.replace(/,/g, '').replace('%', '');
+                if (!isNaN(Number(cleaned)) && cleaned !== '') return Number(cleaned);
+                return v.toLowerCase();
+            }
+            return v;
+        };
+
+        const parsedA = parseValue(valA);
+        const parsedB = parseValue(valB);
+
+        if (parsedA < parsedB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (parsedA > parsedB) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
     });
 
@@ -590,6 +623,7 @@ export default function Home() {
                                     <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
                                     <Tabs.Tab value="5DAYS">📅 5일 누적 (Trends)</Tabs.Tab>
                                     <Tabs.Tab value="3DAYS">📅 3일 누적 (Trends)</Tabs.Tab>
+                                    <Tabs.Tab value="3DAYS">📅 3일 누적 (Trends)</Tabs.Tab>
                                 </Tabs.List>
                             </Tabs>
                             {lastUpdated && <Text size="xs" c="dimmed" ml="md">🕒 Update: {lastUpdated}</Text>}
@@ -646,6 +680,73 @@ export default function Home() {
                                                     <Table.Th>5일 전 주가</Table.Th>
                                                     <Table.Th>현재가</Table.Th>
                                                     <Table.Th>추세 (등락률 5일)</Table.Th>
+                                                </Table.Tr>
+                                            </Table.Thead>
+                                            <Table.Tbody>
+                                                {marketData.map((stock) => (
+                                                    <Table.Tr key={stock.code}>
+                                                        <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                            <Text fw={700}>
+                                                                <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                                                                    {stock.name} 🔗
+                                                                </a>
+                                                            </Text>
+                                                            <Text size="xs" c="dimmed">{stock.code}</Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Badge color="red" variant="filled">{stock.consecutive_days}일</Badge>
+                                                        </Table.Td>
+                                                        <Table.Td>{stock.total_posts.toLocaleString()}</Table.Td>
+                                                        <Table.Td>{stock.avg_posts}</Table.Td>
+                                                        <Table.Td>{stock.std_dev}</Table.Td>
+                                                        <Table.Td>
+                                                            <Text size="sm" fw={500} c="dimmed">{stock.price_start?.toLocaleString() || '-'}</Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Text fw={700}>{stock.price.toLocaleString()}</Text>
+                                                            <Text size="xs" c={stock.change_rate.includes('-') ? 'blue' : 'red'}>
+                                                                {stock.change_rate}
+                                                            </Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Group gap={4} mb={4}>
+                                                                <Text size="xs" c="red">Max: {stock.trend_stats?.max}%</Text>
+                                                                <Text size="xs" c="dimmed">Avg: {stock.trend_stats?.avg}%</Text>
+                                                                <Text size="xs" c="blue">Min: {stock.trend_stats?.min}%</Text>
+                                                            </Group>
+                                                            <Sparkline data={stock.sparkline} />
+                                                        </Table.Td>
+                                                    </Table.Tr>
+                                                ))}
+                                            </Table.Tbody>
+                                        </Table>
+                                    </div>
+                                );
+                            })}
+                        </ScrollArea>
+                    ) : activeTab === '3DAYS' ? (
+                        <ScrollArea type="always" offsetScrollbars>
+                            {/* 3-Day Analysis View */}
+                            {['KOSPI', 'KOSDAQ'].map((marketType) => {
+                                const marketData = sortedThreeDayData.filter(s => s.market === marketType);
+                                if (marketData.length === 0) return null;
+
+                                return (
+                                    <div key={marketType} style={{ marginBottom: 40 }}>
+                                        <Text fw={700} size="xl" mb="md" c="blue.7">{marketType} (3일 누적)</Text>
+                                        <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}>
+                                            <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
+                                                <Table.Tr>
+                                                    <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                        종목명 {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                                    </Table.Th>
+                                                    <Table.Th onClick={() => handleSort('consecutive_days')} style={{ cursor: 'pointer' }}>연속 등록일 {sortConfig?.key === 'consecutive_days' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th onClick={() => handleSort('total_posts')} style={{ cursor: 'pointer' }}>누적 토론글 {sortConfig?.key === 'total_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th onClick={() => handleSort('avg_posts')} style={{ cursor: 'pointer' }}>평균 글수 {sortConfig?.key === 'avg_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
+                                                    <Table.Th>3일 전 주가</Table.Th>
+                                                    <Table.Th>현재가</Table.Th>
+                                                    <Table.Th>추세 (등락률 3일)</Table.Th>
                                                 </Table.Tr>
                                             </Table.Thead>
                                             <Table.Tbody>

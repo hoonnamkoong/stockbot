@@ -584,6 +584,7 @@ export default function Home() {
                                 <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
                                 <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
                                 <Tabs.Tab value="5DAYS">📅 5일 누적</Tabs.Tab>
+                                <Tabs.Tab value="3DAYS">📅 3일 누적</Tabs.Tab>
                             </Tabs.List>
                         </Tabs>
 
@@ -621,7 +622,6 @@ export default function Home() {
                                     <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
                                     <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
                                     <Tabs.Tab value="5DAYS">📅 5일 누적 (Trends)</Tabs.Tab>
-                                    <Tabs.Tab value="3DAYS">📅 3일 누적 (Trends)</Tabs.Tab>
                                     <Tabs.Tab value="3DAYS">📅 3일 누적 (Trends)</Tabs.Tab>
                                 </Tabs.List>
                             </Tabs>

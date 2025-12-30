@@ -227,12 +227,20 @@ def analyze_cumulative(days=5):
             'total_posts': total_posts,
             'avg_posts': round(avg_posts, 1),
             'std_dev': round(std_dev, 1),
-            'sparkline': change_rates[::-1],
-            'price_start': prices[-1] if prices else 0, 
-            'trend_stats': {
-                'min': round(min(change_rates), 2) if change_rates else 0,
-                'max': round(max(change_rates), 2) if change_rates else 0,
-                'avg': round(sum(change_rates)/len(change_rates), 2) if change_rates else 0
+            'price_start': prices[-1] if prices else 0,
+            # Price Trend (Value)
+            'sparkline_price': prices[::-1], # Oldest to Newest
+            'price_stats': {
+                 'min': min(prices) if prices else 0,
+                 'max': max(prices) if prices else 0,
+                 'avg': int(sum(prices)/len(prices)) if prices else 0
+            },
+            # Post Trend (Value)
+            'sparkline_posts': posts_list[::-1], # Oldest to Newest
+            'post_stats': {
+                'min': min(posts_list) if posts_list else 0,
+                'max': max(posts_list) if posts_list else 0,
+                'avg': round(sum(posts_list)/len(posts_list), 1) if posts_list else 0
             }
         }
         records.append(record)

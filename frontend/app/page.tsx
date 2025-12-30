@@ -728,16 +728,18 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
-                                                            <Group gap={4} mt={4} justify="space-between">
-                                                                <Text size="xs" c="blue">Min: {stock.price_stats?.min?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="red">Max: {stock.price_stats?.max?.toLocaleString()}</Text>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_price || []).map((v, i) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{(v / 1000).toFixed(1)}</Text>
+                                                                ))}
                                                             </Group>
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_posts || []} />
-                                                            <Group gap={4} mt={4} justify="space-between">
-                                                                <Text size="xs" c="blue">Min: {stock.post_stats?.min?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="red">Max: {stock.post_stats?.max?.toLocaleString()}</Text>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_posts || []).map((v, i) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{v?.toLocaleString()}</Text>
+                                                                ))}
                                                             </Group>
                                                         </Table.Td>
                                                     </Table.Tr>

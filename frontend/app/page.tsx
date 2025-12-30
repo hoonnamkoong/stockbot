@@ -585,7 +585,7 @@ export default function Home() {
                             <Tabs value={activeTab} onChange={setActiveTab}>
                                 <Tabs.List>
                                     <Tabs.Tab value="ALL">전체 (ALL)</Tabs.Tab>
-                                    <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tabs.Tab>
+                                    <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
                                     <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
                                     <Tabs.Tab value="5DAYS">📅 5일 누적 (Trends)</Tabs.Tab>
                                 </Tabs.List>

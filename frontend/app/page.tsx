@@ -716,11 +716,19 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Group gap={4} mb={4}>
-                                                                <Text size="xs" c="red">Max: {stock.trend_stats?.max}%</Text>
-                                                                <Text size="xs" c="dimmed">Avg: {stock.trend_stats?.avg}%</Text>
-                                                                <Text size="xs" c="blue">Min: {stock.trend_stats?.min}%</Text>
+                                                                <Text size="xs" c="red">Max: {stock.price_stats?.max?.toLocaleString()}</Text>
+                                                                <Text size="xs" c="dimmed">Avg: {stock.price_stats?.avg?.toLocaleString()}</Text>
+                                                                <Text size="xs" c="blue">Min: {stock.price_stats?.min?.toLocaleString()}</Text>
                                                             </Group>
-                                                            <Sparkline data={stock.sparkline} />
+                                                            <Sparkline data={stock.sparkline_price || []} />
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Group gap={4} mb={4}>
+                                                                <Text size="xs" c="red">Max: {stock.post_stats?.max?.toLocaleString()}</Text>
+                                                                <Text size="xs" c="dimmed">Avg: {stock.post_stats?.avg}</Text>
+                                                                <Text size="xs" c="blue">Min: {stock.post_stats?.min?.toLocaleString()}</Text>
+                                                            </Group>
+                                                            <Sparkline data={stock.sparkline_posts || []} />
                                                         </Table.Td>
                                                     </Table.Tr>
                                                 ))}

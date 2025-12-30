@@ -710,8 +710,8 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Text fw={700}>{stock.price.toLocaleString()}</Text>
-                                                            <Text size="xs" c={stock.change_rate.includes('-') ? 'blue' : 'red'}>
-                                                                {stock.change_rate}
+                                                            <Text size="xs" c={stock.period_change_rate && stock.period_change_rate > 0 ? 'red' : 'blue'}>
+                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}%
                                                             </Text>
                                                         </Table.Td>
                                                         <Table.Td>
@@ -778,8 +778,8 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Text fw={700}>{stock.price.toLocaleString()}</Text>
-                                                            <Text size="xs" c={stock.change_rate.includes('-') ? 'blue' : 'red'}>
-                                                                {stock.change_rate}
+                                                            <Text size="xs" c={stock.period_change_rate && stock.period_change_rate > 0 ? 'red' : 'blue'}>
+                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}%
                                                             </Text>
                                                         </Table.Td>
                                                         <Table.Td>

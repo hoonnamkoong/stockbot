@@ -56,8 +56,19 @@ const Sparkline = ({ data }: { data: number[] }) => {
     if (!data || data.length === 0) return null;
     const width = 100;
     const height = 30;
-    const max = Math.max(...data, 1); // Avoid div by zero
-    const min = Math.min(...data, -1);
+
+    const dataMin = Math.min(...data);
+    const dataMax = Math.max(...data);
+
+    let min = dataMin;
+    let max = dataMax;
+
+    // Handle flat line case
+    if (min === max) {
+        min -= 1;
+        max += 1;
+    }
+
     const range = max - min;
 
     // Scale points
@@ -71,19 +82,21 @@ const Sparkline = ({ data }: { data: number[] }) => {
         <svg width={width} height={height} style={{ overflow: 'visible' }}>
             <polyline
                 fill="none"
-                stroke={data[data.length - 1] >= 0 ? 'red' : 'blue'}
+                stroke={data[data.length - 1] >= data[0] ? 'red' : 'blue'}
                 strokeWidth="2"
                 points={points}
             />
-            {/* Zero line */}
-            <line
-                x1="0"
-                y1={height - ((0 - min) / range) * height}
-                x2={width}
-                y2={height - ((0 - min) / range) * height}
-                stroke="#ddd"
-                strokeDasharray="2"
-            />
+            {/* Zero line only if within range */}
+            {min < 0 && max > 0 && (
+                <line
+                    x1="0"
+                    y1={height - ((0 - min) / range) * height}
+                    x2={width}
+                    y2={height - ((0 - min) / range) * height}
+                    stroke="#ddd"
+                    strokeDasharray="2"
+                />
+            )}
         </svg>
     );
 };
@@ -683,7 +696,7 @@ export default function Home() {
                                                     <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                                     <Table.Th>5일 전 주가</Table.Th>
                                                     <Table.Th>현재가</Table.Th>
-                                                    <Table.Th>주가 추세 (5일)</Table.Th>
+                                                    <Table.Th>주가 추세 (5일) (단위: 천원)</Table.Th>
                                                     <Table.Th>토론글 추세 (5일)</Table.Th>
                                                 </Table.Tr>
                                             </Table.Thead>
@@ -757,7 +770,7 @@ export default function Home() {
                                                     <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                                     <Table.Th>3일 전 주가</Table.Th>
                                                     <Table.Th>현재가</Table.Th>
-                                                    <Table.Th>주가 추세 (3일)</Table.Th>
+                                                    <Table.Th>주가 추세 (3일) (단위: 천원)</Table.Th>
                                                     <Table.Th>토론글 추세 (3일)</Table.Th>
                                                 </Table.Tr>
                                             </Table.Thead>
@@ -789,16 +802,18 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
-                                                            <Group gap={4} mt={4} justify="space-between">
-                                                                <Text size="xs" c="blue">Min: {stock.price_stats?.min?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="red">Max: {stock.price_stats?.max?.toLocaleString()}</Text>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_price || []).map((v, i) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{(v / 1000).toFixed(1)}</Text>
+                                                                ))}
                                                             </Group>
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_posts || []} />
-                                                            <Group gap={4} mt={4} justify="space-between">
-                                                                <Text size="xs" c="blue">Min: {stock.post_stats?.min?.toLocaleString()}</Text>
-                                                                <Text size="xs" c="red">Max: {stock.post_stats?.max?.toLocaleString()}</Text>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_posts || []).map((v, i) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{v?.toLocaleString()}</Text>
+                                                                ))}
                                                             </Group>
                                                         </Table.Td>
                                                     </Table.Tr>

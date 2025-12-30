@@ -683,7 +683,6 @@ export default function Home() {
                                                     <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                                     <Table.Th>5일 전 주가</Table.Th>
                                                     <Table.Th>현재가</Table.Th>
-                                                    <Table.Th>현재가</Table.Th>
                                                     <Table.Th>주가 추세 (5일)</Table.Th>
                                                     <Table.Th>토론글 추세 (5일)</Table.Th>
                                                 </Table.Tr>

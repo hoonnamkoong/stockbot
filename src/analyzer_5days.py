@@ -131,15 +131,15 @@ def load_daily_snapshots(target_dates):
         
     return daily_dfs
 
-def analyze_5days():
-    print("\n[5Day Analysis] Starting V3 (Robust)...")
+def analyze_cumulative(days=5):
+    print(f"\n[{days}Day Analysis] Starting V3 (Robust)...")
     
-    target_dates = get_recent_working_days(5) 
-    print(f"[5Day Analysis] Target Dates: {target_dates}")
+    target_dates = get_recent_working_days(days) 
+    print(f"[{days}Day Analysis] Target Dates: {target_dates}")
     
     daily_dfs = load_daily_snapshots(target_dates) 
     if not daily_dfs:
-        print("[5Day Analysis] No data found.")
+        print(f"[{days}Day Analysis] No data found.")
         return pd.DataFrame()
 
     all_codes = set()
@@ -149,13 +149,12 @@ def analyze_5days():
             all_codes.update(df['code'].tolist())
             
     if not all_codes:
-        print("[5Day Analysis] No stock codes found in loaded data.")
+        print(f"[{days}Day Analysis] No stock codes found in loaded data.")
         return pd.DataFrame()
         
     records = []
     
-    # debug count
-    print(f"[5Day Analysis] Found {len(all_codes)} unique codes across 5 days.")
+    print(f"[{days}Day Analysis] Found {len(all_codes)} unique codes across {days} days.")
 
     for code in all_codes:
         consecutive_days = 0 
@@ -199,7 +198,7 @@ def analyze_5days():
                     c_rate = safe_float(data.get('change_rate'))
                     change_rates.append(c_rate)
                         
-                    p_price = safe_int(data.get('price')) # Price is usually int in KRW
+                    p_price = safe_int(data.get('price')) 
                     prices.append(p_price)
                         
             if not found_row:
@@ -211,7 +210,7 @@ def analyze_5days():
         if not latest_meta:
             continue
             
-        avg_posts = total_posts / 5 
+        avg_posts = total_posts / days 
         if len(posts_list) > 1:
             std_dev = statistics.stdev(posts_list)
         else:
@@ -221,14 +220,14 @@ def analyze_5days():
             'code': code,
             'name': latest_meta.get('name'),
             'market': latest_meta.get('market'),
-            'price': safe_int(latest_meta.get('price')), # Clean numeric
-            'change_rate': latest_meta.get('change_rate'), # String is fine format
+            'price': safe_int(latest_meta.get('price')),
+            'change_rate': latest_meta.get('change_rate'),
             'consecutive_days': consecutive_days,
             'total_posts': total_posts,
             'avg_posts': round(avg_posts, 1),
             'std_dev': round(std_dev, 1),
             'sparkline': change_rates[::-1],
-            'price_start': prices[-1] if prices else 0, # Price from 5 days ago (or oldest in window)
+            'price_start': prices[-1] if prices else 0, 
             'trend_stats': {
                 'min': round(min(change_rates), 2) if change_rates else 0,
                 'max': round(max(change_rates), 2) if change_rates else 0,
@@ -242,8 +241,14 @@ def analyze_5days():
     if not result_df.empty:
         result_df = result_df.sort_values(by=['consecutive_days', 'total_posts'], ascending=[False, False])
         
-    print(f"[5Day Analysis] Generated {len(result_df)} records.")
+    print(f"[{days}Day Analysis] Generated {len(result_df)} records.")
     return result_df
+
+def analyze_5days():
+    return analyze_cumulative(5)
+
+def analyze_3days():
+    return analyze_cumulative(3)
 
 if __name__ == "__main__":
     df = analyze_5days()

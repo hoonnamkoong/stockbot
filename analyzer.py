@@ -51,7 +51,7 @@ def analyze_discussion_trend(data_list):
     desired_order = [
         'market', 'name', 'price', 'foreign_rate', 'prev_close', 'prev_foreign_rate', 
         'change_rate', 'recent_posts_count', 'posts_summary', 
-        'sentiment', 'top_keywords', 'is_last_captured'
+        'sentiment', 'top_keywords', 'is_last_captured', 'latest_posts'
     ]
     
     final_cols = [c for c in desired_order if c in df_final.columns]

@@ -38,9 +38,9 @@ export async function GET() {
         // Cleanup expired ones (> 24 hours?)
         const now = Date.now();
         const active = list.filter((r: any) => {
-            // Check if active: simpler to just keep them until user deletes or we implement automated cleanup
-            // For now, return all. User can clear list.
-            return true;
+            // Filter out reservations older than 5 minutes (assumed executed or failed)
+            const cutoff = Date.now() - (5 * 60 * 1000);
+            return new Date(r.targetTime).getTime() > cutoff;
         });
         return NextResponse.json({ reservations: active });
     } catch (error: any) {

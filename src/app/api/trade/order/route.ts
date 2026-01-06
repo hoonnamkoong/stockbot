@@ -18,8 +18,9 @@ async function updateOrderHistory(code: string) {
 
         history[code] = dateStr;
         await fs.writeFile(filePath, JSON.stringify(history, null, 2), 'utf-8');
-    } catch (e) {
-        console.error("Failed to update order history", e);
+    } catch (e: any) {
+        // On Vercel (Read-Only), this will fail. We should NOT fail the order because of this.
+        console.warn("Failed to update order history (likely Read-Only FS):", e.message);
     }
 }
 

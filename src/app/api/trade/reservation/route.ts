@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
 // Dynamic route to prevent caching
 export const dynamic = 'force-dynamic';
@@ -106,46 +107,65 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: `Target time (${timeStr}) has passed. Please choose a future time.` }, { status: 400 });
         }
 
-        // Path to python script
-        const scriptPath = path.join(process.cwd(), 'trade', 'reservation_order.py');
-        const logPath = path.join(process.cwd(), 'trade', 'reservation_spawn.log');
+        // Sanitize numeric inputs (omitted for brevity, assume existing)
 
-        // Open log file for append
-        const logFile = fs.openSync(logPath, 'a');
+        // Vercel Compatibility Check
+        // If we are on Vercel (or any read-only env without python), this will fail.
+        try {
+            // Path to python script
+            const scriptPath = path.join(process.cwd(), 'trade', 'reservation_order.py');
+            const logPath = path.join(os.tmpdir(), 'reservation_spawn.log'); // Use /tmp
 
-        // Spawn Background Process with logging
-        const subprocess = spawn('python', [
-            scriptPath,
-            code,
-            safeQty,
-            safePrice,
-            safeHour,
-            safeMinute,
-            side || 'buy'
-        ], {
-            detached: true,
-            stdio: ['ignore', logFile, logFile], // Redirect stdout/stderr to log
-            cwd: path.join(process.cwd(), 'trade') // Set correct CWD for python imports
-        });
+            // Open log file for append
+            const logFile = fs.openSync(logPath, 'a');
 
-        subprocess.unref();
+            // Spawn Background Process
+            // On Vercel, 'python' command likely missing -> Error
+            const subprocess = spawn('python', [
+                scriptPath,
+                code,
+                safeQty,
+                safePrice,
+                safeHour,
+                safeMinute,
+                side || 'buy'
+            ], {
+                detached: true,
+                stdio: ['ignore', logFile, logFile],
+                cwd: path.join(process.cwd(), 'trade')
+            });
 
-        // Save to Reservations List
-        const newList = getReservations();
-        const newRes = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-            pid: subprocess.pid,
-            code,
-            qty: safeQty,
-            price: safePrice,
-            side: side || 'buy',
-            targetTime: target.toISOString(),
-            createdAt: new Date().toISOString()
-        };
-        newList.push(newRes);
-        saveReservations(newList);
+            subprocess.unref();
 
-        return NextResponse.json({ success: true, message: 'Reservation scheduled', reservation: newRes });
+            // Save to Reservations List (Use Local /tmp if needed or skip)
+            // We can't save persistently on Vercel. 
+            // We'll try to save to file, but catch error if it fails
+            try {
+                const newList = getReservations();
+                const newRes = {
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                    pid: subprocess.pid,
+                    code,
+                    qty: safeQty,
+                    price: safePrice,
+                    side: side || 'buy',
+                    targetTime: target.toISOString(),
+                    createdAt: new Date().toISOString()
+                };
+                newList.push(newRes);
+                saveReservations(newList);
+                return NextResponse.json({ success: true, message: 'Reservation scheduled', reservation: newRes });
+            } catch (saveError) {
+                console.warn("Failed to save reservation record:", saveError);
+                // Even if save fails, process started? Actually on Vercel process might die immediately.
+                // It's safer to tell user it might not work.
+                return NextResponse.json({ success: true, message: 'Reservation attempted (Warning: Persistence Limited)', reservation: {} });
+            }
+
+        } catch (e: any) {
+            console.error("Reservation execution failed:", e);
+            return NextResponse.json({ error: "Reservation failed. Feature requires Local Server (Python/Disk Access)." }, { status: 503 });
+        }
 
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

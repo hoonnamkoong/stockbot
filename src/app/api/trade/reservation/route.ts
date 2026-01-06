@@ -1,47 +1,25 @@
 import { NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+import { fetchReservations, updateReservations } from '@/lib/github-db';
 
 // Dynamic route to prevent caching
 export const dynamic = 'force-dynamic';
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'reservations.json');
-
-function getReservations() {
-    if (!fs.existsSync(DATA_FILE)) return [];
-    try {
-        const data = fs.readFileSync(DATA_FILE, 'utf-8');
-        return JSON.parse(data);
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveReservations(list: any[]) {
-    try {
-        // Ensure dir exists
-        const dir = path.dirname(DATA_FILE);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2));
-    } catch (e) {
-        console.error("Failed to save reservations", e);
-    }
-}
-
 export async function GET() {
     try {
-        const list = getReservations();
-        // Filter out obviously passed ones? 
-        // Or let frontend handle it. Let's return all for now or maybe cleanup old ones.
-        // Cleanup expired ones (> 24 hours?)
-        const now = Date.now();
+        const { list } = await fetchReservations();
+
+        // Filter out reservations older than 5 minutes (assumed executed or failed)
+        // Actually, with Cron, we might want to keep them until Cron deletes them?
+        // But for display, maybe we still hide old ones or show them as 'Processing'?
+        // For now, let's keep the view consistent: show future ones.
+
         const active = list.filter((r: any) => {
-            // Filter out reservations older than 5 minutes (assumed executed or failed)
-            const cutoff = Date.now() - (5 * 60 * 1000);
+            // Show all future or recent past (within 10 mins)
+            // If Cron runs every 10 mins, a reservation might 'wait' for 9 mins.
+            const cutoff = Date.now() - (15 * 60 * 1000);
             return new Date(r.targetTime).getTime() > cutoff;
         });
+
         return NextResponse.json({ reservations: active });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,23 +33,17 @@ export async function DELETE(request: Request) {
 
         if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
-        const list = getReservations();
-        const target = list.find((r: any) => r.id === id);
-
-        if (target) {
-            // Kill Process
-            try {
-                process.kill(target.pid);
-                console.log(`Killed process ${target.pid} for reservation ${id}`);
-            } catch (e) {
-                console.log(`Process ${target.pid} already dead or not found.`);
-            }
-        }
-
+        // Optimistic update
+        const { list, sha } = await fetchReservations();
         const newList = list.filter((r: any) => r.id !== id);
-        saveReservations(newList);
 
-        return NextResponse.json({ success: true });
+        const success = await updateReservations(newList, `Delete reservation ${id}`, sha);
+
+        if (success) {
+            return NextResponse.json({ success: true });
+        } else {
+            return NextResponse.json({ error: "Failed to update GitHub" }, { status: 500 });
+        }
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -87,7 +59,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
         }
 
-        // Sanitize numeric inputs to prevent python crash (int('') error)
+        // Sanitize
         const safeQty = qty ? String(qty) : '1';
         const safePrice = price ? String(price) : '0';
         const safeHour = (hour !== undefined && hour !== '') ? String(hour) : '9';
@@ -101,70 +73,32 @@ export async function POST(request: Request) {
         target.setSeconds(0);
         target.setMilliseconds(0);
 
-        // If target is earlier than now (and not tomorrow), reject or handle logic.
         if (target < now) {
+            // Check if it's for tomorrow? For now just reject past time.
             const timeStr = `${safeHour}:${safeMinute}`;
             return NextResponse.json({ error: `Target time (${timeStr}) has passed. Please choose a future time.` }, { status: 400 });
         }
 
-        // Sanitize numeric inputs (omitted for brevity, assume existing)
+        const newRes = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+            code,
+            qty: safeQty,
+            price: safePrice,
+            side: side || 'buy',
+            targetTime: target.toISOString(),
+            createdAt: new Date().toISOString()
+        };
 
-        // Vercel Compatibility Check
-        // If we are on Vercel (or any read-only env without python), this will fail.
-        try {
-            // Path to python script
-            const scriptPath = path.join(process.cwd(), 'trade', 'reservation_order.py');
-            const logPath = path.join(os.tmpdir(), 'reservation_spawn.log'); // Use /tmp
+        // Save to GitHub
+        const { list, sha } = await fetchReservations();
+        list.push(newRes);
 
-            // Open log file for append
-            const logFile = fs.openSync(logPath, 'a');
+        const success = await updateReservations(list, `Add reservation for ${code}`, sha);
 
-            // Spawn Background Process
-            // On Vercel, 'python' command likely missing -> Error
-            const subprocess = spawn('python', [
-                scriptPath,
-                code,
-                safeQty,
-                safePrice,
-                safeHour,
-                safeMinute,
-                side || 'buy'
-            ], {
-                detached: true,
-                stdio: ['ignore', logFile, logFile],
-                cwd: path.join(process.cwd(), 'trade')
-            });
-
-            subprocess.unref();
-
-            // Save to Reservations List (Use Local /tmp if needed or skip)
-            // We can't save persistently on Vercel. 
-            // We'll try to save to file, but catch error if it fails
-            try {
-                const newList = getReservations();
-                const newRes = {
-                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                    pid: subprocess.pid,
-                    code,
-                    qty: safeQty,
-                    price: safePrice,
-                    side: side || 'buy',
-                    targetTime: target.toISOString(),
-                    createdAt: new Date().toISOString()
-                };
-                newList.push(newRes);
-                saveReservations(newList);
-                return NextResponse.json({ success: true, message: 'Reservation scheduled', reservation: newRes });
-            } catch (saveError) {
-                console.warn("Failed to save reservation record:", saveError);
-                // Even if save fails, process started? Actually on Vercel process might die immediately.
-                // It's safer to tell user it might not work.
-                return NextResponse.json({ success: true, message: 'Reservation attempted (Warning: Persistence Limited)', reservation: {} });
-            }
-
-        } catch (e: any) {
-            console.error("Reservation execution failed:", e);
-            return NextResponse.json({ error: "Reservation failed. Feature requires Local Server (Python/Disk Access)." }, { status: 503 });
+        if (success) {
+            return NextResponse.json({ success: true, message: 'Reservation scheduled (Saved to Cloud)', reservation: newRes });
+        } else {
+            return NextResponse.json({ error: "Failed to save to Cloud Storage (GitHub)" }, { status: 500 });
         }
 
     } catch (error: any) {

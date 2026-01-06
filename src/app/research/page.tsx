@@ -586,6 +586,17 @@ export default function Home() {
             </AppShell.Header>
 
             <AppShell.Navbar p="md">
+                <Button
+                    fullWidth
+                    color="orange"
+                    variant="filled"
+                    mb="md"
+                    leftSection={<IconCoin size={20} />}
+                    onClick={() => window.location.href = '/trade'}
+                    size="md"
+                >
+                    Trading Dashboard
+                </Button>
                 <Text fw={700} mb="sm">Research Reports</Text>
                 {['invest', 'company', 'industry', 'economy'].map((key) => {
                     const count = research?.[key]?.today_count || 0;
@@ -908,7 +919,28 @@ export default function Home() {
                                         <Text size="sm" c="dimmed">For.: {stock.foreign_rate || stock.foreign_ratio_today}</Text>
                                     </Group>
                                     {(stock.is_last_captured || stock.is_consecutive) && <Badge variant="outline" mb="xs" color="green" size="sm" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
-                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary || stock.summary}</Text>
+                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }} mb="xs">{stock.posts_summary || stock.summary}</Text>
+
+                                    <Group grow>
+                                        <Button
+                                            variant="light"
+                                            color="teal"
+                                            size="xs"
+                                            leftSection={<IconCopy size={14} />}
+                                            onClick={() => handleCopyAndOpen(stock.code)}
+                                        >
+                                            Copy Code
+                                        </Button>
+                                        <Button
+                                            variant="light"
+                                            color="blue"
+                                            size="xs"
+                                            leftSection={<IconCoin size={14} />}
+                                            onClick={() => openQuickOrder(stock)}
+                                        >
+                                            Trade Order
+                                        </Button>
+                                    </Group>
                                 </Card>
                             ))}
                         </div>

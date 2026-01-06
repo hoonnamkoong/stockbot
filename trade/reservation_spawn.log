@@ -675,3 +675,27 @@ Rate Limit hit (초당 거래건수를 초과하였습니다.). Retrying 1/5...
 Rate Limit hit (초당 거래건수를 초과하였습니다.). Retrying 2/5...
 Success! Order No: 0000008500
 Message: 모의투자 매도주문이 완료 되었습니다.
+[Reservation] Waiting until 15:25...
+
+[Order] Placing SELL Order: 490470 x 5 @ 0
+Attempt 1 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+Attempt 2 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+Attempt 3 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+[Reservation] Waiting until 15:25...
+
+[Order] Placing SELL Order: 036220 x 5 @ 0
+Attempt 1 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+Attempt 2 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+Attempt 3 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+[Reservation] Waiting until 15:25...
+
+[Order] Placing SELL Order: 950250 x 5 @ 0
+Attempt 1 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+Attempt 2 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+Attempt 3 Failed: HTTP Error 500: {"rt_cd":"1","msg_cd":"EGW00201","msg1":"초당 거래건수를 초과하였습니다."}
+[Reservation] Waiting until 15:25...
+
+[Order] Placing SELL Order: 101970 x 5 @ 0
+Attempt 1 Failed: HTTP Error 500: {"rt_cd":"1","msg_cd":"EGW00201","msg1":"초당 거래건수를 초과하였습니다."}
+Attempt 2 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)
+Attempt 3 Failed: API Error: 모의투자 잔고내역이 없습니다. (Code: 40240000)

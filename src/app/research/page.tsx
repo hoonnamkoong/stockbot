@@ -537,7 +537,7 @@ export default function Home() {
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                     <IconRobot size={isMobile ? 24 : 30} color="#228be6" />
                     <Title order={3} size={isMobile ? 'h5' : 'h3'}>
-                        {isMobile ? 'StockBot V6.11' : 'StockBot V6.11 (Deployment Verified)'}
+                        {isMobile ? 'StockBot V6.12' : 'StockBot V6.12 (Final Fix)'}
                     </Title>
                     <Group ml="auto" gap={isMobile ? 'xs' : 'md'}>
                         {isMobile ? (

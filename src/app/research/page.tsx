@@ -578,9 +578,7 @@ export default function Home() {
                             </Group>
 
                         )}
-                        <Button variant="filled" color="orange" onClick={() => window.location.href = '/trade'}>
-                            Trading
-                        </Button>
+
                     </Group>
                 </Group>
             </AppShell.Header>
@@ -710,9 +708,7 @@ export default function Home() {
                                     <Tabs.Tab value="3DAYS">📅 3일 누적 (Trends)</Tabs.Tab>
                                 </Tabs.List>
                             </Tabs>
-                            <Button component="a" href="/trade" variant="light" size="xs" color="blue" leftSection={<IconCoin size={14} />}>
-                                주식 거래 (Trading)
-                            </Button>
+
                             {lastUpdated && <Text size="xs" c="dimmed" ml="md">🕒 Update: {lastUpdated}</Text>}
                         </Group >
 

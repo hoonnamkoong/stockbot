@@ -132,15 +132,18 @@ def load_daily_snapshots(target_dates):
         
     return daily_dfs
 
-def analyze_cumulative(days=5):
-    print(f"\n[{days}Day Analysis] Starting V3 (Robust)...")
+def analyze_cumulative(days=5, silent=False):
+    if not silent:
+        print(f"\n[{days}Day Analysis] Starting V3 (Robust)...")
     
     target_dates = get_recent_working_days(days) 
-    print(f"[{days}Day Analysis] Target Dates: {target_dates}")
+    if not silent:
+        print(f"[{days}Day Analysis] Target Dates: {target_dates}")
     
     daily_dfs = load_daily_snapshots(target_dates) 
     if not daily_dfs:
-        print(f"[{days}Day Analysis] No data found.")
+        if not silent:
+            print(f"[{days}Day Analysis] No data found.")
         return pd.DataFrame()
 
     all_codes = set()
@@ -150,12 +153,14 @@ def analyze_cumulative(days=5):
             all_codes.update(df['code'].tolist())
             
     if not all_codes:
-        print(f"[{days}Day Analysis] No stock codes found in loaded data.")
+        if not silent:
+            print(f"[{days}Day Analysis] No stock codes found in loaded data.")
         return pd.DataFrame()
         
     records = []
     
-    print(f"[{days}Day Analysis] Found {len(all_codes)} unique codes across {days} days.")
+    if not silent:
+        print(f"[{days}Day Analysis] Found {len(all_codes)} unique codes across {days} days.")
 
     for code in all_codes:
         consecutive_days = 0 
@@ -260,7 +265,8 @@ def analyze_cumulative(days=5):
     if not result_df.empty:
         result_df = result_df.sort_values(by=['consecutive_days', 'total_posts'], ascending=[False, False])
         
-    print(f"[{days}Day Analysis] Generated {len(result_df)} records.")
+    if not silent:
+        print(f"[{days}Day Analysis] Generated {len(result_df)} records.")
     return result_df
 
 def analyze_5days():
@@ -269,8 +275,30 @@ def analyze_5days():
 def analyze_3days():
     return analyze_cumulative(3)
 
+import sys
+import argparse
+
 if __name__ == "__main__":
-    df = analyze_5days()
-    if not df.empty:
-        print(df.head())
-        # print(df.iloc[0].to_dict())
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--days', type=int, default=5, help='Number of days to analyze')
+    parser.add_argument('--json', action='store_true', help='Output result as JSON')
+    args = parser.parse_args()
+
+    # Force stdout to UTF-8 to prevent mojibake in Node.js spawn
+    if args.json:
+        sys.stdout.reconfigure(encoding='utf-8')
+
+    df = analyze_cumulative(args.days, silent=args.json)
+
+    if args.json:
+        # Output strictly JSON for API consumption
+        if df.empty:
+            print("[]")
+        else:
+            print(df.to_json(orient='records', force_ascii=False))
+    else:
+        # Normal console output
+        if not df.empty:
+            pd.set_option('display.max_columns', None)
+            pd.set_option('display.width', 1000)
+            print(df.head())

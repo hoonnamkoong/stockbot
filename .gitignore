@@ -36,5 +36,14 @@ wheels/
 # Mac
 .DS_Store
 
-# Data (Don't ignore JSON/CSV if we want to commit them, but ignore large temp files if any)
-# We WANT to commit data/ so do not ignore it.
+# Node / Next.js
+node_modules/
+/.next/
+/out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Data
+# We keep data/ committed as discussed

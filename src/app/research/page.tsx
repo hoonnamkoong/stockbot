@@ -576,7 +576,11 @@ export default function Home() {
                                     Sign Out
                                 </Button>
                             </Group>
+
                         )}
+                        <Button variant="filled" color="orange" onClick={() => window.location.href = '/trade'}>
+                            Trading
+                        </Button>
                     </Group>
                 </Group>
             </AppShell.Header>

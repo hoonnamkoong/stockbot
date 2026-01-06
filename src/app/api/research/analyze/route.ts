@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 
+export const runtime = 'nodejs'; // Force Node.js runtime (fixes Edge issues)
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const days = searchParams.get('days') || '5';
@@ -16,7 +18,7 @@ export async function GET(request: Request) {
     let dataString = '';
     let errorString = '';
 
-    return new Promise((resolve) => {
+    return new Promise<NextResponse>((resolve) => {
         pythonProcess.stdout.on('data', (data) => {
             dataString += data.toString();
         });

@@ -1,78 +1,70 @@
-[10:00:23] === StockBot Research Scraper Started (V2.0) ===
-[10:00:23] --- Section: invest ---
-[10:00:25] [invest] Today: 21 items
-[10:00:25]    Processing: 2026년 01/06 KIWOOM ESG Weekly
-[10:00:25]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37434&page=1
-[10:00:26]    Processing: 국장 Upside Risk
-[10:00:26]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37433&page=1
-[10:00:27]    Processing: [ETF 전략] 원자재 관련 섹터 중심으로 자금 유입
-[10:00:27]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37432&page=1
-[10:00:28]    Processing: 1월, 시장 소외주에서 찾는 반격의 기회
-[10:00:28]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37431&page=1
-[10:00:30]    Processing: BESG 포트폴리오, 전월대비 성과 일부 개선
-[10:00:30]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37430&page=1
-[10:00:31]    Processing: [New K-ETF] 한국 휴머노이드 로봇
-[10:00:31]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37429&page=1
-[10:00:32]    Processing: ETF 트렌드 & 포트폴리오: 단기 모멘텀과 추세 대응의..
-[10:00:32]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37428&page=1
-[10:00:34]    Processing: Weekly Quant Momentum Strategy(26.1.6)
-[10:00:34]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37427&page=1
-[10:00:35]    Processing: [House View] 2026년 KOSPI 수정 전망: 4,200 ~ 5,200..
-[10:00:35]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37426&page=1
-[10:00:36]    Processing: [Quant Comment] 소외된 모두 왼발을 한 보 앞으로
-[10:00:36]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37425&page=1
-[10:00:37] --- Section: company ---
-[10:00:38] [company] Today: 22 items
-[10:00:38]    Processing: [기아] [4Q25 Preview] 신차 효과 통해 증익 흐름으..
-[10:00:38]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88935&page=1
-[10:00:40]    Processing: [현대차] [4Q25 Preview] 수익성 저점 통과, 밸류 리레..
-[10:00:40]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88934&page=1
-[10:00:41]    Processing: [오리온] 방어 보다는 공격이 필요한 때
-[10:00:41]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88933&page=1
-[10:00:42]    Processing: [아모레퍼시픽] 가장 편안할 선택지
-[10:00:42]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88932&page=1
-[10:00:43]    Processing: [농심] 4Q25 Pre: 일회성비용으로 손익 기대 하회 예..
-[10:00:43]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88931&page=1
-[10:00:44]    Processing: [KT] 1월 전략 - 상반기에 7만원은 넘어갈 것 같습..
-[10:00:44]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88930&page=1
-[10:00:45]    Processing: [LG유플러스] 1월 전략 - 길게 투자 하셔야 성과 날 수 있..
-[10:00:45]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88929&page=1
-[10:00:47]    Processing: [SK텔레콤] 1월 전략 - 4Q 배당 공시에 유의하세요
-[10:00:47]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88928&page=1
-[10:00:48]    Processing: [파인엠텍] 올해 드디어 확인될 폴더블 아이폰 관련 매출
-[10:00:48]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88927&page=1
-[10:00:49]    Processing: [슈프리마] 기다려지는 실적 발표
-[10:00:49]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88926&page=1
-[10:00:50] --- Section: industry ---
-[10:00:51] [industry] Today: 25 items
-[10:00:51]    Processing: 완성차 2025년 도매판매와 2026년 목표
-[10:00:51]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42923&page=1
-[10:00:52]    Processing: KT는 이제 본격 상승 예상됩니다
-[10:00:52]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42922&page=1
-[10:00:54]    Processing: 새울 3호기 하반기 가동 예상
-[10:00:54]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42921&page=1
-[10:00:55]    Processing: 2025년 아파트 가격 정리
-[10:00:55]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42920&page=1
-[10:00:56]    Processing: 우주 관점에서 본 한화에어로스페이스-I
-[10:00:56]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42919&page=1
-[10:00:57]    Processing: 신년사 분석: 붉은 말처럼 K-Food도 글로벌 ..
-[10:00:57]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42918&page=1
-[10:00:58]    Processing: 휴머노이드는 로봇이 아니다 #1 - 움직이는 A..
-[10:00:58]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42917&page=1
-[10:00:59]    Processing: [왜이기 1월] 필연적인 eSSD 수요 급증
-[10:00:59]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42916&page=1
-[10:01:00]    Processing: 2026년의 첫 페이지 - 유안타가 4Q25로 엽니..
-[10:01:00]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42915&page=1
-[10:01:02]    Processing: Chemicals Weekly Data (2026.1.6일, xls데이..
-[10:01:02]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42914&page=1
-[10:01:03] --- Section: economy ---
-[10:01:04] [economy] Today: 4 items
-[10:01:04]    Processing: 12월 미국 ISM 제조업: 쉽지 않은 반등
-[10:01:04]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12830&page=1
-[10:01:05]    Processing: 다시 쓰는 유동성 방정식
-[10:01:05]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12829&page=1
-[10:01:06]    Processing: 01/06, Kiwoom Morning Letter
-[10:01:06]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12828&page=1
-[10:01:07]    Processing: 트럼프 행정부, 계획대로 움직인다
-[10:01:07]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12827&page=1
-[10:01:09] === Completed ===
+[00:14:56] === StockBot Research Scraper Started (V2.0) ===
+[00:14:56] --- Section: invest ---
+[00:14:58] [invest] Today: 12 items
+[00:14:58]    Processing: 알루미늄 기업에 주목할 시점
+[00:14:58]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37446&page=1
+[00:14:59]    Processing: 가상 자산 반등 지표 및 스테이블코인 ETF 상장 점검
+[00:14:59]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37445&page=1
+[00:15:00]    Processing: 반도체 이어달리기, 소부장 랠리의 조건
+[00:15:00]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37444&page=1
+[00:15:01]    Processing: [IBKS Daily]Start with IBKS (2026.1.7) CES2026, AI..
+[00:15:01]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37443&page=1
+[00:15:02]    Processing: [Global Watchlist] 걱정보단 양호한 상황의 연속인 ..
+[00:15:02]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37442&page=1
+[00:15:03]    Processing: [전략 COMMENT] K자 경제 성장으로 주식시장 업종별 ..
+[00:15:03]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37441&page=1
+[00:15:05]    Processing: 01/07, 미 증시, CES 2026 모멘텀 등으로 강세 지속
+[00:15:05]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37440&page=1
+[00:15:06]    Processing: 01/07 달러, 미 금리 상승 속 강세
+[00:15:06]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37439&page=1
+[00:15:07]    Processing: 키움 스몰캡 전략노트 1
+[00:15:07]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37438&page=1
+[00:15:08]    Processing: 키움 글로벌 1월 Monthly - Stay on track
+[00:15:08]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37437&page=1
+[00:15:09] --- Section: company ---
+[00:15:10] [company] Today: 10 items
+[00:15:10]    Processing: [LG에너지솔루션] 잠시 쉬어가는 시기
+[00:15:10]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88945&page=1
+[00:15:11]    Processing: [이지홀딩스] 이지하게 올라올 배당에 주목
+[00:15:11]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88944&page=1
+[00:15:12]    Processing: [삼성전자] 4Q25 Preview: 메모리 맹수, 앙!
+[00:15:12]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88943&page=1
+[00:15:13]    Processing: [CJ대한통운] 경쟁 강도 심화되고 있으나 안정적인 이익 체..
+[00:15:13]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88942&page=1
+[00:15:14]    Processing: [HD현대일렉트릭] 또 한번의 보수적 가이던스, 일시적 주가 충..
+[00:15:14]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88941&page=1
+[00:15:15]    Processing: [롯데웰푸드] 2026년 수익성 회복 본격화
+[00:15:15]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88940&page=1
+[00:15:16]    Processing: [SK하이닉스] 2026년 NAND 실적 전망치 상향
+[00:15:16]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88939&page=1
+[00:15:17]    Processing: [에이피알] 펀더멘탈 이상 無, 고성장 트렌드 유효
+[00:15:17]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88938&page=1
+[00:15:18]    Processing: [삼성바이오로직스] 2025년 실적 A+. 2026년은요?
+[00:15:18]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88937&page=1
+[00:15:19]    Processing: [비에이치아이] 든든한 수주, 단단한 실적
+[00:15:19]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=88936&page=1
+[00:15:20] --- Section: industry ---
+[00:15:21] [industry] Today: 8 items
+[00:15:21]    Processing: 로봇/방산/조선/항공: 2025년과 2026년
+[00:15:21]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42931&page=1
+[00:15:22]    Processing: 2026년 비만 분야 관전포인트
+[00:15:22]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42930&page=1
+[00:15:23]    Processing: 12월 미국 신차 판매
+[00:15:23]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42929&page=1
+[00:15:24]    Processing: CES 2026: 휴머노이드 로봇이 현대차를 만든..
+[00:15:24]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42928&page=1
+[00:15:25]    Processing: (26-01) 주택공급 방향성이 중요
+[00:15:25]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42927&page=1
+[00:15:26]    Processing: [IBKS Daily] 인터넷/게임
+[00:15:26]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42926&page=1
+[00:15:27]    Processing: 12월 게임시장 Review
+[00:15:27]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42925&page=1
+[00:15:28]    Processing: Physical AI 도약 위한 양산 전제 Atlas 첫 ..
+[00:15:28]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=42924&page=1
+[00:15:29] --- Section: economy ---
+[00:15:30] [economy] Today: 2 items
+[00:15:30]    Processing: 01/07, Kiwoom Morning Letter
+[00:15:30]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12832&page=1
+[00:15:31]    Processing: 유동성, 다시 자산가격을 춤추게 한다
+[00:15:31]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12831&page=1
+[00:15:32] === Completed ===

@@ -290,6 +290,16 @@ export default function TradePage() {
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Trading</Title>
                 <Group>
+                    <Button
+                        component="a"
+                        href="koreainvestment://open"
+                        size="sm"
+                        variant="light"
+                        color="red"
+                        leftSection={<IconCoin size={20} />}
+                    >
+                        Open KIS App
+                    </Button>
                     <Button component="a" href="/research" size="sm" variant="light" leftSection={<IconChartBar size={20} />}>
                         StockBot Research
                     </Button>

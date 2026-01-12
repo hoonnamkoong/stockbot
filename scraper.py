@@ -373,7 +373,7 @@ def load_env_manual(filepath=".env.local"):
             for line in f:
                 if line.strip() and not line.startswith('#'):
                     key, val = line.strip().split('=', 1)
-                    os.environ[key] = val
+                    os.environ[key] = val.strip().strip('"').strip("'")
 
 # --- Helper Functions (Added for V6.7 Fix) ---
 def get_current_kst_time():

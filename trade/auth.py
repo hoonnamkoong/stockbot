@@ -4,9 +4,13 @@ import os
 import time
 
 # Load env manually to avoid dependency on python-dotenv for now
-def load_env(env_path=".env"):
+def load_env(env_path=None):
+    if env_path is None:
+        # Default to .env in the same directory as this script
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+
     if not os.path.exists(env_path):
-        print("Error: .env file not found.")
+        print(f"Error: .env file not found at {env_path}")
         return
     with open(env_path, 'r', encoding='utf-8') as f:
         for line in f:

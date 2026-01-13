@@ -267,6 +267,9 @@ def analyze_cumulative(days=5, silent=False):
         
     if not silent:
         print(f"[{days}Day Analysis] Generated {len(result_df)} records.")
+        
+    # [Fix 2026-01-13] Ensure no NaNs in output
+    result_df = result_df.where(pd.notnull(result_df), None)
     return result_df
 
 def analyze_5days():

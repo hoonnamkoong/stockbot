@@ -657,6 +657,22 @@ if __name__ == "__main__":
                     extra_sheets['5Day_Analysis'] = df_5days
             except Exception as e:
                 print(f"[Warning] 5-Day Analysis Failed: {e}")
+
+            # [Feature: 3-Day Cumulative Analysis]
+            try:
+                df_3days = analyzer_5days.analyze_3days()
+                if not df_3days.empty:
+                    # [Fix] Sanitize NaNs
+                    df_3days = df_3days.where(pd.notnull(df_3days), None)
+                    # Save JSON for Frontend
+                    with open('data/analysis_3days.json', 'w', encoding='utf-8') as f:
+                        f.write(df_3days.to_json(orient='records', force_ascii=False))
+                    print(f"[System] Saved 3-Day Analysis JSON (Count: {len(df_3days)})")
+                    
+                    # Add to Excel Sheets
+                    extra_sheets['3Day_Analysis'] = df_3days
+            except Exception as e:
+                print(f"[Warning] 3-Day Analysis Failed: {e}")
             
             # Save CSV & Excel (History) with Extra Sheets
             filename_prefix = f"trending_integrated"

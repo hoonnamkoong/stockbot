@@ -17,6 +17,7 @@ export async function GET() {
                 error: `KIS API Failed: ${(balance as any).error}`,
                 envCheck: {
                     hasKey: !!process.env.KIS_APP_KEY,
+                    keyDebug: `Len:${(process.env.KIS_APP_KEY || '').length} Start:${(process.env.KIS_APP_KEY || '').substring(0, 4)}`,
                     hasSecret: !!process.env.KIS_APP_SECRET,
                     hasAcc: !!process.env.KIS_ACCOUNT_NO,
                     baseUrl: process.env.KIS_BASE_URL,
@@ -64,6 +65,7 @@ export async function GET() {
             details: error.stack,
             envCheck: {
                 hasKey: !!process.env.KIS_APP_KEY,
+                keyDebug: `Len:${(process.env.KIS_APP_KEY || '').length} Start:${(process.env.KIS_APP_KEY || '').substring(0, 4)}`,
                 hasSecret: !!process.env.KIS_APP_SECRET,
                 hasAcc: !!process.env.KIS_ACCOUNT_NO,
                 baseUrl: process.env.KIS_BASE_URL

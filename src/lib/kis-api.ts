@@ -3,14 +3,17 @@ import axios from 'axios';
 // Singleton for Token Management
 let ACCESS_TOKEN: string | null = null;
 
-const KIS_APP_KEY = process.env.KIS_APP_KEY || '';
-const KIS_APP_SECRET = process.env.KIS_APP_SECRET || '';
-const KIS_ACCOUNT_NO = process.env.KIS_ACCOUNT_NO || '';
-const KIS_BASE_URL = process.env.KIS_BASE_URL || 'https://openapivts.koreainvestment.com:29443';
+const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim();
+const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
+const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
+const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapivts.koreainvestment.com:29443').trim();
 
 console.log('[KIS Init] Environment loaded:', {
     hasAppKey: !!KIS_APP_KEY,
+    keyLen: KIS_APP_KEY.length,
+    keyStart: KIS_APP_KEY.substring(0, 4),
     hasAppSecret: !!KIS_APP_SECRET,
+    secretLen: KIS_APP_SECRET.length,
     hasAccountNo: !!KIS_ACCOUNT_NO,
     baseUrl: KIS_BASE_URL
 });
@@ -84,18 +87,18 @@ async function getAccessToken(): Promise<string | null> {
             console.log("[KIS] New Access Token retrieved and cached successfully");
 
             return newToken;
+            return newToken;
         } else {
             console.error(`[KIS] Token Fetch Failed: Status ${res.status}`, res.data);
-            return null;
+            throw new Error(`Token Fetch Failed: ${res.status} - ${JSON.stringify(res.data)}`);
         }
     } catch (error: any) {
         console.error(`[KIS] Token Fetch Exception:`, error.message);
         if (error.response) {
             console.error("[KIS] Error Response:", error.response.data);
-            // If rate limited, try to read file again regardless of expiration as a fallback? 
-            // No, unsafe. Just fail.
+            throw new Error(`Token Fetch Exception: ${error.message} - ${JSON.stringify(error.response.data)}`);
         }
-        return null;
+        throw new Error(`Token Fetch Exception: ${error.message}`);
     }
 }
 
@@ -120,10 +123,8 @@ export async function getBalance(): Promise<BalanceData | null> {
     console.log('[KIS] getBalance called');
 
     const token = await getAccessToken();
-    if (!token) {
-        console.error('[KIS] No token available');
-        return null;
-    }
+    // if (!token) check removed as getAccessToken throws
+
 
     if (!KIS_ACCOUNT_NO.includes('-')) {
         console.error("[KIS] Account No format error. Expected format: 12345678-01, got:", KIS_ACCOUNT_NO);

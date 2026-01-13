@@ -32,7 +32,15 @@ export async function GET() {
         } else {
             console.error('[Balance API] getBalance returned null');
             // Check logs for details, but return a hint
-            return NextResponse.json({ error: 'Failed to fetch balance from KIS (getBalance returned null). Check server logs for Token/API errors.' }, { status: 500 });
+            return NextResponse.json({
+                error: 'Failed to fetch balance from KIS (getBalance returned null). Check server logs.',
+                envCheck: {
+                    hasKey: !!process.env.KIS_APP_KEY,
+                    hasSecret: !!process.env.KIS_APP_SECRET,
+                    hasAcc: !!process.env.KIS_ACCOUNT_NO,
+                    baseUrl: process.env.KIS_BASE_URL
+                }
+            }, { status: 500 });
         }
     } catch (error: any) {
         console.error('[Balance API] Exception:', error.message);

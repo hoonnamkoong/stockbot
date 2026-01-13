@@ -1,5 +1,6 @@
 {
   "invest": {
+<<<<<<< HEAD
     "today_count": 8,
     "summary": "오늘 발행된 주요 리포트는 총 8건이며, 주요 관심 종목 및 산업은 'Weekly Quant Momentum Strategy', '국내 가상자산 정책 팩트체크 필요' 등 입니다. 특히, '[IBKS Daily]Start with IBKS (2026.1.13) 미국 연방..' 리포트와 같이 시장의 핵심 이슈를 다룬 분석이 주목받고 있습니다. AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
     "items": [
@@ -66,10 +67,95 @@
         "pdf_link": "https://stock.pstatic.net/stock-research/invest/56/20260113_invest_748897000.pdf",
         "section": "invest",
         "body_summary": "1) 중국 정부의 반복적이고 명확해진 반내권 정책 메시지 2026년 들어 중국의 반내권 정책은 폴리실리콘·배터리 등 신에너지 산업을 중심으로 경쟁 질서 정상화에 대한 정부 메시지가 한층 직접적이고 본격화되는 모습이다. ① 1월 6일, 시장감독총국과 중국태양광산업협회는 주요 폴리실리콘 기업들을 대상으로 경쟁 및 독점 위험 관련 면담(??/행정지도·경고)을 실시. 가격·생산량·판매량 등 조율 시 독점 리스크를 경고하고 관련 행위에 대한 시정과 자료 제출을 요구 ② 1월 8일, 공신부, 국가발개위, 국가시장감독관리총국, 국가에너지국은 EV·ESS 배터리 산업 좌담회(座??/정책 논의·의견 수렴)를 공동 개최하고, 경쟁질서 정상화 방안을 논의. 중국의 EV·ESS 배터리 산업이 최근 무분별한 설비 투자와 저가 경쟁 등 비이성적 경쟁 행태가 나타나고 있다고 지적 20260112150121993_ko.pdf"
+=======
+    "today_count": 24,
+    "summary": "오늘 발행된 주요 리포트는 총 10건이며, 주요 관심 종목 및 산업은 '[Quant Comment] 국내외 주간 이익 동향 체크', '화수분전략' 등 입니다. 특히, '[New K-ETF] 미국 AI반도체 TOP3+' 리포트와 같이 시장의 핵심 이슈를 다룬 분석이 주목받고 있습니다. AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
+    "items": [
+      {
+        "title": "[Quant Comment] 국내외 주간 이익 동향 체크",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37500&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/57/20260112_invest_315517000.pdf",
+        "section": "invest",
+        "body_summary": "글로벌 이익 동향 및 실적추정치 상, 하향 종목 글로벌 원유 업체 실적 전망치 하향 조정으로 미국 실적모멘텀 다소 약화. IT 및 금융, 커뮤니케이션 등의 실적 상향은 이어지는 가운데 에너지 섹터의 이익 하향 관찰. 에너지 이익 하향은 베네주엘라의 석유 공급 확대 가능성으로 유가 하락 영향 EDIT_Real_Quant_260112.pdf"
+      },
+      {
+        "title": "화수분전략",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37499&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/57/20260112_invest_375581000.pdf",
+        "section": "invest",
+        "body_summary": "섹터마다 잘 나가는 기업은 다 이유가 있다 현재 엔비디아의 주가는 2025년 고점 대비 -11% 하락해 있다. 반면 해당 기간 동안 알파벳 주가는 20%나 상승하며 S&P500지수 내 시가총액 2위가 됐다. 엔비디아 대비 알파벳의 상대적인 장점은 2026년 매출 증가율 턴어라운드 기대, S&P500내 순이익 규모 1위(엔비디아 4위), 낮은 PER(2026년 순이익 기준 알파벳 28배, 엔비디아 40배)이다. 인텔과 마이크론 테크롤로지의 2026년 순이익 증가율 전망치는 286%와 99%로 엔비디아(57%)보다 높고, PER이나 PBR은 상대적으로 낮다. 2026년에도 Tech 섹터가 성장을 주도할 것이라는 것은 이미 알고 있다."
+      },
+      {
+        "title": "[New K-ETF] 미국 AI반도체 TOP3+",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37498&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/57/20260112_invest_607231000.pdf",
+        "section": "invest",
+        "body_summary": "신규 상장 ETF(1/13) - KODEX 미국 AI반도체 TOP3 플러스 KODEX 미국 AI반도체 TOP3 플러스: 미국 증시에 상장된 핵심 AI 반도체 기업 3종목을 집중 편입하는 패시브 ETF이다. GPU와 ASIC(자체 칩, TPU) 간의 경쟁 중에도 산업 전반의 성장세가 지속되는 AI 반도체 분야의 주요 기업들에 투자하는 ETF 종목이 되겠다. 미국 AI 반도체 산업을 이끌어가고 있는 상위 3개 종목들에 대하여 총 62% 비중을 할당한후, AI 반도체 밸류체인의 주요 7개 기업들까지 총 10개 종목으로 최종 포트폴리오를 구성한다. 0.49%의 총 보수가 적용되는 패시브 ETF이다. New_K_ETF_260112_KODEX.pdf"
+      },
+      {
+        "title": "[New K-ETF] 국내 수소전력 ESS 인프라 액티브",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37497&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/57/20260112_invest_459404000.pdf",
+        "section": "invest",
+        "body_summary": "신규 상장 ETF(1/13) - KoAct 수소전력 ESS 인프라 액티브 KoAct 수소전력 ESS 인프라 액티브: 수소발전 설비, ESS(에너지 저장장치)와 관련된 국내 기업들로 포트폴리오를 구성하는 액티브 ETF이다. AI 산업의 성장과 영역 확장 기조가 지속되고 있는 가운데, 미국 전력망 부족 현상이 심화되고 있다. 더불어 에너지 저장장치는 재생에너지의 간헐성을 보완하고 전력 부하를 안정화시킬 수 있는 필수 인프라로 고성장세가 예상되는 유망 전력설비 분야이다. 비교지수인 ‘FnGuide 수소전력ESS인프라 지수’에 대하여 상관계수 0.7의 유지 조건이 적용되는 액티브 형태의 ETF이다. 액티브 운용 과정에서 인하우스 리서치와의 협력과 함께, 이익 성장률 대비 주가가 합리적인 수준에 자리하고 있는 기업들을 골라내기 위한 방법으로 GARP 전략과 주가이익성장비율(PEG)이 1 미만인 종목들을 선별하는 전략이 활용된다."
+      },
+      {
+        "title": "[New K-ETF] 배당성향 Top Pick 액티브",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37496&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/57/20260112_invest_646245000.pdf",
+        "section": "invest",
+        "body_summary": "신규 상장 ETF(1/13) - SOL 배당성향 탑픽 액티브 SOL 배당성향 탑픽 액티브: 높은 배당성향을 기반으로 한 국내 고배당 주식 포트폴리오의 액티브 ETF이다. 안정적인 배당과 주주가치를 높이는 고배당 기업 구성의 포트폴리오를 추구하는 종목으로, 배당성향과 재무건전성 요건, 예상배당 수익률 기준을 고려하여 편입 대상 종목들을 선정한다. 비교지수인 ‘FnGuide 배당성향탑픽 지수’는 먼저 국내 증시에 상장된 종목들 가운데 배당소득 요건, 재무건전성, 배당성장성의 기준을 반영하여 기본 유니버스를 구축한다. 세번째로 3년 연속 현금 배당이 이루어진 동시에 3년전 DPS(배당수익률) 대비 예상 DPS가 줄어들지 않은 기업들을 배당성장성 기준 충족 종목으로 결정하여 기본 편입 대상 유니버스를 구성한다. 비교지수와 0.7 상관계수 조건이 적용되는 액티브 ETF로, 총 보수는 0.30%이다."
+      },
+      {
+        "title": "[Hana China Weekly] 중국 자율주행 밸류체인에 주목..",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37495&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/57/20260112_invest_475358000.pdf",
+        "section": "invest",
+        "body_summary": "허사이테크(2525.HK): 엔비디아 공식 라이다 파트너사 선정 및 CAPA 확대로 주가 강세 시현 - 1/5 허사이테크는 2026년 CES에서 2026년 연간 LiDAR 생산능력을 기존 200만 대에서 400만 대 이상으로 두 배 확대할 계획이라고 발표. 또한 허사이는 글로벌 수요 확대에 대응하기 위해 태국 방콕에 신규 공장을 건설 중이며, 해당 공장은 2027년 초부터 가동될 예정. 이를 통해 글로벌 생산 거점을 확장한다는 계획. 허사이는 DRIVE Hyperion의 개방형 양산 대응 아키텍처에 공식 인증된 센서(카메라/LiDAR 등) 파트너사로 합류. ChinaWeekly_final.pdf"
+      },
+      {
+        "title": "미국 FY2027년 우주군 예산 요청안 예상치 크게 상회",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37494&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/57/20260112_invest_216988000.pdf",
+        "section": "invest",
+        "body_summary": "미국 우주 산업 미국 우주 정책과 주요 정부 프로젝트 진행에 따른 수혜에 주목 - 트럼프 대통령은 FY2027년 국방예산을 현행보다 50% 증가한 1.5조 달러 요청. 우주 미사일 방어 시스템인 Golden Dome 구축이 최우선 과제에 포함되어 있고 최근 행정 명령을 통해 미국 우주 우위 확보가 중요 전략임을 고려하면 FY27년 우주군 예산 또한 기존 전망치 대비 크게 증가 예상 - 우주 산업은 정부의 정책적 지원과 달 탐사와 같은 중요 프로젝트 진행에 따른 영향을 크게 받음. ‘미국 우주 우위 확보’라는 명칭으로 지난 12월 18일에 발령된 행정명령은 미국 우주 산업에 대한 트럼프의 정책적 지원이 본격적으로 시작되고 있음을 시사 - 주목할 점은 기존의 정부 조달 시스템을 바꿔서 민간 기업의 주도적 참여와 상업적 확장을 핵심 기조로 하고 있음. 2026년은 NASA의 CLPS(Commercial Lunar Payload Services) 프로그램이 본 궤도에 오르고 아르테미스 프로젝트의 여러 중요 미션이 예정되어 있기에 관련 기업들의 수혜가 클 것으로 예상 Weekly_0109_F.pdf"
+      },
+      {
+        "title": "Kiwoom ETF Weekly (01/12)",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37493&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/39/20260112_invest_572283000.pdf",
+        "section": "invest",
+        "body_summary": "▶ 주간 글로벌 ETF 동향 - 지난 주 美 대표 지수/ETF 는 상승 마감 (SPY +1.6%, QQQ +2.2%, DIA +2.4%, IWM +4.6%). 트럼프의 베네수엘라 침공으로 에너지 및 원자재 패권 경쟁에 따른 재무장 모멘텀 재차 부각되며 소재, 에너지, 방산, 산업재 중심 강세 흐름 연출. CES 에서 Physical AI 상업화 진전 시사된 점도 위험자산 선호심리 자극하는데 일조, 관련 테마 ETF 등락으로 연결. 트럼프 관세에 대한 대법원 판결은 예고된 지난 9 일에서 한 차례 연기된 가운데, 위법 판정 여부에 관심이 쏠릴 예정. 이 외에도 JP 모건, 골드만삭스 등 금융주 중심 4Q25 실적이 본격화될 예정으로, 높아진 시장 눈높이 충족 여부와 차기 가이던스 내용에 주목할 필요 - GICS 분류 기준 유틸리티(XLU -1.6%) 제외 전 업종 상승 마감한 가운데 경기소비재(XLY +5.1%), 소재(XLB +4.6%), 산업재(XLI +2.5%), 에너지(XLE +2.2%) 업종 강세 두드러짐."
+      },
+      {
+        "title": "중간선거도 이기고 싶은 탐욕왕 트럼프의 정책 비틀기",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37492&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/61/20260112_invest_527028000.pdf",
+        "section": "invest",
+        "body_summary": "25년엔 투자, 투자, 투자에만 집중한 트럼프. 이제 26년 트럼프의 장기적인 시선은 민생회복에 있다 작년 말 지방선거 패배 이후 AI 등 투자확대에만 신경 쓰던 트럼프 행정부는 조금씩 다른 행보를 보이기 시작했다. 이는 26년 중간선거를 앞두고 공화당 또한 민생을 신경 써야만 하는 상황에 놓였기 때문으로 보인다. 최근 베네수엘라 마두로 대통령 체포, 이란 시위 등 지정학 문제가 가장 큰 이슈였지만 중국, 러시아의 미온적인 대응으로 갈등이 확산되는 양상은 아니며 오히려 장기적으로 유가가 안정될 수 있다는 기대가 소비심리 회복으로 연결되고 있다. 결론적으로 앞으로 어떤 정책을 펼치던 중간선거를 앞두고 표면적으로 민생을 훼손하는 정책은 제한적일 가능성이 높다는 판단이다."
+      },
+      {
+        "title": "[IBKS Daily]Start with IBKS (2026.1.12) 미국 비농..",
+        "link": "https://finance.naver.com/research/invest_read.naver?nid=37491&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/invest/40/20260112_invest_299557000.pdf",
+        "section": "invest",
+        "body_summary": "증시 Comment (전일 아시아 증시) ▶ 한국증시 - 방산 및 조선주 강세에 상승. 전일 미국 증시에서 AI 관련주 차익실현 매물출회 영향에 장 초반 약세. 다만, 미국 국방예산 증액 전망 속 방산주 강세 지속되며 지수는 강세 전환. 생산자물가지수도 하락폭이 전월보다 축소되며 투자심리 개선. 전 거래일 대비 0.92% 상승한 4,120.43P로 마감 20260112075203723_ko.pdf"
+>>>>>>> ec03a159d75d67ad2aabd6cadf12f76495d825bc
       }
     ]
   },
   "company": {
+<<<<<<< HEAD
     "today_count": 15,
     "summary": "오늘 발행된 주요 리포트는 총 10건이며, 주요 관심 종목 및 산업은 '[티엘비] 2026년 추가로 도약! 거침 없는 성장!', '[카카오] 어닝 서프가 없어도 긍정적인 이유: 톡비즈 ..' 등 입니다. 특히, '[휴젤] 체질 개선이 필요한 상황' 리포트와 같이 시장의 핵심 이슈를 다룬 분석이 주목받고 있습니다. AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
     "items": [
@@ -152,10 +238,95 @@
         "pdf_link": "",
         "section": "company",
         "body_summary": "오랜 효율화 끝에 실적 반등 성공 4Q25 신작 매출 반영 및 비용 효율화로 실적 서프라이즈 기대. 신작 기대감을 반영할 수 있는 재무구조 완성. 올해 신작에 대한 관심도 증가 예상 신한투자증권 리서치 탐색기"
+=======
+    "today_count": 30,
+    "summary": "오늘 발행된 주요 리포트는 총 10건이며, 주요 관심 종목 및 산업은 '[한화오션] 지정학적 불확실성 속에서 찾는 기회', '[LG에너지솔루션] 4Q25 잠정실적 코멘트 -4Q25 실적 기대치 부..' 등 입니다. 특히, '[대한유화] 2026년 이익 3배 성장 기대된다!' 리포트와 같이 시장의 핵심 이슈를 다룬 분석이 주목받고 있습니다. AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
+    "items": [
+      {
+        "title": "[한화오션] 지정학적 불확실성 속에서 찾는 기회",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89060&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/16/20260112_company_327331000.pdf",
+        "section": "company",
+        "body_summary": "4Q25 Preview: 영업이익 시장 기대치 하회 추정 한화오션의 4분기 실적은 매출액 3조 2,555억원(YoY +0.1%, 이하 YoY), 영업이익 3,242억원(+91.8%, OPM 10.0%)으로 영업이익 기준 컨센서스를 하회할 것으로 추정한다. 시장 기대치 하회 추정의 가장 주된 요인은 성과급 등 일회성 비용의 보수적 가정이다. 4분기에도 상선 매출 내 LNG선 비중이 65% 이상으로 높았을 것으로 추정한다. 탱커 비중이 10% 이상으로 QoQ +3%p 가량 늘었음에도 고선가 물량 비중 증가로 이로 인한 마진 훼손은 제한적이었을 것으로 판단한다. 260112_기업코멘트_한화오션.pdf"
+      },
+      {
+        "title": "[LG에너지솔루션] 4Q25 잠정실적 코멘트 -4Q25 실적 기대치 부..",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89059&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/16/20260112_company_186098000.pdf",
+        "section": "company",
+        "body_summary": "■ 4분기 실적 리뷰 - 동사의 4분기 실적은 매출액 6.1조 원, 영업적자 1,220억 원(OPM -2.0%)으로 컨센서스(매출액 5.7조 원, 영업적자 615억 원(OPM -1.1%)) 하회. AMPC 3,328억 원 제외하면 영업적자 4,548억 원(OPM -7.4%) - 4분기 실적은 매출액 기준 컨센서스 상회했으나, 영업적자는 최근 낮아진 시장 기대치에 부합. GM향 출하는 QoQ 약 2.5GWh 하락한 것으로 추정되나, LFP ESS 양산 본격화되며 출하량이 QoQ 1.5GWh 증가하여 AMPC 하락 폭은 제한적인 것으로 추정. Tesla향 소형전지 실적도 기대치(매출 QoQ +10% 상회) 부합 추정 - AMPC로 역산한 미국 출하량은 6.2GWh(QoQ -14%) vs. 1Q23~4Q25 출하량(단위: GWh): 23년(2.4/2.6/4.8/5.6), 24년(4.1/9.3/9.8/7.7), 25년(9.0/9.9/7.1/6.2) 260112_LGES 4Q25 잠정실적 코멘트.pdf"
+      },
+      {
+        "title": "[대한유화] 2026년 이익 3배 성장 기대된다!",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89058&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/18/20260112_company_173265000.pdf",
+        "section": "company",
+        "body_summary": "2026년 예상 영업이익 1,901억원, 215% 증가 2026년 실적 회복 폭이 클 것이다. 2026년 예상 실적은 ‘매출액 3.3조원, 영업이익 1,901억원(영업이익률 5.8%), 지배주주 순이익 1,047억원’ 등이다. 영업이익은 2025년 흑자 전환(2024년 △599억원 → 604억원(e))에 성공한 후, 215% 증가할 전망이다. ① 울산 한주㈜ LNG발전소 실적 호조(2025년 연결 편입) 속에 ② 분리막용 PE 호조로 석화 스프레드 개선과 ③ 감가 상각비 축소(연간 △300억원) 등의 3가지 호재가 이어지기 때문이다. 부문별 예상 이익은 ‘본사 화학 706억원, 발전소 1,131억원, 산업가스 64억원’ 등이다."
+      },
+      {
+        "title": "[포스코인터내셔널] 알고 보면 심플하다",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89057&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/18/20260112_company_753213000.pdf",
+        "section": "company",
+        "body_summary": "다양성, 확장성, 안정성이 어울리는 기업 글로벌 종합사업회사'를 지향 & 이익의 균형을 갖추고 있다 사업부문은 크게 '소재(트레이딩)'와 '에너지'로 구분하고 있으나 각각에 속해 있는 세부적인 사업은 더 다양하게 분포. '종합사업회사'라는 용어에서 알 수 있듯이 특정 사업에 국한된 것이 아닌 수익성 측면에서 접근하여 사업 진행. 영업이익 비중은 소재사업과 에너지사업이 '24년 각각 46%, 54%를 기록했으며 '25년 1~9월 기준으로는 45%와 55% 나타내. 20260109153807697_0_ko.pdf"
+      },
+      {
+        "title": "[삼성중공업] 4분기 순항, 올해는 23-24년 수주물량 인식",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89056&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/18/20260112_company_440305000.pdf",
+        "section": "company",
+        "body_summary": "4Q25 매출 2.95조, 영업이익 3,150억 추정 당사 매출 추정치는 컨센서스 (2.9조) 부합, 영업이익 또한 컨센서스 (3,000억)을 5%가량 소폭 상회하는 수준. 실적에서 환차익을 기대할 수 없는 만큼, 매출과 영업이익에 대한 이견도 가장 적은 조선업체. 20260111215821873_0_ko.pdf"
+      },
+      {
+        "title": "[한화오션] 4분기 기쁜 일회성 비용, 26년 특장점 발현",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89055&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/18/20260112_company_526761000.pdf",
+        "section": "company",
+        "body_summary": "4Q25 일회성 비용 제외 영업이익 4,400억 추정 4Q25 매출 3.6조 (컨센서스 3.4조 대비 +4%), 영업이익 4,420억 (컨센서스 4,000억 대비 +11%) 추정. 전분기 대비 환차익으로 인한 매출 1,400억, 영업이익 380억 상승 추정. 발생할 수 있는 일회성 비용은 FY25 흑자폭 확대로 인한 4분기 임직원 성과급. 20260111215542653_0_ko.pdf"
+      },
+      {
+        "title": "LG에너지솔루션 4Q25 잠정실적: 영업이익 기..",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89054&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/18/20260112_company_778271000.pdf",
+        "section": "company",
+        "body_summary": "4Q25 Review 컨센서스 하회, 당사 추정 상회 - 매출액 6.14조원(+8% qoq, -5% yoy), 영업이익 -1,220억원(OPM -2%, 적전 qoq, 적지 yoy)으로 시장 컨센서스(영업이익 -230억원)를 하회했으나 당사 추정치(영업이익 -2,770억원) 대비로는 적자 폭 축소. AMPC 규모는 3,328억원으로 4분기 평균 환율 1,440원 적용 시 북미 출하량 약 6.7GWh로 추정 - 매출액은 북미 미시간 공장의 ESS 라인 가동 본격화(가동률 60% 추정) 및 시스템(SI) 단위 공급 확대로 인한 것. 반면 이익은 북미 GM향 EV 가동률 급락 및 유럽 공장의 저조한 가동률 지속으로 고정비 부담 증가. 북미 출하량 약 6.7GWh 중 45% 이상이 ESS AMPC 규모로 추정 20260112064859433_0_ko.pdf"
+      },
+      {
+        "title": "[삼성전자] 놀라운 실적, 더 놀라울 주주환원",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89053&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/56/20260112_company_350162000.pdf",
+        "section": "company",
+        "body_summary": "26년은 주주환원의 해 동사에 대한 목표주가를 18.7만원(기존 15.5만원)으로 21% 상향한다. 사업부별 가치 합계(SOTP)를 통해 적정 기업가치를 1,271조원으로 산출했다. 역시 메모리 사업부의 이익이 111조원(YoY +250%)으로 전사 성장을 견인할 전망이다. 26년 동사가 특별히 더 기대되는 이유는, 1) 최대 생산 Capa: 최소 26년까지는 범용 메모리 가격 강세가 예상되며 공급자 재고도 제한적이다. 그러나 (1) 수율 안정화된 4nm 공정을 적용한 HBM4 Base Die의 성공 사례, (2) 2nm 공정 적용된 엑시노스 2600의 갤럭시 S26 일부 탑재, (3) 테슬라향 AI 반도체 수주 및 테일러 팹의 본격적 가동, (4) 지정학적 안정성 등 단기 실적을 넘어 기대감을 갖게할 만한 요인이 많다."
+      },
+      {
+        "title": "[현대글로비스] 이제는 프리미엄 시대",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89052&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/56/20260112_company_952413000.pdf",
+        "section": "company",
+        "body_summary": "4Q25 Preview: 불확실성 속에서도 지속되는 실적 호조 현대글로비스의 4Q25 매출액은 7조 5,593억원으로 3.7% YoY 증가할 것으로 전망된다. 유통 부문 매출액이 환율 효과 영향으로 4.9% YoY 증가할 것으로 추정된다. 해운 부문 역시 중국 OEM 생산차질 회복으로 전년비 증가세(1.9% YoY)로 전환될 전망이다. 다만, 포워딩 부문 약세로 물류 부문 매출액은 3.2% YoY 증가하며 상대적으로 낮은 수준의 성장률이 예상된다. 마진이 급격하게 확대된 바 있는 해운부문은 입항 수수료 부담에도 불구, 영업이익(1,912억원, 97.7% YoY) 확장세가 가속화될 것으로 전망된다."
+      },
+      {
+        "title": "[LG에너지솔루션] 초기 가동 비용 반영 영향",
+        "link": "https://finance.naver.com/research/company_read.naver?nid=89051&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/company/63/20260112_company_390329000.pdf",
+        "section": "company",
+        "body_summary": "- 당사는 LG에너지솔루션에 대해 목표주가를 410,000원(-29%)으로 수정 제시하며, 투자의견 BUY를 유지함. 최근 미국 EV 월간 판매량 감소 추이 및 포드, 푸르덴베르크 등 13.5조원의 계약 취소를 반영해 ‘26~’27년 실적을 하향 조정했으며, 유사한 실적을 기록하던 ‘22~’23년 평균 EV/EBITDA 32배를 적용해 목표주가를 보수적으로 책정 - 4Q25 매출액 6.1조원(+8%qoq, -5%yoy), 영업손실 -1,220억원(적전qoq, 적지yoy)로 적자 전환. 주요 내용으로는 1) 4Q ESS 판매량 +100%qoq 증가, 2) EV 파우치 물량 감소에도 중국 테슬라 모델 Y 向 증가로 원통형 물량 +15%qoq 등. 라인 전환이 지속됨을 고려할 때 초기 비용 반영으로 수익성 정상화에 시간이 걸릴 전망. 이를 반영해 ‘26년 영업이익을 1조원으로 하향 조정 20260112_373220_tjdgus2009_887.pdf"
+>>>>>>> ec03a159d75d67ad2aabd6cadf12f76495d825bc
       }
     ]
   },
   "industry": {
+<<<<<<< HEAD
     "today_count": 13,
     "summary": "오늘 발행된 주요 리포트는 총 10건이며, 주요 관심 종목 및 산업은 'CES 2026 참관 후기 Compute Everywhere, Sca..', '단기 변동성은 경계하나, 조정은 매수 기회' 등 입니다. 특히, '2025.12 은행/증권/보험 Sector Updates' 리포트와 같이 시장의 핵심 이슈를 다룬 분석이 주목받고 있습니다. AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
     "items": [
@@ -238,10 +409,95 @@
         "pdf_link": "https://stock.pstatic.net/stock-research/industry/40/20260113_industry_295786000.pdf",
         "section": "industry",
         "body_summary": "[단독] 크래프톤, '올데이프로젝트' 더블랙레이블에 1000억 투자 추진 - 크래프톤은 더블랙레이블이 발행하는 신주 1000억원을 인수하기 위한 협상을 진행 중. 더블랙레이블의 기업가치는 8000억원을 넘어설 것으로 추정 - 이번 투자는 펄어비스 출신인 정경인 더블랙레이블 대표와 조석우 더블랙레이블 최고재무책임자(CFO)의 게임사 인연으로 성사된 것으로 알려짐 20260113073006537_ko.pdf"
+=======
+    "today_count": 30,
+    "summary": "오늘 발행된 주요 리포트는 총 10건이며, 주요 관심 종목 및 산업은 '다시 매수해야 하는 시기', '12월 중국 PPI 전월비 상승, 철강가 상승 가..' 등 입니다. 특히, 'KB, 신한 위주의 외국인 매수세 유입' 리포트와 같이 시장의 핵심 이슈를 다룬 분석이 주목받고 있습니다. AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
+    "items": [
+      {
+        "title": "다시 매수해야 하는 시기",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=43003&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/57/20260112_industry_849976000.pdf",
+        "section": "industry",
+        "body_summary": "데이터 포인트 해석 및 투자 전략 : 대형주 매수 - 4분기 테슬라의 ESS 설치량은 14.2GWh로 역대 최고치 기록하며 YoY +29%, QoQ +14% 증가했다. 이에 Fluence Energy 주가도 지난 2주간 +15% 상승했다. 이에 따라 ESS 설치 수요가 지속 증가하는 과정에서, 미국 내 90% 이상을 차지하는 중국 LFP 기업들의 지배력을, 미국 영토 내에서 LFP 배터리 생산하기 시작한 한국 기업들이 빠르게 대체해 나갈 것으로 판단한다. 2026년은 그러한 변화를 숫자로 확인해 나가는 원년이 될 것으로 판단한다. 현 가격에서는 ESS 수혜주에 대해 매수로 대응하는 것이 적절하다고 판단한다(관련기업 : LG에너지솔루션 등)."
+      },
+      {
+        "title": "12월 중국 PPI 전월비 상승, 철강가 상승 가..",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=43002&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/57/20260112_industry_9114000.pdf",
+        "section": "industry",
+        "body_summary": ""
+      },
+      {
+        "title": "KB, 신한 위주의 외국인 매수세 유입",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=43001&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/57/20260112_industry_513311000.pdf",
+        "section": "industry",
+        "body_summary": "전주 주요 뉴스 기사 정리 - 금융당국이 생산적 금융 확대 차원에서 인터넷전문은행들의 기업금융 대면 영업을 제한적으로 허용하는 방안을 검토 예정. 대면 영업을 일부 허용해주는 대신 플랫폼 데이터를 활용한 중·저신용자 특화 상품 제공 등 제 역할을 더 충실히 하라는 것 - 국내 20개 은행이 운영하는 오프라인 점포는 작년 9월말 기준 전년동기대비 111개가 줄어든 5,534개로 집계. 은행들은 금융 서비스의 디지털화로 대부분의 금융 거래가 비대면으로 이뤄지는 만큼 비용 절감을 위해 점포 축소가 불가피하다는 입장 - 5대 은행 요구불예금은 이달 6일 기준 646.5조원으로 급감. 지난해 4분기 이후 은행들이 자금 유출을 막기 위해 정기 예·적금 금리를 일제히 올리며 3%대 고금리 상품을 연이어 출시했지만 새해 주가가 고공행진이 펼쳐지며 27.5조원이 엿새만에 이탈 - 5대 금융그룹들은 취약계층과 소상공인을 지원하기 위해 2030년까지 5년간 총 70조 1,500억원의 포용금융을 공급할 예정. KB 금융이 총 17조원을 제공할 방침이며 신한지주 15조원, 하나금융 16조원, 우리금융 6.8조원 등 대규모 자금을 풀 계획 Bank_Weekly_20260112.pdf"
+      },
+      {
+        "title": "[IT/2차전지/유틸리티]하나증권xKOTRA CES 20..",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=43000&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/57/20260112_industry_863364000.pdf",
+        "section": "industry",
+        "body_summary": "Core themes and products since 2010 - 2010년 이후 CES를 관통하는 주요 트렌드 : ‘AI’, ‘로봇’, ‘Connectivity’ - ‘가전’ 중심에서 ‘모바일 기기’, 나아가 ‘모빌리티와 로봇, 스마트 홈’으로의 기술 적용 영역 확장, 전 부문에서의 AI 적용 노력 동반 - 3D TV, OLED TV 등의 고화질 디스플레이 제품에서부터 AI 기반 모빌리티, 로봇, 스마트홈까지 기술 발전 지속되어 왔음 CES2026_Report_Review.pdf"
+      },
+      {
+        "title": "4Q25 분위기 점검 + 신세계푸드 공개매수 결..",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=42999&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/57/20260112_industry_98718000.pdf",
+        "section": "industry",
+        "body_summary": ""
+      },
+      {
+        "title": "11월 전력통계월보: 요금인상 기저효과 종료",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=42998&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/57/20260112_industry_808281000.pdf",
+        "section": "industry",
+        "body_summary": "11월 전력판매량 YoY +0.3%, 전력판매금액 YoY +0.5% 11월 전력판매량은 42.1TWh로 전년대비 0.3% 증가, 전력판매금액은 7.3조원으로 전년대비 0.5% 증가했다. 용도별 전력판매량은 주택용 +3.5%, 일반용 +3.3%, 산업용 -2.3%, 판매 금액은 주택용 +6.1%, 일반용 +2.8%, 산업용 -2.2%를 기록했다. 전력판매단가는 주택용 +2.5%, 일반용 -0.5%, 산업용 +0.2%이고 평균 판매단가는 174.03원/kWh을 기록하면서 전년대비 0.2% 상승했다. 다음 전기요금 조정 이전까지 판매실적을 결정할 요인은 전기화(Electrification), 기온변화, 높은 요금에 의한 산업용 수요 이탈의 속도 차이로 판단된다. Utilities_260112.pdf"
+      },
+      {
+        "title": "주택 7개사 Corporate Day 후기",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=42997&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/16/20260112_industry_6792000.pdf",
+        "section": "industry",
+        "body_summary": "주택 7개사 현황 및 투자포인트 점검 정부의 주택공급 확대 정책 스탠스와 함께 분양경기 회복에 대한 기대감 등으로 주택주들의 반등이 조금씩 포착되고 있다. 이 가운데 수도권 중심의 부동산 규제와 지방균형발전의 강조로 중소형 건설사로도 관심이 확대되는 중이다. 이에 당사는 대형사 중 순수 주택주인 HDC현대산업개발과 함께 중견 건설사인 아이에스동서/자이에스앤디/금호건설/HL D&I, 신탁사인 한국토지신탁/한국자산신탁, 총 7개 기업을 초청해 Corporate Day를 진행하고, 각 사 현황과 투자포인트를 점검하는 자리를 가졌다."
+      },
+      {
+        "title": "Jan, ‘26: 잘 보낸 비수기 덕에 수월한 프리..",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=42996&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/16/20260112_industry_196413000.pdf",
+        "section": "industry",
+        "body_summary": "좋았던 11월 덕에 12월이 아쉽지만 어쨌든 잘 보낸 비수기 11월부터 12월까지는 통상 외인 카지노 주요 사업장들의 상대적 비수기에 해당되는 기간이다. 10월까지 동북아 주요국의 연휴가 포진된 이후 11-12월은 궂은 날씨와 황금 연휴 부재로 카지노 업장도 다소 한산한 때를 보낸다. 다만 지난해 11월의 경우 전반적으로 강한 홀드율을 기반으로 의외로 좋은 월 매출액을 기록한 바 있다. 12월의 경우 11월보다는 다소 약한 매출 흐름이 확인됐으나 일부 지표에서는 ‘26년의 호조를 점칠 수 있는 시그널들도 확인됐다. 260112_Hanwha Casino Monthly_Jan 26.pdf"
+      },
+      {
+        "title": "CES 참관기: 하드웨어와 소프트웨어의 경계가..",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=42995&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/1/20260112_industry_29083000.pdf",
+        "section": "industry",
+        "body_summary": "Physical AI 시대의 현실화 - 이번 CES 2026의 슬로건은 Innovators Show Up(혁신가들의 등장), ‘Show Up’을 키워드로 성숙 단계에 이른 AI가 실제 삶과 산업에 미치는 영향과 형성하고 있는 생태계를 보여주는 것에 초점 - 2025년이 기술의 발전과 연계에 방점을 둔 전시였다면, 2026년은 기술이 현실에 안착하며 형성되는 생태계와 그 속에서의 상호작용을 강조하는 방향성이라 볼 수 있음 - CES 2026의 주요 핵심 트랙은 AI, 로보틱스, 디지털 헬스. 이 가운데 전년과 달리 단독트랙으로 로보틱스가 이름을 올린 것이 주된 변화. 이는 기존의 ‘말로 답하는 AI’에서 나아가 로봇과 기기가 스스로 판단하고 사용자의 의도를 인식해 행동으로 이어지는 ‘피지컬 AI’로의 진화 방향성 제시 2016000001073.pdf"
+      },
+      {
+        "title": "CES 2026: 혁신가들의 등장 - When Tech Step..",
+        "link": "https://finance.naver.com/research/industry_read.naver?nid=42994&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/industry/18/20260112_industry_204451000.pdf",
+        "section": "industry",
+        "body_summary": "CES 2026 혁신가들의 등장, ‘When Tech Steps Into Life’ - CES(Consumer Electronics Show)는 글로벌 최대 규모의 소비자 기술 전시회로 매년 주요 기조연설을 통해 중장기 산업 발전 방향과 핵심 기술 트렌드를 제시한다. 전시 기간 동안 참여 기업들은 글로벌 투자자와 산업 관계자를 대상으로 기술 혁신에 대응하기 위한 전략적 로드맵과 사업 방향성을 구체화한다. - ‘25년이 AI가 Agent 및 Physical AI 형태로 구체화되며 초기 생태계에 진입한 해(Dive in)였다면 ‘26년은 AI가 하나의 완결된 생태계를 형성해 산업 구분 없는 인프라로 확장되고 수익성을 동반한 신규 비즈니스 모델로 가시화되는 해(Show up)라고 판단한다. 이는 AI가 기술 시연 단계를 넘어 실제 산업 적용과 투자 회수 국면으로 진입하고 있음을 시사한다. 20260111221443410_0_ko.pdf"
+>>>>>>> ec03a159d75d67ad2aabd6cadf12f76495d825bc
       }
     ]
   },
   "economy": {
+<<<<<<< HEAD
     "today_count": 2,
     "summary": "오늘 발행된 주요 리포트는 총 2건이며, 주요 관심 종목 및 산업은 '01/13, Kiwoom Morning Letter', '다시 불안해진 환율, 추가 상승 제한적' 등 입니다. 특히, AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
     "items": [
@@ -260,6 +516,90 @@
         "pdf_link": "https://stock.pstatic.net/stock-research/economy/61/20260113_economy_397118000.pdf",
         "section": "economy",
         "body_summary": "달러 수급과 원화 약세 기대 심리를 이기지 못하는 시장개입 달러-원 환율이 8영업일 연속 상승하면서 1,470원에 바짝 근접했다. 특히, 12일에는 달러-원 환율이 전일대비 10.8원 급등하면서 달러-원 환율 추가 상승 우려를 더욱 부추겼다. 최근 금 및 은 가격 상승세가 지속되고 있는 원인에는 유동성 확대 기대감 및 AI발 수요 확대도 있지만 FAFO로 대변되는 트럼프 대통령 리스크, 즉 안전자산 수요도 일부 영향을 미치고 있는 것으로 판단된다. 요약하면 원화 약세, 즉 달러-원 환율 반등이 하나의 요인으로 설명하기 힘들며 다양한 약세 재료가 복합적으로 작용한 것이다. 다만, 지난해말 정부의 잇따른 외환수급 대책이 아직 뚜렷한 효과를 내지 못하면서 원화 약세 심리가 제대로 치유되지 못한 것은 분명해 보인다."
+=======
+    "today_count": 12,
+    "summary": "오늘 발행된 주요 리포트는 총 10건이며, 주요 관심 종목 및 산업은 '12월 미국 고용: 크지 않은 우려', '시클리컬의 귀환' 등 입니다. 특히, '[FX 전망] 흩어진 변수들을 잇다: TSMixer로 완성한 2..' 리포트와 같이 시장의 핵심 이슈를 다룬 분석이 주목받고 있습니다. AI 분석 결과, 전반적으로 기업 실적 개선과 산업 동향 변화에 대한 기대감이 관찰됩니다.",
+    "items": [
+      {
+        "title": "12월 미국 고용: 크지 않은 우려",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12850&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/16/20260112_economy_415295000.pdf",
+        "section": "economy",
+        "body_summary": "실업률 하락 12월 미국 비농업부문 고용은 전월대비 5.0만 명 증가해 예상치 하회. 여가/숙박(+4.7만 명) 고용이 반등했지만, 건설업(-1.1만 명)과 소매업(-2.5만 명) 등 그 외 고용은 대체로 둔화. 연방정부(+0.2만 명) 고용도 크게 늘지 않았음 실업률은 4.4%로 전월대비 0.1%p 하락, 경제활동참가율도 62.4%로 0.1%p 하락. 다만 주당 평균 근무시간이 재차 줄어들어 주당 평균임금은 전월대비 보합 수준 2025년 비농업부문 고용은 의료서비스(+71.2만 명) 중심으로 58.4만명 증가한 가운데, 연방정부 고용은 27.4만 명 감소. 실업률은 전년동월대비 0.3%p 올랐고, 경제활동참가율은 0.1%p 하락 260112 Macro Review US Employment.pdf"
+      },
+      {
+        "title": "시클리컬의 귀환",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12849&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/16/20260112_economy_414000.pdf",
+        "section": "economy",
+        "body_summary": "중국 공급 부담이 정점을 통과했고, 선진국 투자 수요가 늘고 있다. 국내 소재 및 산업재 수출 회복은 하반기에 두드러질 전망이다. 정책대응과 재고를 감안한 미국과 중국 제조업 반등 시점은 2/4분기 전후인데, 국내 수출은 G2 제조업 PMI에 후행하기 때문이다. 미국 자본재 수주 증가율 상승과 기업들의 불확실성 완화 기대, 중국 credit impulse 반등과 재정정책 강도 유지, 독일의 특별기금을 활용한 핵심 인프라 투자 집행, 일본 민간기계수주 회복과 대기업 업황 인식 개선 등은 투자 확대를 기대할 만한 요인이다. 중국 석유제품 수출물량이 정체되고, 한국 석유제품 수출단가가 반등했기 때문이다."
+      },
+      {
+        "title": "[FX 전망] 흩어진 변수들을 잇다: TSMixer로 완성한 2..",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12848&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/18/20260112_economy_540477000.pdf",
+        "section": "economy",
+        "body_summary": "달러화의 구조적 약세 압력이 반영될 환경 - 미국의 재정 적자가 GDP 대비 8%를 상회하고 정부 부채 누증이 가속화되면서, 시장은 재정 정책을 단순한 정책 변수가 아닌 통화 가치 하락 리스크 변수로 인식하게 될 수 있다. 특히 미국 중립금리(R?)의 구조적 상승은 부채가 높은 환경에서 이자 비용 부담을 확대시켜 ’재정 지배’ 현상을 현실화하는 요인이다. - 통상적으로 시장이 주목하던 변수가 국가 간 금리 차였다면, 2026년에는 장기금리 레벨이 높게 유지됨에 따라 재정에 대한 우려 신호로 해석되며 재정 지속성으로 가중치가 이동할 것으로 생각된다. - 당사의 2026년은 달러 인덱스(DXY) 밴드는 94~99 수준으로 구조적 약세기가 될 것으로 전망한다. 단기적인 금리 등락보다는 미국의 구조적 재정 취약성이 달러의 상단을 제한하는 핵심 기제로 작용할 것으로 본다."
+      },
+      {
+        "title": "급랭 없는 둔화 흐름 지속",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12847&page=1",
+        "date": "26.01.12",
+        "pdf_link": "",
+        "section": "economy",
+        "body_summary": "12월 비농가취업자 5.0만명 증가에 그쳐. 실업률 4.4%로 하락 미국 12월 비농가취업자는 전월대비 5.0만명 늘며 컨센서스(+7.0만명)를 하회했다. 특히 직전 2개월 수치가 7.6만명 하향 조정된 점을 감안 시 실제 고용 모멘텀은 헤드라인 수치보다 더욱 악화됐다. 경제활동참가율이 62.4%로 0.1%p 내려간 효과를 고려해야 하나 실업률은 4.4%로 0.1%p 낮아졌다. U-6(광의실업률) 역시 8.4%로 0.3%p 하락해 셧다운에 따른 충격 완화를 확인했다."
+      },
+      {
+        "title": "1월 금통위 프리뷰: 달라질 것 없음",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12846&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/63/20260112_economy_538685000.pdf",
+        "section": "economy",
+        "body_summary": "1 월 금통위, 기준금리 동결 전망 반복된 의견으로 중립적 영향 다음주 15일 올해 첫 금통위가 예정되어 있다. 기준금리는 현 수준(2.50%)에서 동결을 예상하며, 지난 번과 같이 신성환 위원의 25bp 인하 소수의견이 포함될 것으로 예상된다. 향후 3 개월 간 의견을 나타내는 포워드 가이던스는 인하 3 명, 동결 3 명으로 역시 11 월과 동일할 것으로 전망한다. 전체적으로 11 월 회의와 특별히 다를 것이 없는 중립적인 회의라고 전망한다. 여전히 금리 매력은 높고, 본격적인 기관의 순매수(보험사 등)가 시작되지 않았다는 점에서 캐리를 쌓기에 우호적인 시기라는 전망을 유지한다."
+      },
+      {
+        "title": "이제 ‘각자의 길’을 가는 글로벌 중앙은행들",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12845&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/1/20260112_economy_953027000.pdf",
+        "section": "economy",
+        "body_summary": "팬데믹 이후 ‘같이’, 이제는 ‘따로’ 주요 중앙은행들의 통화정책 행보가 본격적으로 각자의 길을 찾기 시작했다. 팬데믹을 거치면서 거의 동일한 방향성을 추구했던 적극적인 돈풀기와 이후 공격적인 기준 금리 인상이란 수순이 일제히 사이클을 돌고 난 이후 각기 다른 매크로 환경과 금융 여건이란 틀에 맞춰 상이한 양상으로 전개되고 있다. 56265_260112_each_road.pdf"
+      },
+      {
+        "title": "01/12, Kiwoom Morning Letter",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12844&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/39/20260112_economy_359949000.pdf",
+        "section": "economy",
+        "body_summary": "Comment - 9일(금) 코스피는 외국인의 순매수세에 힘입어 사상 최고치 마감(KOSPI 0.75%, KOSDAQ 0.41%). 지수는 전장보다 0.49% 내린 4,530.03로 출발해 장 초반 한때 4,500.48까지 내려 4,500선을 위협받았으나, 장중 상승세로 돌아섬. 삼성전자(0.14%)가 장중 상승세로 돌아서며 지수에 상방 압력을 가했으며, 미국 국방비 예산 증액 기대가 지속되면서 한화에어로스페이스(11.38%)가 역대 최고가 경신. 업종별로는 운송장비(6.24%), 건설(1.99%), IT서비스(1.84%)가 상승했고, 코스닥은 전날보다 오른 944.74로 출발해 하락 전환뒤 등락하다 장 후반 상승세. 유가증권시장과 코스닥시장 거래대금은 각각 23조1,850억원, 9조10억원 기록."
+      },
+      {
+        "title": "긍정의 속도 위반",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12843&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/63/20260112_economy_876440000.pdf",
+        "section": "economy",
+        "body_summary": "폭발적인 반도체 이익 상향 연초 코스피 상승세가 심상치 않다. 지난 주 후반 주춤하긴 했지만 코스피는 12/18 일 이후 14% 상승했다. 2026 년 코스피 영업이익 추정치가 12 월말 이후 가파르게 상향되고 있다(도표 1). 영업이익과 일평균 코스피 간 상관관계로 추정해 보면, 적정 코스피 상단은 4 천 후반대에서 5,360pt 로 상향된다(도표 3). 애널리스트로서 주가가 오른다고 코스피 상단을 올리고 싶지는 않지만, 이익 상향 속도를 무시할 수는 없다."
+      },
+      {
+        "title": "엔화와 원화 추가 약세 용인될까?",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12842&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/61/20260112_economy_334883000.pdf",
+        "section": "economy",
+        "body_summary": "주간 동향: 양호한 지표 등으로 달러 강세 - 다소 엇갈렸지만 12월 고용지표는 미 연준의 금리동결 가능성을 높인 동시에 모기지 채권 매입 발표 등 백악관발 양적완화 정책 추진 등으로 인한 미국 주식시장 호조 등이 달러 강세 요인으로 일단 작용함 - 유로화는 덜러 강세와 ECB 금리 동결 기대감 강화 등으로 약세를 보임. 지난해 유로존 12월 소비자물가 상승률이 2.0%로 석달 연속 둔화되면 ECB의 금리동결 기대감이 강화됨 - 엔화 가치도 1년만에 최저치를 기록하면서 158엔대 육박함. 다카이치 총리가 조기 총선거를 검토하고 있다는 일부 보도가 엔화 약세 심리를 강화시킴 - 역외 위안화는 약보합세를 보임. 가파른 위안화 강세 현상이 베네수엘라 사태와 달러 강세 영향 등으로 숨 고르기를 보임 - 호주달러도 예상치를 하회한 11월 소비자물가 영향 등으로 소폭의 약세를 기록함 - 달러-원 환율은 7거래 영업일 연속 상승함. 달러 강세 및 엔 약세 영향과 더불어 연초 서학개미의 역대 최대 수준의 미국 주식 순매수 영향 등으로 달러-원 환율이 재차 1,460원대 근접 [외환] 엔화와 원화 추가 약세 용인될까.pdf"
+      },
+      {
+        "title": "금리 억압 정책 강화: 백악관발 양적완화",
+        "link": "https://finance.naver.com/research/economy_read.naver?nid=12841&page=1",
+        "date": "26.01.12",
+        "pdf_link": "https://stock.pstatic.net/stock-research/economy/61/20260112_economy_240347000.pdf",
+        "section": "economy",
+        "body_summary": "금리 억압 정책 강화: 백악관발 양적완화 집권 2기 2년차를 맞이한 트럼프 대통령의 행보가 거침없다. 소위 ‘FAFO(까불면 죽는다)’로 대변되는 트럼프 대통령의 잇따른 대내외 강경정책 기조가 일단은 금융시장에 긍정적 효과를 미치고 있다. 당사가 올해 경제전망에서 언급했던 시중 금리를 낮추기 위한 ‘금리 억압’ 정책이 현실화되는 분위기다. 통화정책마저 트럼프 대통령의 FAFO 기조가 강화되었다는 측면에서 올해 미 연준의 금리인하 폭은 경제지표 흐름만으로 판단하기 어려워졌다. 12월 미국 고용보고서 등 현재 미국 고용시장이 차갑게 식지 않고 밋밋한 둔화 흐름을 보이고 있다는 점에서 미 연준의 추가 금리인하를 당장 기대하기 어려울 것은 현실이다."
+>>>>>>> ec03a159d75d67ad2aabd6cadf12f76495d825bc
       }
     ]
   }

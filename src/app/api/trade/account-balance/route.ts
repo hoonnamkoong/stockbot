@@ -11,6 +11,20 @@ export async function GET() {
         const balance = await getBalance();
         console.log('[Balance API] getBalance returned:', balance ? 'data' : 'null');
 
+        // Check if it's an error object (weak type check but works given the change)
+        if (balance && (balance as any).error) {
+            return NextResponse.json({
+                error: `KIS API Failed: ${(balance as any).error}`,
+                envCheck: {
+                    hasKey: !!process.env.KIS_APP_KEY,
+                    hasSecret: !!process.env.KIS_APP_SECRET,
+                    hasAcc: !!process.env.KIS_ACCOUNT_NO,
+                    baseUrl: process.env.KIS_BASE_URL,
+                    timestamp: new Date().toISOString()
+                }
+            }, { status: 500 });
+        }
+
         if (balance) {
             // Merge Local History
             try {
@@ -19,7 +33,7 @@ export async function GET() {
                 const history = JSON.parse(historyData);
 
                 // Inject last_buy_date
-                balance.holdings = balance.holdings.map(h => ({
+                balance.holdings = balance.holdings.map((h: any) => ({
                     ...h,
                     last_buy_date: history[h.code] || '-'
                 }));
@@ -30,10 +44,10 @@ export async function GET() {
 
             return NextResponse.json(balance);
         } else {
-            console.error('[Balance API] getBalance returned null');
-            // Check logs for details, but return a hint
+            console.error('[Balance API] getBalance returned null (unexpected)');
+            // Fallback
             return NextResponse.json({
-                error: 'ERROR_V2_FORCE_UPDATE: Failed to fetch balance (getBalance returned null).',
+                error: 'Unknown Error: getBalance returned null.',
                 envCheck: {
                     hasKey: !!process.env.KIS_APP_KEY,
                     hasSecret: !!process.env.KIS_APP_SECRET,

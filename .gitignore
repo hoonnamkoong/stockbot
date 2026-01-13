@@ -49,3 +49,5 @@ yarn-error.log*
 # We keep data/ committed as discussed
 
 frontend/
+.vercel
+.env*.local

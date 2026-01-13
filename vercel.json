@@ -1,11 +1,5 @@
 {
     "framework": "nextjs",
     "buildCommand": "next build",
-    "outputDirectory": ".next",
-    "crons": [
-        {
-            "path": "/api/trade/schedule",
-            "schedule": "*/10 * * * *"
-        }
-    ]
+    "outputDirectory": ".next"
 }

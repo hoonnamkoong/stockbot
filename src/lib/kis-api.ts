@@ -200,15 +200,17 @@ export async function getBalance(): Promise<BalanceData | null> {
 
             return result;
         } else {
-            console.error("[KIS] API Error:", res.data.msg1, "Code:", res.data.msg_cd);
-            return null;
+            const errorMsg = `[KIS] API Error: ${res.data.msg1} (Code: ${res.data.msg_cd})`;
+            console.error(errorMsg);
+            return { error: errorMsg } as any;
         }
     } catch (e: any) {
-        console.error("[KIS] Exception in getBalance:", e.message);
+        const errorMsg = `[KIS] Exception in getBalance: ${e.message}`;
+        console.error(errorMsg);
         if (e.response) {
             console.error("[KIS] Response data:", e.response.data);
         }
-        return null;
+        return { error: errorMsg } as any;
     }
 }
 

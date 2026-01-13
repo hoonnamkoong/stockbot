@@ -634,7 +634,11 @@ if __name__ == "__main__":
         if all_data:
             print(f"\nAnalyzing total {len(all_data)} items...")
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
+            
+            # [Fix 2026-01-13] Replace NaN with None (null in JSON)
+            result_df_en = result_df_en.where(pd.notnull(result_df_en), None)
             json_records = result_df_en.to_dict('records')
+            
             
             # [Feature: 5-Day Cumulative Analysis]
             extra_sheets = {}
@@ -642,6 +646,8 @@ if __name__ == "__main__":
                 from src import analyzer_5days
                 df_5days = analyzer_5days.analyze_5days()
                 if not df_5days.empty:
+                    # [Fix] Sanitize NaNs
+                    df_5days = df_5days.where(pd.notnull(df_5days), None)
                     # Save JSON for Frontend
                     with open('data/analysis_5days.json', 'w', encoding='utf-8') as f:
                         f.write(df_5days.to_json(orient='records', force_ascii=False))

@@ -33,12 +33,13 @@ export async function GET() {
             console.error('[Balance API] getBalance returned null');
             // Check logs for details, but return a hint
             return NextResponse.json({
-                error: 'Failed to fetch balance from KIS (getBalance returned null). Check server logs.',
+                error: 'ERROR_V2_FORCE_UPDATE: Failed to fetch balance (getBalance returned null).',
                 envCheck: {
                     hasKey: !!process.env.KIS_APP_KEY,
                     hasSecret: !!process.env.KIS_APP_SECRET,
                     hasAcc: !!process.env.KIS_ACCOUNT_NO,
-                    baseUrl: process.env.KIS_BASE_URL
+                    baseUrl: process.env.KIS_BASE_URL,
+                    timestamp: new Date().toISOString()
                 }
             }, { status: 500 });
         }

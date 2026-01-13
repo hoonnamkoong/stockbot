@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 [10:40:25] === StockBot Research Scraper Started (V2.0) ===
 [10:40:25] --- Section: invest ---
 [10:40:26] [invest] Today: 10 items
@@ -74,3 +75,81 @@
 [10:40:48]    Processing: 다시 불안해진 환율, 추가 상승 제한적
 [10:40:48]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12852&page=1
 [10:40:49] === Completed ===
+=======
+[01:40:37] === StockBot Research Scraper Started (V2.0) ===
+[01:40:37] --- Section: invest ---
+[01:40:38] [invest] Today: 10 items
+[01:40:38]    Processing: 노이즈로 순탄치만은 않았던 코스피 4,600 선 안착
+[01:40:38]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37513&page=1
+[01:40:39]    Processing: 주간 금리·환율 전망
+[01:40:39]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37512&page=1
+[01:40:40]    Processing: Weekly Quant Momentum Strategy(26.1.13)
+[01:40:40]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37511&page=1
+[01:40:41]    Processing: 국내 가상자산 정책 팩트체크 필요
+[01:40:41]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37510&page=1
+[01:40:42]    Processing: [IBKS Daily]Start with IBKS (2026.1.13) 미국 연방..
+[01:40:42]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37509&page=1
+[01:40:43]    Processing: 뉴 ETF 라인 업 : 국내 배당, 온사이트 발전, AI반도..
+[01:40:43]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37508&page=1
+[01:40:44]    Processing: 다시 도래한 추세추종의 시간
+[01:40:44]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37507&page=1
+[01:40:45]    Processing: 01/13 달러, 연준 불확실성 속 하락
+[01:40:45]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37506&page=1
+[01:40:46]    Processing: 01/13, 미 증시, 트럼프발 불확실성 확대에도 소폭 상..
+[01:40:46]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37505&page=1
+[01:40:47]    Processing: China Weekly Issue : 중국 신에너지 산업: 더욱 명확..
+[01:40:47]    > Fetching Detail: https://finance.naver.com/research/invest_read.naver?nid=37504&page=1
+[01:40:48] --- Section: company ---
+[01:40:49] [company] Today: 16 items
+[01:40:49]    Processing: [현대제철] 실적 개선 방향성은 유효
+[01:40:49]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89101&page=1
+[01:40:49]    Processing: [POSCO홀딩스] 낮아진 4분기 실적 기대감, 2026년 이익 정상..
+[01:40:49]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89100&page=1
+[01:40:50]    Processing: [OCI홀딩스] 폴리실리콘, 워밍업 중
+[01:40:50]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89099&page=1
+[01:40:51]    Processing: [티엘비] 2026년 추가로 도약! 거침 없는 성장!
+[01:40:51]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89098&page=1
+[01:40:52]    Processing: [원익IPS] 파운드리도 있죠
+[01:40:52]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89095&page=1
+[01:40:53]    Processing: [삼양식품] 달라진 것은 없다
+[01:40:53]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89094&page=1
+[01:40:54]    Processing: [농심] 아쉬운 비용 부담
+[01:40:54]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89093&page=1
+[01:40:55]    Processing: [넷마블] 신작만 잘 해준다면 올해도 끄떡없을 것
+[01:40:55]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89092&page=1
+[01:40:56]    Processing: [GS건설] 내실을 다지는 구간
+[01:40:56]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89091&page=1
+[01:40:57]    Processing: [엔씨소프트] 1분기부터가 진짜 실적
+[01:40:57]    > Fetching Detail: https://finance.naver.com/research/company_read.naver?nid=89090&page=1
+[01:40:58] --- Section: industry ---
+[01:40:58] [industry] Today: 13 items
+[01:40:58]    Processing: CES 2026 참관 후기 Compute Everywhere, Sca..
+[01:40:58]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43023&page=1
+[01:40:59]    Processing: 단기 변동성은 경계하나, 조정은 매수 기회
+[01:40:59]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43022&page=1
+[01:41:00]    Processing: 2025.12 은행/증권/보험 Sector Updates
+[01:41:00]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43021&page=1
+[01:41:01]    Processing: 미국 전기차 신차 32개 출시
+[01:41:01]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43020&page=1
+[01:41:02]    Processing: 4Q25 Preview - 다소 묵직한 연말 정산서
+[01:41:02]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43019&page=1
+[01:41:03]    Processing: 실패 없는 현대차 그룹주 투자
+[01:41:03]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43018&page=1
+[01:41:04]    Processing: 12월 중국 자동차 판매_ 내수 판매 급속히 둔..
+[01:41:04]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43017&page=1
+[01:41:05]    Processing: 중국 PVC 수출세 환급 폐지 영향
+[01:41:05]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43016&page=1
+[01:41:06]    Processing: 보스턴다이내믹스는 현대차그룹 주가에 얼마..
+[01:41:06]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43015&page=1
+[01:41:07]    Processing: [IBKS Daily] 인터넷/게임
+[01:41:07]    > Fetching Detail: https://finance.naver.com/research/industry_read.naver?nid=43014&page=1
+[01:41:07] --- Section: economy ---
+[01:41:08] [economy] Today: 3 items
+[01:41:08]    Processing: 2026년, 생산적 금융 효과
+[01:41:08]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12854&page=1
+[01:41:09]    Processing: 01/13, Kiwoom Morning Letter
+[01:41:09]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12853&page=1
+[01:41:10]    Processing: 다시 불안해진 환율, 추가 상승 제한적
+[01:41:10]    > Fetching Detail: https://finance.naver.com/research/economy_read.naver?nid=12852&page=1
+[01:41:11] === Completed ===
+>>>>>>> a5f0cce308c39639205b77cda922297c60c7b5f4

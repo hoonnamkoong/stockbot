@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchReservations, updateReservations } from '@/lib/github-db';
-import { placeOrder } from '@/lib/kis';
+import { placeOrder } from '@/lib/kis-api';
 
 // Vercel Cron routes are GET
 export const dynamic = 'force-dynamic';

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getBalance } from '@/lib/kis';
+import { getBalance } from '@/lib/kis-api';
 import path from 'path';
 import fs from 'fs/promises';
 

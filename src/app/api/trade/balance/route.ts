@@ -36,6 +36,15 @@ export async function GET() {
         }
     } catch (error: any) {
         console.error('[Balance API] Exception:', error.message);
-        return NextResponse.json({ error: `Internal Error: ${error.message}` }, { status: 500 });
+        return NextResponse.json({
+            error: `Internal Error: ${error.message}`,
+            details: error.stack,
+            envCheck: {
+                hasKey: !!process.env.KIS_APP_KEY,
+                hasSecret: !!process.env.KIS_APP_SECRET,
+                hasAcc: !!process.env.KIS_ACCOUNT_NO,
+                baseUrl: process.env.KIS_BASE_URL
+            }
+        }, { status: 500 });
     }
 }

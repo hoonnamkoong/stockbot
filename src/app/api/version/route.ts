@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-    return NextResponse.json({
-        version: "v2026.01.06-16:47",
+    return Response.json({
+        version: 'v1-debug-deploy',
         timestamp: new Date().toISOString(),
-        commit: "1bf0338",
-        message: "If you see this, new deployment is LIVE!"
+        env: {
+            nodeEnv: process.env.NODE_ENV,
+            hasKey: !!process.env.KIS_APP_KEY
+        }
     });
 }

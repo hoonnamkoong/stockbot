@@ -101,7 +101,7 @@ export default function TradePage() {
         setLoading(true);
         try {
             // Add timestamp to prevent browser caching
-            const res = await axios.get(`/api/trade/balance?t=${Date.now()}`);
+            const res = await axios.get(`/api/trade/account-balance?t=${Date.now()}`);
             setBalance(res.data);
         } catch (error) {
             console.error(error);

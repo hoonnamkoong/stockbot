@@ -1,5 +1,15 @@
 {
     "framework": "nextjs",
+    "crons": [
+        {
+            "path": "/api/cron/trigger",
+            "schedule": "5 1,4,6 * * *"
+        },
+        {
+            "path": "/api/trade/schedule",
+            "schedule": "*/10 * * * *"
+        }
+    ],
     "buildCommand": "next build",
     "outputDirectory": ".next"
 }

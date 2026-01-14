@@ -149,16 +149,13 @@ export default function Home() {
         const isIOS = /iphone|ipad|ipod/i.test(userAgent);
 
         if (isAndroid) {
-            // Android: Use Intent Scheme (Most Reliable)
-            // Opens app if installed, or goes to Play Store if not.
-            // Package: com.koreainvestment.stock (Main KIS App)
-            // Scheme: koreainvestment (derived from common knowledge, intent usually maps scheme to package)
-            // Try explicit intent first
-            const intentUrl = "intent://open#Intent;scheme=koreainvestment;package=com.koreainvestment.stock;end";
+            // Android: Use Intent Scheme with Correct Package
+            // Package: com.truefriend.m.common (Main 'Korea Investment' App)
+            // Scheme: koreainvestment (matches trade page)
+            const intentUrl = "intent://open#Intent;scheme=koreainvestment;package=com.truefriend.m.common;end";
             window.location.href = intentUrl;
         } else if (isIOS) {
-            // iOS: Use Custom Scheme (koreainvestment://)
-            // No native fallback mechanism like Intent, relies on user having app.
+            // iOS: Use Custom Scheme
             window.location.href = "koreainvestment://open";
         } else {
             alert(`Code ${code} Copied to clipboard!`);

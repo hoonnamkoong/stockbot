@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     return Response.json({
-        version: 'v9-force-deploy',
+        version: 'v10-full-auto',
         timestamp: new Date().toISOString(),
         env: {
             nodeEnv: process.env.NODE_ENV,

@@ -148,13 +148,13 @@ export default function Home() {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
         if (isMobile) {
-            alert(`Code ${code} Copied!\n\nTrying to open KIS App...`);
-            // Attempt generic scheme
-            window.location.href = "neosmartaf://";
+            // Attempt generic scheme for KIS (Korea Investment)
+            // Fix: 'neosmartaf' was incorrect. 'koreainvestment' is correct.
+            window.location.href = "koreainvestment://open";
+
+            // Optional: Provide visual feedback without blocking
+            // alert(`Code ${code} Copied! Opening App...`); // Removed to prevent blocking
         } else {
-            // Desktop: just notify
-            // Using simple alert or console for now, or could use Mantine notification if available
-            // But to avoid 'notifications' dependency if not present, simple alert for now
             alert(`Code ${code} Copied to clipboard!`);
         }
     };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import {
     Container, Title, Text, Paper, Group, Stack,
     Table, Badge, Button, Tabs, TextInput, NumberInput,
@@ -151,6 +151,23 @@ export default function TradePage() {
         fetchBalance();
         fetchStocks();
         fetchReservations();
+    }, []);
+
+    // [Real-time Execution] Poll schedule endpoint every 30 seconds while page is open.
+    // This ensures trades are executed instantly when user is watching, even if Cron is slow.
+    const schedulePoller = useInterval(async () => {
+        try {
+            await axios.get('/api/trade/schedule');
+            fetchReservations(); // Refresh list after check
+            fetchBalance();      // Refresh balance if trade happened
+        } catch (e) {
+            console.error("Schedule Poller Error", e);
+        }
+    }, 30000); // 30 seconds
+
+    useEffect(() => {
+        schedulePoller.start();
+        return () => schedulePoller.stop();
     }, []);
 
     const showNotify = (title: string, msg: string, color: string) => {

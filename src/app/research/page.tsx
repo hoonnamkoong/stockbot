@@ -144,16 +144,19 @@ export default function Home() {
     const handleCopyAndOpen = (code: string) => {
         navigator.clipboard.writeText(code);
 
-        // Context-aware notification
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
         if (isMobile) {
-            // Attempt generic scheme for KIS (Korea Investment)
-            // Fix: 'neosmartaf' was incorrect. 'koreainvestment' is correct.
-            window.location.href = "koreainvestment://open";
+            // Use anchor click method which is more reliable for deep links
+            const link = document.createElement('a');
+            link.href = "koreainvestment://open";
+            // Fallback scheme if needed: neosmartaf://
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-            // Optional: Provide visual feedback without blocking
-            // alert(`Code ${code} Copied! Opening App...`); // Removed to prevent blocking
+            // Non-blocking toast (using alert for now as minimal viable feedback, but short)
+            // actually, remove alert entirely for smooth experience.
         } else {
             alert(`Code ${code} Copied to clipboard!`);
         }

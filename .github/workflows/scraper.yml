@@ -40,11 +40,18 @@ jobs:
         run: |
           python scraper.py
 
-      - name: Commit and Push Data
+      - name: Commit and Push Data (db-data)
         run: |
-          git config --global user.name "StockBot"
-          git config --global user.email "bot@stockbot.com"
-          git add data/ trending_*.csv trending_*.xlsx
-          git commit -m "data: Update stock data and research reports" || exit 0
-          git pull --rebase -Xtheirs origin main
-          git push
+          # ROBUST METHOD: Clone db-data to subdir, copy files, push.
+          
+          git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_repo
+          cp -r data/ db_repo/
+          cp trending_*.csv db_repo/ || true
+          cp trending_*.xlsx db_repo/ || true
+          
+          cd db_repo
+          git config user.name "StockBot"
+          git config user.email "bot@stockbot.com"
+          git add .
+          git commit -m "data: Update stock data (Isolated Branch)" || exit 0
+          git push https://${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data

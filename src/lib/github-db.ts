@@ -3,7 +3,7 @@ import axios from 'axios';
 const REPO_OWNER = 'hoonnamkoong';
 const REPO_NAME = 'stockbot';
 const FILE_PATH = 'data/reservations.json';
-const BRANCH = 'main';
+const BRANCH = 'db-data';
 
 // Ensure GITHUB_PAT is set in Vercel Environment Variables
 const GITHUB_TOKEN = process.env.GITHUB_PAT;

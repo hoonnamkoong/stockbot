@@ -6,7 +6,7 @@ let ACCESS_TOKEN: string | null = null;
 const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim();
 const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
 const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
-const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapivts.koreainvestment.com:29443').trim();
+const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443').trim();
 
 console.log('[KIS Init] Environment loaded:', {
     hasAppKey: !!KIS_APP_KEY,

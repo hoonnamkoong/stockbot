@@ -144,19 +144,22 @@ export default function Home() {
     const handleCopyAndOpen = (code: string) => {
         navigator.clipboard.writeText(code);
 
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-            // Use anchor click method which is more reliable for deep links
-            const link = document.createElement('a');
-            link.href = "koreainvestment://open";
-            // Fallback scheme if needed: neosmartaf://
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isAndroid = /android/i.test(userAgent);
+        const isIOS = /iphone|ipad|ipod/i.test(userAgent);
 
-            // Non-blocking toast (using alert for now as minimal viable feedback, but short)
-            // actually, remove alert entirely for smooth experience.
+        if (isAndroid) {
+            // Android: Use Intent Scheme (Most Reliable)
+            // Opens app if installed, or goes to Play Store if not.
+            // Package: com.koreainvestment.stock (Main KIS App)
+            // Scheme: koreainvestment (derived from common knowledge, intent usually maps scheme to package)
+            // Try explicit intent first
+            const intentUrl = "intent://open#Intent;scheme=koreainvestment;package=com.koreainvestment.stock;end";
+            window.location.href = intentUrl;
+        } else if (isIOS) {
+            // iOS: Use Custom Scheme (koreainvestment://)
+            // No native fallback mechanism like Intent, relies on user having app.
+            window.location.href = "koreainvestment://open";
         } else {
             alert(`Code ${code} Copied to clipboard!`);
         }

@@ -66,12 +66,23 @@ export async function POST(request: Request) {
         const safeMinute = (minute !== undefined && minute !== '') ? String(minute) : '0';
 
         // Time Validation
+        // Time Validation (Fix: Interpret input as KST)
         const now = new Date();
-        const target = new Date();
-        target.setHours(Number(safeHour));
-        target.setMinutes(Number(safeMinute));
-        target.setSeconds(0);
-        target.setMilliseconds(0);
+        const kstOffset = 9 * 60 * 60 * 1000;
+        const kstNow = new Date(now.getTime() + kstOffset);
+
+        // Construct target time based on KST date components
+        const targetKST_Timestamp = Date.UTC(
+            kstNow.getUTCFullYear(),
+            kstNow.getUTCMonth(),
+            kstNow.getUTCDate(),
+            Number(safeHour),
+            Number(safeMinute),
+            0
+        );
+
+        // Convert back to true UTC
+        const target = new Date(targetKST_Timestamp - kstOffset);
 
         if (target < now) {
             // Check if it's for tomorrow? For now just reject past time.

@@ -2,7 +2,7 @@ name: Stock Scraper Schedule
 
 on:
   schedule:
-    - cron: '0 1,4,6 * * *' # KST 10:00, 13:00, 15:00
+    - cron: '5 1,4,6 * * *' # KST 10:05, 13:05, 15:05
   push:
     branches: [ "main" ]
     paths-ignore:

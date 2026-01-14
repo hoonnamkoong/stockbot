@@ -169,7 +169,7 @@ def get_stock_details(code):
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        response = requests.get(url_frgn, headers=headers)
+        response = requests.get(url_frgn, headers=headers, timeout=10)
         soup = BeautifulSoup(response.content, 'html.parser')
         
         # '보유율' 텍스트 포함된 테이블 찾기

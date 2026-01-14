@@ -70,7 +70,12 @@ export async function GET(request: Request) {
             success: true,
             githubStatus,
             results,
-            remainingCount: remainingList.length
+            remainingCount: remainingList.length,
+            debug: {
+                env_url: process.env.KIS_BASE_URL || 'default-vts',
+                key_start: (process.env.KIS_APP_KEY || '').substring(0, 4),
+                has_secret: !!process.env.KIS_APP_SECRET
+            }
         });
 
     } catch (error: any) {

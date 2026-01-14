@@ -7,7 +7,7 @@
         },
         {
             "path": "/api/trade/schedule",
-            "schedule": "*/10 * * * *"
+            "schedule": "* * * * *"
         }
     ],
     "buildCommand": "next build",

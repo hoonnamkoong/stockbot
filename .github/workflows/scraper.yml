@@ -10,7 +10,7 @@ on:
       - 'trending_*.xlsx'
       - 'reports.json'
       - '*.md'
-  workflow_dispatch: # Allow manual trigger
+
 
 jobs:
   scrape-and-report:

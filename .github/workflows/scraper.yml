@@ -40,6 +40,15 @@ jobs:
         run: |
           python scraper.py
 
+      - name: Run Trade Executor (Reservations)
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
+        run: |
+          python src/trade_executor.py
+
       - name: Commit and Push Data (db-data)
         run: |
           # ROBUST METHOD: Clone db-data to subdir, copy files, push.

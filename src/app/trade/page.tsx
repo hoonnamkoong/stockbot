@@ -231,6 +231,9 @@ export default function TradePage() {
                 }
                 showNotify('Bulk Action Complete', `Success: ${successCount}, Failed: ${failCount}`, 'teal');
                 fetchBalance();
+                if (bulkMode === 'reservation') {
+                    fetchReservations(); // Refresh reservation list
+                }
                 setSelectedHoldings([]); // Clear selection
 
             } else {

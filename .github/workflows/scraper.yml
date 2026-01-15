@@ -1,16 +1,16 @@
 name: Stock Scraper Schedule
 
 on:
-  workflow_dispatch: # Allow manual trigger via API or UI
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
     paths-ignore:
       - 'data/**'
       - 'trending_*.csv'
       - 'trending_*.xlsx'
       - 'reports.json'
       - '*.md'
-
 
 jobs:
   scrape-and-report:
@@ -51,8 +51,6 @@ jobs:
 
       - name: Commit and Push Data (db-data)
         run: |
-          # ROBUST METHOD: Clone db-data to subdir, copy files, push.
-          
           git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_repo
           cp -r data/ db_repo/
           cp trending_*.csv db_repo/ || true

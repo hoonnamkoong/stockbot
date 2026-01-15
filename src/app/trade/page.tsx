@@ -5,7 +5,7 @@ import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import {
     Container, Title, Text, Paper, Group, Stack,
     Table, Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition
+    Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea
 } from '@mantine/core';
 import { IconCoin, IconClock, IconChartBar } from '@tabler/icons-react';
 import axios from 'axios';
@@ -275,6 +275,8 @@ export default function TradePage() {
         }
     };
 
+    const isMobile = useMediaQuery('(max-width: 768px)');
+
     return (
         <Container size="lg" py="xl">
             {notification && (
@@ -287,7 +289,7 @@ export default function TradePage() {
                 </Notification>
             )}
 
-            <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security Verification" centered>
+            <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security Verification" centered zIndex={2000}>
                 <Stack align="center" py="md" ref={pinContainerRef}>
                     <Text>Please enter your 4-digit PIN to confirm.</Text>
                     <PinInput
@@ -307,90 +309,119 @@ export default function TradePage() {
 
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Trading</Title>
-                <Group>
+                <Group gap={5}>
+                    {/* Mobile Deep Link with specific Intent */}
                     <Button
                         component="a"
-                        href="koreainvestment://open"
+                        onClick={() => {
+                            // "Korea Investment" (HanTo) - com.koreainvestment.stock
+                            // "eFriend Smart" - com.truefriend.m.common
+                            // Try Intent that targets the package directly
+                            const isAndroid = /android/i.test(navigator.userAgent);
+                            const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+                            if (isAndroid) {
+                                // Try opening Main HanTo App via Intent
+                                // Format: intent://<path>#Intent;scheme=<scheme>;package=<package>;end
+                                // If scheme unknown, try launching by package ?
+                                window.location.href = "intent://#Intent;package=com.truefriend.neosmartarenewal;end";
+                            } else if (isIOS) {
+                                window.location.href = "koreainvestment://open";
+                            }
+                        }}
                         size="sm"
                         variant="light"
                         color="red"
                         leftSection={<IconCoin size={20} />}
                     >
-                        Open KIS App
+                        App
                     </Button>
                     <Button component="a" href="/research" size="sm" variant="light" leftSection={<IconChartBar size={20} />}>
-                        StockBot Research
+                        Research
                     </Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>
-                        Sign Out
+                        Out
                     </Button>
                 </Group>
             </Group>
 
-            <Group grow align="flex-start">
-                {/* 1. Portfolio Section */}
-                <Stack>
-                    <Paper p="md" withBorder radius="md">
-                        <Title order={4} mb="md">My Portfolio</Title>
-                        <LoadingOverlay visible={loading} />
+            {/* Layout: Stack on Mobile, Group on Desktop */}
+            {isMobile ? (
+                <Stack gap="lg">
+                    {/* 1. Portfolio Section */}
+                    {renderPortfolio()}
+                    {/* 2. Trading Section */}
+                    {renderTrading()}
+                </Stack>
+            ) : (
+                <Group grow align="flex-start">
+                    {renderPortfolio()}
+                    {renderTrading()}
+                </Group>
+            )}
+        </Container >
+    );
 
-                        <Group justify="space-between" mb="md" align="flex-end">
-                            <Stack gap={0}>
-                                <Text size="sm" c="dimmed">예수금 (Cash)</Text>
-                                <Title order={3}>{balance?.deposit.toLocaleString()} KRW</Title>
-                            </Stack>
+    function renderPortfolio() {
+        return (
+            <Stack>
+                <Paper p="md" withBorder radius="md">
+                    <Title order={4} mb="md">My Portfolio</Title>
+                    <LoadingOverlay visible={loading} zIndex={100} overlayProps={{ radius: 'sm', blur: 2 }} />
 
-                            <Stack gap={0}>
-                                <Text size="sm" c="dimmed">주식 총액 (Stock Value)</Text>
-                                <Title order={3}>
-                                    {balance?.holdings.reduce((sum, h) => sum + (h.price * h.qty), 0).toLocaleString()} KRW
-                                </Title>
-                            </Stack>
-
-                            <Stack gap={0}>
-                                <Text size="sm" c="dimmed">주식 수익 (Stock P/L)</Text>
-                                <Title order={3} c={
-                                    (balance?.holdings.reduce((sum, h) => sum + h.pl_amount, 0) || 0) > 0 ? 'red' :
-                                        (balance?.holdings.reduce((sum, h) => sum + h.pl_amount, 0) || 0) < 0 ? 'blue' : 'dimmed'
-                                }>
-                                    {balance?.holdings.reduce((sum, h) => sum + h.pl_amount, 0).toLocaleString()} KRW
-                                </Title>
-                            </Stack>
-
-                            <Group gap="xs">
-                                <Button variant="light" size="xs" onClick={fetchBalance}>Refresh</Button>
-                            </Group>
+                    <Group justify="space-between" mb="md" align="flex-end">
+                        <Stack gap={0}>
+                            <Text size="sm" c="dimmed">예수금</Text>
+                            <Title order={3}>{balance?.deposit.toLocaleString()} 원</Title>
+                        </Stack>
+                        <Group gap="xs">
+                            <Button variant="light" size="xs" onClick={fetchBalance}>Refresh</Button>
                         </Group>
+                    </Group>
 
-                        {/* Bulk Action Bar using Transition to smooth appearance */}
-                        <Transition transition="slide-up" mounted={selectedHoldings.length > 0} duration={200}>
-                            {(styles) => (
-                                <Paper withBorder p="xs" mb="md" bg="blue.0" style={styles}>
+                    {/* Summary Row */}
+                    <Group grow mb="md">
+                        <Stack gap={0}>
+                            <Text size="sm" c="dimmed">평가금액</Text>
+                            <Text fw={700}>
+                                {balance?.holdings.reduce((sum, h) => sum + (h.price * h.qty), 0).toLocaleString()}
+                            </Text>
+                        </Stack>
+                        <Stack gap={0}>
+                            <Text size="sm" c="dimmed">평가손익</Text>
+                            <Text fw={700} c={
+                                (balance?.holdings.reduce((sum, h) => sum + h.pl_amount, 0) || 0) > 0 ? 'red' : 'blue'
+                            }>
+                                {balance?.holdings.reduce((sum, h) => sum + h.pl_amount, 0).toLocaleString()}
+                            </Text>
+                        </Stack>
+                    </Group>
+
+                    {/* Bulk Action Bar using Transition */}
+                    <Transition transition="slide-up" mounted={selectedHoldings.length > 0} duration={200}>
+                        {(styles) => (
+                            <Paper withBorder p="xs" mb="md" bg="blue.0" style={styles}>
+                                <Stack gap="xs">
                                     <Group justify="space-between">
-                                        <Group>
-                                            <Text fw={700} c="blue">Selected: {selectedHoldings.length} stocks</Text>
-                                            {/* Reservation Time Picker for Bulk */}
-                                            <Group gap={5} align="center">
-                                                <Text size="xs" c="dimmed">Res. Time:</Text>
-                                                <NumberInput size="xs" w={50} min={0} max={23} value={resHour} onChange={setResHour} placeholder="HH" />
-                                                <Text>:</Text>
-                                                <NumberInput size="xs" w={50} min={0} max={59} value={resMin} onChange={setResMin} placeholder="MM" />
-                                            </Group>
-                                        </Group>
-                                        <Group gap="xs">
-                                            <Button size="xs" color="violet" leftSection={<IconClock size={14} />} onClick={() => handleBulkOrder('reservation')}>
-                                                Bulk Reserve Sell
-                                            </Button>
-                                            <Button size="xs" color="red" leftSection={<IconCoin size={14} />} onClick={() => handleBulkOrder('sell')}>
-                                                Bulk Sell Now
-                                            </Button>
+                                        <Text fw={700} c="blue">Selected: {selectedHoldings.length}</Text>
+                                        <Group gap={5}>
+                                            <Button size="xs" color="violet" onClick={() => handleBulkOrder('reservation')}>Reserve</Button>
+                                            <Button size="xs" color="red" onClick={() => handleBulkOrder('sell')}>Sell</Button>
                                         </Group>
                                     </Group>
-                                </Paper>
-                            )}
-                        </Transition>
+                                    <Group gap={5} align="center">
+                                        <Text size="xs" c="dimmed">Time:</Text>
+                                        <NumberInput size="xs" w={60} min={0} max={23} value={resHour} onChange={setResHour} />
+                                        <Text>:</Text>
+                                        <NumberInput size="xs" w={60} min={0} max={59} value={resMin} onChange={setResMin} />
+                                    </Group>
+                                </Stack>
+                            </Paper>
+                        )}
+                    </Transition>
 
-                        <Table striped highlightOnHover>
+                    <ScrollArea>
+                        <Table striped highlightOnHover style={{ minWidth: 500 }}>
                             <Table.Thead>
                                 <Table.Tr>
                                     <Table.Th>
@@ -400,19 +431,17 @@ export default function TradePage() {
                                             onChange={toggleSelectAll}
                                         />
                                     </Table.Th>
-                                    <Table.Th>Stock</Table.Th>
-                                    <Table.Th>Qty</Table.Th>
-                                    <Table.Th>Cur. Price</Table.Th>
-                                    <Table.Th>Avg. Price</Table.Th>
-                                    <Table.Th>Last Buy</Table.Th>
-                                    <Table.Th>P/L Amt</Table.Th>
-                                    <Table.Th>P/L %</Table.Th>
+                                    <Table.Th>종목</Table.Th>
+                                    <Table.Th>수량</Table.Th>
+                                    <Table.Th>현재가</Table.Th>
+                                    <Table.Th>손익</Table.Th>
+                                    <Table.Th>수익률</Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
                                 {balance?.holdings.length === 0 && (
                                     <Table.Tr>
-                                        <Table.Td colSpan={8} align="center">No holdings</Table.Td>
+                                        <Table.Td colSpan={6} align="center">보유 주식 없음</Table.Td>
                                     </Table.Tr>
                                 )}
                                 {balance?.holdings.map((h) => (
@@ -427,18 +456,13 @@ export default function TradePage() {
                                             <Stack gap={0}>
                                                 <Text size="sm" fw={500}>{h.name}</Text>
                                                 <Text size="xs" c="dimmed">{h.code}</Text>
-                                                {/* Show if reserved */}
                                                 {reservations.some(r => r.code === h.code) && (
-                                                    <Badge size="xs" color="violet" variant="light">Reserved</Badge>
+                                                    <Badge size="xs" color="violet" variant="light">Resv</Badge>
                                                 )}
                                             </Stack>
                                         </Table.Td>
                                         <Table.Td>{h.qty}</Table.Td>
                                         <Table.Td>{h.price.toLocaleString()}</Table.Td>
-                                        <Table.Td>{h.avg_price.toLocaleString()}</Table.Td>
-                                        <Table.Td>
-                                            <Text size="xs" c="dimmed">{h.last_buy_date || '-'}</Text>
-                                        </Table.Td>
                                         <Table.Td>
                                             <Text c={h.pl_amount > 0 ? 'red' : (h.pl_amount < 0 ? 'blue' : 'dimmed')}>
                                                 {h.pl_amount.toLocaleString()}
@@ -453,23 +477,23 @@ export default function TradePage() {
                                 ))}
                             </Table.Tbody>
                         </Table>
-                    </Paper>
+                    </ScrollArea>
+                </Paper>
 
-                    {/* Active Reservations Panel */}
-                    {reservations.length > 0 && (
-                        <Paper p="md" withBorder radius="md">
-                            <Group justify="space-between" mb="md">
-                                <Title order={4}>Active Reservations ({reservations.length})</Title>
-                                <Button size="xs" variant="light" onClick={fetchReservations}>Refresh</Button>
-                            </Group>
-                            <Table>
+                {/* Active Reservations Panel */}
+                {reservations.length > 0 && (
+                    <Paper p="md" withBorder radius="md">
+                        <Group justify="space-between" mb="md">
+                            <Title order={4}>Active Reservations</Title>
+                            <Button size="xs" variant="light" onClick={fetchReservations}>Refresh</Button>
+                        </Group>
+                        <ScrollArea>
+                            <Table style={{ minWidth: 400 }}>
                                 <Table.Thead>
                                     <Table.Tr>
                                         <Table.Th>Time</Table.Th>
                                         <Table.Th>Stock</Table.Th>
                                         <Table.Th>Type</Table.Th>
-                                        <Table.Th>Qty</Table.Th>
-                                        <Table.Th>Price</Table.Th>
                                         <Table.Th>Action</Table.Th>
                                     </Table.Tr>
                                 </Table.Thead>
@@ -480,14 +504,12 @@ export default function TradePage() {
                                                 {new Date(r.targetTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </Table.Td>
                                             <Table.Td>
-                                                <Text size="sm">{getStockName(r.code)}</Text>
-                                                <Text size="xs" c="dimmed">{r.code}</Text>
+                                                <Stack gap={0}>
+                                                    <Text size="sm">{getStockName(r.code)}</Text>
+                                                    <Badge size="xs" color={r.side === 'buy' ? 'red' : 'blue'}>{r.side}</Badge>
+                                                </Stack>
                                             </Table.Td>
-                                            <Table.Td>
-                                                <Badge color={r.side === 'buy' ? 'red' : 'blue'}>{r.side.toUpperCase()}</Badge>
-                                            </Table.Td>
-                                            <Table.Td>{r.qty}</Table.Td>
-                                            <Table.Td>{Number(r.price) === 0 ? 'Market' : r.price}</Table.Td>
+                                            <Table.Td>{Number(r.price) === 0 ? 'Mkt' : r.price}</Table.Td>
                                             <Table.Td>
                                                 <Button color="red" size="xs" variant="outline" onClick={() => cancelReservation(r.id)}>
                                                     Cancel
@@ -497,96 +519,98 @@ export default function TradePage() {
                                     ))}
                                 </Table.Tbody>
                             </Table>
-                        </Paper>
-                    )}
-                </Stack>
-
-                {/* 2. Trading Section */}
-                <Stack>
-                    <Paper p="md" withBorder radius="md">
-                        <Title order={4} mb="md">Place Order</Title>
-
-                        <Tabs defaultValue="immediate">
-                            <Tabs.List mb="md">
-                                <Tabs.Tab value="immediate">Immediate</Tabs.Tab>
-                                <Tabs.Tab value="reservation">Reservation</Tabs.Tab>
-                            </Tabs.List>
-
-                            <Group mb="sm" grow>
-                                <Button
-                                    variant={orderType === 'buy' ? 'filled' : 'outline'}
-                                    color="red"
-                                    onClick={() => setOrderType('buy')}
-                                >
-                                    BUY
-                                </Button>
-                                <Button
-                                    variant={orderType === 'sell' ? 'filled' : 'outline'}
-                                    color="blue"
-                                    onClick={() => setOrderType('sell')}
-                                >
-                                    SELL
-                                </Button>
-                            </Group>
-
-                            <Stack>
-                                <Select
-                                    label="Stock"
-                                    placeholder="Search Stock (e.g. Samsung)"
-                                    searchable
-                                    data={stocks.map(s => ({ value: s.code, label: `${s.name} (${s.code})` }))}
-                                    value={code}
-                                    onChange={(val) => setCode(val || '')}
-                                    nothingFoundMessage="No stock found"
-                                    maxDropdownHeight={200}
-                                />
-                                <NumberInput
-                                    label="Quantity"
-                                    min={1}
-                                    value={qty} onChange={(val) => setQty(val || 1)}
-                                />
-                                {orderType === 'sell' && (
-                                    <Group justify="flex-end" mt={5}>
-                                        <Badge
-                                            size="sm"
-                                            variant="outline"
-                                            style={{ cursor: 'pointer' }}
-                                            onClick={handleSellAll}
-                                        >
-                                            전액 매도 (Sell All)
-                                        </Badge>
-                                    </Group>
-                                )}
-                                <NumberInput
-                                    label="Price (0 = Market Price)"
-                                    min={0}
-                                    step={100}
-                                    value={price} onChange={(val) => setPrice(val || 0)}
-                                />
-                            </Stack>
-
-                            <Tabs.Panel value="immediate" pt="md">
-                                <Button fullWidth size="lg" loading={orderLoading} onClick={() => handleOrder(false)}>
-                                    Submit Order
-                                </Button>
-                            </Tabs.Panel>
-
-                            <Tabs.Panel value="reservation" pt="md">
-                                <Group grow>
-                                    <NumberInput label="Hour" min={0} max={23} value={resHour} onChange={setResHour} />
-                                    <NumberInput label="Minute" min={0} max={59} value={resMin} onChange={setResMin} />
-                                </Group>
-                                <Text size="xs" c="dimmed" mt="xs">
-                                    * Order will be executed locally at the specified time.
-                                </Text>
-                                <Button fullWidth size="lg" mt="md" color="violet" loading={orderLoading} onClick={() => handleOrder(true)}>
-                                    Schedule Order
-                                </Button>
-                            </Tabs.Panel>
-                        </Tabs>
+                        </ScrollArea>
                     </Paper>
-                </Stack>
-            </Group>
-        </Container >
-    );
+                )}
+            </Stack>
+        );
+    }
+
+    function renderTrading() {
+        return (
+            <Stack>
+                <Paper p="md" withBorder radius="md">
+                    <Title order={4} mb="md">Place Order</Title>
+
+                    <Tabs defaultValue="immediate">
+                        <Tabs.List mb="md">
+                            <Tabs.Tab value="immediate">Immediate</Tabs.Tab>
+                            <Tabs.Tab value="reservation">Reservation</Tabs.Tab>
+                        </Tabs.List>
+
+                        <Group mb="sm" grow>
+                            <Button
+                                variant={orderType === 'buy' ? 'filled' : 'outline'}
+                                color="red"
+                                onClick={() => setOrderType('buy')}
+                            >
+                                BUY
+                            </Button>
+                            <Button
+                                variant={orderType === 'sell' ? 'filled' : 'outline'}
+                                color="blue"
+                                onClick={() => setOrderType('sell')}
+                            >
+                                SELL
+                            </Button>
+                        </Group>
+
+                        <Stack>
+                            <Select
+                                label="Stock"
+                                placeholder="Search Stock"
+                                searchable
+                                data={stocks.map(s => ({ value: s.code, label: `${s.name} (${s.code})` }))}
+                                value={code}
+                                onChange={(val) => setCode(val || '')}
+                                maxDropdownHeight={200}
+                            />
+                            <NumberInput
+                                label="Quantity"
+                                min={1}
+                                value={qty} onChange={(val) => setQty(val || 1)}
+                            />
+                            {orderType === 'sell' && (
+                                <Group justify="flex-end" mt={5}>
+                                    <Badge
+                                        size="sm"
+                                        variant="outline"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={handleSellAll}
+                                    >
+                                        전액 매도
+                                    </Badge>
+                                </Group>
+                            )}
+                            <NumberInput
+                                label="Price (0 = Market)"
+                                min={0}
+                                step={100}
+                                value={price} onChange={(val) => setPrice(val || 0)}
+                            />
+                        </Stack>
+
+                        <Tabs.Panel value="immediate" pt="md">
+                            <Button fullWidth size="lg" loading={orderLoading} onClick={() => handleOrder(false)}>
+                                Submit Order
+                            </Button>
+                        </Tabs.Panel>
+
+                        <Tabs.Panel value="reservation" pt="md">
+                            <Group grow>
+                                <NumberInput label="Hour" min={0} max={23} value={resHour} onChange={setResHour} />
+                                <NumberInput label="Minute" min={0} max={59} value={resMin} onChange={setResMin} />
+                            </Group>
+                            <Text size="xs" c="dimmed" mt="xs">
+                                * Local browser reservation.
+                            </Text>
+                            <Button fullWidth size="lg" mt="md" color="violet" loading={orderLoading} onClick={() => handleOrder(true)}>
+                                Schedule Order
+                            </Button>
+                        </Tabs.Panel>
+                    </Tabs>
+                </Paper>
+            </Stack>
+        );
+    }
 }

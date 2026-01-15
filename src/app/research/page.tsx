@@ -141,25 +141,12 @@ export default function Home() {
     const [quickOrderOpen, setQuickOrderOpen] = useState(false);
     const [selectedQuickStock, setSelectedQuickStock] = useState<{ code: string, name: string }>({ code: '', name: '' });
 
-    const handleCopyAndOpen = (code: string) => {
+    const handleCopyAndOpen = (code: string, name: string = '') => {
         navigator.clipboard.writeText(code);
 
-        const userAgent = navigator.userAgent.toLowerCase();
-        const isAndroid = /android/i.test(userAgent);
-        const isIOS = /iphone|ipad|ipod/i.test(userAgent);
-
-        if (isAndroid) {
-            // Android: Use Intent Scheme with Correct Package
-            // Package: com.truefriend.m.common (Main 'Korea Investment' App)
-            // Scheme: koreainvestment (matches trade page)
-            const intentUrl = "intent://open#Intent;scheme=koreainvestment;package=com.truefriend.m.common;end";
-            window.location.href = intentUrl;
-        } else if (isIOS) {
-            // iOS: Use Custom Scheme
-            window.location.href = "koreainvestment://open";
-        } else {
-            alert(`Code ${code} Copied to clipboard!`);
-        }
+        // Open Quick Order modal for in-app trading
+        setSelectedQuickStock({ code, name: name || code });
+        setQuickOrderOpen(true);
     };
 
     const openQuickOrder = (stock: any) => {
@@ -926,9 +913,9 @@ export default function Home() {
                                             color="teal"
                                             size="xs"
                                             leftSection={<IconCopy size={14} />}
-                                            onClick={() => handleCopyAndOpen(stock.code)}
+                                            onClick={() => handleCopyAndOpen(stock.code, stock.name)}
                                         >
-                                            Copy Code
+                                            매수 (Buy)
                                         </Button>
                                         <Button
                                             variant="light"
@@ -993,7 +980,7 @@ export default function Home() {
                                                             {stock.name}
                                                         </a>
                                                         <Group gap={2}>
-                                                            <ActionIcon size="sm" variant="subtle" color="teal" onClick={() => handleCopyAndOpen(stock.code)}>
+                                                            <ActionIcon size="sm" variant="subtle" color="teal" onClick={() => handleCopyAndOpen(stock.code, stock.name)}>
                                                                 <IconCopy size={16} />
                                                             </ActionIcon>
                                                             <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => openQuickOrder(stock)}>

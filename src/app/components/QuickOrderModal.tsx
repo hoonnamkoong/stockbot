@@ -97,12 +97,19 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
                 });
             }
 
-            if (res.data.success || res.data.message) {
-                alert('Order Successful');
+            // Check if order was actually successful
+            if (res.data.success && res.data.data) {
+                const orderNo = res.data.data.ODNO || res.data.data.ORD_NO || 'N/A';
+                alert(`✅ 주문 성공!\n주문번호: ${orderNo}\n종목: ${initialName || code}\n수량: ${qty}`);
                 onClose();
+            } else {
+                // API returned success:true but no order data - this is an error
+                const errorMsg = res.data.error || res.data.message || '주문 실패 (응답 데이터 없음)';
+                alert(`❌ 주문 실패\n${errorMsg}`);
             }
         } catch (error: any) {
-            alert(error.response?.data?.error || error.message);
+            const errorMsg = error.response?.data?.error || error.message || '알 수 없는 오류';
+            alert(`❌ 주문 실패\n${errorMsg}`);
         } finally {
             setLoading(false);
             setPinStage(false);

@@ -1,5 +1,19 @@
 {
     "framework": "nextjs",
     "buildCommand": "next build",
-    "outputDirectory": ".next"
+    "outputDirectory": ".next",
+    "crons": [
+        {
+            "path": "/api/cron/trigger",
+            "schedule": "0 1 * * *"
+        },
+        {
+            "path": "/api/cron/trigger",
+            "schedule": "0 4 * * *"
+        },
+        {
+            "path": "/api/cron/trigger",
+            "schedule": "0 6 * * *"
+        }
+    ]
 }

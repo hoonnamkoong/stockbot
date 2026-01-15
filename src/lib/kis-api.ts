@@ -6,7 +6,7 @@ let ACCESS_TOKEN: string | null = null;
 const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim();
 const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
 const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
-const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapivts.koreainvestment.com:29443').trim();
+const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443').trim();
 
 console.log('[KIS Init] Environment loaded:', {
     hasAppKey: !!KIS_APP_KEY,
@@ -22,37 +22,39 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-// File-based Token Management to prevent EGW00133 (Rate Limit)
-// Use /tmp for Vercel compatibility (Read-Only JS env)
-const TOKEN_FILE_PATH = path.join(os.tmpdir(), 'token.json');
+import { fetchFile, saveFile } from './github-db';
+
+// File-based Token Management to prevent EGW00133 (Rate Limit) & SMS Spam
+const TOKEN_FILE_LOCAL = path.join(os.tmpdir(), 'token.json');
+const TOKEN_FILE_GITHUB = 'data/kis_token.json';
 
 function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function getAccessToken(): Promise<string | null> {
-    // 1. Try to read from file first
+    // 1. Try to read from GitHub (Persistent Storage) first
     try {
-        if (fs.existsSync(TOKEN_FILE_PATH)) {
-            const fileData = fs.readFileSync(TOKEN_FILE_PATH, 'utf-8');
-            const tokenData = JSON.parse(fileData);
+        const { data: ghTokenData } = await fetchFile<{ access_token: string, expires_at: string }>(TOKEN_FILE_GITHUB);
 
-            // Check if token is valid (give 1 minute buffer)
+        if (ghTokenData) {
             const now = new Date().getTime();
-            const expiresAt = new Date(tokenData.expires_at).getTime();
+            const expiresAt = new Date(ghTokenData.expires_at).getTime();
 
-            if (now < expiresAt - 60000) {
-                // console.log("[KIS] Using cached Access Token"); 
-                return tokenData.access_token;
+            // Give 10 minute buffer to be safe
+            if (now < expiresAt - 600000) {
+                console.log("[KIS] Using cached Access Token from GitHub");
+                return ghTokenData.access_token;
             } else {
-                console.log("[KIS] Cached token expired, refreshing...");
+                console.log("[KIS] GitHub cached token expired, refreshing...");
             }
         }
     } catch (e) {
-        console.warn("[KIS] Failed to read token cache, fetching new one.");
+        console.warn("[KIS] Failed to check GitHub token cache:", e);
     }
 
-    // 2. Fetch New Token
+    // 2. Fetch New Token from KIS
+    console.log("[KIS] Requesting New Access Token from KIS...");
     const url = `${KIS_BASE_URL}/oauth2/tokenP`;
     const body = {
         grant_type: 'client_credentials',
@@ -73,20 +75,25 @@ async function getAccessToken(): Promise<string | null> {
             const now = new Date();
             const expiresAt = new Date(now.getTime() + (expiresIn * 1000));
 
-            // Save to file
             const tokenData = {
                 access_token: newToken,
                 expires_at: expiresAt.toISOString()
             };
 
-            // Ensure data dir exists
-            const dir = path.dirname(TOKEN_FILE_PATH);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            // 3. Save to GitHub (Persistent)
+            // Fire and forget - don't block return
+            saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token").then(success => {
+                if (success) console.log("[KIS] Token saved to GitHub successfully");
+                else console.warn("[KIS] Failed to save token to GitHub");
+            });
 
-            fs.writeFileSync(TOKEN_FILE_PATH, JSON.stringify(tokenData, null, 2), 'utf-8');
-            console.log("[KIS] New Access Token retrieved and cached successfully");
+            // 4. Save to Local (Ephemeral/Fast Cache)
+            try {
+                const dir = path.dirname(TOKEN_FILE_LOCAL);
+                if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(TOKEN_FILE_LOCAL, JSON.stringify(tokenData, null, 2), 'utf-8');
+            } catch (e) { /* ignore local save error */ }
 
-            return newToken;
             return newToken;
         } else {
             console.error(`[KIS] Token Fetch Failed: Status ${res.status}`, res.data);
@@ -126,16 +133,20 @@ export async function getBalance(): Promise<BalanceData | null> {
     // if (!token) check removed as getAccessToken throws
 
 
-    if (!KIS_ACCOUNT_NO.includes('-')) {
-        console.error("[KIS] Account No format error. Expected format: 12345678-01, got:", KIS_ACCOUNT_NO);
-        return null;
+    let cleanAccount = KIS_ACCOUNT_NO.replace(/-/g, '').trim();
+    if (cleanAccount.length === 8) {
+        cleanAccount += '01'; // Default Suffix
     }
-
-    const [cano, acnt_prdt_cd] = KIS_ACCOUNT_NO.split('-');
+    if (cleanAccount.length !== 10) {
+        throw new Error(`Invalid Account Number Length: ${cleanAccount.length}. Expected 10 digits (8 account + 2 suffix).`);
+    }
+    const cano = cleanAccount.substring(0, 8);
+    const acnt_prdt_cd = cleanAccount.substring(8, 10);
     console.log('[KIS] Account parsed:', { cano, acnt_prdt_cd });
 
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`;
-    const tr_id = "VTTC8434R";
+    const isVTS = KIS_BASE_URL.includes('vts');
+    const tr_id = isVTS ? "VTTC8434R" : "TTTC8434R";
 
     const headers = {
         "content-type": "application/json; charset=utf-8",
@@ -224,8 +235,24 @@ export async function placeOrder(code: string, qty: number, price: number, side:
         throw new Error("No Access Token");
     }
 
-    const [cano, acnt_prdt_cd] = KIS_ACCOUNT_NO.split('-');
-    const tr_id = side === 'buy' ? 'VTTC0802U' : 'VTTC0801U';
+    let cleanAccount = KIS_ACCOUNT_NO.replace(/-/g, '').trim();
+    if (cleanAccount.length === 8) {
+        cleanAccount += '01'; // Default Suffix
+    }
+    if (cleanAccount.length !== 10) {
+        throw new Error(`Invalid Account Number Length: ${cleanAccount.length}. Expected 10 digits (8 account + 2 suffix).`);
+    }
+    const cano = cleanAccount.substring(0, 8);
+    const acnt_prdt_cd = cleanAccount.substring(8, 10);
+    const isVTS = KIS_BASE_URL.includes('vts');
+
+    let tr_id = '';
+    if (side === 'buy') {
+        tr_id = isVTS ? 'VTTC0802U' : 'TTTC0802U';
+    } else {
+        tr_id = isVTS ? 'VTTC0801U' : 'TTTC0801U';
+    }
+
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`;
 
     const headers = {

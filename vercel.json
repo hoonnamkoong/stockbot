@@ -4,8 +4,12 @@
     "outputDirectory": ".next",
     "crons": [
         {
-            "path": "/api/cron/smart-trigger",
-            "schedule": "* 0,1,2,3,4,5,6,7 * * *"
+            "path": "/api/cron/trigger",
+            "schedule": "5 1,4,6 * * *"
+        },
+        {
+            "path": "/api/trade/schedule",
+            "schedule": "* * * * *"
         }
     ]
 }

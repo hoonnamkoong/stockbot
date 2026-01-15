@@ -230,7 +230,7 @@ export default function Home() {
                 filename = `stocks_${slot}.json`;
             }
 
-            const stockUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/${filename}?t=${timeMap}`;
+            const stockUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/${filename}?t=${timeMap}`;
 
             addSystemLog(`📡 Fetching Stocks: ${stockUrl}`);
 
@@ -252,7 +252,7 @@ export default function Home() {
 
             // Fetch Research (Always latest for now, or match slot?) 
             // Keep latest for research as it's daily.
-            const resResearch = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/latest_research.json?t=${timeMap}`, { cache: 'no-store' });
+            const resResearch = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/latest_research.json?t=${timeMap}`, { cache: 'no-store' });
             if (resResearch.ok) {
                 const data = await resResearch.json();
                 setResearch(data);
@@ -261,7 +261,7 @@ export default function Home() {
 
             // Fetch Status (Timestamp)
             try {
-                const resStatus = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/status.json?t=${timeMap}`, { cache: 'no-store' });
+                const resStatus = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/status.json?t=${timeMap}`, { cache: 'no-store' });
                 if (resStatus.ok) {
                     const statusData = await resStatus.json();
                     setLastUpdated(statusData.last_updated);
@@ -274,7 +274,7 @@ export default function Home() {
 
             // Fetch Reports Index
             try {
-                const resReports = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/reports.json?t=${timeMap}`, { cache: 'no-store' });
+                const resReports = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/reports.json?t=${timeMap}`, { cache: 'no-store' });
                 if (resReports.ok) {
                     const data = await resReports.json();
                     setReports(data.slice(0, 5)); // Top 5
@@ -283,7 +283,7 @@ export default function Home() {
 
             // Fetch 5-Day Analysis
             try {
-                const res5 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/analysis_5days.json?t=${timeMap}`, { cache: 'no-store' });
+                const res5 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_5days.json?t=${timeMap}`, { cache: 'no-store' });
                 if (res5.ok) {
                     const data = await res5.json();
                     // Enforce consistency: Calculate registered days from sparkline data
@@ -297,7 +297,7 @@ export default function Home() {
 
             // Fetch 3-Day Analysis
             try {
-                const res3 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/data/analysis_3days.json?t=${timeMap}`, { cache: 'no-store' });
+                const res3 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_3days.json?t=${timeMap}`, { cache: 'no-store' });
                 if (res3.ok) {
                     const data = await res3.json();
                     // Enforce consistency here too

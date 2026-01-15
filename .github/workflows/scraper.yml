@@ -2,6 +2,9 @@ name: Stock Scraper Schedule
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'   # 10:00 KST (01:00 UTC) - Market open
+    - cron: '0 6 * * *'   # 15:00 KST (06:00 UTC) - Market close
   push:
     branches:
       - main

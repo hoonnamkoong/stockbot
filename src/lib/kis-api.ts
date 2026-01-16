@@ -186,15 +186,17 @@ export async function getBalance(): Promise<BalanceData | null> {
             const output1 = res.data.output1 || [];
             const output2 = (res.data.output2 || [])[0] || {};
 
-            const holdings: HoldingsItem[] = output1.map((item: any) => ({
-                name: item.prdt_name,
-                qty: parseInt(item.hldg_qty),
-                price: parseInt(item.prpr),
-                avg_price: parseFloat(item.pchs_avg_pric),
-                pl_rate: parseFloat(item.evlu_pfls_rt),
-                pl_amount: parseInt(item.evlu_pfls_amt),
-                code: item.pdno
-            }));
+            const holdings: HoldingsItem[] = output1
+                .map((item: any) => ({
+                    name: item.prdt_name,
+                    qty: parseInt(item.hldg_qty),
+                    price: parseInt(item.prpr),
+                    avg_price: parseFloat(item.pchs_avg_pric),
+                    pl_rate: parseFloat(item.evlu_pfls_rt),
+                    pl_amount: parseInt(item.evlu_pfls_amt),
+                    code: item.pdno
+                }))
+                .filter((holding: HoldingsItem) => holding.qty > 0); // Filter out sold stocks
 
             const result = {
                 // Use prvs_rcdl_excc_amt (D+2 Provisional) for Real-time Buying Power

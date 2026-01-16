@@ -19,8 +19,8 @@ export async function GET(request: Request) {
 
         console.log(`[Smart Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST`);
 
-        // 1. Check if scraping time (10:00, 13:00, 15:00)
-        const isScrapingTime = minute === 0 && [10, 13, 15].includes(hour);
+        // 1. Check if scraping time (10:00, 12:00, 15:00)
+        const isScrapingTime = minute === 0 && [10, 12, 15].includes(hour);
 
         if (isScrapingTime) {
             console.log(`[Smart Cron] Scraping time detected. Triggering GitHub Actions...`);

@@ -137,6 +137,9 @@ export default function Home() {
     const [pdfItem, setPdfItem] = useState<any>(null);
     const [reports, setReports] = useState<any[]>([]);
 
+    // Version State
+    const [versionInfo, setVersionInfo] = useState<{ version: string, timestamp: string } | null>(null);
+
     // Quick Order State
     const [quickOrderOpen, setQuickOrderOpen] = useState(false);
     const [selectedQuickStock, setSelectedQuickStock] = useState<{ code: string, name: string }>({ code: '', name: '' });
@@ -209,9 +212,22 @@ export default function Home() {
 
     useEffect(() => {
         fetchData(timeSlot);
+        fetchVersion();
         const storedToken = localStorage.getItem('github_pat');
         if (storedToken) setGithubToken(storedToken);
     }, [timeSlot]);
+
+    const fetchVersion = async () => {
+        try {
+            const res = await fetch('/api/version');
+            if (res.ok) {
+                const data = await res.json();
+                setVersionInfo(data);
+            }
+        } catch (e) {
+            console.error('Failed to fetch version:', e);
+        }
+    };
 
     const [systemLogs, setSystemLogs] = useState<string[]>([]);
 
@@ -527,7 +543,10 @@ export default function Home() {
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                     <IconRobot size={isMobile ? 24 : 30} color="#228be6" />
                     <Title order={3} size={isMobile ? 'h5' : 'h3'}>
-                        {isMobile ? 'StockBot v2026.01.06' : 'StockBot v2026.01.06 (Deployed 16:44 KST)'}
+                        {isMobile
+                            ? `StockBot ${versionInfo?.version || 'v28-schedule-12pm'}`
+                            : `StockBot ${versionInfo?.version || 'v28-schedule-12pm'} (Deployed ${versionInfo?.timestamp ? new Date(versionInfo.timestamp).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }).replace(/\. /g, '/').replace('.', '') : 'N/A'} KST)`
+                        }
                     </Title>
                     <Group ml="auto" gap={isMobile ? 'xs' : 'md'}>
                         {isMobile ? (

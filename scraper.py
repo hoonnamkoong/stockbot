@@ -467,6 +467,51 @@ def get_yesterday_last_stocks():
         print(f"[Warning] Failed to get yesterday's stocks: {e}")
         return set()
 
+def append_to_monthly_report(df_kr, now_kst):
+    """
+    현재 월의 누적 리포트에 데이터를 추가합니다.
+    
+    Args:
+        df_kr: 한글 결과 DataFrame
+        now_kst: 현재 KST 시간
+    
+    Returns:
+        monthly_file_path: 저장된 월별 파일 경로
+        total_count: 누적된 총 행 개수
+    """
+    try:
+        # 1. 월별 파일명 생성
+        month_str = now_kst.strftime('%Y-%m')
+        monthly_filename = f'monthly_report_{month_str}.xlsx'
+        monthly_filepath = f'data/{monthly_filename}'
+        
+        # 2. 현재 데이터에 날짜/시간 컬럼 추가
+        df_with_datetime = df_kr.copy()
+        df_with_datetime.insert(0, '취합시간', now_kst.strftime('%H:%M'))
+        df_with_datetime.insert(0, '취합날짜', now_kst.strftime('%Y-%m-%d'))
+        
+        # 3. 기존 파일 로드 또는 새로 생성
+        if os.path.exists(monthly_filepath):
+            # 기존 데이터 로드
+            existing_df = pd.read_excel(monthly_filepath, engine='openpyxl')
+            # 새 데이터 추가
+            combined_df = pd.concat([existing_df, df_with_datetime], ignore_index=True)
+            print(f"[Monthly Report] Appended {len(df_with_datetime)} rows to existing file (Total: {len(combined_df)} rows)")
+        else:
+            # 새 파일 생성
+            combined_df = df_with_datetime
+            print(f"[Monthly Report] Created new monthly report with {len(combined_df)} rows")
+        
+        # 4. 파일 저장
+        os.makedirs('data', exist_ok=True)
+        combined_df.to_excel(monthly_filepath, index=False, engine='openpyxl')
+        
+        return monthly_filepath, len(combined_df)
+        
+    except Exception as e:
+        print(f"[Error] Failed to update monthly report: {e}")
+        return None, 0
+
 if __name__ == "__main__":
     # 0. Load Environment Variables
     load_env_manual()
@@ -678,15 +723,11 @@ if __name__ == "__main__":
             filename_prefix = f"trending_integrated"
             saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
             
+            # [NEW] Append to Monthly Report
+            monthly_file, monthly_count = append_to_monthly_report(result_df_kr, now_kst)
+            
             # --- Update Reports Index (reports.json) ---
             if 'excel' in saved_files:
-                report_entry = {
-                    "date": now_kst.strftime('%Y-%m-%d %H:%M'),
-                    "filename": os.path.basename(saved_files['excel']),
-                    "count": len(all_data),
-                    "timestamp": datetime.now().timestamp()
-                }
-                
                 reports_file = 'data/reports.json'
                 current_reports = []
                 if os.path.exists(reports_file):
@@ -696,14 +737,60 @@ if __name__ == "__main__":
                     except:
                         pass
                 
-                # Prepend new report (Latest first)
-                current_reports.insert(0, report_entry)
-                # Keep last 50
-                current_reports = current_reports[:50]
+                # 1. Update or Add Monthly Report Entry
+                if monthly_file:
+                    month_str = now_kst.strftime('%Y-%m')
+                    month_label = f"{now_kst.month}월 누적 리포트 ({month_str})"
+                    
+                    monthly_entry = {
+                        "type": "monthly",
+                        "date": month_str,
+                        "filename": os.path.basename(monthly_file),
+                        "count": monthly_count,
+                        "label": month_label,
+                        "timestamp": datetime.now().timestamp()
+                    }
+                    
+                    # Find and update existing monthly entry or add new one
+                    monthly_exists = False
+                    for i, report in enumerate(current_reports):
+                        if report.get('type') == 'monthly' and report.get('date') == month_str:
+                            current_reports[i] = monthly_entry
+                            monthly_exists = True
+                            print(f"[System] Updated monthly report entry: {month_label}")
+                            break
+                    
+                    if not monthly_exists:
+                        # Insert at top (before daily reports)
+                        daily_start = next((i for i, r in enumerate(current_reports) if r.get('type') == 'daily'), len(current_reports))
+                        current_reports.insert(daily_start, monthly_entry)
+                        print(f"[System] Added new monthly report entry: {month_label}")
+                
+                # 2. Add Daily Report Entry
+                daily_entry = {
+                    "type": "daily",
+                    "date": now_kst.strftime('%Y-%m-%d %H:%M'),
+                    "filename": os.path.basename(saved_files['excel']),
+                    "count": len(all_data),
+                    "timestamp": datetime.now().timestamp()
+                }
+                
+                # Insert daily report after monthly reports
+                daily_start = next((i for i, r in enumerate(current_reports) if r.get('type') == 'daily'), len(current_reports))
+                current_reports.insert(daily_start, daily_entry)
+                
+                # 3. Keep only last 50 daily reports, all monthly reports
+                daily_reports = [r for r in current_reports if r.get('type') == 'daily'][:50]
+                monthly_reports = [r for r in current_reports if r.get('type') == 'monthly']
+                
+                # Sort monthly reports by date descending (newest first)
+                monthly_reports.sort(key=lambda x: x.get('date', ''), reverse=True)
+                
+                current_reports = monthly_reports + daily_reports
                 
                 with open(reports_file, 'w', encoding='utf-8') as f:
                     json.dump(current_reports, f, ensure_ascii=False, indent=2)
-                print(f"[System] Updated reports index: {reports_file}")
+                print(f"[System] Updated reports index: {reports_file} (Monthly: {len(monthly_reports)}, Daily: {len(daily_reports)})")
                 
         else:
             print(f"\n[System] No data collected (all below threshold {threshold}). Saving empty records.")

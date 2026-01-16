@@ -623,22 +623,51 @@ export default function Home() {
 
                 <Text fw={700} mb="sm">Downloads (Excel)</Text>
                 <div className="flex flex-col gap-2">
-                    {reports.length > 0 ? reports.map((rpt, idx) => (
-                        <Button
-                            key={idx}
-                            fullWidth
-                            variant="subtle"
-                            size="xs"
-                            justify="flex-start"
-                            component="a"
-                            href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/main/${rpt.filename}`}
-                            target="_blank"
-                            leftSection={<IconRefresh size={14} />} // IconDownload replacement if not imported
-                            color="gray"
-                        >
-                            {rpt.date.split(' ')[1]} 리포트 ({rpt.count}건)
-                        </Button>
-                    )) : (
+                    {reports.length > 0 ? (
+                        <>
+                            {/* Monthly Reports */}
+                            {reports.filter(r => r.type === 'monthly').map((rpt, idx) => (
+                                <Button
+                                    key={`monthly-${idx}`}
+                                    fullWidth
+                                    variant="light"
+                                    size="xs"
+                                    justify="flex-start"
+                                    component="a"
+                                    href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/db-data/${rpt.filename}`}
+                                    target="_blank"
+                                    leftSection={<IconRefresh size={14} />}
+                                    color="blue"
+                                    fw={600}
+                                >
+                                    {rpt.label || `${rpt.date} 누적`} ({rpt.count}건)
+                                </Button>
+                            ))}
+
+                            {/* Divider if both types exist */}
+                            {reports.some(r => r.type === 'monthly') && reports.some(r => r.type === 'daily') && (
+                                <div style={{ borderTop: '1px solid #dee2e6', margin: '8px 0' }} />
+                            )}
+
+                            {/* Daily Reports */}
+                            {reports.filter(r => r.type === 'daily').map((rpt, idx) => (
+                                <Button
+                                    key={`daily-${idx}`}
+                                    fullWidth
+                                    variant="subtle"
+                                    size="xs"
+                                    justify="flex-start"
+                                    component="a"
+                                    href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/main/${rpt.filename}`}
+                                    target="_blank"
+                                    leftSection={<IconRefresh size={14} />}
+                                    color="gray"
+                                >
+                                    {rpt.date.split(' ')[1]} 리포트 ({rpt.count}건)
+                                </Button>
+                            ))}
+                        </>
+                    ) : (
                         <Text size="xs" c="dimmed">리포트 없음</Text>
                     )}
                 </div>

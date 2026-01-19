@@ -32,6 +32,18 @@ jobs:
           pip install -r requirements.txt
           pip install openpyxl
 
+      - name: Download Existing Monthly Report
+        run: |
+          MONTH=$(date -u +"%Y-%m")
+          MONTHLY_FILE="monthly_report_${MONTH}.xlsx"
+          mkdir -p data
+          
+          # Try to download existing monthly report from db-data branch
+          curl -f -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o "data/${MONTHLY_FILE}" \
+            "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}" \
+            || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
+
       - name: Run Scraper
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

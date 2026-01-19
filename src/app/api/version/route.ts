@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     return Response.json({
-        version: 'v30-filter-zero-qty',
+        version: 'v31-fix-report-url',
         timestamp: new Date().toISOString(),
         env: {
             nodeEnv: process.env.NODE_ENV,

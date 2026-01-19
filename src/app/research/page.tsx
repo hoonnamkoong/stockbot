@@ -653,7 +653,7 @@ export default function Home() {
                                     size="xs"
                                     justify="flex-start"
                                     component="a"
-                                    href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/db-data/${rpt.filename}`}
+                                    href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/db-data/data/${rpt.filename}`}
                                     target="_blank"
                                     leftSection={<IconRefresh size={14} />}
                                     color="blue"
@@ -677,7 +677,7 @@ export default function Home() {
                                     size="xs"
                                     justify="flex-start"
                                     component="a"
-                                    href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/main/${rpt.filename}`}
+                                    href={`https://github.com/${REPO_OWNER}/${REPO_NAME}/raw/db-data/${rpt.filename}`}
                                     target="_blank"
                                     leftSection={<IconRefresh size={14} />}
                                     color="gray"

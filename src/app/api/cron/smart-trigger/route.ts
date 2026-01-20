@@ -19,8 +19,8 @@ export async function GET(request: Request) {
 
         console.log(`[Smart Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST`);
 
-        // 1. Check if scraping time (10:00, 12:00, 15:00)
-        const isScrapingTime = minute === 0 && [10, 12, 15].includes(hour);
+        // 1. Check if scraping time (10:00, 13:00, 15:00)
+        const isScrapingTime = minute === 0 && [10, 13, 15].includes(hour);
 
         if (isScrapingTime) {
             console.log(`[Smart Cron] Scraping time detected. Triggering GitHub Actions...`);
@@ -44,6 +44,8 @@ export async function GET(request: Request) {
         }
 
         // 2. Check for reservations at current time
+        // Note: Tasker runs every 2 minutes (even minutes only)
+        // If user sets odd minute (e.g., 14:31), we execute it at next even minute (14:32)
         console.log(`[Smart Cron] Checking for reservations at ${hour}:${minute.toString().padStart(2, '0')}...`);
 
         const reservationResponse = await axios.get(
@@ -54,7 +56,20 @@ export async function GET(request: Request) {
         const reservations = reservationResponse.data.reservations || [];
         const dueReservations = reservations.filter((r: any) => {
             const [resHour, resMin] = r.time.split(':').map(Number);
-            return resHour === hour && resMin === minute;
+
+            // Exact match for even minutes
+            if (resHour === hour && resMin === minute) {
+                return true;
+            }
+
+            // Handle odd minutes: execute at next even minute
+            // e.g., reservation at 14:31 executes at 14:32
+            if (resHour === hour && resMin % 2 === 1 && resMin + 1 === minute) {
+                console.log(`[Smart Cron] Executing odd-minute reservation ${r.time} at ${hour}:${minute}`);
+                return true;
+            }
+
+            return false;
         });
 
         if (dueReservations.length > 0) {

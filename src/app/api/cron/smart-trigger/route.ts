@@ -20,10 +20,13 @@ export async function GET(request: Request) {
         console.log(`[Smart Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST`);
 
         // 1. Check if scraping time (10:00, 13:00, 15:00)
-        const isScrapingTime = minute === 0 && [10, 13, 15].includes(hour);
+        // Allow ±1 minute tolerance for Tasker timing variations
+        // e.g., 9:59, 10:00, 10:01 all trigger 10:00 scraping
+        const isScrapingTime = [10, 13, 15].includes(hour) && (minute === 59 || minute === 0 || minute === 1);
+        const isExactScrapingMinute = minute === 0;
 
-        if (isScrapingTime) {
-            console.log(`[Smart Cron] Scraping time detected. Triggering GitHub Actions...`);
+        if (isScrapingTime && isExactScrapingMinute) {
+            console.log(`[Smart Cron] Scraping time detected (exact minute). Triggering GitHub Actions...`);
 
             if (!GITHUB_PAT) {
                 return NextResponse.json({ error: 'Missing GITHUB_PAT' }, { status: 500 });
@@ -41,11 +44,33 @@ export async function GET(request: Request) {
             );
 
             console.log(`[Smart Cron] Scraper triggered successfully.`);
+        } else if (isScrapingTime && minute === 59) {
+            // Triggered at X:59 (e.g., 9:59 for 10:00 scraping)
+            // Trigger scraping for the NEXT hour
+            console.log(`[Smart Cron] Pre-scraping time detected (59 min). Triggering GitHub Actions for ${hour + 1}:00...`);
+
+            if (!GITHUB_PAT) {
+                return NextResponse.json({ error: 'Missing GITHUB_PAT' }, { status: 500 });
+            }
+
+            await axios.post(
+                `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+                { ref: 'main' },
+                {
+                    headers: {
+                        Authorization: `Bearer ${GITHUB_PAT}`,
+                        Accept: 'application/vnd.github.v3+json',
+                    },
+                }
+            );
+
+            console.log(`[Smart Cron] Scraper triggered successfully (pre-trigger).`);
         }
 
-        // 2. Check for reservations at current time
+        // 2. Check for reservations at current time AND previous minute
         // Note: Tasker runs every 2 minutes (even minutes only)
         // If user sets odd minute (e.g., 14:31), we execute it at next even minute (14:32)
+        // Also check previous minute to catch any missed reservations
         console.log(`[Smart Cron] Checking for reservations at ${hour}:${minute.toString().padStart(2, '0')}...`);
 
         const reservationResponse = await axios.get(
@@ -57,7 +82,7 @@ export async function GET(request: Request) {
         const dueReservations = reservations.filter((r: any) => {
             const [resHour, resMin] = r.time.split(':').map(Number);
 
-            // Exact match for even minutes
+            // Exact match for current minute
             if (resHour === hour && resMin === minute) {
                 return true;
             }
@@ -66,6 +91,13 @@ export async function GET(request: Request) {
             // e.g., reservation at 14:31 executes at 14:32
             if (resHour === hour && resMin % 2 === 1 && resMin + 1 === minute) {
                 console.log(`[Smart Cron] Executing odd-minute reservation ${r.time} at ${hour}:${minute}`);
+                return true;
+            }
+
+            // Check previous minute (in case Tasker was delayed)
+            const prevMin = minute - 1;
+            if (resHour === hour && resMin === prevMin) {
+                console.log(`[Smart Cron] Executing delayed reservation ${r.time} at ${hour}:${minute}`);
                 return true;
             }
 

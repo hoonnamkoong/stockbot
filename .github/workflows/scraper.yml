@@ -64,9 +64,13 @@ jobs:
       - name: Commit and Push Data (db-data)
         run: |
           git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_repo
+          
+          # Copy data folder (contains reports.json, monthly reports, etc.)
           cp -r data/ db_repo/
-          cp trending_*.csv db_repo/ || true
-          cp trending_*.xlsx db_repo/ || true
+          
+          # Copy daily Excel/CSV files from data/ folder to db-data root for backward compatibility
+          cp data/trending_*.csv db_repo/ 2>/dev/null || true
+          cp data/trending_*.xlsx db_repo/ 2>/dev/null || true
           
           cd db_repo
           git config user.name "StockBot"

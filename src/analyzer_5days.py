@@ -80,12 +80,16 @@ def load_daily_snapshots(target_dates):
     try:
         with open(reports_file, 'r', encoding='utf-8') as f:
             reports = json.load(f)
+        
+        # Filter only daily reports (exclude monthly reports)
+        daily_reports = [r for r in reports if r.get('type') == 'daily']
             
         for date_str in target_dates:
             # Filter reports for this date
-            day_reports = [r for r in reports if r['date'].startswith(date_str)]
+            day_reports = [r for r in daily_reports if r['date'].startswith(date_str)]
             
             if not day_reports:
+                print(f"[5Day] No report found for {date_str}")
                 continue
                 
             # Take the first one (assuming sorted desc by timestamp in updates)
@@ -94,10 +98,10 @@ def load_daily_snapshots(target_dates):
             last_report = day_reports[0]
             
             filename = last_report['filename']
-            # Search logic
+            # Search logic - prioritize data/ folder
             possible_paths = [
-                filename,
                 f"data/{filename}",
+                filename,
                 os.path.join(os.getcwd(), 'data', filename),
                 os.path.join(os.getcwd(), filename)
             ]
@@ -118,14 +122,12 @@ def load_daily_snapshots(target_dates):
                         continue
                     
                     df = normalize_columns(df)
-                    # Debug print
-                    # print(f"[5Day] Loaded {date_str} cols: {list(df.columns)}")
-                    
                     daily_dfs[date_str] = df
+                    print(f"[5Day] Loaded {date_str}: {len(df)} stocks from {filename}")
                 except Exception as e:
                     print(f"[5Day] Error loading {filename}: {e}")
             else:
-                print(f"[5Day] File not found: {filename}")
+                print(f"[5Day] File not found: {filename} (searched {len(possible_paths)} paths)")
                     
     except Exception as e:
         print(f"[5Day] Error reading reports.json: {e}")

@@ -513,6 +513,22 @@ def append_to_monthly_report(df_kr, now_kst):
             except Exception as e:
                 print(f"[Warning] Duplicate check failed: {e}")
 
+            # [Duplicate Check] 같은 날짜 + 같은 시간대(HH) 데이터가 있으면 삭제 (덮어쓰기 모드)
+            try:
+                current_date = now_kst.strftime('%Y-%m-%d')
+                current_hour = now_kst.strftime('%H')
+                
+                # 취합시간(HH:MM) 포맷 가정
+                mask = (existing_df['취합날짜'] == current_date) & \
+                       (existing_df['취합시간'].astype(str).str.startswith(current_hour))
+                
+                if mask.any():
+                    deleted_count = mask.sum()
+                    print(f"[Monthly Report] Overwriting {deleted_count} existing rows for {current_date} {current_hour}h...")
+                    existing_df = existing_df[~mask]
+            except Exception as e:
+                print(f"[Warning] Duplicate check failed: {e}")
+
             # 새 데이터 추가
             combined_df = pd.concat([existing_df, df_with_datetime], ignore_index=True)
             print(f"[Monthly Report] Appended {len(df_with_datetime)} rows to existing file (Total: {len(combined_df)} rows)")

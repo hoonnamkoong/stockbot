@@ -494,6 +494,25 @@ def append_to_monthly_report(df_kr, now_kst):
         if os.path.exists(monthly_filepath):
             # 기존 데이터 로드
             existing_df = pd.read_excel(monthly_filepath, engine='openpyxl')
+            
+            # [Duplicate Check] 같은 날짜 + 같은 시간대(HH) 데이터가 있으면 삭제 (덮어쓰기 모드)
+            # 이유: Tasker와 GitHub Cron이 중복 실행되거나 재실행 시 데이터 중복 방지
+            try:
+                current_date = now_kst.strftime('%Y-%m-%d')
+                current_hour = now_kst.strftime('%H')
+                
+                # 취합시간(HH:MM)에서 HH 추출하여 비교
+                # 포맷이 확실하다고 가정 (문자열 '10:00')
+                mask = (existing_df['취합날짜'] == current_date) & \
+                       (existing_df['취합시간'].astype(str).str.startswith(current_hour))
+                
+                if mask.any():
+                    deleted_count = mask.sum()
+                    print(f"[Monthly Report] Overwriting {deleted_count} existing rows for {current_date} {current_hour}h...")
+                    existing_df = existing_df[~mask]
+            except Exception as e:
+                print(f"[Warning] Duplicate check failed: {e}")
+
             # 새 데이터 추가
             combined_df = pd.concat([existing_df, df_with_datetime], ignore_index=True)
             print(f"[Monthly Report] Appended {len(df_with_datetime)} rows to existing file (Total: {len(combined_df)} rows)")

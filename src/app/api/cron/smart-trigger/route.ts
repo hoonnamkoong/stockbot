@@ -21,8 +21,11 @@ export async function GET(request: Request) {
 
         // 1. Check if scraping time (10:00, 13:00, 15:00)
         // Allow ±1 minute tolerance for Tasker timing variations
-        // e.g., 9:59, 10:00, 10:01 all trigger 10:00 scraping
-        const isScrapingTime = [10, 13, 15].includes(hour) && (minute === 59 || minute === 0 || minute === 1);
+        // IMPORTANT: Tasker "From 12:59PM Till 1:00PM" triggers at 12:59 (hour=12, not 13)
+        // So we need to check if (hour+1) is in scraping hours when minute=59
+        const scrapingHours = [10, 13, 15];
+        const effectiveHour = (minute === 59) ? hour + 1 : hour;
+        const isScrapingTime = scrapingHours.includes(effectiveHour) && (minute === 59 || minute === 0 || minute === 1);
         const isExactScrapingMinute = minute === 0;
 
         if (isScrapingTime && isExactScrapingMinute) {
@@ -45,9 +48,8 @@ export async function GET(request: Request) {
 
             console.log(`[Smart Cron] Scraper triggered successfully.`);
         } else if (isScrapingTime && minute === 59) {
-            // Triggered at X:59 (e.g., 9:59 for 10:00 scraping)
-            // Trigger scraping for the NEXT hour
-            console.log(`[Smart Cron] Pre-scraping time detected (59 min). Triggering GitHub Actions for ${hour + 1}:00...`);
+            // Triggered at X:59 (e.g., 12:59 for 13:00 scraping)
+            console.log(`[Smart Cron] Pre-scraping time detected (59 min). Triggering GitHub Actions for ${effectiveHour}:00...`);
 
             if (!GITHUB_PAT) {
                 return NextResponse.json({ error: 'Missing GITHUB_PAT' }, { status: 500 });

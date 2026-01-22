@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     return Response.json({
-        version: 'v37-enhanced-tasker',
+        version: 'v38-fix-hour-mismatch',
         timestamp: new Date().toISOString(),
         env: {
             nodeEnv: process.env.NODE_ENV,

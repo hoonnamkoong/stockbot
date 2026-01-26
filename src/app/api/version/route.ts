@@ -1,12 +1,14 @@
 export const dynamic = 'force-dynamic';
 
+export const VERSION = 'v45-security-update-start';
+
 export async function GET() {
     return Response.json({
-        version: 'v38-fix-hour-mismatch',
+        version: VERSION,
         timestamp: new Date().toISOString(),
         env: {
             nodeEnv: process.env.NODE_ENV,
-            hasKey: !!process.env.KIS_APP_KEY
+            vercelEnv: process.env.VERCEL_ENV
         }
     });
 }

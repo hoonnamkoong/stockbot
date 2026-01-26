@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-export const VERSION = 'v45-security-update-start';
+export const VERSION = 'v46-device-whitelist';
 
 export async function GET() {
     return Response.json({

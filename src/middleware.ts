@@ -4,10 +4,10 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname
 
-    // 1. Protect Dashboard and Trade APIs (Reservation, Execution)
+    // 1. Protect Trade, Research pages and Trade APIs (Reservation, Execution)
     // Smart-trigger is excluded because it is called by Tasker (stateless)
     // but it's safe because creating reservations requires auth.
-    if (path.startsWith('/dashboard') || path.startsWith('/api/trade')) {
+    if (path.startsWith('/trade') || path.startsWith('/research') || path.startsWith('/api/trade')) {
 
         // Exception: Allow execute-reservation to be called by smart-trigger (internal loopback or Tasker)
         // However, execute-reservation should ideally be protected too.
@@ -20,7 +20,7 @@ export function middleware(request: NextRequest) {
         // This is tricky.
 
         // STRATEGY: 
-        // 1. Dashboard: Strict Cookie Auth.
+        // 1. Dashboard locations (/trade, /research): Strict Cookie Auth.
         // 2. /api/trade/reservation (POST/DELETE): Strict Cookie Auth (User interacts via Dashboard).
         // 3. /api/trade/execute-reservation: This is automated. Needs bypass or secret header.
 
@@ -50,5 +50,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/dashboard/:path*', '/api/trade/:path*'],
+    // Protect /trade, /research and /api/trade/*
+    matcher: ['/trade/:path*', '/research/:path*', '/api/trade/:path*'],
 }

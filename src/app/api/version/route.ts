@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-const APP_VERSION = 'v50-fix-vercel-build';
+const APP_VERSION = 'v51-fix-redirect-404';
 
 export async function GET() {
     return Response.json({

@@ -47,7 +47,7 @@ export default function LoginPage() {
             const data = await res.json();
 
             if (res.ok) {
-                router.push('/dashboard');
+                router.push('/trade');
             } else {
                 setError(data.error || 'Login failed');
             }

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-export const VERSION = 'v47-login-fix';
+export const VERSION = 'v48-fix-version-cache';
 
 export async function GET() {
     return Response.json({

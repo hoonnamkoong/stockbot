@@ -219,7 +219,7 @@ export default function Home() {
 
     const fetchVersion = async () => {
         try {
-            const res = await fetch('/api/version');
+            const res = await fetch('/api/version', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 setVersionInfo(data);

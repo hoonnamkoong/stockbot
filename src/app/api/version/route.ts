@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-export const VERSION = 'v48-fix-version-cache';
+export const VERSION = 'v49-fix-trend-persistence';
 
 export async function GET() {
     return Response.json({

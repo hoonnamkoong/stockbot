@@ -39,10 +39,22 @@ jobs:
           mkdir -p data
           
           # Try to download existing monthly report from db-data branch
-          curl -f -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -o "data/${MONTHLY_FILE}" \
             "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}" \
             || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
+            
+      - name: Restore Previous Data (db-data)
+        run: |
+          mkdir -p data
+          git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_temp
+          
+          # Restore normal data folder
+          cp -r db_temp/data/* data/ 2>/dev/null || true
+          
+          # [Fix] Restore legacy data saved in root (Move to data/)
+          cp db_temp/trending_*.csv data/ 2>/dev/null || true
+          cp db_temp/trending_*.xlsx data/ 2>/dev/null || true
+          
+          rm -rf db_temp
 
       - name: Run Scraper
         env:

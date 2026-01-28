@@ -39,6 +39,8 @@ type FiveDayStock = {
     market: string;
     price: string | number;
     change_rate: string;
+    daily_change_rate?: number; // New field
+    prev_close?: number; // New field
     period_change_rate?: number;
     consecutive_days: number;
     total_posts: number;
@@ -219,7 +221,7 @@ export default function Home() {
 
     const fetchVersion = async () => {
         try {
-            const res = await fetch('/api/version', { cache: 'no-store' });
+            const res = await fetch('/api/version');
             if (res.ok) {
                 const data = await res.json();
                 setVersionInfo(data);
@@ -800,6 +802,7 @@ export default function Home() {
                                                     <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                                     <Table.Th>5일 전 주가</Table.Th>
                                                     <Table.Th>현재가</Table.Th>
+                                                    <Table.Th>전일비</Table.Th>
                                                     <Table.Th>주가 추세 (5일) (단위: 천원)</Table.Th>
                                                     <Table.Th>토론글 추세 (5일)</Table.Th>
                                                 </Table.Tr>
@@ -832,8 +835,14 @@ export default function Home() {
                                                         <Table.Td>
                                                             <Text fw={700}>{stock.price.toLocaleString()}</Text>
                                                             <Text size="xs" c={stock.period_change_rate && stock.period_change_rate > 0 ? 'red' : 'blue'}>
-                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}%
+                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}% (5일)
                                                             </Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Text size="sm" fw={700} c={stock.daily_change_rate && stock.daily_change_rate > 0 ? 'red' : 'blue'}>
+                                                                {stock.daily_change_rate && stock.daily_change_rate > 0 ? '+' : ''}{stock.daily_change_rate}%
+                                                            </Text>
+                                                            {stock.prev_close && <Text size="xs" c="dimmed">어제: {stock.prev_close.toLocaleString()}</Text>}
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
@@ -881,6 +890,7 @@ export default function Home() {
                                                     <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
                                                     <Table.Th>3일 전 주가</Table.Th>
                                                     <Table.Th>현재가</Table.Th>
+                                                    <Table.Th>전일비</Table.Th>
                                                     <Table.Th>주가 추세 (3일) (단위: 천원)</Table.Th>
                                                     <Table.Th>토론글 추세 (3일)</Table.Th>
                                                 </Table.Tr>
@@ -913,8 +923,14 @@ export default function Home() {
                                                         <Table.Td>
                                                             <Text fw={700}>{stock.price.toLocaleString()}</Text>
                                                             <Text size="xs" c={stock.period_change_rate && stock.period_change_rate > 0 ? 'red' : 'blue'}>
-                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}%
+                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}% (3일)
                                                             </Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Text size="sm" fw={700} c={stock.daily_change_rate && stock.daily_change_rate > 0 ? 'red' : 'blue'}>
+                                                                {stock.daily_change_rate && stock.daily_change_rate > 0 ? '+' : ''}{stock.daily_change_rate}%
+                                                            </Text>
+                                                            {stock.prev_close && <Text size="xs" c="dimmed">어제: {stock.prev_close.toLocaleString()}</Text>}
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />

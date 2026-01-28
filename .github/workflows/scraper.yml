@@ -32,25 +32,17 @@ jobs:
           pip install -r requirements.txt
           pip install openpyxl
 
-      - name: Restore Previous Data (db-data)
+      - name: Download Existing Monthly Report
         run: |
+          MONTH=$(date -u +"%Y-%m")
+          MONTHLY_FILE="monthly_report_${MONTH}.xlsx"
           mkdir -p data
           
-          echo "Restoring data from db-data branch..."
-          # Clone db-data branch to a temporary folder
-          git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_temp
-          
-          # Restore ALL content from data/ folder (reports.json, trending_*.csv, monthly_*, etc.)
-          if [ -d "db_temp/data" ]; then
-            cp -r db_temp/data/* data/
-            echo "✅ Data restored successfully."
-            ls -F data/
-          else
-            echo "⚠️ No previous data found in db-data branch. Starting fresh."
-          fi
-          
-          # Clean up temp repo
-          rm -rf db_temp
+          # Try to download existing monthly report from db-data branch
+          curl -f -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o "data/${MONTHLY_FILE}" \
+            "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}" \
+            || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
 
       - name: Run Scraper
         env:
@@ -84,5 +76,6 @@ jobs:
           git config user.name "StockBot"
           git config user.email "bot@stockbot.com"
           git add .
-          git commit -m "data: Update stock data (Isolated Branch)" || exit 0
+          git status
+          git commit -m "data: Update stock data (Isolated Branch)"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data

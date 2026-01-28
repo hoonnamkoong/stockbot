@@ -193,6 +193,7 @@ def analyze_cumulative(days=5, silent=False):
                             'market': data.get('market', ''),
                             'price': data.get('price', 0),
                             'change_rate': data.get('change_rate', '0%'),
+                            'prev_close': data.get('prev_close', 0),
                             'code': code
                         }
                     
@@ -240,6 +241,10 @@ def analyze_cumulative(days=5, silent=False):
             'price': safe_int(latest_meta.get('price')),
             'change_rate': latest_meta.get('change_rate'),
             'period_change_rate': period_change,
+            'daily_change_rate': safe_float(latest_meta.get('change_rate')), # Use raw scraper value or calc? Scraper is usually correct for daily.
+            # However, user requested "relative to prev_close". Scraper's change_rate is usually (price - prev_close)/prev_close.
+            # Let's ensure we pass what the scraper found.
+            'prev_close': safe_int(latest_meta.get('prev_close')), 
             'consecutive_days': consecutive_days,
             'total_posts': total_posts,
             'avg_posts': round(avg_posts, 1),

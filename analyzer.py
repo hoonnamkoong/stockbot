@@ -86,7 +86,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         return {}
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_name = f"{filename_prefix}_{timestamp}"
+    base_name = f"data/{filename_prefix}_{timestamp}"
     csv_filename = f"{base_name}.csv"
     xlsx_filename = f"{base_name}.xlsx"
     

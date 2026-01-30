@@ -20,16 +20,12 @@ export async function GET(request: Request) {
         console.log(`[Smart Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST`);
 
         // 1. Check if scraping time (10:00, 13:00, 15:00)
-        // Allow ±1 minute tolerance for Tasker timing variations
-        // IMPORTANT: Tasker "From 12:59PM Till 1:00PM" triggers at 12:59 (hour=12, not 13)
-        // So we need to check if (hour+1) is in scraping hours when minute=59
+        // Only trigger at exact hour (minute === 0)
         const scrapingHours = [10, 13, 15];
-        const effectiveHour = (minute === 59) ? hour + 1 : hour;
-        const isScrapingTime = scrapingHours.includes(effectiveHour) && (minute === 59 || minute === 0 || minute === 1);
-        const isExactScrapingMinute = minute === 0;
+        const isScrapingTime = scrapingHours.includes(hour) && minute === 0;
 
-        if (isScrapingTime && isExactScrapingMinute) {
-            console.log(`[Smart Cron] Scraping time detected (exact minute). Triggering GitHub Actions...`);
+        if (isScrapingTime) {
+            console.log(`[Smart Cron] Scraping time detected (${hour}:00). Triggering GitHub Actions...`);
 
             if (!GITHUB_PAT) {
                 return NextResponse.json({ error: 'Missing GITHUB_PAT' }, { status: 500 });
@@ -47,26 +43,6 @@ export async function GET(request: Request) {
             );
 
             console.log(`[Smart Cron] Scraper triggered successfully.`);
-        } else if (isScrapingTime && minute === 59) {
-            // Triggered at X:59 (e.g., 12:59 for 13:00 scraping)
-            console.log(`[Smart Cron] Pre-scraping time detected (59 min). Triggering GitHub Actions for ${effectiveHour}:00...`);
-
-            if (!GITHUB_PAT) {
-                return NextResponse.json({ error: 'Missing GITHUB_PAT' }, { status: 500 });
-            }
-
-            await axios.post(
-                `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
-                { ref: 'main' },
-                {
-                    headers: {
-                        Authorization: `Bearer ${GITHUB_PAT}`,
-                        Accept: 'application/vnd.github.v3+json',
-                    },
-                }
-            );
-
-            console.log(`[Smart Cron] Scraper triggered successfully (pre-trigger).`);
         }
 
         // 2. Check for reservations at current time AND previous minute

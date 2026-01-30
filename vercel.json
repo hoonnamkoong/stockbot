@@ -4,8 +4,8 @@
     "outputDirectory": ".next",
     "crons": [
         {
-            "path": "/api/cron/trigger",
-            "schedule": "0 1 * * *"
+            "path": "/api/cron/smart-trigger",
+            "schedule": "0 1,4,6 * * *"
         }
     ]
 }

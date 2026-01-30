@@ -888,8 +888,14 @@ if __name__ == "__main__":
         # Save Status JSON for Frontend (ALWAYS RUN)
         try:
             import json
+            from datetime import timezone, timedelta
+            
+            # Get current KST time at save point (not script start time)
+            kst_tz = timezone(timedelta(hours=9))
+            current_kst = datetime.now(kst_tz)
+            
             status_data = {
-                "last_updated": now_kst.strftime('%Y-%m-%d %H:%M:%S'),
+                "last_updated": current_kst.strftime('%Y-%m-%d %H:%M:%S'),
                 "message": "Data updated successfully" if all_data else "No data collected",
                 "count": len(all_data) if 'all_data' in locals() else 0
             }

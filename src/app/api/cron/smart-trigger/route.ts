@@ -16,8 +16,21 @@ export async function GET(request: Request) {
         const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
         const hour = kstTime.getHours();
         const minute = kstTime.getMinutes();
+        const dayOfWeek = kstTime.getDay(); // 0=Sun, 6=Sat
 
-        console.log(`[Smart Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST`);
+        console.log(`[Smart Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST (Day: ${dayOfWeek})`);
+
+        // 0. Check if market is open (Mon-Fri only)
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            const dayName = dayOfWeek === 0 ? 'Sunday' : 'Saturday';
+            console.log(`[Smart Cron] Market closed (${dayName}). Skipping execution.`);
+            return NextResponse.json({
+                success: true,
+                skipped: true,
+                reason: `Market closed on ${dayName}`,
+                time: `${hour}:${minute.toString().padStart(2, '0')} KST`
+            });
+        }
 
         // 1. Check if scraping time (10:00, 13:00, 15:00)
         // Only trigger at exact hour (minute === 0)

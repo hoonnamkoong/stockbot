@@ -19,36 +19,61 @@ jobs:
       contents: write
     
     steps:
-      - name: Check if weekend
-        id: weekend_check
+      - name: Check if market is closed (Weekend or Holiday)
+        id: market_check
         run: |
-          DAY=$(date -u +%u)  # 1=Mon, 7=Sun
-          if [ "$DAY" -eq 6 ] || [ "$DAY" -eq 7 ]; then
-            echo "Weekend detected (day=$DAY). Skipping workflow."
-            echo "is_weekend=true" >> $GITHUB_OUTPUT
+          # Install Python holidays library
+          pip install holidays
+          
+          # Check if today is weekend or Korean holiday
+          python3 << 'EOF'
+          import holidays
+          from datetime import datetime
+          
+          kr_holidays = holidays.KR()
+          today = datetime.now()
+          day_of_week = today.weekday()  # 0=Mon, 6=Sun
+          
+          is_weekend = day_of_week >= 5  # 5=Sat, 6=Sun
+          is_holiday = today.strftime('%Y-%m-%d') in kr_holidays
+          
+          if is_weekend:
+              print(f"Weekend detected (day={day_of_week}). Market closed.")
+              print("is_market_closed=true")
+          elif is_holiday:
+              holiday_name = kr_holidays.get(today.strftime('%Y-%m-%d'))
+              print(f"Korean holiday detected: {holiday_name}. Market closed.")
+              print("is_market_closed=true")
+          else:
+              print(f"Weekday detected (day={day_of_week}). Market open.")
+              print("is_market_closed=false")
+          EOF
+          
+          # Set output based on Python result
+          if python3 -c "import holidays; from datetime import datetime; kr_holidays = holidays.KR(); today = datetime.now(); print(today.weekday() >= 5 or today.strftime('%Y-%m-%d') in kr_holidays)" | grep -q "True"; then
+            echo "is_market_closed=true" >> $GITHUB_OUTPUT
           else
-            echo "Weekday detected (day=$DAY). Proceeding."
-            echo "is_weekend=false" >> $GITHUB_OUTPUT
+            echo "is_market_closed=false" >> $GITHUB_OUTPUT
           fi
       
       - name: Checkout content
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         uses: actions/checkout@v3
 
       - name: Set up Python
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
       - name: Install dependencies
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
           pip install -r requirements.txt
           pip install openpyxl
 
       - name: Download Existing Monthly Report
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
           MONTH=$(date -u +"%Y-%m")
           MONTHLY_FILE="monthly_report_${MONTH}.xlsx"
@@ -59,7 +84,7 @@ jobs:
             || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
             
       - name: Restore Previous Data (db-data)
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
           mkdir -p data
           git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_temp
@@ -74,7 +99,7 @@ jobs:
           rm -rf db_temp
 
       - name: Run Scraper
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -83,7 +108,7 @@ jobs:
           python scraper.py
 
       - name: Run Trade Executor (Reservations)
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
@@ -93,7 +118,7 @@ jobs:
           python src/trade_executor.py
 
       - name: Commit and Push Data (db-data)
-        if: steps.weekend_check.outputs.is_weekend == 'false'
+        if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
           git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_repo
           

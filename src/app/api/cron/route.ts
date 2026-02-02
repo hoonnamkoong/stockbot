@@ -32,9 +32,11 @@ export async function GET(request: Request) {
             });
         }
 
-        // 1. Check if scraping time (10:00, 13:00, 15:00)
+        // 1. Check if scraping time (handles both X:59 and X:00 triggers)
         const scrapingHours = [10, 13, 15];
-        const isScrapingTime = scrapingHours.includes(hour) && minute === 0;
+        const isScrapingTime =
+            (scrapingHours.includes(hour) && minute === 0) ||           // X:00 trigger
+            (scrapingHours.includes(hour + 1) && minute === 59);        // X:59 trigger (for next hour)
 
         if (isScrapingTime) {
             console.log(`[Cron] Scraping time detected (${hour}:00). Triggering GitHub Actions...`);

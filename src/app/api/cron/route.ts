@@ -39,24 +39,40 @@ export async function GET(request: Request) {
             (scrapingHours.includes(hour + 1) && minute === 59);        // X:59 trigger (for next hour)
 
         if (isScrapingTime) {
-            console.log(`[Cron] Scraping time detected (${hour}:00). Triggering GitHub Actions...`);
+            console.log(`[Cron] Scraping time detected (${hour}:${minute.toString().padStart(2, '0')} KST). Triggering GitHub Actions...`);
 
             if (!GITHUB_PAT) {
-                return NextResponse.json({ error: 'Missing GITHUB_PAT' }, { status: 500 });
+                console.error('[Cron] GITHUB_PAT is missing!');
+                return NextResponse.json({
+                    error: 'Missing GITHUB_PAT',
+                    success: false
+                }, { status: 500 });
             }
 
-            await axios.post(
-                `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
-                { ref: 'main' },
-                {
-                    headers: {
-                        Authorization: `Bearer ${GITHUB_PAT}`,
-                        Accept: 'application/vnd.github.v3+json',
-                    },
-                }
-            );
+            try {
+                const response = await axios.post(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+                    { ref: 'main' },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${GITHUB_PAT}`,
+                            Accept: 'application/vnd.github.v3+json',
+                        },
+                    }
+                );
 
-            console.log(`[Cron] Scraper triggered successfully.`);
+                console.log(`[Cron] GitHub Actions triggered successfully. Status: ${response.status}`);
+            } catch (githubError: any) {
+                console.error('[Cron] GitHub API Error:', githubError.message);
+                console.error('[Cron] Error details:', githubError.response?.data);
+
+                return NextResponse.json({
+                    error: 'Failed to trigger GitHub Actions',
+                    details: githubError.message,
+                    githubResponse: githubError.response?.data,
+                    success: false
+                }, { status: 500 });
+            }
         }
 
         return NextResponse.json({

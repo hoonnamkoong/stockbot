@@ -22,13 +22,12 @@ jobs:
       - name: Check if market is closed (Weekend or Holiday)
         id: market_check
         run: |
-          # Install Python holidays library
           pip install holidays
           
-          # Check if today is weekend or Korean holiday
           python3 << 'EOF'
           import holidays
           from datetime import datetime
+          import os
           
           kr_holidays = holidays.KR()
           today = datetime.now()
@@ -39,22 +38,18 @@ jobs:
           
           if is_weekend:
               print(f"Weekend detected (day={day_of_week}). Market closed.")
-              print("is_market_closed=true")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=true\n')
           elif is_holiday:
               holiday_name = kr_holidays.get(today.strftime('%Y-%m-%d'))
               print(f"Korean holiday detected: {holiday_name}. Market closed.")
-              print("is_market_closed=true")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=true\n')
           else:
               print(f"Weekday detected (day={day_of_week}). Market open.")
-              print("is_market_closed=false")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=false\n')
           EOF
-          
-          # Set output based on Python result
-          if python3 -c "import holidays; from datetime import datetime; kr_holidays = holidays.KR(); today = datetime.now(); print(today.weekday() >= 5 or today.strftime('%Y-%m-%d') in kr_holidays)" | grep -q "True"; then
-            echo "is_market_closed=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_market_closed=false" >> $GITHUB_OUTPUT
-          fi
       
       - name: Checkout content
         if: steps.market_check.outputs.is_market_closed == 'false'

@@ -129,5 +129,5 @@ jobs:
           git config user.email "bot@stockbot.com"
           git add .
           git status
-          git commit -m "data: Update stock data (Isolated Branch)"
+          git commit -m "data: Update stock data (Isolated Branch)" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data

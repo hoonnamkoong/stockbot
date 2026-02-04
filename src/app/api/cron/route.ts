@@ -11,14 +11,26 @@ export async function GET(request: Request) {
     const WORKFLOW_FILE = 'scraper.yml';
 
     try {
+        // Parse debug params
+        const { searchParams } = new URL(request.url);
+        const debugHour = searchParams.get('hour');
+        const debugMinute = searchParams.get('minute');
+
         // Get current KST time
         const now = new Date();
         const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-        const hour = kstTime.getHours();
-        const minute = kstTime.getMinutes();
+
+        // Use debug time if provided, otherwise use real time
+        let hour = debugHour ? parseInt(debugHour) : kstTime.getHours();
+        let minute = debugMinute ? parseInt(debugMinute) : kstTime.getMinutes();
         const dayOfWeek = kstTime.getDay(); // 0=Sun, 6=Sat
 
-        console.log(`[Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST (Day: ${dayOfWeek})`);
+        // Allow debug to bypass current time for logs
+        if (debugHour) {
+            console.log(`[Debug] Simulating time: ${hour}:${minute} (Real: ${kstTime.getHours()}:${kstTime.getMinutes()})`);
+        } else {
+            console.log(`[Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST (Day: ${dayOfWeek})`);
+        }
 
         // 0. Check if market is open (Mon-Fri only)
         if (dayOfWeek === 0 || dayOfWeek === 6) {

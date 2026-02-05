@@ -45,7 +45,7 @@ export async function GET(request: Request) {
         }
 
         // 1. Check if scraping time (handles both X:59 and X:00 triggers)
-        const scrapingHours = [10, 13, 15];
+        const scrapingHours = [10, 12, 13, 15];
         const isScrapingTime =
             (scrapingHours.includes(hour) && minute === 0) ||           // X:00 trigger
             (scrapingHours.includes(hour + 1) && minute === 59);        // X:59 trigger (for next hour)

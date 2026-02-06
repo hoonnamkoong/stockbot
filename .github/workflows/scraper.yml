@@ -138,4 +138,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }} # Requires Personal Access Token (Workflow Scope)
         run: |
           echo "Triggering Sentinel-V AI Trader..."
-          gh workflow run sentinel_v.yml -f ref=main || echo "Failed to trigger AI Trader"
+          gh workflow run sentinel_v.yml --ref main
+          echo "Trigger command executed."

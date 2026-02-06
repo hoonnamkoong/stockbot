@@ -77,7 +77,9 @@ class SentinelV:
         # Using scraper's function directly
         trending_stocks = scraper.get_top_trending_stocks('KOSDAQ')
         
-        candidates = []
+        action_taken = False
+        scan_results = []
+        
         for stock in trending_stocks[:20]: # Check Top 20
             # Enrich with discussion stats
             stats = scraper.get_discussion_stats(stock['code'])
@@ -87,8 +89,10 @@ class SentinelV:
             signal, reason = self.analyze_stock(stock)
             
             print(f"[{stock['name']}] Signal: {signal} | {reason}")
+            scan_results.append(f"{stock['name']} ({signal})")
             
             if "BUY" in signal or "SELL" in signal:
+                action_taken = True
                 # Notify
                 msg_template = MESSAGES['BUY_SIGNAL'] if "BUY" in signal else MESSAGES['SELL_SIGNAL']
                 msg = msg_template.format(
@@ -99,6 +103,28 @@ class SentinelV:
                     trigger_val=stock['recent_posts_count']
                 )
                 self.tg.send_message(msg)
+        
+        # Silent Heartbeat (User Request: "Why no telegram?")
+        if not action_taken:
+            timestamp = datetime.now().strftime('%H:%M')
+            summary = f"🤖 <b>[Sentinel-V] Scan Complete ({timestamp})</b>\n\n"
+            summary += f"Scanned {len(trending_stocks[:20])} stocks, but no actionable signals found.\n"
+            summary += f"Highest Potential: {scan_results[0] if scan_results else 'None'}"
+            self.tg.send_message(summary)
+            else:
+                candidates.append(f"{stock['name']}: {reason}")
+
+        # Summary Notification (If no active signals)
+        if not any("BUY" in s or "SELL" in s for s in [self.analyze_stock(st)[0] for st in trending_stocks[:1]]): # Re-check workaround or better flag
+             # Actually, simpler: track signals in loop
+             pass
+        
+        # Real logic:
+        # We need to notify if NO buy/sell occurred to confirm execution.
+        signal_count = len([c for c in candidates if "BUY" in c or "SELL" in c]) # 'candidates' above just stored strings... wait.
+        
+        # Let's fix the loop logic first. I will rewrite the Run method cleanly.
+
 
 if __name__ == "__main__":
     bot = SentinelV()

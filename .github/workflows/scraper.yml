@@ -135,7 +135,7 @@ jobs:
       - name: Trigger Sentinel-V AI Trader
         if: steps.market_check.outputs.is_market_closed == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }} # Requires Personal Access Token (Workflow Scope)
         run: |
           echo "Triggering Sentinel-V AI Trader..."
           gh workflow run sentinel_v.yml -f ref=main || echo "Failed to trigger AI Trader"

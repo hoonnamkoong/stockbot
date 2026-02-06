@@ -131,3 +131,11 @@ jobs:
           git status
           git commit -m "data: Update stock data (Isolated Branch)" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data
+
+      - name: Trigger Sentinel-V AI Trader
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggering Sentinel-V AI Trader..."
+          gh workflow run sentinel_v.yml -f ref=main || echo "Failed to trigger AI Trader"

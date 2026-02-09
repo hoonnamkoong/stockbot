@@ -31,7 +31,6 @@ interface BalanceData {
 interface StockItem {
     code: string;
     name: string;
-    market: string;
 }
 
 export default function TradePage() {

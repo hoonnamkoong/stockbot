@@ -929,67 +929,60 @@ if __name__ == "__main__":
             try:
                 print("[System] Generating Consolidated Telegram Report...")
                 
-                # 1. Market Summary
-                summary_msg = f"📊 <b>[StockBot] Market Report ({datetime.now().strftime('%H:%M')})</b>\n\n"
-                
+                # 1. KOSPI Report
                 records = result_df_kr.to_dict('records')
                 kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
-                kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
-                
                 if kospi_items:
-                    summary_msg += f"<b>[KOSPI]</b> {len(kospi_items)} items\n"
-                    # Top 3 only
-                    for item in kospi_items[:3]:
-                        summary_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
-                    if len(kospi_items) > 3: summary_msg += f"... and {len(kospi_items)-3} more\n"
-                    summary_msg += "\n"
-                    
-                if kosdaq_items:
-                    summary_msg += f"<b>[KOSDAQ]</b> {len(kosdaq_items)} items\n"
-                    for item in kosdaq_items[:3]:
-                        summary_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
-                    if len(kosdaq_items) > 3: summary_msg += f"... and {len(kosdaq_items)-3} more\n"
-                    summary_msg += "\n"
+                    kospi_msg = f"📉 <b>[KOSPI] Market Report</b> ({len(kospi_items)} items)\n\n"
+                    for item in kospi_items[:5]: # Show Top 5
+                        kospi_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
+                    if len(kospi_items) > 5: kospi_msg += f"... and {len(kospi_items)-5} more\n"
+                    tg_manager.send_message(kospi_msg)
 
-                # 2. Sentinel-V
-                sentinel_msg = ""
+                # 2. KOSDAQ Report
+                kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
+                if kosdaq_items:
+                    kosdaq_msg = f"📈 <b>[KOSDAQ] Market Report</b> ({len(kosdaq_items)} items)\n\n"
+                    for item in kosdaq_items[:5]: # Show Top 5
+                        kosdaq_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
+                    if len(kosdaq_items) > 5: kosdaq_msg += f"... and {len(kosdaq_items)-5} more\n"
+                    tg_manager.send_message(kosdaq_msg)
+
+                # 3. Sentinel-V Signals (Integrated)
                 sentinel = SentinelV()
                 buy_signals = []
                 sell_signals = []
                 
+                # Re-analyze all data for signals
                 for stock in all_data:
                     signal, reason = sentinel.analyze_stock(stock)
                     if "BUY" in signal:
-                        buy_signals.append(f"🔴 <b>매수 신호</b>: {stock['name']} ({signal})\n   └ {reason}")
+                        buy_signals.append(f"🔴 <b>매수 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
                     elif "SELL" in signal:
-                        sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ {reason}")
+                        sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
                 
                 if buy_signals or sell_signals:
-                    sentinel_msg = "⚡ <b>[Sentinel-V Signals]</b>\n" + "\n".join(buy_signals + sell_signals) + "\n\n"
-                else:
-                    sentinel_msg = "⚡ <b>[Sentinel-V]</b> 특이 매매 신호 없음\n\n"
+                    signal_msg = "⚡ <b>[Sentinel-V Signals]</b>\n" + "\n".join(buy_signals + sell_signals)
+                    tg_manager.send_message(signal_msg)
 
-                # 3. Expert Guide
-                expert_msg = ""
+                # 4. Expert Guide (Detailed)
                 try:
                     gemini = GeminiAgent()
                     if gemini.model:
-                        # Pass ALL data to Gemini
                         guide_text = gemini.generate_trading_guide(all_data)
-                        expert_msg = f"🧠 <b>[Expert Guide]</b>\n{guide_text}\n\n"
+                        # Split guide if too long
+                        if len(guide_text) > 3000:
+                            parts = [guide_text[i:i+3000] for i in range(0, len(guide_text), 3000)]
+                            for i, part in enumerate(parts):
+                                tg_manager.send_message(f"🧠 <b>[Expert Guide {i+1}/{len(parts)}]</b>\n{part}")
+                        else:
+                            tg_manager.send_message(f"🧠 <b>[Expert Guide]</b>\n{guide_text}")
                 except Exception as user_e:
                     print(f"Gemini Error: {user_e}")
 
-                # 4. Dashboard
-                dash_msg = f"👉 <b>Dashboard</b>: {os.environ.get('DASHBOARD_URL', '')}"
-
-                final_msg = summary_msg + sentinel_msg + expert_msg + dash_msg
-                
-                if len(final_msg) > 4000:
-                    tg_manager.send_message(summary_msg + sentinel_msg)
-                    tg_manager.send_message(expert_msg + dash_msg)
-                else:
-                    tg_manager.send_message(final_msg)
+                # 5. Dashboard Link (Separate small msg)
+                dash_msg = f"👉 <b>Dashboard</b>: {os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app')}"
+                tg_manager.send_message(dash_msg)
                     
             except Exception as e:
                 print(f"[ERROR] Notification Logic Failed: {e}")

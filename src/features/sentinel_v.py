@@ -120,11 +120,13 @@ class SentinelV:
             guide = self.gemini.generate_trading_guide(analysis_candidates)
             
             timestamp = datetime.now().strftime('%H:%M')
-            summary = f"🤖 <b>[Sentinel-V] 시장 감시 리포트 ({timestamp})</b>\n\n"
-            summary += f"특이 종목이 포착되지 않았으나, 현재 시장 흐름은 다음과 같습니다:\n\n"
-            summary += guide
+            # [User Request] Simplify: Do not send "No signals" report. Scraper.py handles the main report.
+            # summary = f"🤖 <b>[Sentinel-V] 시장 감시 리포트 ({timestamp})</b>\n\n"
+            # summary += f"특이 종목이 포착되지 않았으나, 현재 시장 흐름은 다음과 같습니다:\n\n"
+            # summary += guide
             
-            self.tg.send_message(summary)
+            # self.tg.send_message(summary)
+            pass
 
 
 

@@ -824,6 +824,7 @@ if __name__ == "__main__":
     try:
         from src.telegram_manager import TelegramManager
         from src.features.sentinel_v import SentinelV
+        from src.features.gemini_agent import GeminiAgent
         
         try:
             tg_manager = TelegramManager()
@@ -880,6 +881,9 @@ if __name__ == "__main__":
                         return {k: sanitize_for_json(v) for k, v in obj.items()}
                     elif isinstance(obj, list):
                         return [sanitize_for_json(item) for item in obj]
+                    # Check for Pandas/Numpy NaNs explicitly
+                    if pd.isna(obj): 
+                        return None
                     elif isinstance(obj, float):
                         if math.isnan(obj) or math.isinf(obj):
                             return None
@@ -1044,7 +1048,21 @@ if __name__ == "__main__":
                     if "BUY" in signal:
                         buy_signals.append(f"🔴 <b>매수 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
                     elif "SELL" in signal:
-                        sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
+                        # [V8.1] Expert Opinion Injection
+                        try:
+                            summary = stock.get('posts_summary', '요약 없음')
+                            keywords = stock.get('top_keywords', '키워드 없음')
+                            ai_opinion = gemini.generate_risk_assessment(
+                                symbol=stock['name'],
+                                signal_type=signal,
+                                technical_reason=reason,
+                                keywords=keywords,
+                                summary=summary
+                            )
+                            sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ <i>Reason: {reason}</i>\n   └ 🧠 <b>AI 의견</b>: {ai_opinion}")
+                        except Exception as e:
+                            print(f"[Warning] AI Opinion Failed: {e}")
+                            sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
                 
                 if buy_signals or sell_signals:
                     signal_msg = "⚡ <b>[Sentinel-V Signals]</b>\n" + "\n".join(buy_signals + sell_signals)

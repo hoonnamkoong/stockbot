@@ -115,7 +115,7 @@ export default function Home() {
     const [stocks, setStocks] = useState<Stock[]>([]);
     const [fiveDayData, setFiveDayData] = useState<FiveDayStock[]>([]);
     const [threeDayData, setThreeDayData] = useState<FiveDayStock[]>([]); // 3-Day State (Fixed duplicate)
-    const [research, setResearch] = useState<any>(null);
+    // const [research, setResearch] = useState<any>(null); // Removed V8.0
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [activeTab, setActiveTab] = useState<string | null>('ALL');
@@ -133,10 +133,10 @@ export default function Home() {
     const theme = useMantineTheme();
     const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
-    // Research Modal
-    const [researchModalOpened, { open: openResearchModal, close: closeResearchModal }] = useDisclosure(false);
-    const [selectedResearchCategory, setSelectedResearchCategory] = useState<string | null>(null);
-    const [pdfItem, setPdfItem] = useState<any>(null);
+    // Research Modal (Disabled V8.0)
+    // const [researchModalOpened, { open: openResearchModal, close: closeResearchModal }] = useDisclosure(false);
+    // const [selectedResearchCategory, setSelectedResearchCategory] = useState<string | null>(null);
+    // const [pdfItem, setPdfItem] = useState<any>(null);
     const [reports, setReports] = useState<any[]>([]);
 
     // Version State
@@ -268,14 +268,13 @@ export default function Home() {
                 addSystemLog(`❌ Stocks Fetch Failed: ${text.slice(0, 100)}`);
             }
 
-            // Fetch Research (Always latest for now, or match slot?) 
-            // Keep latest for research as it's daily.
-            const resResearch = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/latest_research.json?t=${timeMap}`, { cache: 'no-store' });
-            if (resResearch.ok) {
-                const data = await resResearch.json();
-                setResearch(data);
-                addSystemLog(`✅ Research Loaded`);
-            }
+            // Fetch Research (Removed V8.0)
+            // const resResearch = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/latest_research.json?t=${timeMap}`, { cache: 'no-store' });
+            // if (resResearch.ok) {
+            //    const data = await resResearch.json();
+            //    setResearch(data);
+            //    addSystemLog(`✅ Research Loaded`);
+            // }
 
             // Fetch Status (Timestamp)
             try {
@@ -507,10 +506,16 @@ export default function Home() {
         return 0;
     });
 
-    // Research Modal Logic
+    // Research Logic (V8.0: Direct Links)
     const handleResearchClick = (key: string) => {
-        setSelectedResearchCategory(key);
-        openResearchModal();
+        const urls: any = {
+            invest: 'https://finance.naver.com/research/market_info_list.naver',
+            company: 'https://finance.naver.com/research/company_list.naver',
+            industry: 'https://finance.naver.com/research/industry_list.naver',
+            economy: 'https://finance.naver.com/research/economy_list.naver'
+        };
+        const target = urls[key];
+        if (target) window.open(target, '_blank');
     };
 
     // Helper for Sort Header
@@ -608,7 +613,6 @@ export default function Home() {
                 </Button>
                 <Text fw={700} mb="sm">Research Reports</Text>
                 {['invest', 'company', 'industry', 'economy'].map((key) => {
-                    const count = research?.[key]?.today_count || 0;
                     const labelMap: any = { invest: '투자정보', company: '종목분석', industry: '산업분석', economy: '경제분석' };
                     return (
                         <Button
@@ -618,7 +622,7 @@ export default function Home() {
                             mb="xs"
                             justify="space-between"
                             onClick={() => handleResearchClick(key)}
-                            rightSection={<Badge color="red" size="sm" circle>{count}</Badge>}
+                        // rightSection={<Badge color="red" size="sm" circle>{count}</Badge>} // Removed count
                         >
                             {labelMap[key]}
                         </Button>

@@ -352,18 +352,14 @@ def fetch_post_body(link_suffix):
         # Naver Finance Board Body Selector
         # specific ID or class might vary, usually 'div#body' or 'div.view_se'
         body_tag = soup.select_one('#body') or soup.select_one('.view_se') or soup.select_one('.scr01')
-        
-        if body_tag:
-            return body_tag.get_text("\n", strip=True)
         return ""
     except Exception:
         return ""
 
 
-
-
 import analyzer
 from src import research_scraper
+from src.features.gemini_agent import GeminiAgent  # [NEW] Import Gemini Agent
 # from src import utils # Removed V7.0 (Legacy)
 
 def load_env_manual(filepath=".env.local"):
@@ -583,14 +579,13 @@ if __name__ == "__main__":
         print(f"[System] Failed to initialize TelegramManager: {e}")
         tg_manager = None
     # 2. Research Briefing (Enabled)
-    print("\n[Research] Updating Market Briefing & PDF Analysis...")
-    try:
-        from src import research_scraper # Ensure import
-        research_scraper.main()
-        print("[Research] Completed.")
-        
-        # Send Research Telegram
-        try:
+    print("\n[Research]    # --- 0. Research Report Scraping (Disabled V8.0) ---
+    # print("=== [Phase 0] Starting Research Report Scraping ===")
+    # try:
+    #     research_scraper.main()
+    #     print("=== [Phase 0] Research Scraping Complete ===")
+    # except Exception as e:
+    #     print(f"=== [Phase 0] Research Scraping Failed: {e} ===")      try:
             import json
             # Correct path matches research_scraper.py output (data/latest_research.json)
             with open('data/latest_research.json', 'r', encoding='utf-8') as f:
@@ -865,7 +860,19 @@ if __name__ == "__main__":
                         tg_manager.send_market_report('KOSDAQ', kosdaq_items)
                         time.sleep(1)
 
-                    # 2. Dashboard Link
+                    # 2. Expert Trading Guide (Gemini) [NEW]
+                    try:
+                        print(f"[System] Generating Expert Trading Guide...")
+                        gemini = GeminiAgent()
+                        if gemini.model and all_data:
+                            guide_text = gemini.generate_trading_guide(all_data)
+                            if guide_text:
+                                tg_manager.send_message(f"🧠 <b>[StockBot Expert Guide]</b>\n\n{guide_text}")
+                                time.sleep(1)
+                    except Exception as ai_e:
+                        print(f"[ERROR] Gemini Guide Failed: {ai_e}")
+
+                    # 3. Dashboard Link
                     print(f"[System] Sending Dashboard Link last... (v7.0)")
                     tg_manager.send_dashboard_link()
                 except Exception as send_err:

@@ -373,7 +373,7 @@ def get_discussion_stats(code):
     
     collected_posts = []
     page = 1
-    max_pages = 5 # v8.5 Tuning: Reduced from 50 to 5 (Speed Optimization)
+    max_pages = 50 # v7.0 Tuning: Limit to ~1000 posts (User Request: 800)
     stop_collecting = False
     
     headers['Referer'] = f"https://finance.naver.com/item/board.naver?code={code}"
@@ -383,7 +383,7 @@ def get_discussion_stats(code):
         
         try:
             if page > 1:
-                time.sleep(0.2) # Reduced sleep
+                time.sleep(0.5)
 
             response = requests.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(response.content, 'html.parser')

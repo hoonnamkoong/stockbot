@@ -630,8 +630,6 @@ export default function Home() {
                 })}
 
 
-
-
                 <Text fw={700} mt="md" mb="sm">News Feed</Text>
                 <Button
                     fullWidth
@@ -798,71 +796,53 @@ export default function Home() {
                                             <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
                                                 <Table.Tr>
                                                     <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
-                                                        종목명 {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                                        <Group gap="xs">
+                                                            종목명
+                                                            {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                                        </Group>
                                                     </Table.Th>
-                                                    <Table.Th onClick={() => handleSort('consecutive_days')} style={{ cursor: 'pointer' }}>등록일 {sortConfig?.key === 'consecutive_days' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th onClick={() => handleSort('total_posts')} style={{ cursor: 'pointer' }}>누적 토론글 {sortConfig?.key === 'total_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th onClick={() => handleSort('avg_posts')} style={{ cursor: 'pointer' }}>평균 글수 {sortConfig?.key === 'avg_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th>5일 전 주가</Table.Th>
-                                                    <Table.Th>현재가</Table.Th>
-                                                    <Table.Th>전일비</Table.Th>
-                                                    <Table.Th>주가 추세 (5일) (단위: 천원)</Table.Th>
-                                                    <Table.Th>토론글 추세 (5일)</Table.Th>
+                                                    <ThSort sortKey="price">현재가</ThSort>
+                                                    <ThSort sortKey="change_rate">등락률 (누적)</ThSort>
+                                                    <ThSort sortKey="daily_change_rate">등락률 (전일비)</ThSort> {/* New Column */}
+                                                    <ThSort sortKey="consecutive_days">연속 등장</ThSort>
+                                                    <ThSort sortKey="avg_posts">평균 게시글</ThSort>
+                                                    <ThSort sortKey="total_posts">총 게시글</ThSort>
+                                                    {/* Sparkline Headers */}
+                                                    <Table.Th>Price Trend (5D)</Table.Th>
                                                 </Table.Tr>
                                             </Table.Thead>
                                             <Table.Tbody>
                                                 {marketData.map((stock) => (
-                                                    <Table.Tr key={stock.code}>
-                                                        <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
-                                                            <Text fw={700}>
-                                                                <Group gap={4}>
-                                                                    <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
-                                                                        {stock.name}
-                                                                    </a>
-                                                                    <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => openQuickOrder(stock)}>
-                                                                        <IconCoin size={16} />
-                                                                    </ActionIcon>
-                                                                </Group>
-                                                            </Text>
-                                                            <Text size="xs" c="dimmed">{stock.code}</Text>
+                                                    <Table.Tr key={stock.code} style={{
+                                                        backgroundColor: stock.consecutive_days >= 3 ? 'var(--mantine-color-orange-0)' : undefined,
+                                                        cursor: 'pointer'
+                                                    }}
+                                                        onClick={() => handleCopyAndOpen(stock.code, stock.name)}
+                                                    >
+                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'inherit', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                            {stock.name} <Text span c="dimmed" size="xs">{stock.code}</Text>
+                                                        </Table.Td>
+                                                        <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>
+                                                        <Table.Td c={Number(stock.period_change_rate) > 0 ? 'red' : 'blue'}>
+                                                            {Number(stock.period_change_rate) > 0 ? '+' : ''}{Number(stock.period_change_rate)?.toFixed(2)}%
+                                                        </Table.Td>
+                                                        <Table.Td c={Number(stock.daily_change_rate) > 0 ? 'red' : 'blue'}>
+                                                            {/* Display Daily Change Rate */}
+                                                            {stock.daily_change_rate !== undefined ? (
+                                                                <>
+                                                                    {Number(stock.daily_change_rate) > 0 ? '▲' : '▼'} {Math.abs(Number(stock.daily_change_rate)).toFixed(2)}%
+                                                                </>
+                                                            ) : '-'}
                                                         </Table.Td>
                                                         <Table.Td>
-                                                            <Badge color="red" variant="filled">{stock.consecutive_days}일</Badge>
+                                                            <Badge color={stock.consecutive_days >= 3 ? 'red' : 'gray'}>
+                                                                {stock.consecutive_days}일 연속
+                                                            </Badge>
                                                         </Table.Td>
-                                                        <Table.Td>{stock.total_posts.toLocaleString()}</Table.Td>
-                                                        <Table.Td>{stock.avg_posts}</Table.Td>
-                                                        <Table.Td>{stock.std_dev}</Table.Td>
-                                                        <Table.Td>
-                                                            <Text size="sm" fw={500} c="dimmed">{stock.price_start?.toLocaleString() || '-'}</Text>
-                                                        </Table.Td>
-                                                        <Table.Td>
-                                                            <Text fw={700}>{stock.price.toLocaleString()}</Text>
-                                                            <Text size="xs" c={stock.period_change_rate && stock.period_change_rate > 0 ? 'red' : 'blue'}>
-                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}% (5일)
-                                                            </Text>
-                                                        </Table.Td>
-                                                        <Table.Td>
-                                                            <Text size="sm" fw={700} c={stock.daily_change_rate && stock.daily_change_rate > 0 ? 'red' : 'blue'}>
-                                                                {stock.daily_change_rate && stock.daily_change_rate > 0 ? '+' : ''}{stock.daily_change_rate}%
-                                                            </Text>
-                                                            {stock.prev_close && <Text size="xs" c="dimmed">어제: {stock.prev_close.toLocaleString()}</Text>}
-                                                        </Table.Td>
+                                                        <Table.Td>{Math.round(stock.avg_posts)}개</Table.Td>
+                                                        <Table.Td>{stock.total_posts}개</Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
-                                                                {(stock.sparkline_price || []).map((v, i) => (
-                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{v > 0 ? (v / 1000).toFixed(1) : '-'}</Text>
-                                                                ))}
-                                                            </Group>
-                                                        </Table.Td>
-                                                        <Table.Td>
-                                                            <Sparkline data={stock.sparkline_posts || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
-                                                                {(stock.sparkline_posts || []).map((v, i) => (
-                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{v?.toLocaleString()}</Text>
-                                                                ))}
-                                                            </Group>
                                                         </Table.Td>
                                                     </Table.Tr>
                                                 ))}
@@ -873,84 +853,66 @@ export default function Home() {
                             })}
                         </ScrollArea>
                     ) : activeTab === '3DAYS' ? (
+                        // 3-Day Analysis View (Cloned from 5DAYS logic)
                         <ScrollArea type="always" offsetScrollbars>
-                            {/* 3-Day Analysis View */}
+                            {/* Split KOSPI and KOSDAQ Tables */}
                             {['KOSPI', 'KOSDAQ'].map((marketType) => {
                                 const marketData = sortedThreeDayData.filter(s => s.market === marketType);
                                 if (marketData.length === 0) return null;
 
                                 return (
                                     <div key={marketType} style={{ marginBottom: 40 }}>
-                                        <Text fw={700} size="xl" mb="md" c="blue.7">{marketType} (3일 누적)</Text>
+                                        <Text fw={700} size="xl" mb="md" c="cyan.7">{marketType} (3일 누적)</Text>
                                         <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}>
                                             <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
                                                 <Table.Tr>
                                                     <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
-                                                        종목명 {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                                        <Group gap="xs">
+                                                            종목명
+                                                            {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                                        </Group>
                                                     </Table.Th>
-                                                    <Table.Th onClick={() => handleSort('consecutive_days')} style={{ cursor: 'pointer' }}>연속 등록일 {sortConfig?.key === 'consecutive_days' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th onClick={() => handleSort('total_posts')} style={{ cursor: 'pointer' }}>누적 토론글 {sortConfig?.key === 'total_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th onClick={() => handleSort('avg_posts')} style={{ cursor: 'pointer' }}>평균 글수 {sortConfig?.key === 'avg_posts' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th onClick={() => handleSort('std_dev')} style={{ cursor: 'pointer' }}>표준편차 {sortConfig?.key === 'std_dev' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                                    <Table.Th>3일 전 주가</Table.Th>
-                                                    <Table.Th>현재가</Table.Th>
-                                                    <Table.Th>전일비</Table.Th>
-                                                    <Table.Th>주가 추세 (3일) (단위: 천원)</Table.Th>
-                                                    <Table.Th>토론글 추세 (3일)</Table.Th>
+                                                    <ThSort sortKey="price">현재가</ThSort>
+                                                    <ThSort sortKey="change_rate">등락률 (누적)</ThSort>
+                                                    <ThSort sortKey="daily_change_rate">등락률 (전일비)</ThSort>
+                                                    <ThSort sortKey="consecutive_days">연속 등장</ThSort>
+                                                    <ThSort sortKey="avg_posts">평균 게시글</ThSort>
+                                                    <ThSort sortKey="total_posts">총 게시글</ThSort>
+                                                    {/* Sparkline Headers */}
+                                                    <Table.Th>Price Trend (3D)</Table.Th>
                                                 </Table.Tr>
                                             </Table.Thead>
                                             <Table.Tbody>
                                                 {marketData.map((stock) => (
-                                                    <Table.Tr key={stock.code}>
-                                                        <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
-                                                            <Text fw={700}>
-                                                                <Group gap={4}>
-                                                                    <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
-                                                                        {stock.name}
-                                                                    </a>
-                                                                    <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => openQuickOrder(stock)}>
-                                                                        <IconCoin size={16} />
-                                                                    </ActionIcon>
-                                                                </Group>
-                                                            </Text>
-                                                            <Text size="xs" c="dimmed">{stock.code}</Text>
+                                                    <Table.Tr key={stock.code} style={{
+                                                        backgroundColor: stock.consecutive_days >= 3 ? 'var(--mantine-color-cyan-0)' : undefined,
+                                                        cursor: 'pointer'
+                                                    }}
+                                                        onClick={() => handleCopyAndOpen(stock.code, stock.name)}
+                                                    >
+                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'inherit', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                            {stock.name} <Text span c="dimmed" size="xs">{stock.code}</Text>
+                                                        </Table.Td>
+                                                        <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>
+                                                        <Table.Td c={Number(stock.period_change_rate) > 0 ? 'red' : 'blue'}>
+                                                            {Number(stock.period_change_rate) > 0 ? '+' : ''}{Number(stock.period_change_rate)?.toFixed(2)}%
+                                                        </Table.Td>
+                                                        <Table.Td c={Number(stock.daily_change_rate) > 0 ? 'red' : 'blue'}>
+                                                            {stock.daily_change_rate !== undefined ? (
+                                                                <>
+                                                                    {Number(stock.daily_change_rate) > 0 ? '▲' : '▼'} {Math.abs(Number(stock.daily_change_rate)).toFixed(2)}%
+                                                                </>
+                                                            ) : '-'}
                                                         </Table.Td>
                                                         <Table.Td>
-                                                            <Badge color="red" variant="filled">{stock.consecutive_days}일</Badge>
+                                                            <Badge color={stock.consecutive_days >= 3 ? 'red' : 'gray'}>
+                                                                {stock.consecutive_days}일 연속
+                                                            </Badge>
                                                         </Table.Td>
-                                                        <Table.Td>{stock.total_posts.toLocaleString()}</Table.Td>
-                                                        <Table.Td>{stock.avg_posts}</Table.Td>
-                                                        <Table.Td>{stock.std_dev}</Table.Td>
-                                                        <Table.Td>
-                                                            <Text size="sm" fw={500} c="dimmed">{stock.price_start?.toLocaleString() || '-'}</Text>
-                                                        </Table.Td>
-                                                        <Table.Td>
-                                                            <Text fw={700}>{stock.price.toLocaleString()}</Text>
-                                                            <Text size="xs" c={stock.period_change_rate && stock.period_change_rate > 0 ? 'red' : 'blue'}>
-                                                                {stock.period_change_rate && stock.period_change_rate > 0 ? '+' : ''}{stock.period_change_rate}% (3일)
-                                                            </Text>
-                                                        </Table.Td>
-                                                        <Table.Td>
-                                                            <Text size="sm" fw={700} c={stock.daily_change_rate && stock.daily_change_rate > 0 ? 'red' : 'blue'}>
-                                                                {stock.daily_change_rate && stock.daily_change_rate > 0 ? '+' : ''}{stock.daily_change_rate}%
-                                                            </Text>
-                                                            {stock.prev_close && <Text size="xs" c="dimmed">어제: {stock.prev_close.toLocaleString()}</Text>}
-                                                        </Table.Td>
+                                                        <Table.Td>{Math.round(stock.avg_posts)}개</Table.Td>
+                                                        <Table.Td>{stock.total_posts}개</Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
-                                                                {(stock.sparkline_price || []).map((v, i) => (
-                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{(v / 1000).toFixed(1)}</Text>
-                                                                ))}
-                                                            </Group>
-                                                        </Table.Td>
-                                                        <Table.Td>
-                                                            <Sparkline data={stock.sparkline_posts || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
-                                                                {(stock.sparkline_posts || []).map((v, i) => (
-                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{v?.toLocaleString()}</Text>
-                                                                ))}
-                                                            </Group>
                                                         </Table.Td>
                                                     </Table.Tr>
                                                 ))}
@@ -960,377 +922,152 @@ export default function Home() {
                                 );
                             })}
                         </ScrollArea>
-                    ) : (isMobile && viewMode === 'card') ? (
-                        <div className="flex flex-col gap-3">
-                            {sortedStocks.map((stock) => (
-                                <Card key={stock.code} shadow="sm" padding="lg" radius="md" withBorder>
-                                    <Group justify="space-between" mb="xs">
-                                        <Text fw={500}>{stock.name}</Text>
-                                        <Badge color={stock.change_rate.includes('+') ? 'red' : 'blue'}>{stock.change_rate}</Badge>
-                                    </Group>
-                                    <Group gap="xs" mb="xs">
-                                        <Text size="sm" c="dimmed">Posts: <b>{stock.recent_posts_count || stock.count_today}</b></Text>
-                                        <Text size="sm" c="dimmed">For.: {stock.foreign_rate || stock.foreign_ratio_today}</Text>
-                                    </Group>
-                                    {(stock.is_last_captured || stock.is_consecutive) && <Badge variant="outline" mb="xs" color="green" size="sm" leftSection={<IconCheck size={12} />}>연속 포착</Badge>}
-                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }} mb="xs">{stock.posts_summary || stock.summary}</Text>
-
-                                    <Group grow>
-                                        <Button
-                                            variant="light"
-                                            color="teal"
-                                            size="xs"
-                                            leftSection={<IconCopy size={14} />}
-                                            onClick={() => handleCopyAndOpen(stock.code, stock.name)}
-                                        >
-                                            매수 (Buy)
-                                        </Button>
-                                        <Button
-                                            variant="light"
-                                            color="blue"
-                                            size="xs"
-                                            leftSection={<IconCoin size={14} />}
-                                            onClick={() => openQuickOrder(stock)}
-                                        >
-                                            Trade Order
-                                        </Button>
-                                    </Group>
-                                </Card>
-                            ))}
-                        </div>
                     ) : (
-                        <ScrollArea type="always" offsetScrollbars>
-                            <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}> {/* Ensure width for sticky behavior */}
-                                <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
-                                    <Table.Tr>
-                                        {/* Sticky First Column Header */}
-                                        <Table.Th
-                                            onClick={() => handleSort('name')}
-                                            style={{
-                                                cursor: 'pointer',
-                                                position: 'sticky',
-                                                left: 0,
-                                                zIndex: 4,
-                                                backgroundColor: 'var(--mantine-color-body)',
-                                                boxShadow: '2px 0 5px rgba(0,0,0,0.1)'
-                                            }}
-                                        >
-                                            종목명 (코드) {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
-                                        </Table.Th>
-                                        <Table.Th onClick={() => handleSort('price')} style={{ cursor: 'pointer' }}>현재가 {sortConfig?.key === 'price' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th>어제가</Table.Th>
-                                        <Table.Th onClick={() => handleSort('change_rate')} style={{ cursor: 'pointer' }}>등락률 {sortConfig?.key === 'change_rate' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th onClick={() => handleSort('volume')} style={{ cursor: 'pointer' }}>거래량 {sortConfig?.key === 'volume' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th onClick={() => handleSort('recent_posts_count')} style={{ cursor: 'pointer' }}>토론글 {sortConfig?.key === 'recent_posts_count' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}</Table.Th>
-                                        <Table.Th>외인비(현)</Table.Th>
-                                        <Table.Th>외인비(전)</Table.Th>
-                                        <Table.Th>감성</Table.Th>
-                                        <Table.Th>연속</Table.Th>
-                                        <Table.Th>요약 (Click)</Table.Th>
-                                    </Table.Tr>
-                                </Table.Thead>
-                                <Table.Tbody>
-                                    {sortedStocks.map((stock) => (
-                                        <Table.Tr key={stock.code}>
-                                            {/* Sticky First Column Data */}
-                                            <Table.Td
-                                                style={{
-                                                    position: 'sticky',
-                                                    left: 0,
-                                                    backgroundColor: 'var(--mantine-color-body)',
-                                                    zIndex: 2,
-                                                    boxShadow: '2px 0 5px rgba(0,0,0,0.1)'
-                                                }}
-                                            >
-                                                <Text fw={700}>
-                                                    <Group gap={4}>
-                                                        <a href={`https://finance.naver.com/item/main.naver?code=${stock.code}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+
+                        viewMode === 'table' ? (
+                            // --- TABLE VIEW ---
+                            <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+                                <ScrollArea>
+                                    <Table striped highlightOnHover>
+                                        <Table.Thead>
+                                            <Table.Tr>
+                                                <ThSort sortKey="name">종목명</ThSort>
+                                                <ThSort sortKey="price">현재가</ThSort>
+                                                <ThSort sortKey="change_rate">등락률</ThSort>
+                                                <ThSort sortKey="recent_posts_count">게시글수</ThSort>
+                                                <ThSort sortKey="foreign_rate">외인소진율</ThSort>
+                                                <Table.Th>시장</Table.Th>
+                                            </Table.Tr>
+                                        </Table.Thead>
+                                        <Table.Tbody>
+                                            {sortedStocks.length > 0 ? (
+                                                sortedStocks.map((stock) => (
+                                                    <Table.Tr key={stock.code} style={{ cursor: 'pointer' }} onClick={() => handleCopyAndOpen(stock.code, stock.name)}>
+                                                        <Table.Td fw={700}>
                                                             {stock.name}
-                                                        </a>
-                                                        <Group gap={2}>
-                                                            <ActionIcon size="sm" variant="subtle" color="teal" onClick={() => handleCopyAndOpen(stock.code, stock.name)}>
-                                                                <IconCopy size={16} />
-                                                            </ActionIcon>
-                                                            <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => openQuickOrder(stock)}>
-                                                                <IconCoin size={16} />
-                                                            </ActionIcon>
-                                                        </Group>
-                                                    </Group>
-                                                </Text>
-                                                <Text size="xs" c="dimmed">{stock.code}</Text>
-                                            </Table.Td>
-                                            <Table.Td>{stock.price || stock.current_price}</Table.Td>
-                                            <Table.Td>{stock.prev_close || stock.yesterday_close}</Table.Td>
-                                            <Table.Td style={{ color: stock.change_rate.includes('+') ? 'red' : 'blue' }}>{stock.change_rate}</Table.Td>
-                                            <Table.Td>{stock.volume}</Table.Td>
-                                            <Table.Td>{stock.recent_posts_count || stock.count_today}</Table.Td>
-                                            <Table.Td>{stock.foreign_rate || stock.foreign_ratio_today}</Table.Td>
-                                            <Table.Td>{stock.prev_foreign_rate || stock.foreign_ratio_yesterday}</Table.Td>
-                                            <Table.Td>
-                                                <Badge color={stock.sentiment === '긍정' ? 'green' : stock.sentiment === '부정' ? 'red' : 'gray'}>
-                                                    {stock.sentiment}
-                                                </Badge>
-                                            </Table.Td>
-                                            <Table.Td>{(stock.is_last_captured || stock.is_consecutive) ? <IconCheck size={16} color="green" /> : '-'}</Table.Td>
-                                            <Table.Td style={{ maxWidth: 200 }}>
-                                                <Popover width={300} position="bottom" withArrow shadow="md">
-                                                    <Popover.Target>
-                                                        <Text truncate style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-                                                            {stock.posts_summary || stock.summary}
-                                                        </Text>
-                                                    </Popover.Target>
-                                                    <Popover.Dropdown>
-                                                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{stock.posts_summary || stock.summary}</Text>
-                                                    </Popover.Dropdown>
-                                                </Popover>
-                                            </Table.Td>
-                                        </Table.Tr>
-                                    ))}
-                                </Table.Tbody>
-                            </Table>
-                        </ScrollArea>
-                    )
-                }
-
-
-                <Paper withBorder p="md" mt="xl" bg="gray.0">
-                    <Text fw={700} size="sm" mb="xs">🛠️ 시스템 로그 (Debug Console)</Text>
-                    <ScrollArea h={150} type="always" bg="black" style={{ borderRadius: 8 }}>
-                        <div style={{ padding: 10 }}>
-                            {systemLogs.length === 0 ? <Text c="dimmed" size="xs">로그 대기 중...</Text> :
-                                systemLogs.map((log, i) => (
-                                    <Text key={i} c="green" size="xs" style={{ fontFamily: 'monospace' }}>{log}</Text>
-                                ))
-                            }
-                        </div>
-                    </ScrollArea>
-                </Paper>
-            </AppShell.Main >
-
-            {/* Scraper Control Modal */}
-            < Modal opened={controlOpened} onClose={closeControl} title="스크래퍼 제어 센터 (Scraper Control)" centered >
-                <PasswordInput
-                    label="GitHub Personal Access Token (PAT)"
-                    placeholder="ghp_..."
-                    value={githubToken}
-                    onChange={(e) => setGithubToken(e.target.value)}
-                    description="Actions 실행 권한이 필요합니다 (브라우저 저장됨)"
-                    mb="md"
-                />
-                <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
-                    지금 즉시 실행 (RUN NOW)
-                </Button>
-
-                <Paper withBorder p="sm" mt="md" bg="gray.1">
-                    <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
-                    <ScrollArea h={150}>
-                        {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
-                    </ScrollArea>
-                </Paper>
-            </Modal >
-
-            {/* Research List Modal */}
-            < Modal opened={researchModalOpened} onClose={closeResearchModal} title={`오늘의 리포트 (${selectedResearchCategory && research?.[selectedResearchCategory]?.today_count}건)`} centered size="90%" styles={{ body: { height: '80vh', overflow: 'hidden', padding: 0 } }}>
-                {selectedResearchCategory && research?.[selectedResearchCategory]?.items?.length > 0 ? (
-                    isMobile ? (
-                        // --- Mobile View (Stacked) ---
-                        <ScrollArea h="100%" p="md">
-                            <div className="flex flex-col gap-4">
-                                {/* Insight Summary Top */}
-                                <Paper withBorder p="sm" bg="blue.0" radius="md">
-                                    <Group mb="xs">
-                                        <IconNews size={20} color="#228be6" />
-                                        <Text fw={700} size="md" c="blue.8">오늘의 시장 인사이트</Text>
-                                    </Group>
-                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                                        {research[selectedResearchCategory].summary}
-                                    </Text>
-                                </Paper>
-
-                                {/* List Area */}
-                                <div className="flex flex-col gap-3">
-                                    {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                                        <Card key={idx} shadow="sm" padding="md" radius="md" withBorder>
-                                            <Text fw={700} size="md" mb="xs">{item.title}</Text>
-
-                                            {/* Tags */}
-                                            <Group gap={6} mb="sm">
-                                                <Badge color="gray" size="xs">{item.date}</Badge>
-                                                {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
-                                                    <Badge size="xs" color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
-                                                        {item.pdf_analysis.opinion}
-                                                    </Badge>
-                                                )}
-                                            </Group>
-
-                                            {/* Summary */}
-                                            <Paper bg="gray.1" p="xs" radius="sm" mb="sm">
-                                                <Text size="xs" c="dimmed" lineClamp={4}>
-                                                    {item.body_summary || "요약 내용이 없습니다."}
-                                                </Text>
-                                            </Paper>
-
-                                            {/* Buttons */}
-                                            <Group justify="end" gap="xs">
-                                                <Button variant="light" size="xs" component="a" href={item.link} target="_blank">본문</Button>
-                                                {item.pdf_link && (
-                                                    <>
-                                                        <Button variant="light" size="xs" color="grape" onClick={() => {
-                                                            setPdfItem(item);
-                                                        }}>AI 분석</Button>
-                                                        <Button variant="outline" size="xs" component="a" href={item.pdf_link} target="_blank">PDF</Button>
-                                                    </>
-                                                )}
-                                            </Group>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        </ScrollArea>
-                    ) : (
-                        // --- Desktop View (Split) ---
-                        <Grid h="100%" gutter={0}>
-                            {/* Left: List */}
-                            <Grid.Col span={4} style={{ borderRight: '1px solid #eee', height: '100%' }}>
-                                <ScrollArea h="100%" p="md">
-                                    {/* Insight Summary */}
-                                    <Paper withBorder p="sm" bg="blue.0" radius="md" mb="md">
-                                        <Group mb="xs">
-                                            <IconNews size={20} color="#228be6" />
-                                            <Text fw={700} size="sm" c="blue.8">오늘의 시장 인사이트</Text>
-                                        </Group>
-                                        <Text size="xs" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                                            {research[selectedResearchCategory].summary}
-                                        </Text>
-                                    </Paper>
-
-                                    <div className="flex flex-col gap-2">
-                                        {research[selectedResearchCategory].items.map((item: any, idx: number) => (
-                                            <UnstyledButton
-                                                key={idx}
-                                                onClick={() => {
-                                                    if (item.pdf_link) {
-                                                        setPdfItem(item);
-                                                    } else {
-                                                        window.open(item.link, '_blank');
-                                                    }
-                                                }}
-                                                style={{
-                                                    padding: '12px',
-                                                    borderRadius: '8px',
-                                                    border: '1px solid #eee',
-                                                    backgroundColor: 'white',
-                                                    transition: 'all 0.2s',
-                                                }}
-                                                className="hover:bg-gray-50 hover:shadow-sm"
-                                            >
-                                                <Text fw={600} size="sm" mb={4} lineClamp={1}>{item.title}</Text>
-                                                <Group gap={4} mb={4}>
-                                                    <Badge size="xs" variant="dot" color="gray">{item.date}</Badge>
-                                                    {item.pdf_analysis?.opinion && item.pdf_analysis.opinion !== 'N/A' && (
-                                                        <Badge size="xs" variant="light" color={item.pdf_analysis.opinion === 'BUY' ? 'red' : 'orange'}>
-                                                            {item.pdf_analysis.opinion}
-                                                        </Badge>
-                                                    )}
-                                                </Group>
-                                                <Text size="xs" c="dimmed" lineClamp={2}>{item.body_summary}</Text>
-                                            </UnstyledButton>
-                                        ))}
-                                    </div>
+                                                            {stock.source === 'volume' && <Badge size="xs" color="gray" ml={4} variant="outline">Vol</Badge>}
+                                                            {stock.source === 'rising' && <Badge size="xs" color="red" ml={4} variant="outline">Rise</Badge>}
+                                                        </Table.Td>
+                                                        <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>
+                                                        <Table.Td c={Number(stock.change_rate.replace('%', '')) > 0 ? 'red' : 'blue'}>
+                                                            {stock.change_rate}
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Badge variant="light" color={stock.recent_posts_count && stock.recent_posts_count >= 50 ? 'red' : 'gray'}>
+                                                                {stock.recent_posts_count}
+                                                            </Badge>
+                                                        </Table.Td>
+                                                        <Table.Td>{stock.foreign_rate || '-'}</Table.Td>
+                                                        <Table.Td><Badge size="xs" variant="outline">{stock.market}</Badge></Table.Td>
+                                                    </Table.Tr>
+                                                ))
+                                            ) : (
+                                                <Table.Tr>
+                                                    <Table.Td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
+                                                        <Text c="dimmed">데이터가 없습니다.</Text>
+                                                    </Table.Td>
+                                                </Table.Tr>
+                                            )}
+                                        </Table.Tbody>
+                                    </Table>
                                 </ScrollArea>
-                            </Grid.Col>
-                            {/* Right: PDF Viewer or Placeholder */}
-                            <Grid.Col span={8} h="100%" bg="gray.0">
-                                <Center h="100%">
-                                    <div className="text-center text-gray-400">
-                                        <IconNews size={48} className="mx-auto mb-2 opacity-50" />
-                                        <Text>왼쪽 리스트에서 리포트를 선택하세요</Text>
-                                    </div>
-                                </Center>
-                            </Grid.Col>
-                        </Grid>
-                    )
-                ) : (
-                    <Center h="100%"><Text c="dimmed">등록된 리포트가 없습니다.</Text></Center>
-                )}
-            </Modal>
+                            </Paper>
+                        ) : (
+                            // --- CARD VIEW (Original) ---
+                            <Grid>
+                                {sortedStocks.map((stock) => (
+                                    <Grid.Col key={stock.code} span={{ base: 12, sm: 6, lg: 4 }}>
+                                        <Card shadow="sm" padding="lg" radius="md" withBorder onClick={() => handleCopyAndOpen(stock.code, stock.name)} style={{ cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'translateY(-2px)' } }}>
+                                            <Group justify="space-between" mb="xs">
+                                                <Text fw={700} size="lg">{stock.name}</Text>
+                                                <Badge
+                                                    color={stock.market === 'KOSPI' ? 'blue' : 'green'}
+                                                    variant="light"
+                                                >
+                                                    {stock.market}
+                                                </Badge>
+                                            </Group>
 
+                                            <Group mb="md" gap="xs">
+                                                <Text size="xl" fw={700}>{Number(stock.price).toLocaleString()}원</Text>
+                                                <Text
+                                                    c={Number(stock.change_rate.replace('%', '')) > 0 ? 'red' : 'blue'}
+                                                    fw={700}
+                                                >
+                                                    {stock.change_rate}
+                                                </Text>
+                                            </Group>
 
-            {/* PDF Analysis Modal */}
-            < Modal opened={!!pdfItem} onClose={() => setPdfItem(null)} title="AI 심층 리포트 분석" centered size="xl" >
-                {pdfItem && (
-                    <div className="flex flex-col gap-4">
-                        <Group justify="space-between" align="center" style={{ borderBottom: '1px solid #eee', paddingBottom: 10 }}>
-                            <div>
-                                <Text fw={700} size="xl">{pdfItem.title}</Text>
-                                <Text size="sm" c="dimmed">발행일: {pdfItem.date}</Text>
-                            </div>
-                            <Group>
-                                <Badge size="lg" color={pdfItem.pdf_analysis?.opinion === 'BUY' ? 'red' : 'gray'}>
-                                    {pdfItem.pdf_analysis?.opinion || 'N/A'}
-                                </Badge>
-                                <Badge size="lg" variant="outline">
-                                    TP: {pdfItem.pdf_analysis?.target_price || 'N/A'}
-                                </Badge>
-                            </Group>
-                        </Group>
+                                            <Group justify="space-between" mt="md" align="center">
+                                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                    {stock.is_consecutive && (
+                                                        <Badge color="orange" variant="filled">🔥 연속등장</Badge>
+                                                    )}
+                                                    {Number(stock.recent_posts_count) >= 100 && (
+                                                        <Badge color="red" variant="filled">HOT</Badge>
+                                                    )}
+                                                    {/* Source Badges */}
+                                                    {stock.source === 'volume' && <Badge color="gray" variant="outline">Vol</Badge>}
+                                                    {stock.source === 'rising' && <Badge color="red" variant="outline">Rise</Badge>}
+                                                </div>
+                                                <Group gap={4}>
+                                                    <IconNews size={16} color="gray" />
+                                                    <Text size="sm" c="dimmed">
+                                                        {stock.recent_posts_count} posts
+                                                    </Text>
+                                                </Group>
+                                            </Group>
 
-                        <div className="flex gap-4" style={{ height: '60vh' }}>
-                            {/* Left: Structured Analysis */}
-                            <ScrollArea className="w-1/2 bg-gray-50 p-4 rounded-md">
-                                <Text fw={700} size="lg" mb="md" c="violet.8">💡 핵심 투자 포인트</Text>
-                                <Text style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }} size="sm">
-                                    {pdfItem.pdf_analysis?.summary || "PDF 분석 데이터가 없습니다."}
-                                </Text>
-                            </ScrollArea>
+                                            {stock.top_keywords && (
+                                                <Paper bg="gray.0" p="xs" mt="md" radius="sm">
+                                                    <Group gap={4} mb={4}>
+                                                        <IconCopy size={12} style={{ opacity: 0.5 }} />
+                                                        <Text size="xs" c="dimmed" fw={700}>토론 키워드:</Text>
+                                                    </Group>
+                                                    <Text size="xs" lineClamp={2} style={{ wordBreak: 'keep-all' }}>
+                                                        {stock.top_keywords}
+                                                    </Text>
+                                                </Paper>
+                                            )}
 
-                            {/* Right: Context & Tables */}
-                            <ScrollArea className="w-1/2 bg-white p-4 rounded-md border border-gray-200">
-                                <Text fw={700} size="lg" mb="md" c="teal.8">📊 핵심 재무 데이터 (Table)</Text>
+                                            {/* Sentinel-V Buy/Sell Badges (if exposed in JSON, currently in Telegram mostly but... lets see if analyze_discussion_trend stores it) */}
+                                            {/* Currently not in JSON, but can be added if needed */}
+                                        </Card>
+                                    </Grid.Col>
+                                ))}
+                            </Grid>
+                        )
+                    )}
 
-                                {/* PDF Tables (New) */}
-                                {pdfItem.pdf_analysis?.tables && pdfItem.pdf_analysis.tables.length > 0 ? (
-                                    <div className="flex flex-col gap-4 mb-6">
-                                        {pdfItem.pdf_analysis.tables.map((table: string, i: number) => (
-                                            <Paper key={i} withBorder p="xs" bg="gray.1">
-                                                <Text size="xs" fw={700} mb={1} c="dimmed">Table {i + 1}</Text>
-                                                <ScrollArea>
-                                                    <div style={{ whiteSpace: 'pre', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.2 }}>
-                                                        {table}
-                                                    </div>
-                                                </ScrollArea>
-                                            </Paper>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <Text size="sm" c="dimmed" mb="md">PDF에서 추출된 표가 없습니다.</Text>
-                                )}
+                {/* Scraper Control Modal */}
+                <Modal opened={controlOpened} onClose={closeControl} title="Scraper Control Center (GitHub Actions)" centered>
+                    <Text size="sm" mb="md" c="dimmed">
+                        GitHub Actions 워크플로우를 직접 실행합니다.<br />
+                        실행 시 최신 데이터가 수집되며 약 1~2분 소요됩니다.
+                    </Text>
 
-                                <Divider my="sm" />
+                    <PasswordInput
+                        label="GitHub Personal Access Token (PAT)"
+                        placeholder="ghp_..."
+                        value={githubToken}
+                        onChange={(event) => setGithubToken(event.currentTarget.value)}
+                        mb="md"
+                        description="설정 > Developer settings > Tokens (classic) > repo 권한 필요"
+                    />
 
-                                <Paper withBorder p="sm" mb="md" bg="blue.0">
-                                    <Text size="xs" fw={700} c="blue.8" mb={1}>웹 게시글 요약 (Cross-Check)</Text>
-                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{pdfItem.body_summary || "웹 요약 없음"}</Text>
-                                </Paper>
+                    <Button fullWidth onClick={runScraper} loading={workflowStatus === 'running'} color="teal">
+                        지금 즉시 실행 (RUN NOW)
+                    </Button>
 
-                                <Text fw={700} size="sm" mb="xs">📄 원문 발췌 (Snippet)</Text>
-                                <Paper withBorder p="sm" bg="gray.0">
-                                    <Text size="xs" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                                        {pdfItem.pdf_analysis?.raw_text_snippet || "원문 텍스트 없음"}
-                                    </Text>
-                                </Paper>
-                            </ScrollArea>
-                        </div>
+                    <Paper withBorder p="sm" mt="md" bg="gray.1">
+                        <Text size="sm" fw={700} mb="xs">실시간 상태 로그:</Text>
+                        <ScrollArea h={150}>
+                            {workflowLogs.length === 0 ? <Text size="xs" c="dimmed">대기 중...</Text> : workflowLogs.map((log, i) => <Text key={i} size="xs">{log}</Text>)}
+                        </ScrollArea>
+                    </Paper>
+                </Modal >
 
-                        <Group justify="flex-end" mt="md">
-                            <Button component="a" href={pdfItem.pdf_link} target="_blank" variant="default">
-                                PDF 원본 열기
-                            </Button>
-                            <Button onClick={() => setPdfItem(null)} color="gray">닫기</Button>
-                        </Group>
-                    </div>
-                )}
-            </Modal >
-        </AppShell >
+            </AppShell.Main>
+        </AppShell>
     );
 }

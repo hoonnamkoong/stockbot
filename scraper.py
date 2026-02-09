@@ -114,8 +114,139 @@ def get_top_trending_stocks(market_type='KOSPI'):
     except Exception as e:
         print(f"Error fetching trending stocks for {market_type}: {e}")
         return []
+    except Exception as e:
+        print(f"Error fetching trending stocks for {market_type}: {e}")
+        return []
 
 
+def get_top_rising_stocks(market_type='KOSPI'):
+    """
+    네이버 금융 상승률 상위(Top Rising) 종목 리스트를 가져옵니다.
+    market_type: 'KOSPI' or 'KOSDAQ'
+    """
+    sosok = '0' if market_type == 'KOSPI' else '1'
+    url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}" 
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    }
+    
+    exclude_keywords = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
+
+    try:
+        print(f"[DEBUG] Fetching {market_type} Rising stocks...", flush=True)
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.content.decode('euc-kr', 'replace'), 'html.parser')
+        
+        table = soup.select_one('table.type_2')
+        if not table: return []
+
+        rows = table.select('tr')
+        data = []
+        for row in rows:
+            cols = row.select('td')
+            if len(cols) < 10: continue
+
+            try:
+                name_tag = cols[1].select_one('a')
+                if not name_tag: continue
+                name = name_tag.get_text(strip=True)
+                
+                is_excluded = False
+                for kw in exclude_keywords:
+                    if kw in name.upper():
+                        is_excluded = True
+                        break
+                if is_excluded: continue
+
+                url_suffix = name_tag['href']
+                code = url_suffix.split('code=')[-1]
+                
+                price_str = cols[2].get_text(strip=True).replace(',', '')
+                current_price = int(price_str) if price_str.isdigit() else 0
+                
+                change_rate = cols[4].get_text(strip=True).strip()
+                
+                stock_info = {
+                    'market': market_type,
+                    'code': code,
+                    'name': name,
+                    'price': current_price,
+                    'change_rate': change_rate,
+                    'source': 'rising'
+                }
+                data.append(stock_info)
+            except:
+                continue
+
+        return data[:20] # Top 20 as requested
+    except Exception as e:
+        print(f"Error fetching Rising stocks: {e}")
+        return []
+
+
+def get_top_rising_stocks(market_type='KOSPI'):
+    """
+    네이버 금융 상승률 상위(Top Rising) 종목 리스트를 가져옵니다.
+    market_type: 'KOSPI' or 'KOSDAQ'
+    """
+    sosok = '0' if market_type == 'KOSPI' else '1'
+    url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}" 
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    }
+    
+    exclude_keywords = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
+
+    try:
+        print(f"[DEBUG] Fetching {market_type} Rising stocks...", flush=True)
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.content.decode('euc-kr', 'replace'), 'html.parser')
+        
+        table = soup.select_one('table.type_2')
+        if not table: return []
+
+        rows = table.select('tr')
+        data = []
+        for row in rows:
+            cols = row.select('td')
+            if len(cols) < 10: continue
+
+            try:
+                name_tag = cols[1].select_one('a')
+                if not name_tag: continue
+                name = name_tag.get_text(strip=True)
+                
+                is_excluded = False
+                for kw in exclude_keywords:
+                    if kw in name.upper():
+                        is_excluded = True
+                        break
+                if is_excluded: continue
+
+                url_suffix = name_tag['href']
+                code = url_suffix.split('code=')[-1]
+                
+                price_str = cols[2].get_text(strip=True).replace(',', '')
+                current_price = int(price_str) if price_str.isdigit() else 0
+                
+                change_rate = cols[4].get_text(strip=True).strip()
+                
+                stock_info = {
+                    'market': market_type,
+                    'code': code,
+                    'name': name,
+                    'price': current_price,
+                    'change_rate': change_rate,
+                    'source': 'rising'
+                }
+                data.append(stock_info)
+            except:
+                continue
+
+        return data[:20] # Top 20 as requested
+    except Exception as e:
+        print(f"Error fetching Rising stocks: {e}")
+        return []
 def get_stock_details(code):
     """
     특정 종목의 상세 정보(전일종가, 외국인소진율 이력 등)를 가져옵니다.
@@ -589,43 +720,58 @@ if __name__ == "__main__":
 
     # [Note] Legacy Telegram Notification for Research also disabled.
 
-    markets = ['KOSPI', 'KOSDAQ']
-    # ... (rest of code) ...
-    
     all_data = [] # 통합 데이터 저장용
 
+    # [Consolidated Scraping V8.0]
+    # Fetch Volume Top 30 + Rising Top 20
+    candidates = []
+    
+    for market in markets:
+        # 1. Volume Top 30
+        vol_stocks = get_top_trending_stocks(market)
+        for s in vol_stocks: s['source'] = 'volume'
+        candidates.extend(vol_stocks)
+        
+        # 2. Rising Top 20
+        rise_stocks = get_top_rising_stocks(market)
+        candidates.extend(rise_stocks)
+    
+    # Deduplicate by Code
+    unique_candidates = {}
+    for stock in candidates:
+        if stock['code'] not in unique_candidates:
+            unique_candidates[stock['code']] = stock
+        else:
+            # If already exists, maybe update source info to 'both'?
+            pass
+            
+    print(f"\n[System] Total Unique Candidates: {len(unique_candidates)}")
+
+    # Process Candidates
     today_consecutive_check_done = False
     yesterday_codes = set()
     
     # [Consecutive Check V7.4]
     try:
         yesterday_codes = get_yesterday_last_stocks()
-        print(f"[System] Loaded {len(yesterday_codes)} stocks from yesterday for consecutive check.")
-    except Exception as e:
-        print(f"[System] Consecutive check setup failed: {e}")
+    except:
+        pass
 
-    for market in markets:
-        if market == 'KOSDAQ':
-             print("Wait 5 seconds before KOSDAQ...", flush=True)
-             time.sleep(5)
+    count_collected = 0
+    
+    print("\n[System] Starting detailed analysis & filtering...")
+    
+    for code, stock in unique_candidates.items():
+        # ... logic ...
+        # Need to iterate values
+        pass 
 
-        print(f"\n[{market}] Starting collection...")
-        # Get MORE stocks to ensure we find enough active ones (Top 50)
-        trending_stocks = get_top_trending_stocks(market)
-        # Limit to top 50 (Apply function limit)
-        # Assuming get_top_trending_stocks returns whatever it finds on page (usually 100 if not sliced)
-        
-        # In this edited version, we'll slice larger
-        source_count = len(trending_stocks)
-        print(f"Found {source_count} stocks in {market} Top list.")
-        
-        count_collected = 0
-        
-        for i, stock in enumerate(trending_stocks):
-            # Performance safety / Limit (User Request V7.0: 20 stocks)
-            if i >= 20: break 
-            
-            # 1. 상세 정보 (전일종가, 외국인)
+    # Refactor loop to use dict values
+    for stock in unique_candidates.values():
+        market = stock['market']
+        # Proceed with Detail Fetching & Threshold Check
+        try:
+             # 1. 상세 정보 (전일종가, 외국인)
             details = get_stock_details(stock['code'])
             stock.update(details)
             
@@ -634,83 +780,76 @@ if __name__ == "__main__":
             recent_count = stats.get('recent_posts_count', 0)
             
             # FILTER HERE
-            # FILTER HERE
             if recent_count >= threshold:
                 stock['recent_posts_count'] = recent_count
                 
                 # [Deep Dive V7.5] Analyze Top 10 Liked Posts
                 raw_latest = stats.get('latest_posts', [])
-                # Take Top 10 (Already sorted by likes in get_discussion_stats? No, we need to ensure int sort there or here)
-                # Ensure sort by likes descending
                 raw_latest.sort(key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
-                candidates = raw_latest[:10]
+                candidates_posts = raw_latest[:10] # Renamed from 'candidates' to avoid confusion
                 
-                print(f"   [Deep Dive] Fetching body for {len(candidates)} posts...")
-                for post in candidates:
+                print(f"   [dtl] {stock['name']}: {recent_count} (Fetching bodies...)")
+                for post in candidates_posts:
                     if post.get('link'):
                         post['body'] = fetch_post_body(post['link'])
                     else:
                         post['body'] = ""
                 
-                stock['latest_posts'] = candidates # Assign enriched posts
+                stock['latest_posts'] = candidates_posts
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
                 
+                # Keywords (for Sentinel-V)
+                titles = [p['title'] for p in candidates_posts]
+                stock['top_keywords'] = ", ".join(titles[:3]) if titles else ""
+
                 # Consecutive Flag
                 if stock['code'] in yesterday_codes:
                     stock['is_consecutive'] = True
-                    # Legacy 'summary' field update for frontend display if needed
-                    # stock['posts_summary'] = "[연속] " + stock.get('posts_summary', '') 
                 else:
                     stock['is_consecutive'] = False
 
                 all_data.append(stock)
                 count_collected += 1
-                print(f" [KEEP] {stock['name']}: {recent_count} posts (Threshold {threshold})")
+                # print(f" [KEEP] {stock['name']}: {recent_count} posts")
             else:
-                # print(f" [SKIP] {stock['name']}: {recent_count} posts")
                 pass
 
-        print(f"Collected {count_collected} items from {market} meeting criteria.")
+        except Exception as e:
+            print(f"Error processing {stock['name']}: {e}")
+            continue
 
-    # --- 5. Telegram Notification (Refactored V7.0 - Zero Base) ---
+    print(f"\n[System] Final Collected Items: {len(all_data)}")
+    # --- Consolidated Analysis & Notification (V8.0) ---
     try:
         from src.telegram_manager import TelegramManager
+        from src.features.sentinel_v import SentinelV
+        
         try:
             tg_manager = TelegramManager()
-            # DEBUG: Check credentials
-            print(f"[DEBUG] Telegram Token Loaded: {bool(tg_manager.token)}")
-            print(f"[DEBUG] Telegram Chat ID Loaded: {bool(tg_manager.chat_id)}")
-        except Exception as e:
-            print(f"[WARNING] Failed to initialize TelegramManager: {e}")
+        except:
             tg_manager = None
-
-        # Prepare Data for Saving (Always, even if empty)
+            
         import json
         os.makedirs('data', exist_ok=True)
+        
+        json_records = []
+        result_df_kr = None
         
         if all_data:
             print(f"\nAnalyzing total {len(all_data)} items...")
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
-            
-            # [Fix 2026-01-13] Replace NaN with None (null in JSON)
             result_df_en = result_df_en.where(pd.notnull(result_df_en), None)
             json_records = result_df_en.to_dict('records')
-            
-            
+
             # [Feature: 5-Day Cumulative Analysis]
             extra_sheets = {}
             try:
                 from src import analyzer_5days
                 df_5days = analyzer_5days.analyze_5days()
                 if not df_5days.empty:
-                    # [Fix] Sanitize NaNs
                     df_5days = df_5days.where(pd.notnull(df_5days), None)
-                    # Save JSON for Frontend
                     with open('data/analysis_5days.json', 'w', encoding='utf-8') as f:
                         f.write(df_5days.to_json(orient='records', force_ascii=False))
-                    print(f"[System] Saved 5-Day Analysis JSON (Count: {len(df_5days)})")
-                    
-                    # Add to Excel Sheets
                     extra_sheets['5Day_Analysis'] = df_5days
             except Exception as e:
                 print(f"[Warning] 5-Day Analysis Failed: {e}")
@@ -719,26 +858,21 @@ if __name__ == "__main__":
             try:
                 df_3days = analyzer_5days.analyze_3days()
                 if not df_3days.empty:
-                    # [Fix] Sanitize NaNs
                     df_3days = df_3days.where(pd.notnull(df_3days), None)
-                    # Save JSON for Frontend
                     with open('data/analysis_3days.json', 'w', encoding='utf-8') as f:
                         f.write(df_3days.to_json(orient='records', force_ascii=False))
-                    print(f"[System] Saved 3-Day Analysis JSON (Count: {len(df_3days)})")
-                    
-                    # Add to Excel Sheets
                     extra_sheets['3Day_Analysis'] = df_3days
             except Exception as e:
                 print(f"[Warning] 3-Day Analysis Failed: {e}")
             
-            # Save CSV & Excel (History) with Extra Sheets
+            # Save CSV & Excel
             filename_prefix = f"trending_integrated"
             saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
             
-            # [NEW] Append to Monthly Report
+            # monthly report
             monthly_file, monthly_count = append_to_monthly_report(result_df_kr, now_kst)
             
-            # --- Update Reports Index (reports.json) ---
+            # reports.json update
             if 'excel' in saved_files:
                 reports_file = 'data/reports.json'
                 current_reports = []
@@ -746,132 +880,125 @@ if __name__ == "__main__":
                     try:
                         with open(reports_file, 'r', encoding='utf-8') as f:
                             current_reports = json.load(f)
-                    except:
-                        pass
+                    except: pass
                 
-                # 1. Update or Add Monthly Report Entry
                 if monthly_file:
                     month_str = now_kst.strftime('%Y-%m')
                     month_label = f"{now_kst.month}월 누적 리포트 ({month_str})"
+                    monthly_entry = { "type": "monthly", "date": month_str, "filename": os.path.basename(monthly_file), "count": monthly_count, "label": month_label, "timestamp": datetime.now().timestamp() }
                     
-                    monthly_entry = {
-                        "type": "monthly",
-                        "date": month_str,
-                        "filename": os.path.basename(monthly_file),
-                        "count": monthly_count,
-                        "label": month_label,
-                        "timestamp": datetime.now().timestamp()
-                    }
-                    
-                    # Find and update existing monthly entry or add new one
                     monthly_exists = False
                     for i, report in enumerate(current_reports):
                         if report.get('type') == 'monthly' and report.get('date') == month_str:
                             current_reports[i] = monthly_entry
                             monthly_exists = True
-                            print(f"[System] Updated monthly report entry: {month_label}")
                             break
-                    
                     if not monthly_exists:
-                        # Insert at top (before daily reports)
                         daily_start = next((i for i, r in enumerate(current_reports) if r.get('type') == 'daily'), len(current_reports))
                         current_reports.insert(daily_start, monthly_entry)
-                        print(f"[System] Added new monthly report entry: {month_label}")
                 
-                # 2. Add Daily Report Entry
-                daily_entry = {
-                    "type": "daily",
-                    "date": now_kst.strftime('%Y-%m-%d %H:%M'),
-                    "filename": os.path.basename(saved_files['excel']),
-                    "count": len(all_data),
-                    "timestamp": datetime.now().timestamp()
-                }
-                
-                # Insert daily report after monthly reports
+                daily_entry = { "type": "daily", "date": now_kst.strftime('%Y-%m-%d %H:%M'), "filename": os.path.basename(saved_files['excel']), "count": len(all_data), "timestamp": datetime.now().timestamp() }
                 daily_start = next((i for i, r in enumerate(current_reports) if r.get('type') == 'daily'), len(current_reports))
                 current_reports.insert(daily_start, daily_entry)
                 
-                # 3. Keep only last 50 daily reports, all monthly reports
                 daily_reports = [r for r in current_reports if r.get('type') == 'daily'][:50]
                 monthly_reports = [r for r in current_reports if r.get('type') == 'monthly']
-                
-                # Sort monthly reports by date descending (newest first)
                 monthly_reports.sort(key=lambda x: x.get('date', ''), reverse=True)
-                
                 current_reports = monthly_reports + daily_reports
                 
                 with open(reports_file, 'w', encoding='utf-8') as f:
                     json.dump(current_reports, f, ensure_ascii=False, indent=2)
-                print(f"[System] Updated reports index: {reports_file} (Monthly: {len(monthly_reports)}, Daily: {len(daily_reports)})")
-                
-        else:
-            print(f"\n[System] No data collected (all below threshold {threshold}). Saving empty records.")
-            json_records = []
-            result_df_kr = None
 
-        # Save JSON for Frontend (latest_stocks.json) - ALWAYS
+        # Save latest_stocks.json
         with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
             json.dump(json_records, f, ensure_ascii=False, indent=2)
-        print(f"Data saved to data/latest_stocks.json (Count: {len(json_records)})")
 
-        # [User Request V7.3] Save Time-Specific Snapshot - ALWAYS
+        # Save Time Snapshot
         snapshot_name = None
         if 9 <= current_hour <= 10: snapshot_name = "stocks_1000.json"
         elif 12 <= current_hour <= 13: snapshot_name = "stocks_1300.json"
-        elif 14 <= current_hour <= 23: snapshot_name = "stocks_1500.json" # Covers 14:00 ~ Midnight (Closing Data)
+        elif 14 <= current_hour <= 23: snapshot_name = "stocks_1500.json"
         
         if snapshot_name:
             with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
-            print(f"Snapshot saved: data/{snapshot_name} (Count: {len(json_records)})")
 
-        # Telegram Notifications
-        if all_data:
-            if tg_manager:
-                try:
-                    # Filter Lists
-                    records = result_df_kr.to_dict('records')
-                    kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
-                    kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
+        # --- Consolidated Notification ---
+        if all_data and tg_manager:
+            try:
+                print("[System] Generating Consolidated Telegram Report...")
+                
+                # 1. Market Summary
+                summary_msg = f"📊 <b>[StockBot] Market Report ({datetime.now().strftime('%H:%M')})</b>\n\n"
+                
+                records = result_df_kr.to_dict('records')
+                kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
+                kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
+                
+                if kospi_items:
+                    summary_msg += f"<b>[KOSPI]</b> {len(kospi_items)} items\n"
+                    # Top 3 only
+                    for item in kospi_items[:3]:
+                        summary_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
+                    if len(kospi_items) > 3: summary_msg += f"... and {len(kospi_items)-3} more\n"
+                    summary_msg += "\n"
                     
-                    if kospi_items:
-                        tg_manager.send_market_report('KOSPI', kospi_items)
-                        time.sleep(1)
-                        
-                    if kosdaq_items:
-                        tg_manager.send_market_report('KOSDAQ', kosdaq_items)
-                        time.sleep(1)
+                if kosdaq_items:
+                    summary_msg += f"<b>[KOSDAQ]</b> {len(kosdaq_items)} items\n"
+                    for item in kosdaq_items[:3]:
+                        summary_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
+                    if len(kosdaq_items) > 3: summary_msg += f"... and {len(kosdaq_items)-3} more\n"
+                    summary_msg += "\n"
 
-                    # 2. Expert Trading Guide (Gemini) [NEW]
-                    try:
-                        print(f"[System] Generating Expert Trading Guide...")
-                        gemini = GeminiAgent()
-                        if gemini.model and all_data:
-                            guide_text = gemini.generate_trading_guide(all_data)
-                            if guide_text:
-                                tg_manager.send_message(f"🧠 <b>[StockBot Expert Guide]</b>\n\n{guide_text}")
-                                time.sleep(1)
-                    except Exception as ai_e:
-                        print(f"[ERROR] Gemini Guide Failed: {ai_e}")
+                # 2. Sentinel-V
+                sentinel_msg = ""
+                sentinel = SentinelV()
+                buy_signals = []
+                sell_signals = []
+                
+                for stock in all_data:
+                    signal, reason = sentinel.analyze_stock(stock)
+                    if "BUY" in signal:
+                        buy_signals.append(f"🔴 <b>매수 신호</b>: {stock['name']} ({signal})\n   └ {reason}")
+                    elif "SELL" in signal:
+                        sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ {reason}")
+                
+                if buy_signals or sell_signals:
+                    sentinel_msg = "⚡ <b>[Sentinel-V Signals]</b>\n" + "\n".join(buy_signals + sell_signals) + "\n\n"
+                else:
+                    sentinel_msg = "⚡ <b>[Sentinel-V]</b> 특이 매매 신호 없음\n\n"
 
-                    # 3. Dashboard Link
-                    print(f"[System] Sending Dashboard Link last... (v7.0)")
-                    tg_manager.send_dashboard_link()
-                except Exception as send_err:
-                    print(f"[ERROR] details sending Telegram: {send_err}")
-            else:
-                 print("[System] TelegramManager not available. Skipping notifications.")
-        else:
-            print("No data collected meeting the threshold.")
-            if tg_manager:
-                print(f"[System] Sending No Data Alert (Threshold: {threshold})")
+                # 3. Expert Guide
+                expert_msg = ""
                 try:
-                    tg_manager.send_no_data_alert(threshold)
-                except Exception as e:
-                    print(f"[ERROR] Failed to send No Data Alert: {e}")
+                    gemini = GeminiAgent()
+                    if gemini.model:
+                        # Pass ALL data to Gemini
+                        guide_text = gemini.generate_trading_guide(all_data)
+                        expert_msg = f"🧠 <b>[Expert Guide]</b>\n{guide_text}\n\n"
+                except Exception as user_e:
+                    print(f"Gemini Error: {user_e}")
+
+                # 4. Dashboard
+                dash_msg = f"👉 <b>Dashboard</b>: {os.environ.get('DASHBOARD_URL', '')}"
+
+                final_msg = summary_msg + sentinel_msg + expert_msg + dash_msg
+                
+                if len(final_msg) > 4000:
+                    tg_manager.send_message(summary_msg + sentinel_msg)
+                    tg_manager.send_message(expert_msg + dash_msg)
+                else:
+                    tg_manager.send_message(final_msg)
+                    
+            except Exception as e:
+                print(f"[ERROR] Notification Logic Failed: {e}")
+                
+        elif not all_data and tg_manager:
+            tg_manager.send_no_data_alert(threshold)
 
     except Exception as e:
-        print(f"Failed in notification/saving section: {e}")
+        print(f"Failed in consolidated section: {e}")
+
 
     finally:
         # Save Status JSON for Frontend (ALWAYS RUN)

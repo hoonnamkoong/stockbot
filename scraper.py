@@ -762,17 +762,16 @@ if __name__ == "__main__":
     
     print("\n[System] Starting detailed analysis & filtering...")
     
-    for code, stock in unique_candidates.items():
-        # ... logic ...
-        # Need to iterate values
-        pass 
+    # [Parallel Processing V8.6]
+    import concurrent.futures
 
-    # Refactor loop to use dict values
-    for stock in unique_candidates.values():
-        market = stock['market']
-        # Proceed with Detail Fetching & Threshold Check
+    def process_single_stock(stock, yesterday_codes, threshold):
+        """
+        Process a single stock: fetch details, stats, discussion bodies, and apply logic.
+        Returns the updated stock dict if it meets criteria, else None.
+        """
         try:
-             # 1. 상세 정보 (전일종가, 외국인)
+            # 1. 상세 정보 (전일종가, 외국인)
             details = get_stock_details(stock['code'])
             stock.update(details)
             
@@ -809,15 +808,34 @@ if __name__ == "__main__":
                 else:
                     stock['is_consecutive'] = False
 
-                all_data.append(stock)
-                count_collected += 1
-                # print(f" [KEEP] {stock['name']}: {recent_count} posts")
+                return stock
             else:
-                pass
+                return None
 
         except Exception as e:
             print(f"Error processing {stock['name']}: {e}")
-            continue
+            return None
+
+    # Use ThreadPoolExecutor for Parallel Scraping
+    print(f"\n[System] Starting detailed analysis with Parallel Processing (Workers: 4)...")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        # Prepare arguments for map/submit
+        # We need to pass stock, yesterday_codes, and threshold to each call
+        future_to_stock = {
+            executor.submit(process_single_stock, stock, yesterday_codes, threshold): stock 
+            for stock in unique_candidates.values()
+        }
+        
+        for future in concurrent.futures.as_completed(future_to_stock):
+            stock_ref = future_to_stock[future]
+            try:
+                result = future.result()
+                if result:
+                    all_data.append(result)
+                    count_collected += 1
+            except Exception as exc:
+                print(f"{stock_ref['name']} generated an exception: {exc}")
 
     print(f"\n[System] Final Collected Items: {len(all_data)}")
     # --- Consolidated Analysis & Notification (V8.0) ---

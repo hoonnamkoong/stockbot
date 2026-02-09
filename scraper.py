@@ -869,8 +869,8 @@ if __name__ == "__main__":
             
             # Save CSV & Excel
             filename_prefix = f"trending_integrated"
-            # [User Request] Revert to Korean Format (Original)
-            saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
+            # [User Request] Revert to English Format (Old Format) to fix Dashboard
+            saved_files = analyzer.save_data(result_df_en, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
             
             # --- Fix: Save JSON for Frontend (Dashboard) ---
             try:

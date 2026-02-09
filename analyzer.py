@@ -30,35 +30,34 @@ def analyze_discussion_trend(data_list):
     # [사용자 요청] 컬럼 순서 및 한글 이름 변경
     # 순서: 현재가, 현재 외국인 비중, 어제 종가, 어제 외국인 비중, 어제 대비 등락률, 당일 게시글 수, 당일 게시물 주요 내용 요약 (3문장 이내), 감정 분석, top keyword, 연속 등록
     
-    # 1. 컬럼 매핑 (내부이름 -> 한글이름)
+    # 1. 컬럼 매핑 (User Screenshot Matching)
     col_map = {
-        'market': '시장구분',
+        'market': '시장',  # 시장구분 -> 시장
         'name': '종목명',
         'price': '현재가',
-        'foreign_rate': '현재_외국인비중',
+        'foreign_rate': '외인소진율', # 현재_외국인비중 -> 외인소진율
         'prev_close': '어제_종가',
         'prev_foreign_rate': '어제_외국인비중',
         'change_rate': '등락률',
-        'recent_posts_count': '당일_게시글수',
+        'recent_posts_count': '게시글수', # 당일_게시글수 -> 게시글수
         'posts_summary': '게시물_요약',
         'sentiment': '감정분석',
         'top_keywords': 'Top_Keyword',
         'is_last_captured': '연속_등록'
     }
     
-    # 2. 존재하는 컬럼만 선택하여 순서 지정
-    # 종목코드는 식별용으로 맨 앞에 두는 것이 관례이나, 사용자 요청 순서가 명확하므로 '종목명'을 맨 앞에 두고 커스텀 순서 배치
+    # 2. 존재하는 컬럼만 선택하여 순서 지정 (User Screenshot Order: 종목명, 현재가, 등락률, 게시글수, 외인소진율, 시장...)
     desired_order = [
-        'market', 'name', 'price', 'foreign_rate', 'prev_close', 'prev_foreign_rate', 
-        'change_rate', 'recent_posts_count', 'posts_summary', 
+        'name', 'price', 'change_rate', 'recent_posts_count', 'foreign_rate', 'market',
+        'prev_close', 'prev_foreign_rate', 'posts_summary', 
         'sentiment', 'top_keywords', 'is_last_captured', 'latest_posts'
     ]
     
     final_cols = [c for c in desired_order if c in df_final.columns]
     
-    # 사용자 요청에 없지만 중요한 'code'는 맨 앞에 숨겨두거나 제외? 일단 포함.
+    # code는 식별용으로 남겨둠 (화면에 안보이더라도 필요할 수 있음)
     if 'code' in df_final.columns:
-        final_cols.insert(1, 'code') # market 다음, name 앞
+        final_cols.append('code') 
 
     df_result = df_final[final_cols].rename(columns=col_map)
 

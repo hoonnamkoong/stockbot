@@ -32,14 +32,14 @@ def analyze_discussion_trend(data_list):
     
     # 1. 컬럼 매핑 (User Screenshot Matching)
     col_map = {
-        'market': '시장',  # 시장구분 -> 시장
+        'market': '시장구분',
         'name': '종목명',
         'price': '현재가',
-        'foreign_rate': '외인소진율', # 현재_외국인비중 -> 외인소진율
+        'foreign_rate': '현재_외국인비중',
         'prev_close': '어제_종가',
         'prev_foreign_rate': '어제_외국인비중',
         'change_rate': '등락률',
-        'recent_posts_count': '게시글수', # 당일_게시글수 -> 게시글수
+        'recent_posts_count': '당일_게시글수',
         'posts_summary': '게시물_요약',
         'sentiment': '감정분석',
         'top_keywords': 'Top_Keyword',

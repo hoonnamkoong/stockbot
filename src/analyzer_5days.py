@@ -39,13 +39,17 @@ def normalize_columns(df):
     col_map = {
         '종목명': 'name',
         '시장구분': 'market',
+        '시장': 'market', # Legacy support
         '현재가': 'price',
         '등락률': 'change_rate',
-        '당일_게시글수': 'recent_posts_count', # Also handle variants
+        '당일_게시글수': 'recent_posts_count', 
         '당일 게시글수': 'recent_posts_count',
-        '게시글수': 'recent_posts_count',
+        '게시글수': 'recent_posts_count', # Legacy
         '현재_외국인비중': 'foreign_rate',
-        '어제_종가': 'prev_close'
+        '외인소진율': 'foreign_rate', # Legacy
+        '어제_종가': 'prev_close',
+        '어제_외국인비중': 'prev_foreign_rate',
+        '연속_등록': 'is_last_captured'
     }
     return df.rename(columns=col_map)
 

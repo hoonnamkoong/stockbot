@@ -256,9 +256,25 @@ export default function Home() {
             addSystemLog(`📩 Stocks Status: ${resStocks.status} ${resStocks.statusText}`);
 
             if (resStocks.ok) {
-                const data = await resStocks.json();
-                addSystemLog(`✅ Stocks Loaded: ${data.length} items`);
-                setStocks(data);
+                const rawData = await resStocks.json();
+                // Map Korean Keys (from latest_stocks.json) to English Properties (for Component Logic)
+                const mappedData = rawData.map((item: any) => ({
+                    ...item,
+                    market: item.market || item['시장'] || item['시장구분'],
+                    name: item.name || item['종목명'],
+                    price: item.price || item['현재가'],
+                    change_rate: item.change_rate || item['등락률'],
+                    recent_posts_count: item.recent_posts_count || item['게시글수'] || item['당일_게시글수'] || item['당일 게시글수'],
+                    foreign_rate: item.foreign_rate || item['외인소진율'] || item['현재_외국인비중'],
+                    prev_close: item.prev_close || item['어제_종가'],
+                    prev_foreign_rate: item.prev_foreign_rate || item['어제_외국인비중'],
+                    posts_summary: item.posts_summary || item['게시물_요약'],
+                    sentiment: item.sentiment || item['감정분석'],
+                    top_keywords: item.top_keywords || item['Top_Keyword'],
+                    is_last_captured: item.is_last_captured || item['연속_등록'],
+                }));
+                addSystemLog(`✅ Stocks Loaded: ${mappedData.length} items`);
+                setStocks(mappedData);
             } else {
                 if (slot !== 'latest') {
                     alert(`해당 시간대(${slot})의 데이터가 아직 없습니다.`);
@@ -934,9 +950,9 @@ export default function Home() {
                                                 <ThSort sortKey="name">종목명</ThSort>
                                                 <ThSort sortKey="price">현재가</ThSort>
                                                 <ThSort sortKey="change_rate">등락률</ThSort>
-                                                <ThSort sortKey="recent_posts_count">게시글수</ThSort>
-                                                <ThSort sortKey="foreign_rate">외인소진율</ThSort>
-                                                <Table.Th>시장</Table.Th>
+                                                <ThSort sortKey="recent_posts_count">당일_게시글수</ThSort>
+                                                <ThSort sortKey="foreign_rate">현재_외국인비중</ThSort>
+                                                <Table.Th>시장구분</Table.Th>
                                             </Table.Tr>
                                         </Table.Thead>
                                         <Table.Tbody>

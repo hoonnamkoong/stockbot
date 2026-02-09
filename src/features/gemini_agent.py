@@ -62,6 +62,7 @@ class GeminiAgent:
             else:
                  return {'status': 'PASS', 'reason': "Gemini did not find strong evidence."}
 
+        except Exception as e:
             print(f"[GeminiAgent] Generation Error: {e}")
             return {'status': 'ERROR', 'reason': str(e)}
 

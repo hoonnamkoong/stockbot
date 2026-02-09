@@ -933,19 +933,47 @@ if __name__ == "__main__":
                 records = result_df_kr.to_dict('records')
                 kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
                 if kospi_items:
-                    kospi_msg = f"📉 <b>[KOSPI] Market Report</b> ({len(kospi_items)} items)\n\n"
+                    # Header Style: [KOSPI] Top 5 (토론 급등) (v7.0)
+                    kospi_msg = f"📉 <b>[KOSPI] Top {min(len(kospi_items), 5)} (토론 급등)</b>\n\n"
                     for item in kospi_items[:5]: # Show Top 5
-                        kospi_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
-                    if len(kospi_items) > 5: kospi_msg += f"... and {len(kospi_items)-5} more\n"
+                        name = item['종목명']
+                        # Price/Change might be int or str, handle safely
+                        try:
+                            price = f"{int(item.get('현재가', 0)):,}"
+                        except:
+                            price = item.get('현재가', '0')
+                            
+                        change = item['등락률']
+                        posts = item['당일_게시글수']
+                        summary = item.get('게시물_요약', '요약 없음')
+                        
+                        kospi_msg += f"🔥 <b>{name}</b> ({price}원 | {change})\n"
+                        kospi_msg += f"💬 {posts}개 의견\n"
+                        kospi_msg += f"📝 {summary}\n\n"
+                        
+                    if len(kospi_items) > 5: kospi_msg += f"<i>... and {len(kospi_items)-5} more on Dashboard</i>\n"
                     tg_manager.send_message(kospi_msg)
 
                 # 2. KOSDAQ Report
                 kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
                 if kosdaq_items:
-                    kosdaq_msg = f"📈 <b>[KOSDAQ] Market Report</b> ({len(kosdaq_items)} items)\n\n"
+                    kosdaq_msg = f"📈 <b>[KOSDAQ] Top {min(len(kosdaq_items), 5)} (토론 급등)</b>\n\n"
                     for item in kosdaq_items[:5]: # Show Top 5
-                        kosdaq_msg += f"- {item['종목명']} ({item['등락률']}): {item['당일_게시글수']} posts\n"
-                    if len(kosdaq_items) > 5: kosdaq_msg += f"... and {len(kosdaq_items)-5} more\n"
+                        name = item['종목명']
+                        try:
+                            price = f"{int(item.get('현재가', 0)):,}"
+                        except:
+                            price = item.get('현재가', '0')
+                            
+                        change = item['등락률']
+                        posts = item['당일_게시글수']
+                        summary = item.get('게시물_요약', '요약 없음')
+                        
+                        kosdaq_msg += f"🔥 <b>{name}</b> ({price}원 | {change})\n"
+                        kosdaq_msg += f"💬 {posts}개 의견\n"
+                        kosdaq_msg += f"📝 {summary}\n\n"
+
+                    if len(kosdaq_items) > 5: kosdaq_msg += f"<i>... and {len(kosdaq_items)-5} more on Dashboard</i>\n"
                     tg_manager.send_message(kosdaq_msg)
 
                 # 3. Sentinel-V Signals (Integrated)

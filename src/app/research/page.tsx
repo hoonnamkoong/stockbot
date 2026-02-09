@@ -953,6 +953,9 @@ export default function Home() {
                                                 <ThSort sortKey="recent_posts_count">당일_게시글수</ThSort>
                                                 <ThSort sortKey="foreign_rate">현재_외국인비중</ThSort>
                                                 <Table.Th>시장구분</Table.Th>
+                                                <ThSort sortKey="top_keywords">Top_Keyword</ThSort>
+                                                <ThSort sortKey="sentiment">감정분석</ThSort>
+                                                <Table.Th style={{ width: '30%' }}>게시물_요약</Table.Th>
                                             </Table.Tr>
                                         </Table.Thead>
                                         <Table.Tbody>
@@ -975,11 +978,24 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>{stock.foreign_rate || '-'}</Table.Td>
                                                         <Table.Td><Badge size="xs" variant="outline">{stock.market}</Badge></Table.Td>
+                                                        <Table.Td style={{ whiteSpace: 'nowrap', color: 'var(--mantine-color-dimmed)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock.top_keywords}</Table.Td>
+                                                        <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                                                            <Badge
+                                                                color={stock.sentiment?.includes("Positive") ? "blue" : stock.sentiment?.includes("Negative") ? "red" : "gray"}
+                                                                variant="light"
+                                                                size="sm"
+                                                            >
+                                                                {stock.sentiment?.split(' ')[0] || '-'}
+                                                            </Badge>
+                                                        </Table.Td>
+                                                        <Table.Td style={{ fontSize: '0.85em', color: 'var(--mantine-color-dimmed)', lineHeight: '1.3', minWidth: '250px' }}>
+                                                            {stock.posts_summary}
+                                                        </Table.Td>
                                                     </Table.Tr>
                                                 ))
                                             ) : (
                                                 <Table.Tr>
-                                                    <Table.Td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
+                                                    <Table.Td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>
                                                         <Text c="dimmed">데이터가 없습니다.</Text>
                                                     </Table.Td>
                                                 </Table.Tr>

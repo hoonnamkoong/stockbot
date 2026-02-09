@@ -725,6 +725,7 @@ if __name__ == "__main__":
     # [Consolidated Scraping V8.0]
     # Fetch Volume Top 30 + Rising Top 20
     candidates = []
+    markets = ['KOSPI', 'KOSDAQ']  # [FIX] Define markets
     
     for market in markets:
         # 1. Volume Top 30

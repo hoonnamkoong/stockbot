@@ -104,12 +104,26 @@ class SentinelV:
                 )
                 self.tg.send_message(msg)
         
-        # Silent Heartbeat (User Request: "Why no telegram?")
+        # Silent Heartbeat -> Expert Briefing (User Request: Korean Analysis)
         if not action_taken:
+            print("[Sentinel-V] No signals found. Generating Expert Briefing...")
+            
+            # Prepare data for Gemini (Needs 'top_keywords')
+            analysis_candidates = []
+            for stock in trending_stocks[:10]:
+                # Simple keyword extraction from titles if not present
+                if 'top_keywords' not in stock:
+                    titles = [p['title'] for p in stock.get('latest_posts', [])]
+                    stock['top_keywords'] = ", ".join(titles[:3]) if titles else "이슈 없음"
+                analysis_candidates.append(stock)
+
+            guide = self.gemini.generate_trading_guide(analysis_candidates)
+            
             timestamp = datetime.now().strftime('%H:%M')
-            summary = f"🤖 <b>[Sentinel-V] Scan Complete ({timestamp})</b>\n\n"
-            summary += f"Scanned {len(trending_stocks[:20])} stocks, but no actionable signals found.\n"
-            summary += f"Highest Potential: {scan_results[0] if scan_results else 'None'}"
+            summary = f"🤖 <b>[Sentinel-V] 시장 감시 리포트 ({timestamp})</b>\n\n"
+            summary += f"특이 종목이 포착되지 않았으나, 현재 시장 흐름은 다음과 같습니다:\n\n"
+            summary += guide
+            
             self.tg.send_message(summary)
 
 

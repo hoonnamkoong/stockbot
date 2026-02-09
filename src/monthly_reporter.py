@@ -36,15 +36,16 @@ def send_monthly_report():
     for f in files:
         try:
             df = pd.read_csv(f)
-            
-            # [Fix] Restore English Headers if Korean detected
-            kor_to_eng = {
-                '시장구분': 'market', '종목명': 'name', '현재가': 'price', '현재_외국인비중': 'foreign_rate',
-                '어제_종가': 'prev_close', '어제_외국인비중': 'prev_foreign_rate', '등락률': 'change_rate',
-                '당일_게시글수': 'recent_posts_count', '게시물_요약': 'posts_summary', '감정분석': 'sentiment',
-                'Top_Keyword': 'top_keywords', '연속_등록': 'is_last_captured'
+            # [Fix] Handle English Headers -> Restore to Korean
+            # If the CSV has English headers (from today's earlier runs), convert them back to Korean
+            eng_to_kor = {
+                'market': '시장구분', 'name': '종목명', 'price': '현재가', 'foreign_rate': '현재_외국인비중',
+                'prev_close': '어제_종가', 'prev_foreign_rate': '어제_외국인비중', 'change_rate': '등락률',
+                'recent_posts_count': '당일_게시글수', 'posts_summary': '게시물_요약', 'sentiment': '감정분석',
+                'top_keywords': 'Top_Keyword', 'is_last_captured': '연속_등록'
             }
-            df = df.rename(columns=kor_to_eng)
+            df = df.rename(columns=eng_to_kor) # Rename English to Korean
+            # df = df.rename(columns=kor_to_eng) # Removed Korean->English renaming
 
             # Extract timestamp from filename for 'Collected_At' column
             # filename example: data/trending_integrated_20251210_195101.csv

@@ -10,10 +10,13 @@ from email import encoders
 
 def send_monthly_report():
     # 1. Determine "Last Month"
+    # 1. Determine "Last Month"
     today = datetime.now()
-    first = today.replace(day=1)
-    last_month = first - timedelta(days=1)
-    target_ym = last_month.strftime("%Y%m") # e.g. 202511
+    # first = today.replace(day=1)
+    # last_month = first - timedelta(days=1)
+    # [Fix] Target Current Month (Feb)
+    last_month = today
+    target_ym = last_month.strftime("%Y%m") # e.g. 202602
     
     print(f"📊 Generating Monthly Report for: {last_month.strftime('%B %Y')}")
     
@@ -33,13 +36,24 @@ def send_monthly_report():
     for f in files:
         try:
             df = pd.read_csv(f)
-            # Extract timestamp from filename for 'Collected At' column
+            
+            # [Fix] Restore English Headers if Korean detected
+            kor_to_eng = {
+                '시장구분': 'market', '종목명': 'name', '현재가': 'price', '현재_외국인비중': 'foreign_rate',
+                '어제_종가': 'prev_close', '어제_외국인비중': 'prev_foreign_rate', '등락률': 'change_rate',
+                '당일_게시글수': 'recent_posts_count', '게시물_요약': 'posts_summary', '감정분석': 'sentiment',
+                'Top_Keyword': 'top_keywords', '연속_등록': 'is_last_captured'
+            }
+            df = df.rename(columns=kor_to_eng)
+
+            # Extract timestamp from filename for 'Collected_At' column
             # filename example: data/trending_integrated_20251210_195101.csv
             basename = os.path.basename(f)
             time_part = basename.split('_')[2] + "_" + basename.split('_')[3].replace('.csv','')
             # Format: YYYYMMDD_HHMMSS
             dt = datetime.strptime(time_part, "%Y%m%d_%H%M%S")
-            df['Collected_At'] = dt
+            # [User Request] Exclude Collection Date/Time
+            # df['Collected_At'] = dt
             
             combined_df = pd.concat([combined_df, df])
         except Exception as e:
@@ -50,7 +64,11 @@ def send_monthly_report():
         return
 
     # 4. Save to Excel
-    output_filename = f"StockBot_Report_{target_ym}.xlsx"
+    # output_filename = f"StockBot_Report_{target_ym}.xlsx"
+    # [Fix] Match Dashboard Filename Format
+    month_str = last_month.strftime('%Y-%m') # e.g. 2026-02
+    output_filename = f"data/monthly_report_{month_str}.xlsx"
+    
     combined_df.to_excel(output_filename, index=False)
     print(f"✅ Excel saved: {output_filename}")
 

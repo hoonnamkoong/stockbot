@@ -870,6 +870,40 @@ if __name__ == "__main__":
             filename_prefix = f"trending_integrated"
             saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
             
+            # --- Fix: Save JSON for Frontend (Dashboard) ---
+            try:
+                # 1. Save latest_stocks.json (Always overwrite)
+                latest_file = 'data/latest_stocks.json'
+                with open(latest_file, 'w', encoding='utf-8') as f:
+                    json.dump(json_records, f, ensure_ascii=False, indent=4)
+                print(f"Saved {latest_file}")
+                
+                # 2. Save Time Slot File (stocks_HH00.json) if matched
+                hour = now_kst.hour
+                # Define slots of interest if needed, or just save every hour formatted
+                # Frontend uses 1000, 1300, 1500, 1700
+                target_slots = [10, 13, 15, 17]
+                if hour in target_slots:
+                    slot_file = f"data/stocks_{hour}00.json"
+                    with open(slot_file, 'w', encoding='utf-8') as f:
+                        json.dump(json_records, f, ensure_ascii=False, indent=4)
+                    print(f"Saved {slot_file}")
+                
+                # 3. Save status.json (For Last Updated Timestamp)
+                status_file = 'data/status.json'
+                status_data = {
+                    "last_updated": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": "ok",
+                    "timestamp": now_kst.timestamp()
+                }
+                with open(status_file, 'w', encoding='utf-8') as f:
+                    json.dump(status_data, f, ensure_ascii=False, indent=4)
+                print(f"Saved {status_file}")
+                
+            except Exception as e:
+                print(f"Error saving JSON files: {e}")
+            # -----------------------------------------------
+
             # monthly report
             monthly_file, monthly_count = append_to_monthly_report(result_df_kr, now_kst)
             

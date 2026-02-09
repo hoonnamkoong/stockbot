@@ -21,7 +21,7 @@ print(f"🔑 Found Key: {KEY[:5]}...{KEY[-3:]}")
 
 try:
     genai.configure(api_key=KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-pro')
     print("🤖 Model configured. Sending test prompt...")
     
     response = model.generate_content("Hello, are you working? Reply with 'Yes, I am active.'")

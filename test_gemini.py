@@ -21,11 +21,17 @@ print(f"🔑 Found Key: {KEY[:5]}...{KEY[-3:]}")
 
 try:
     genai.configure(api_key=KEY)
-    model = genai.GenerativeModel('gemini-1.5-pro')
+    model = genai.GenerativeModel('gemini-2.0-flash-exp')
     print("🤖 Model configured. Sending test prompt...")
-    
-    response = model.generate_content("Hello, are you working? Reply with 'Yes, I am active.'")
-    print(f"✅ Response received: {response.text}")
+            
+    # Check specifically for flash versions
+    print("\n🔍 Checking specific Flash models:")
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        response = model.generate_content("Ping")
+        print(f"✅ gemini-2.0-flash-exp is AVAILABLE.")
+    except Exception as e:
+        print(f"❌ gemini-2.0-flash-exp is NOT available: {e}")
 
 except Exception as e:
     print(f"❌ API Error: {e}")

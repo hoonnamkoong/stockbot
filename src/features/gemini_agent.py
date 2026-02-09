@@ -14,7 +14,7 @@ class GeminiAgent:
 
         try:
             genai.configure(api_key=GEMINI_KEY)
-            self.model = genai.GenerativeModel('gemini-1.5-pro')
+            self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
             print("[GeminiAgent] Initialized successfully.")
         except Exception as e:
             print(f"[GeminiAgent] Initialization Error: {e}")

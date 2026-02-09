@@ -11,7 +11,7 @@ export async function GET() {
         const branch = 'db-data';
         const url = `https://raw.githubusercontent.com/hoonnamkoong/stockbot/${branch}/data/all_stocks.json`;
 
-        let stocks = [];
+        let stocks: Array<{ code: string, name: string }> = [];
         try {
             const res = await fetch(url, { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);

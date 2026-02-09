@@ -579,33 +579,15 @@ if __name__ == "__main__":
         print(f"[System] Failed to initialize TelegramManager: {e}")
         tg_manager = None
     # 2. Research Briefing (Enabled)
-    print("\n[Research]    # --- 0. Research Report Scraping (Disabled V8.0) ---
-    # print("=== [Phase 0] Starting Research Report Scraping ===")
+    # --- 0. Research Report Scraping (Disabled V8.0) ---
+    print("\n[Research] Research Report Scraping is DISABLED (V8.0).")
     # try:
     #     research_scraper.main()
     #     print("=== [Phase 0] Research Scraping Complete ===")
     # except Exception as e:
-    #     print(f"=== [Phase 0] Research Scraping Failed: {e} ===")      try:
-            import json
-            # Correct path matches research_scraper.py output (data/latest_research.json)
-            with open('data/latest_research.json', 'r', encoding='utf-8') as f:
-                r_data = json.load(f)
-            
-            invest_summary = r_data.get('invest', {}).get('summary', '요약 없음')
-            items_count = r_data.get('invest', {}).get('today_count', 0)
-            
-            r_msg = f"📑 <b>[리포트 브리핑] 총 {items_count}건</b>\n\n"
-            r_msg += f"💡 시장 요약: {invest_summary[:300]}...\n\n"
-            r_msg += f"👉 자세히 보기: {os.environ.get('DASHBOARD_URL', '')}"
-            
-            # tg_manager.send_message(r_msg) # User requested to disable Research Briefing (V7.1)
-            print("[Research] Telegram Sent (Disabled by User Request).")
-            
-        except Exception as tg_e:
-            print(f"[Research] Telegram Error: {tg_e}")
-            
-    except Exception as e:
-        print(f"[Research] Error: {e}")
+    #     print(f"=== [Phase 0] Research Scraping Failed: {e} ===")
+
+    # [Note] Legacy Telegram Notification for Research also disabled.
 
     markets = ['KOSPI', 'KOSDAQ']
     # ... (rest of code) ...

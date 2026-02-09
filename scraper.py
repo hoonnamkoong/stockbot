@@ -894,6 +894,10 @@ if __name__ == "__main__":
                 # Sanitize json_records before saving
                 clean_json_records = sanitize_for_json(json_records)
 
+            except Exception as e:
+                print(f"[Warning] JSON Sanitization failed: {e}")
+                clean_json_records = json_records # Fallback
+
     # ... [Skipping unchanged lines] ...
 
             # monthly report

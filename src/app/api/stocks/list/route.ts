@@ -15,7 +15,15 @@ export async function GET() {
         try {
             const res = await fetch(url, { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            stocks = await res.json();
+            const rawData = await res.json();
+
+            // Transform complex scraper data to simple {code, name} format
+            if (Array.isArray(rawData)) {
+                stocks = rawData.map((item: any) => ({
+                    code: item.code,
+                    name: item.name
+                }));
+            }
             console.log(`[Stocks] Loaded ${stocks.length} items from ${branch}`);
         } catch (e) {
             console.error("Failed to fetch all_stocks.json from GitHub:", e);

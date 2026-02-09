@@ -83,9 +83,9 @@ try:
     def sanitize_for_json(obj):
         if isinstance(obj, dict): return {k: sanitize_for_json(v) for k, v in obj.items()}
         elif isinstance(obj, list): return [sanitize_for_json(item) for item in obj]
-        if pd.isna(obj): return None
+        if pd.isna(obj): return 0
         elif isinstance(obj, float):
-            if math.isnan(obj) or math.isinf(obj): return None
+            if math.isnan(obj) or math.isinf(obj): return 0
             return obj
         return obj
 

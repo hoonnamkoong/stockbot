@@ -373,7 +373,7 @@ def get_discussion_stats(code):
     
     collected_posts = []
     page = 1
-    max_pages = 50 # v7.0 Tuning: Limit to ~1000 posts (User Request: 800)
+    max_pages = 5 # v8.5 Tuning: Reduced from 50 to 5 (Speed Optimization)
     stop_collecting = False
     
     headers['Referer'] = f"https://finance.naver.com/item/board.naver?code={code}"
@@ -383,7 +383,7 @@ def get_discussion_stats(code):
         
         try:
             if page > 1:
-                time.sleep(0.5)
+                time.sleep(0.2) # Reduced sleep
 
             response = requests.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -877,18 +877,19 @@ if __name__ == "__main__":
                 # Helper function to sanitize NaN values for JSON
                 import math
                 def sanitize_for_json(obj):
-                    """Recursively replace NaN and Infinity with None for valid JSON"""
+                    """Recursively replace NaN and Infinity with None/0 for valid JSON"""
                     if isinstance(obj, dict):
                         return {k: sanitize_for_json(v) for k, v in obj.items()}
                     elif isinstance(obj, list):
                         return [sanitize_for_json(item) for item in obj]
-                    # Check for Pandas/Numpy NaNs explicitly
-                    if pd.isna(obj): 
-                        return None
-                    elif isinstance(obj, float):
+                    
+                    # Handle Numeric NaNs
+                    if isinstance(obj, float):
                         if math.isnan(obj) or math.isinf(obj):
-                            return None
-                        return obj
+                            return 0 # Default to 0 instead of None for easier frontend math
+                    if pd.isna(obj): 
+                        return 0
+                        
                     return obj
                 
                 # Sanitize json_records before saving

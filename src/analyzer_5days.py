@@ -280,7 +280,9 @@ def analyze_cumulative(days=5, silent=False):
         print(f"[{days}Day Analysis] Generated {len(result_df)} records.")
         
     # [Fix 2026-01-13] Ensure no NaNs in output
-    result_df = result_df.where(pd.notnull(result_df), None)
+    # [Fix 2026-02-10] Ensure no NaNs in output (Strict sanitization)
+    result_df = result_df.fillna(0) # Simple fillna(0) for numeric safety
+    result_df = result_df.replace({float('nan'): 0, float('inf'): 0, -float('inf'): 0})
     return result_df
 
 def analyze_5days():

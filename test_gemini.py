@@ -21,7 +21,7 @@ print(f"🔑 Found Key: {KEY[:5]}...{KEY[-3:]}")
 
 try:
     genai.configure(api_key=KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    model = genai.GenerativeModel('gemini-3.0-flash')
     print("🤖 Model configured. Sending test prompt...")
             
     # Check specifically for flash versions

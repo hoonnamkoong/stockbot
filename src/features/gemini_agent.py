@@ -104,7 +104,7 @@ class GeminiAgent:
             return response.text.strip()
         except Exception as e:
             print(f"[GeminiAgent] Risk Assessment Error: {e}")
-            return "AI 분석 중 오류가 발생했습니다."
+            return f"AI 분석 오류: {str(e)[:50]}..." # Show partial error for debugging
 
     def generate_trading_guide(self, market_data):
         """
@@ -165,5 +165,5 @@ class GeminiAgent:
             return response.text.strip()
         except Exception as e:
             print(f"[GeminiAgent] Guide Generation Error: {e}")
-            return "AI 분석 중 오류가 발생했습니다."
+            return f"AI 분석 중 오류가 발생했습니다. (사유: {str(e)[:100]})"
 

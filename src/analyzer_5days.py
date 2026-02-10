@@ -37,6 +37,7 @@ def normalize_columns(df):
     Renames Korean columns to English for consistency.
     """
     col_map = {
+        '종목코드': 'code',
         '종목명': 'name',
         '시장구분': 'market',
         '시장': 'market', # Legacy support
@@ -169,8 +170,7 @@ def analyze_cumulative(days=5, silent=False):
         print(f"[{days}Day Analysis] Found {len(all_codes)} unique codes across {days} days.")
 
     for code in all_codes:
-        # Count TRULY consecutive days from the most recent date backwards
-        consecutive_days = 0
+        consecutive_days = 0  # Total appearance count across the period
         
         total_posts = 0
         posts_list = []
@@ -179,8 +179,6 @@ def analyze_cumulative(days=5, silent=False):
         
         latest_meta = {}
         
-        # First pass: collect data for each day
-        day_present = []  # Track which days the stock appeared
         for i, date_str in enumerate(target_dates):
             df = daily_dfs.get(date_str)
             
@@ -202,7 +200,8 @@ def analyze_cumulative(days=5, silent=False):
                             'code': code
                         }
                     
-                    day_present.append(True)
+                    # Count total registered days (appearance count)
+                    consecutive_days += 1
                         
                     p_count = safe_int(data.get('recent_posts_count'))
                     total_posts += p_count
@@ -213,27 +212,14 @@ def analyze_cumulative(days=5, silent=False):
                         
                     p_price = safe_int(data.get('price')) 
                     prices.append(p_price)
-                else:
-                    day_present.append(False)
-                    posts_list.append(0)
-                    change_rates.append(0.0)
-                    prices.append(0)
-            else:
-                day_present.append(False)
+                        
+            if not found_row:
                 posts_list.append(0)
                 change_rates.append(0.0)
                 prices.append(0)
         
         if not latest_meta:
             continue
-        
-        # Count truly consecutive days from the most recent date backwards
-        # target_dates[0] = most recent, target_dates[-1] = oldest
-        for present in day_present:
-            if present:
-                consecutive_days += 1
-            else:
-                break  # Stop at first gap
             
         avg_posts = total_posts / days 
         if len(posts_list) > 1:

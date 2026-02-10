@@ -119,7 +119,7 @@ export default function Home() {
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [activeTab, setActiveTab] = useState<string | null>('ALL');
-    const [viewMode, setViewMode] = useState<'card' | 'table'>('card'); // 'card' or 'table'
+    const [viewMode, setViewMode] = useState<'card' | 'table'>('table'); // 'card' or 'table'
 
     // Sorting State
     const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'asc' | 'desc' }>({ key: 'recent_posts_count', direction: 'desc' });

@@ -8,6 +8,10 @@ import sys
 
 import re
 
+# VERSION
+SCRAPER_VERSION = "8.2"
+
+
 # --- Keyword Extraction Helper ---
 STOPWORDS = {
     '오늘', '어제', '내일', '지금', '현재', '실시간', '속보', '긴급',
@@ -80,6 +84,103 @@ def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
     sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
     return [w[0] for w in sorted_words[:max_keywords]]
 
+
+def calculate_long_term_consecutive_days(current_codes):
+    """
+    Calculates consecutive days by scanning BACKWARDS from TODAY.
+    It looks for 'trending_integrated_YYYYMMDD_HHMMSS.xlsx' (or .csv) in 'data/'
+    and counts how many consecutive days each stock code appears.
+    [Updated V8.2] Robust CSV reading.
+    """
+    consecutive_counts = {code: 1 for code in current_codes} # Default 1 (today)
+    active_codes = set(current_codes)
+    
+    data_dir = 'data'
+    if not os.path.exists(data_dir):
+        return consecutive_counts
+    
+    # Identify unique DATE files
+    pattern = re.compile(r'trending_integrated_(\d{8})_(\d{6})\.(xlsx|csv)$')
+    date_files = {} 
+    
+    for filename in os.listdir(data_dir):
+        match = pattern.match(filename)
+        if match:
+            d_str = match.group(1) # YYYYMMDD
+            t_str = match.group(2) # HHMMSS
+            try:
+                date_obj = datetime.strptime(d_str, '%Y%m%d')
+                date_fmt = date_obj.strftime('%Y-%m-%d')
+                if date_fmt not in date_files:
+                    date_files[date_fmt] = []
+                date_files[date_fmt].append((t_str, os.path.join(data_dir, filename)))
+            except:
+                continue
+            
+    sorted_dates = sorted(date_files.keys(), reverse=True)
+    
+    now_kst = datetime.utcnow() + timedelta(hours=9)
+    today_str = now_kst.strftime('%Y-%m-%d')
+    
+    for d_str in sorted_dates:
+        if d_str == today_str:
+            continue
+        
+        if not active_codes:
+            break 
+        
+        files = sorted(date_files[d_str], key=lambda x: x[0], reverse=True)
+        if not files: continue
+        
+        best_time, filepath = files[0] 
+        
+        try:
+            # We use '종목코드' column. Support fallback.
+            if filepath.endswith('.csv'):
+                try:
+                    df = pd.read_csv(filepath, dtype=str)
+                except UnicodeDecodeError:
+                    df = pd.read_csv(filepath, dtype=str, encoding='cp949')
+            else:
+                df = pd.read_excel(filepath, dtype=str)
+            
+            day_codes = set()
+            
+            # 1. Try standard columns
+            target_cols = ['종목코드', 'Code', 'code', 'Symbol', 'symbol']
+            found_col = None
+            for col in target_cols:
+                if col in df.columns:
+                    found_col = col
+                    break
+            
+            if found_col:
+                day_codes = set(df[found_col].astype(str).str.replace('A', '').str.zfill(6).tolist())
+            else:
+                # 2. Fallback: check index name? or first column?
+                first_col = df.columns[0]
+                sample = df[first_col].head(5).astype(str).tolist()
+                is_code = all(s.isdigit() and len(s)==6 for s in sample if s and s != 'nan')
+                if is_code:
+                    day_codes = set(df[first_col].astype(str).str.zfill(6).tolist())
+
+            if not day_codes:
+                continue
+                 
+            next_active = set()
+            for code in active_codes:
+                if code in day_codes:
+                    consecutive_counts[code] += 1
+                    next_active.add(code)
+                else:
+                    pass 
+            active_codes = next_active
+            
+        except Exception as e:
+            print(f"Error reading {filepath}: {e}")
+            continue
+
+    return consecutive_counts
 
 def get_top_trending_stocks(market_type='KOSPI'):
 
@@ -855,6 +956,12 @@ if __name__ == "__main__":
                 stock['foreign_change_rate'] = round(fr - pfr, 2)
             except:
                 stock['foreign_change_rate'] = 0.0
+
+            # [Added V8.2] Version
+            stock['scraper_version'] = SCRAPER_VERSION
+
+            # [Added V8.2] Version
+            stock['scraper_version'] = SCRAPER_VERSION
             
             # 2. 토론방 정보 (시간 기준 카운팅)
             stats = get_discussion_stats(stock['code'])

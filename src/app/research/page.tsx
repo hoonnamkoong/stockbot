@@ -960,12 +960,12 @@ export default function Home() {
                                                 <ThSort sortKey="prev_close">어제_종가</ThSort>
                                                 <ThSort sortKey="prev_foreign_rate">어제_외국인비중</ThSort>
                                                 <ThSort sortKey="change_rate">등락률</ThSort>
+                                                <ThSort sortKey="foreign_change_rate">외인변화</ThSort>
                                                 <ThSort sortKey="recent_posts_count">당일_게시글수</ThSort>
                                                 <Table.Th style={{ width: '20%' }}>게시물_요약</Table.Th>
                                                 <ThSort sortKey="sentiment">감정분석</ThSort>
                                                 <ThSort sortKey="top_keywords">Top_Keywords</ThSort>
                                                 <ThSort sortKey="consecutive_days">연속_등록</ThSort>
-                                                <ThSort sortKey="foreign_change_rate">외인변화</ThSort>
                                                 <Table.Th>latest_post</Table.Th>
                                             </Table.Tr>
                                         </Table.Thead>
@@ -1010,6 +1010,9 @@ export default function Home() {
                                                         <Table.Td c={Number(stock.change_rate.replace('%', '')) > 0 ? 'red' : 'blue'}>
                                                             {stock.change_rate}
                                                         </Table.Td>
+                                                        <Table.Td c={Number(stock.foreign_change_rate) > 0 ? 'red' : Number(stock.foreign_change_rate) < 0 ? 'blue' : 'dimmed'}>
+                                                            {Number(stock.foreign_change_rate) > 0 ? '+' : ''}{stock.foreign_change_rate}%
+                                                        </Table.Td>
                                                         <Table.Td>
                                                             <Badge variant="light" color={stock.recent_posts_count && stock.recent_posts_count >= 50 ? 'red' : 'gray'}>
                                                                 {stock.recent_posts_count}
@@ -1033,9 +1036,6 @@ export default function Home() {
                                                                 <Badge color="orange" size="xs">{stock.consecutive_days}일 연속</Badge>
                                                                 : <Text size="xs" c="dimmed">New</Text>
                                                             }
-                                                        </Table.Td>
-                                                        <Table.Td c={Number(stock.foreign_change_rate) > 0 ? 'red' : Number(stock.foreign_change_rate) < 0 ? 'blue' : 'dimmed'}>
-                                                            {Number(stock.foreign_change_rate) > 0 ? '+' : ''}{stock.foreign_change_rate}%
                                                         </Table.Td>
                                                         <Table.Td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85em' }}>
                                                             {stock.latest_post || '-'}

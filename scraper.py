@@ -24,7 +24,8 @@ STOPWORDS = {
     '코스피', '코스닥', 'KOSPI', 'KOSDAQ',
     '원', '만원', '천원', '억', '조', '퍼센트',
     '오늘도', '오늘은', '어제도', '내일도', '지금은', '현재가', '목표가', '매수가', '매도가',
-    'ㅋㅋ', 'ㅋㅋㅋ', 'ㅋㅋㅋㅋ', 'ㅎㅎ', 'ㅎㅎㅎ', 'ㄷㄷ', 'ㄷㄷㄷ'
+    'ㅋㅋ', 'ㅋㅋㅋ', 'ㅋㅋㅋㅋ', 'ㅎㅎ', 'ㅎㅎㅎ', 'ㄷㄷ', 'ㄷㄷㄷ',
+    '공시', '뉴스', '속보', '특징주', '단독', '상보', '종합', '오후', '오전'
 }
 
 def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
@@ -55,8 +56,20 @@ def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
                 continue
             if word in STOPWORDS or word.lower() in STOPWORDS:
                 continue
-            if word in name_parts:
+            
+            # Check if word contains any part of the stock name
+            is_name_part = False
+            for part in name_parts:
+                if part in word:
+                    is_name_part = True
+                    break
+            if is_name_part:
                 continue
+            
+            # Simple heuristic to filter verbs/endings (다, 요, 까, 죠, 임, 함)
+            if word.endswith('다') or word.endswith('요') or word.endswith('까') or word.endswith('죠') or word.endswith('임') or word.endswith('함'):
+                continue
+
             # Skip repetitive chars (ㅋㅋ, ㅎㅎ, ㄷㄷ, etc.)
             if len(set(word)) == 1:
                 continue

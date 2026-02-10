@@ -102,10 +102,17 @@ export default function TradePage() {
         try {
             // Add timestamp to prevent browser caching
             const res = await axios.get(`/api/trade/account-balance?t=${Date.now()}`);
-            setBalance(res.data);
-        } catch (error) {
+            if (res.data.error) {
+                // API returned 200 but with error payload
+                console.error('[Trade] API Error:', res.data.error);
+                showNotify('API Error', res.data.error, 'red');
+            } else {
+                setBalance(res.data);
+            }
+        } catch (error: any) {
             console.error(error);
-            showNotify('Error', 'Failed to fetch balance', 'red');
+            const detail = error.response?.data?.error || error.message || 'Unknown error';
+            showNotify('Fetch Error', `잔고 조회 실패: ${detail}`, 'red');
         } finally {
             setLoading(false);
         }

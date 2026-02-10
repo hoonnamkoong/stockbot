@@ -314,7 +314,10 @@ export default function Home() {
                 const resReports = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/reports.json?t=${timeMap}`, { cache: 'no-store' });
                 if (resReports.ok) {
                     const data = await resReports.json();
-                    setReports(data.slice(0, 5)); // Top 5
+                    // Show ALL monthly reports + top 10 daily reports
+                    const monthlyReports = data.filter((r: any) => r.type === 'monthly');
+                    const dailyReports = data.filter((r: any) => r.type === 'daily').slice(0, 10);
+                    setReports([...monthlyReports, ...dailyReports]);
                 }
             } catch (e) { console.error(e); }
 

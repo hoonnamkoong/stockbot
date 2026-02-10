@@ -972,7 +972,7 @@ export default function Home() {
                                                 sortedStocks.map((stock) => (
                                                     <Table.Tr key={stock.code} style={{ cursor: 'pointer' }} onClick={() => handleCopyAndOpen(stock.code, stock.name)}>
                                                         <Table.Td><Badge size="xs" variant="outline" color={stock.market === 'KOSPI' ? 'blue' : 'green'}>{stock.market}</Badge></Table.Td>
-                                                        <Table.Td c="dimmed" size="xs">{stock.code}</Table.Td>
+                                                        <Table.Td><Text span c="dimmed" size="xs">{stock.code}</Text></Table.Td>
                                                         <Table.Td fw={700} style={{ position: 'relative' }}>
                                                             <Group gap={8} wrap="nowrap">
                                                                 <a

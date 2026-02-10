@@ -839,13 +839,13 @@ export default function Home() {
                                                         </Group>
                                                     </Table.Th>
                                                     <ThSort sortKey="price">현재가</ThSort>
-                                                    <ThSort sortKey="change_rate">등락률 (누적)</ThSort>
-                                                    <ThSort sortKey="daily_change_rate">등락률 (전일비)</ThSort> {/* New Column */}
+                                                    <ThSort sortKey="change_rate">등락률</ThSort>
                                                     <ThSort sortKey="consecutive_days">연속 등장</ThSort>
                                                     <ThSort sortKey="avg_posts">평균 게시글</ThSort>
                                                     <ThSort sortKey="total_posts">총 게시글</ThSort>
                                                     {/* Sparkline Headers */}
-                                                    <Table.Th>Price Trend (5D)</Table.Th>
+                                                    <Table.Th>주가 추세 (5D)</Table.Th>
+                                                    <Table.Th>토론 추세 (5D)</Table.Th>
                                                 </Table.Tr>
                                             </Table.Thead>
                                             <Table.Tbody>
@@ -863,14 +863,7 @@ export default function Home() {
                                                         <Table.Td c={Number(stock.period_change_rate) > 0 ? 'red' : 'blue'}>
                                                             {Number(stock.period_change_rate) > 0 ? '+' : ''}{Number(stock.period_change_rate)?.toFixed(2)}%
                                                         </Table.Td>
-                                                        <Table.Td c={Number(stock.daily_change_rate) > 0 ? 'red' : 'blue'}>
-                                                            {/* Display Daily Change Rate */}
-                                                            {stock.daily_change_rate !== undefined ? (
-                                                                <>
-                                                                    {Number(stock.daily_change_rate) > 0 ? '▲' : '▼'} {Math.abs(Number(stock.daily_change_rate)).toFixed(2)}%
-                                                                </>
-                                                            ) : '-'}
-                                                        </Table.Td>
+
                                                         <Table.Td>
                                                             <Badge color={stock.consecutive_days >= 3 ? 'red' : 'gray'}>
                                                                 {stock.consecutive_days}일 연속
@@ -880,6 +873,19 @@ export default function Home() {
                                                         <Table.Td>{stock.total_posts}개</Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_price || []).map((v: any, i: number) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
+                                                                ))}
+                                                            </Group>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Sparkline data={stock.sparkline_posts || []} />
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_posts || []).map((v: any, i: number) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
+                                                                ))}
+                                                            </Group>
                                                         </Table.Td>
                                                     </Table.Tr>
                                                 ))}
@@ -916,7 +922,8 @@ export default function Home() {
                                                     <ThSort sortKey="avg_posts">평균 게시글</ThSort>
                                                     <ThSort sortKey="total_posts">총 게시글</ThSort>
                                                     {/* Sparkline Headers */}
-                                                    <Table.Th>Price Trend (3D)</Table.Th>
+                                                    <Table.Th>주가 추세 (3D)</Table.Th>
+                                                    <Table.Th>토론 추세 (3D)</Table.Th>
                                                 </Table.Tr>
                                             </Table.Thead>
                                             <Table.Tbody>
@@ -934,13 +941,7 @@ export default function Home() {
                                                         <Table.Td c={Number(stock.period_change_rate) > 0 ? 'red' : 'blue'}>
                                                             {Number(stock.period_change_rate) > 0 ? '+' : ''}{Number(stock.period_change_rate)?.toFixed(2)}%
                                                         </Table.Td>
-                                                        <Table.Td c={Number(stock.daily_change_rate) > 0 ? 'red' : 'blue'}>
-                                                            {stock.daily_change_rate !== undefined ? (
-                                                                <>
-                                                                    {Number(stock.daily_change_rate) > 0 ? '▲' : '▼'} {Math.abs(Number(stock.daily_change_rate)).toFixed(2)}%
-                                                                </>
-                                                            ) : '-'}
-                                                        </Table.Td>
+
                                                         <Table.Td>
                                                             <Badge color={stock.consecutive_days >= 3 ? 'red' : 'gray'}>
                                                                 {stock.consecutive_days}일 연속
@@ -950,6 +951,19 @@ export default function Home() {
                                                         <Table.Td>{stock.total_posts}개</Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_price || []).map((v: any, i: number) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
+                                                                ))}
+                                                            </Group>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Sparkline data={stock.sparkline_posts || []} />
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                                {(stock.sparkline_posts || []).map((v: any, i: number) => (
+                                                                    <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
+                                                                ))}
+                                                            </Group>
                                                         </Table.Td>
                                                     </Table.Tr>
                                                 ))}

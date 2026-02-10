@@ -1,6 +1,8 @@
 
 import pandas as pd
 import os
+import re
+import glob
 import json
 import holidays
 from datetime import datetime, timedelta
@@ -72,71 +74,72 @@ def safe_float(val, default=0.0):
 
 def load_daily_snapshots(target_dates):
     """
-    For each target date, find the LAST generated report file from reports.json.
+    For each target date, find Excel/CSV files by scanning the data/ folder.
+    Files are named like: trending_integrated_YYYYMMDD_HHMMSS.xlsx
+    Extracts date from filename and picks the latest file per day.
     Returns a dict: { 'YYYY-MM-DD': DataFrame }
     """
     daily_dfs = {}
-    reports_file = 'data/reports.json'
+    data_dir = 'data'
     
-    if not os.path.exists(reports_file):
-        print(f"[5Day] {reports_file} not found.")
+    if not os.path.exists(data_dir):
+        print(f"[5Day] {data_dir} folder not found.")
         return {}
-        
-    try:
-        with open(reports_file, 'r', encoding='utf-8') as f:
-            reports = json.load(f)
-        
-        # Filter only daily reports (exclude monthly reports)
-        daily_reports = [r for r in reports if r.get('type') == 'daily']
-            
-        for date_str in target_dates:
-            # Filter reports for this date
-            day_reports = [r for r in daily_reports if r['date'].startswith(date_str)]
-            
-            if not day_reports:
-                print(f"[5Day] No report found for {date_str}")
+    
+    # Pattern: trending_integrated_YYYYMMDD_HHMMSS.xlsx or .csv
+    pattern = re.compile(r'trending_integrated_(\d{8})_(\d{6})\.(xlsx|csv)$')
+    
+    # Build a map: { 'YYYY-MM-DD': [ (timestamp_str, filepath) ] }
+    date_files = {}
+    for filename in os.listdir(data_dir):
+        match = pattern.match(filename)
+        if match:
+            date_raw = match.group(1)  # e.g. '20260210'
+            time_raw = match.group(2)  # e.g. '022419'
+            ext = match.group(3)
+            try:
+                file_date = datetime.strptime(date_raw, '%Y%m%d').strftime('%Y-%m-%d')
+            except ValueError:
                 continue
-                
-            # Take the first one (assuming sorted desc by timestamp in updates)
-            # If not sorted, we might need to sort by timestamp
-            day_reports.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
-            last_report = day_reports[0]
             
-            filename = last_report['filename']
-            # Search logic - prioritize data/ folder
-            possible_paths = [
-                f"data/{filename}",
-                filename,
-                os.path.join(os.getcwd(), 'data', filename),
-                os.path.join(os.getcwd(), filename)
-            ]
-            
-            file_path = None
-            for p in possible_paths:
-                if os.path.exists(p):
-                    file_path = p
-                    break
-            
-            if file_path:
-                try:
-                    if file_path.endswith('.csv'):
-                        df = pd.read_csv(file_path)
-                    elif file_path.endswith('.xlsx'):
-                        df = pd.read_excel(file_path)
-                    else:
-                        continue
-                    
-                    df = normalize_columns(df)
-                    daily_dfs[date_str] = df
-                    print(f"[5Day] Loaded {date_str}: {len(df)} stocks from {filename}")
-                except Exception as e:
-                    print(f"[5Day] Error loading {filename}: {e}")
-            else:
-                print(f"[5Day] File not found: {filename} (searched {len(possible_paths)} paths)")
-                    
-    except Exception as e:
-        print(f"[5Day] Error reading reports.json: {e}")
+            filepath = os.path.join(data_dir, filename)
+            if file_date not in date_files:
+                date_files[file_date] = []
+            # Prefer xlsx over csv; use time as tiebreaker
+            date_files[file_date].append((time_raw, ext, filepath))
+    
+    print(f"[5Day] Found files for {len(date_files)} dates: {sorted(date_files.keys())}")
+    
+    for date_str in target_dates:
+        if date_str not in date_files:
+            print(f"[5Day] No file found for {date_str}")
+            continue
         
+        # Sort: prefer xlsx over csv, then latest time
+        candidates = date_files[date_str]
+        # Sort by (extension priority: xlsx=0, csv=1), then by time descending
+        candidates.sort(key=lambda x: (0 if x[1] == 'xlsx' else 1, x[0]), reverse=False)
+        # After sort, xlsx comes first; among xlsx, earliest time is first
+        # We want latest time with xlsx preference
+        candidates.sort(key=lambda x: (0 if x[1] == 'xlsx' else 1, -int(x[0]) if x[0].isdigit() else 0))
+        
+        best = candidates[0]
+        file_path = best[2]
+        
+        try:
+            if file_path.endswith('.csv'):
+                df = pd.read_csv(file_path)
+            elif file_path.endswith('.xlsx'):
+                df = pd.read_excel(file_path)
+            else:
+                continue
+            
+            df = normalize_columns(df)
+            daily_dfs[date_str] = df
+            print(f"[5Day] Loaded {date_str}: {len(df)} stocks from {os.path.basename(file_path)}")
+        except Exception as e:
+            print(f"[5Day] Error loading {file_path}: {e}")
+    
     return daily_dfs
 
 def analyze_cumulative(days=5, silent=False):

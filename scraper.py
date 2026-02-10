@@ -6,6 +6,64 @@ import time
 import os
 import sys
 
+import re
+
+# --- Keyword Extraction Helper ---
+STOPWORDS = {
+    '오늘', '어제', '내일', '지금', '현재', '실시간', '속보', '긴급',
+    '주식', '종목', '매수', '매도', '매매', '투자', '주가', '가격',
+    '상한가', '하한가', '급등', '급락', '폭등', '폭락', '상승', '하락',
+    '정보', '분석', '전망', '예상', '의견', '생각', '질문', '궁금',
+    '여기', '저기', '이거', '저거', '그거', '뭐', '왜', '어떻게',
+    '진짜', '정말', '완전', '너무', '진심', '대박', '헐', '와',
+    '사람', '분들', '여러분', '우리', '나', '제가', '내가',
+    '합니다', '입니다', '습니다', '됩니다', '같습니다', '봅니다',
+    '하는', '것', '수', '중', '후', '전', '때', '더', '안', '못',
+    '좀', '잘', '다', '또', '그냥', '아직', '이미', '계속', '다시',
+    '보세요', '하세요', '드립니다', '감사', '부탁', '제발',
+    '코스피', '코스닥', 'KOSPI', 'KOSDAQ',
+    '원', '만원', '천원', '억', '조', '퍼센트',
+}
+
+def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
+    """
+    Extracts meaningful keywords from post titles,
+    filtering out noise words and the stock name itself.
+    """
+    # Break stock name into parts for filtering (e.g., '삼성전자' -> ['삼성전자', '삼성', '전자'])
+    name_parts = set()
+    name_parts.add(stock_name)
+    if len(stock_name) >= 4:
+        name_parts.add(stock_name[:2])
+        name_parts.add(stock_name[2:])
+        name_parts.add(stock_name[:3])
+    
+    word_freq = {}
+    for title in titles:
+        # Remove special chars, keep Korean/English/numbers
+        cleaned = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', title)
+        words = cleaned.split()
+        
+        for word in words:
+            word = word.strip()
+            # Skip: empty, single char, pure numbers, stopwords, stock name parts
+            if len(word) <= 1:
+                continue
+            if word.isdigit():
+                continue
+            if word in STOPWORDS or word.lower() in STOPWORDS:
+                continue
+            if word in name_parts:
+                continue
+            # Skip repetitive chars (ㅋㅋ, ㅎㅎ, ㄷㄷ, etc.)
+            if len(set(word)) == 1:
+                continue
+            
+            word_freq[word] = word_freq.get(word, 0) + 1
+    
+    # Sort by frequency (desc), then return top N
+    sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
+    return [w[0] for w in sorted_words[:max_keywords]]
 
 
 def get_top_trending_stocks(market_type='KOSPI'):
@@ -798,9 +856,10 @@ if __name__ == "__main__":
                 stock['latest_posts'] = candidates_posts
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
                 
-                # Keywords (for Sentinel-V)
+                # Keywords (for Sentinel-V) - Extract meaningful keywords, not raw titles
                 titles = [p['title'] for p in candidates_posts]
-                stock['top_keywords'] = ", ".join(titles[:3]) if titles else ""
+                meaningful_kws = extract_meaningful_keywords(titles, stock.get('name', ''))
+                stock['top_keywords'] = ", ".join(meaningful_kws) if meaningful_kws else ""
 
                 # Consecutive Flag
                 if stock['code'] in yesterday_codes:

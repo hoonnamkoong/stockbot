@@ -14,11 +14,49 @@ class GeminiAgent:
 
         try:
             genai.configure(api_key=GEMINI_KEY)
-            self.model = genai.GenerativeModel('gemini-3.0-flash')
-            print("[GeminiAgent] Initialized successfully.")
+            self.model_name = 'gemini-3.0-flash'
+            self.model = genai.GenerativeModel(self.model_name)
+            self.fallback_models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash']
+            print(f"[GeminiAgent] Initialized with {self.model_name}")
         except Exception as e:
             print(f"[GeminiAgent] Initialization Error: {e}")
             self.model = None
+
+    def _generate_content_safe(self, prompt):
+        """
+        Attempts to generate content with the current model.
+        If it fails (404 or 400), retries with fallback models.
+        """
+        if not self.model:
+            raise Exception("Model not initialized")
+
+        # List of models to try: Current -> Fallback 1 -> Fallback 2
+        models_to_try = [self.model_name] + self.fallback_models
+        
+        last_error = None
+
+        for model_name in models_to_try:
+            try:
+                # Re-configure model if switching
+                if model_name != self.model_name:
+                    print(f"[GeminiAgent] Switching to fallback model: {model_name}")
+                    self.model = genai.GenerativeModel(model_name)
+                    self.model_name = model_name
+
+                response = self.model.generate_content(prompt)
+                return response
+            except Exception as e:
+                error_str = str(e)
+                # Catch 404 (Not Found) or 400 (Invalid Argument/Bad Request)
+                if "404" in error_str or "not found" in error_str.lower() or "400" in error_str:
+                    print(f"[GeminiAgent] Model {model_name} failed: {e}")
+                    last_error = e
+                    continue # Try next model
+                else:
+                    # If it's another error (e.g. quota, auth), fail immediately
+                    raise e
+        
+        raise last_error
 
     def cross_validate(self, symbol, keywords):
         """
@@ -50,12 +88,11 @@ class GeminiAgent:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self._generate_content_safe(prompt)
             # Basic cleanup in case Gemini returns markdown blocks
             text = response.text.replace('```json', '').replace('```', '').strip()
             
             # Simple simulation of parsing (In production, use json.loads)
-            # Here we trust Gemini's string output, or fallback
             if "APPROVED" in text:
                 reason = text.split('"reason":')[1].strip().strip('"}') if '"reason":' in text else "Gemini Approved"
                 return {'status': 'APPROVED', 'reason': reason}
@@ -69,7 +106,6 @@ class GeminiAgent:
     def generate_risk_assessment(self, symbol, signal_type, technical_reason, keywords, summary):
         """
         Generates a concise expert opinion for a sell/buy signal.
-        Target length: 1-2 sentences.
         """
         if not self.model:
             return "AI 모델 오류: 키 생성 실패"
@@ -100,21 +136,15 @@ class GeminiAgent:
         """
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self._generate_content_safe(prompt)
             return response.text.strip()
         except Exception as e:
             print(f"[GeminiAgent] Risk Assessment Error: {e}")
-            return f"AI 분석 오류: {str(e)[:50]}..." # Show partial error for debugging
+            return f"AI 분석 오류: {str(e)[:50]}..." 
 
     def generate_trading_guide(self, market_data):
         """
         Generates a 'Stock Investment Expert' style trading guide based on the collected market data.
-        
-        Args:
-            market_data (list): List of dictionaries containing stock info (name, change_rate, keywords, etc.)
-        
-        Returns:
-            str: A structured analysis string in Korean.
         """
         if not self.model:
             return "AI 모델이 초기화되지 않아 분석을 제공할 수 없습니다."
@@ -161,7 +191,7 @@ class GeminiAgent:
         """
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self._generate_content_safe(prompt)
             return response.text.strip()
         except Exception as e:
             print(f"[GeminiAgent] Guide Generation Error: {e}")

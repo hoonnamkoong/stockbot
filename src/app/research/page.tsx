@@ -29,6 +29,8 @@ type Stock = {
     summary?: string; // Legacy fallback
     sentiment: string;
     is_last_captured?: boolean;
+    consecutive_days?: number; // [New] Unlimited consecutive count
+    foreign_change_rate?: number; // [New]
     is_consecutive?: boolean; // Legacy fallback
     [key: string]: any; // Index signature for sorting
 };
@@ -276,6 +278,8 @@ export default function Home() {
                     sentiment: item.sentiment || item['감정분석'],
                     top_keywords: item.top_keywords || item['Top_Keyword'] || item['Top_Keywords'],
                     is_last_captured: item.is_last_captured || item['연속_등록'],
+                    consecutive_days: item.consecutive_days || (item['연속_등록'] === true ? 2 : 1), // Fallback
+                    foreign_change_rate: item.foreign_change_rate || item['외국인_변화'] || 0,
                     // Derive latest_post title
                     latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
                 }));
@@ -960,7 +964,8 @@ export default function Home() {
                                                 <Table.Th style={{ width: '20%' }}>게시물_요약</Table.Th>
                                                 <ThSort sortKey="sentiment">감정분석</ThSort>
                                                 <ThSort sortKey="top_keywords">Top_Keywords</ThSort>
-                                                <ThSort sortKey="is_last_captured">연속_등록</ThSort>
+                                                <ThSort sortKey="consecutive_days">연속_등록</ThSort>
+                                                <ThSort sortKey="foreign_change_rate">외인변화</ThSort>
                                                 <Table.Th>latest_post</Table.Th>
                                             </Table.Tr>
                                         </Table.Thead>
@@ -1024,7 +1029,13 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td style={{ whiteSpace: 'nowrap', color: 'var(--mantine-color-dimmed)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock.top_keywords}</Table.Td>
                                                         <Table.Td>
-                                                            {stock.is_last_captured ? <Badge color="orange" size="xs">O</Badge> : <Text size="xs" c="dimmed">-</Text>}
+                                                            {stock.consecutive_days && stock.consecutive_days > 1 ?
+                                                                <Badge color="orange" size="xs">{stock.consecutive_days}일 연속</Badge>
+                                                                : <Text size="xs" c="dimmed">New</Text>
+                                                            }
+                                                        </Table.Td>
+                                                        <Table.Td c={Number(stock.foreign_change_rate) > 0 ? 'red' : Number(stock.foreign_change_rate) < 0 ? 'blue' : 'dimmed'}>
+                                                            {Number(stock.foreign_change_rate) > 0 ? '+' : ''}{stock.foreign_change_rate}%
                                                         </Table.Td>
                                                         <Table.Td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85em' }}>
                                                             {stock.latest_post || '-'}

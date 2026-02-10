@@ -23,6 +23,8 @@ STOPWORDS = {
     '보세요', '하세요', '드립니다', '감사', '부탁', '제발',
     '코스피', '코스닥', 'KOSPI', 'KOSDAQ',
     '원', '만원', '천원', '억', '조', '퍼센트',
+    '오늘도', '오늘은', '어제도', '내일도', '지금은', '현재가', '목표가', '매수가', '매도가',
+    'ㅋㅋ', 'ㅋㅋㅋ', 'ㅋㅋㅋㅋ', 'ㅎㅎ', 'ㅎㅎㅎ', 'ㄷㄷ', 'ㄷㄷㄷ'
 }
 
 def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
@@ -833,6 +835,14 @@ if __name__ == "__main__":
             details = get_stock_details(stock['code'])
             stock.update(details)
             
+            # [Added V8.X] Foreign Change Rate
+            try:
+                fr = float(str(stock.get('foreign_rate', '0')).replace('%', '').strip())
+                pfr = float(str(stock.get('prev_foreign_rate', '0')).replace('%', '').strip())
+                stock['foreign_change_rate'] = round(fr - pfr, 2)
+            except:
+                stock['foreign_change_rate'] = 0.0
+            
             # 2. 토론방 정보 (시간 기준 카운팅)
             stats = get_discussion_stats(stock['code'])
             recent_count = stats.get('recent_posts_count', 0)
@@ -911,11 +921,16 @@ if __name__ == "__main__":
         import json
         os.makedirs('data', exist_ok=True)
         
-        json_records = []
-        result_df_kr = None
-        
         if all_data:
             print(f"\nAnalyzing total {len(all_data)} items...")
+
+            # [Consecutive Days Calculation - Unlimited]
+            all_codes = [s['code'] for s in all_data]
+            consecutive_map = calculate_long_term_consecutive_days(all_codes)
+            for s in all_data:
+                s['consecutive_days'] = consecutive_map.get(s['code'], 1)
+                s['연속_등록'] = s['consecutive_days'] > 1 # Maintain legacy bool for fallback
+
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
             result_df_en = result_df_en.where(pd.notnull(result_df_en), None)
             json_records = result_df_en.to_dict('records')

@@ -1,9 +1,6 @@
 name: Stock Scraper Schedule
 
 on:
-  schedule:
-    # Run at 10:00, 13:00, 15:00 KST (01:00, 04:00, 06:00 UTC) on weekdays
-    - cron: '0 1,4,6 * * 1-5'
   workflow_dispatch:
   push:
     branches:

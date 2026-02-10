@@ -106,7 +106,7 @@ def get_top_trending_stocks(market_type='KOSPI'):
                 except Exception as e:
                     continue
             
-            return data[:30] # 상위 30개로 축소 (Top 30 Focus - User Request V7.5)
+            return data[:35] # 상위 35개 (Top 35 - User Request)
         else:
             print(f"Stock table NOT found for {market_type}")
             return []
@@ -178,7 +178,7 @@ def get_top_rising_stocks(market_type='KOSPI'):
             except:
                 continue
 
-        return data[:20] # Top 20 as requested
+        return data[:35] # Top 35 as requested
     except Exception as e:
         print(f"Error fetching Rising stocks: {e}")
         return []
@@ -243,7 +243,7 @@ def get_top_rising_stocks(market_type='KOSPI'):
             except:
                 continue
 
-        return data[:20] # Top 20 as requested
+        return data[:35] # Top 35 as requested
     except Exception as e:
         print(f"Error fetching Rising stocks: {e}")
         return []

@@ -917,7 +917,6 @@ export default function Home() {
                                                     </Table.Th>
                                                     <ThSort sortKey="price">현재가</ThSort>
                                                     <ThSort sortKey="change_rate">등락률 (누적)</ThSort>
-                                                    <ThSort sortKey="daily_change_rate">등락률 (전일비)</ThSort>
                                                     <ThSort sortKey="consecutive_days">연속 등장</ThSort>
                                                     <ThSort sortKey="avg_posts">평균 게시글</ThSort>
                                                     <ThSort sortKey="total_posts">총 게시글</ThSort>
@@ -941,6 +940,7 @@ export default function Home() {
                                                         <Table.Td c={Number(stock.period_change_rate) > 0 ? 'red' : 'blue'}>
                                                             {Number(stock.period_change_rate) > 0 ? '+' : ''}{Number(stock.period_change_rate)?.toFixed(2)}%
                                                         </Table.Td>
+
 
                                                         <Table.Td>
                                                             <Badge color={stock.consecutive_days >= 3 ? 'red' : 'gray'}>

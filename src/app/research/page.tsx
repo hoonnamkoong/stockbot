@@ -256,7 +256,9 @@ export default function Home() {
             addSystemLog(`📩 Stocks Status: ${resStocks.status} ${resStocks.statusText}`);
 
             if (resStocks.ok) {
-                const rawData = await resStocks.json();
+                // Parse JSON safely - handle NaN values from Python's json output
+                const rawText = await resStocks.text();
+                const rawData = JSON.parse(rawText.replace(/\bNaN\b/g, '0').replace(/\bInfinity\b/g, '0').replace(/\b-Infinity\b/g, '0'));
                 // Map Korean Keys (from latest_stocks.json) to English Properties (for Component Logic)
                 const mappedData = rawData.map((item: any) => ({
                     ...item,
@@ -325,13 +327,9 @@ export default function Home() {
             try {
                 const res5 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_5days.json?t=${timeMap}`, { cache: 'no-store' });
                 if (res5.ok) {
-                    const data = await res5.json();
-                    // Enforce consistency: Calculate registered days from sparkline data
-                    const fixedData = data.map((item: any) => ({
-                        ...item,
-                        consecutive_days: item.sparkline_price ? item.sparkline_price.filter((p: number) => p > 0).length : item.consecutive_days
-                    }));
-                    setFiveDayData(fixedData);
+                    const raw5 = await res5.text();
+                    const data = JSON.parse(raw5.replace(/\bNaN\b/g, '0').replace(/\bInfinity\b/g, '0').replace(/\b-Infinity\b/g, '0'));
+                    setFiveDayData(data);
                 }
             } catch (e) { console.error(e); }
 
@@ -339,13 +337,9 @@ export default function Home() {
             try {
                 const res3 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_3days.json?t=${timeMap}`, { cache: 'no-store' });
                 if (res3.ok) {
-                    const data = await res3.json();
-                    // Enforce consistency here too
-                    const fixedData = data.map((item: any) => ({
-                        ...item,
-                        consecutive_days: item.sparkline_price ? item.sparkline_price.filter((p: number) => p > 0).length : item.consecutive_days
-                    }));
-                    setThreeDayData(fixedData);
+                    const raw3 = await res3.text();
+                    const data = JSON.parse(raw3.replace(/\bNaN\b/g, '0').replace(/\bInfinity\b/g, '0').replace(/\b-Infinity\b/g, '0'));
+                    setThreeDayData(data);
                 }
             } catch (e) { console.error(e); }
 

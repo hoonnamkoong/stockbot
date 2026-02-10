@@ -220,7 +220,14 @@ def analyze_sentiment(df):
             
         sentiment_summaries.append(sentiment)
         
-        # 주요 키워드 Top 3
+        # [Revised Logic] Prefer existing 'Top_Keyword' from scraper if available
+        existing_kw = row.get('Top_Keyword', '')
+        if existing_kw and isinstance(existing_kw, str) and len(existing_kw.strip()) > 1:
+            keyword_summaries.append(existing_kw)
+            # sentiment_summaries already appended above
+            continue
+
+        # 주요 키워드 Top 3 (Fallback)
         sorted_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)
         top_keywords = ", ".join([w[0] for w in sorted_words[:3]])
         keyword_summaries.append(top_keywords)

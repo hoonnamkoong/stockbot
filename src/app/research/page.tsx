@@ -722,7 +722,14 @@ export default function Home() {
                 {isMobile ? (
                     <div className="flex flex-col gap-3 mb-4">
                         <Group justify="space-between" align="center" mb={-5}>
-                            <Text size="xs" c="dimmed">🕒 Update: {lastUpdated}</Text>
+                            <Group ms="auto">
+                                <Text size="xs" c="dimmed">🕒 Update: {lastUpdated}</Text>
+                                {stocks.length > 0 && stocks[0].scraper_version && (
+                                    <Badge size="xs" variant="outline" color="blue">
+                                        Data v{stocks[0].scraper_version}
+                                    </Badge>
+                                )}
+                            </Group>
                         </Group>
                         <Tabs value={activeTab} onChange={setActiveTab}>
                             <Tabs.List grow>
@@ -772,7 +779,16 @@ export default function Home() {
                                 </Tabs.List>
                             </Tabs>
 
-                            {lastUpdated && <Text size="xs" c="dimmed" ml="md">🕒 Update: {lastUpdated}</Text>}
+                            {lastUpdated &&
+                                <Group gap="xs" ml="md">
+                                    <Text size="xs" c="dimmed">🕒 Update: {lastUpdated}</Text>
+                                    {stocks.length > 0 && stocks[0].scraper_version && (
+                                        <Badge size="xs" variant="outline" color="blue">
+                                            Data v{stocks[0].scraper_version}
+                                        </Badge>
+                                    )}
+                                </Group>
+                            }
                         </Group >
 
                         <Group>

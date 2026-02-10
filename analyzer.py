@@ -221,7 +221,8 @@ def analyze_sentiment(df):
         sentiment_summaries.append(sentiment)
         
         # [Revised Logic] Prefer existing 'Top_Keyword' from scraper if available
-        existing_kw = row.get('Top_Keyword', '')
+        # Scraper saves as 'top_keywords' (v8.2)
+        existing_kw = row.get('top_keywords') or row.get('Top_Keyword') or row.get('Top_Keywords', '')
         if existing_kw and isinstance(existing_kw, str) and len(existing_kw.strip()) > 1:
             keyword_summaries.append(existing_kw)
             # sentiment_summaries already appended above

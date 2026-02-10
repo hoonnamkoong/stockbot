@@ -1,6 +1,9 @@
 name: Stock Scraper Schedule
 
 on:
+  schedule:
+    # Run at 10:00, 13:00, 15:00 KST (01:00, 04:00, 06:00 UTC) on weekdays
+    - cron: '0 1,4,6 * * 1-5'
   workflow_dispatch:
   push:
     branches:
@@ -132,3 +135,13 @@ jobs:
           git status
           git commit -m "data: Update stock data (Isolated Branch)" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data
+
+      - name: Notify on Failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d text="⚠️ Stock Scraper Workflow Failed! Check GitHub Actions logs."

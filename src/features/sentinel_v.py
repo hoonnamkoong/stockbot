@@ -7,13 +7,14 @@ from datetime import datetime
 from src.core.config import SENTINEL_V, MESSAGES
 from src.features.gemini_agent import GeminiAgent
 from src.telegram_manager import TelegramManager
-import scraper # Import existing scraper for data fetching
-from src.analyzer_5days import safe_float, safe_int
+import scraper 
+from src.analyzer_5days import safe_float, safe_int, get_recent_working_days, load_daily_snapshots
 
 class SentinelV:
     """
     Sentinel-V Advisory System.
     Monitors market for Buy Signals and manages Active Recommendations (Advisory).
+    Includes Anti-FOMO Logic (Overheat Prevention).
     """
     def __init__(self):
         self.gemini = GeminiAgent()
@@ -49,10 +50,39 @@ class SentinelV:
         if total_views == 0: return 0
         return (total_likes / total_views) * 100
 
-    def analyze_stock(self, stock):
+    def check_historical_overheat(self, code, current_price, snapshots):
         """
-        Applies Sentinel-V Advisory Logic to a single stock.
-        Returns: 'BUY_STRONG', 'PASS', 'WARN_OVERHEAT'
+        Anti-FOMO: Checks if stock rose > 50% in last 5 days.
+        """
+        if not snapshots: return False, 0.0
+        
+        # Find oldest available price in snapshots
+        dates = sorted(snapshots.keys())
+        oldest_price = 0
+        
+        for d in dates:
+            df = snapshots[d]
+            # code matching (ensure format)
+            # Ensure code is string and zero-padded
+            code_str = str(code).zfill(6)
+            # Assuming df['code'] might be int or string
+            df['code'] = df['code'].astype(str).str.zfill(6)
+            
+            row = df[df['code'] == code_str]
+            if not row.empty:
+                oldest_price = safe_int(row.iloc[0]['price'])
+                break # Found oldest available price in the window
+                
+        if oldest_price > 0:
+            cumulative_return = (current_price - oldest_price) / oldest_price * 100
+            if cumulative_return > 50.0:
+                return True, cumulative_return
+                
+        return False, 0.0
+
+    def analyze_stock(self, stock, snapshots=None):
+        """
+        Applies Sentinel-V Advisory Logic + Anti-FOMO.
         """
         # Data Extraction
         posts_count = stock.get('recent_posts_count', 0)
@@ -66,13 +96,12 @@ class SentinelV:
             return "PASS", f"하락 추세 강함 ({change_rate}%)"
             
         # 2. Supply Filter (Foreigner)
-        # Foreigner buying is a strong signal, but if small cap with 0% foreign, skip strict check
         if foreign_rate > 0 and prev_foreign_rate > 0:
+            # Divergence Check (Strict)
             if foreign_rate < prev_foreign_rate:
                  return "PASS", f"외국인 이탈 ({prev_foreign_rate}->{foreign_rate}%)"
 
         # 3. Buzz Filter
-        # Spark Check: High Volume or Growth (Growth requires yesterday data, assume High Volume for now)
         is_buzzing = False
         if posts_count >= self.config['SPARK_POSTS_MIN']: # 400
             is_buzzing = True
@@ -80,14 +109,16 @@ class SentinelV:
         if not is_buzzing:
             return "PASS", "게시물 부족"
             
-        # PQI Check (Quality)
+        # 4. Anti-FOMO (Overheat Check)
+        if snapshots:
+            is_overheated, cum_return = self.check_historical_overheat(stock['code'], current_price, snapshots)
+            if is_overheated:
+                return "PASS", f"이격도 과열 (5일 +{cum_return:.1f}%)"
+
+        # PQI Check
         pqi = self.calculate_pqi(stock.get('latest_posts', []))
         if pqi < self.config['PQI_MIN']:
             return "PASS_LOW_QUALITY", f"Low PQI: {pqi:.2f}"
-
-        # 4. Overheat Warning
-        if change_rate > 20.0:
-            return "WARN_OVERHEAT", f"단기 급등 과열 ({change_rate}%)"
 
         # 5. Agentic Check (Gemini)
         keywords = [p['title'] for p in stock.get('latest_posts', [])[:5]]
@@ -104,9 +135,7 @@ class SentinelV:
         return "PASS", "Gemini did not approve"
 
     def monitor_recommendations(self, trending_stocks):
-        """
-        Monitors active recommendations and provides Sell/Hold advice.
-        """
+        """Advisory Monitor: Profit Taking / Stop Loss"""
         recs = self.load_recommendations()
         if not recs: return
         
@@ -114,7 +143,6 @@ class SentinelV:
         stock_map = {s['code']: s for s in trending_stocks}
         
         for code, rec in recs.items():
-            # If stock is in today's trend list, update it
             current_data = stock_map.get(code)
             
             if current_data:
@@ -125,16 +153,13 @@ class SentinelV:
                 if current_price > rec['peak_price']:
                     rec['peak_price'] = current_price
                     
-                # Calculate Returns
                 buy_price = rec['recommended_price']
                 profit_rate = (current_price - buy_price) / buy_price * 100
                 drop_from_peak = (rec['peak_price'] - current_price) / rec['peak_price'] * 100
                 
-                # Update Max Profit recorded
                 if profit_rate > rec.get('highest_profit_rate', -99):
                     rec['highest_profit_rate'] = profit_rate
                 
-                # Advisory Logic
                 advice = None
                 
                 # 1. Stop Loss (Trailing Stop)
@@ -151,10 +176,7 @@ class SentinelV:
                 if advice:
                     msg = f"🔔 <b>[Sentinel-V] Advisory Alert</b>\n\nStock: {rec['name']} ({code})\nAdvice: {advice}\nProfit: {profit_rate:.1f}%"
                     self.tg.send_message(msg)
-                    # Once advised to exit, maybe remove? Or keep until sold?
-                    # For advisory, we keep it but mark advised
             
-            # Keep in list (User decides when to stop tracking, or auto-expire after N days)
             updated_recs[code] = rec
             
         self.save_recommendations(updated_recs)
@@ -163,10 +185,15 @@ class SentinelV:
         """Main Execution Flow"""
         print("=== Sentinel-V Advisory System Triggered ===")
         
+        # 0. Load History for Anti-FOMO
+        print("[Sentinel-V] Loading historical data for Anti-FOMO check...")
+        working_days = get_recent_working_days(6) 
+        snapshots = load_daily_snapshots(working_days[1:]) # Past 5 days
+        
         # 1. Fetch Basic Trend List
         trending_stocks = scraper.get_top_trending_stocks('KOSDAQ')
         
-        # Enrich Data (CRITICAL: Get Foreign Rate & Prev Close)
+        # Enrich Data
         enriched_stocks = []
         for stock in trending_stocks:
              try:
@@ -179,26 +206,25 @@ class SentinelV:
                  print(f"Error enriching {stock['name']}: {e}")
                  continue
         
-        # 2. Monitor Existing Recommendations (AS)
+        # 2. Monitor Recommendations
         self.monitor_recommendations(enriched_stocks)
         
-        # 3. Scan for New Opportunities
+        # 3. New Opportunities
         action_taken = False
         recs = self.load_recommendations()
         
-        for stock in enriched_stocks[:20]: # Check Top 20
+        for stock in enriched_stocks[:20]: 
             code = stock['code']
-            if code in recs: continue # Already tracking
+            if code in recs: continue 
             
-            # Analyze
-            signal, reason = self.analyze_stock(stock)
+            # Analyze with Snapshots
+            signal, reason = self.analyze_stock(stock, snapshots)
             
             print(f"[{stock['name']}] Signal: {signal} | {reason}")
             
             if signal == "BUY_STRONG":
                 action_taken = True
                 
-                # Register Recommendation
                 recs[code] = {
                     "name": stock['name'],
                     "recommended_date": datetime.now().strftime('%Y-%m-%d'),
@@ -209,7 +235,6 @@ class SentinelV:
                 }
                 self.save_recommendations(recs)
                 
-                # Notify
                 msg = MESSAGES['BUY_SIGNAL'].format(
                     name=stock['name'],
                     code=stock['code'],
@@ -218,7 +243,7 @@ class SentinelV:
                     trigger_val=stock['recent_posts_count']
                 )
                 self.tg.send_message(msg)
-
+                
         if not action_taken:
             print("[Sentinel-V] No new buy signals.")
 

@@ -1,0 +1,732 @@
+<html lang="ko">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=euc-kr">
+<title>Npay 증권</title>
+
+<link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/css/newstock.css">
+<link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/css/common.css">
+<link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/css/layout.css">
+<link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/css/main.css">
+<link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/css/newstock2.css">
+<link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/css/newstock3.css">
+<link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/css/world.css">
+</head>
+<body>
+<script type="text/javascript" src="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/js/jindo.min.ns.1.5.3.euckr.js"></script>
+<script language="JavaScript">
+var nsc="finance.stockend";
+
+function mouseOver(obj){
+  obj.style.backgroundColor="#f6f4e5";
+}
+function mouseOut(obj){
+  obj.style.backgroundColor="#ffffff";
+}
+function showPannel(layerId){
+	var layer = jindo.$(layerId);
+	layer.style.display='block';
+	
+	if (layerId == "summary_lyr") {
+		var layerHeight = jindo.$Element(layer).height();
+		jindo.$Element("summary_ifr").height(layerHeight);
+	}
+}
+function hidePannel(layerId){
+	var layer = jindo.$(layerId);
+	layer.style.display='none';
+}
+function togglePannel(layerId) {
+	var elTargetLayer = jindo.$Element(jindo.$$.getSingle("#" + layerId));
+	
+	if (elTargetLayer != null) {
+		if (elTargetLayer.visible()) {
+			hidePannel(layerId);
+		} else {
+			showPannel(layerId);
+		}
+	}
+}
+function toggleList(classId, clusterId) {
+	var up = true;
+	var sm = 'entity_id.basic';
+	if (classId.text == '접기') {
+		if (sm == 'title_entity_id.basic') {
+			clickcr(this,'stn.ntitclustclose','','',event);
+		} else {
+			clickcr(this,'stn.nbdyclustclose','','',event);
+		}
+		jindo.$Element(classId).html('관련뉴스 <em>' + classId.getAttribute("data-count") + '</em>건 더보기<span class="ico_down"></span>');
+		up = false;
+	} else {
+		clickcr(this,'stn.ntitclustclose','','',event);
+		if (sm == 'title_entity_id.basic') {
+			clickcr(this,'stn.ntitclustmore','','',event);
+		} else {
+			clickcr(this,'stn.nbdyclustmore','','',event);
+		}
+		jindo.$Element(classId).html('접기<span class="ico_up"></span>');
+	}
+
+	var height = 0;
+	if (document.querySelector("._clusterId"+clusterId)) {
+		height = document.querySelector("._clusterId"+clusterId).offsetHeight - 46;
+	}
+
+	jindo.$ElementList(jindo.$$(".hide_news", classId.parentElement.parentElement.parentElement)).toggleClass('none');
+
+	if (up) {
+		parentHeightResize();
+	} else {
+		parentHeightResize(document.body.offsetHeight - height);
+	}
+}
+</script>
+<script type="text/javascript" src="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/js/nclktag.js"></script>
+		<div class="tb_cont _replaceNewsLink">
+			<div class="tlline2">
+				<strong><span class="red03">종목</span>뉴스</strong>
+				<div class="info_txt">종목뉴스 안내<a href="#" onclick="togglePannel('layer_section'); clickcr(this,'stn.ninfo','','',event); return false;" class="btn_info_layer"><img src="https://ssl.pstatic.net/static/nfinance/2017/10/13/btn_help2.png" alt="상세 설명"></a>
+					<div class="layer_section" id="layer_section" style="display:none">
+						<strong>Npay 증권 종목뉴스 안내</strong>
+						<p class="txt">
+							AI(인공지능 검색기술)을 이용한 종목 관련 뉴스입니다. <br>관련뉴스는 자동으로 묶어 보여줍니다.
+						</p>
+						<a href="#" onclick="togglePannel('layer_section'); return false;" class="btn_close"><span class="blind">닫기</span></a>
+					</div>
+				</div>
+			</div>
+			
+			<table summary="종목뉴스의 제목, 정보제공, 날짜" cellspacing="0" class="type5">
+				<caption>종목뉴스</caption>
+				<colgroup>
+					<col>
+					<col width="130px">
+					<col width="110px">
+				</colgroup>
+				<thead>
+					<tr>
+						<th scope="col">제목</th>
+						<th scope="col">정보제공</th>
+						<th scope="col">날짜</th>
+					</tr>
+				</thead>
+
+		 		<tbody>
+		 		
+		 		
+		 		
+		 		<!-- [D] tr class : 첫번째 first, 마지막 last, 연관 뉴스 relation_tit, 연관 뉴스 목록 relation_lst -->
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									 class="first"
+		 							
+		 							
+		 							
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0000079579&office_id=293&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>[ETF 결산] 삼성자산 KODEX, 지난해 거래대금 톱5 '싹쓸이'</a>
+									
+								</td>
+								<td class="info">블로터</td>
+								<td class="date"> 2026.02.19 14:04</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							 class="relation_tit"
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0002602230&office_id=016&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>&ldquo;상승장서 날았다&rdquo; 타임폴리오 &lsquo;TIME 코스피액티브 ETF&rsquo; 상장 이...</a>
+									
+								</td>
+								<td class="info">헤럴드경제</td>
+								<td class="date"> 2026.02.19 14:00</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+ 						
+
+						
+	 						<tr class="relation_lst _clusterId0160002602230">
+								<td colspan="3">
+									<table class="type5">
+										<caption>연관기사 목록</caption>
+										<colgroup>
+											<col>
+											<col width="130px">
+											<col width="110px">
+										</colgroup>
+										<tbody>
+						
+						
+											<tr  >
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0013775454&office_id=003&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>타임폴리오 '코스피액티브 ETF', 상장 후 수익률 100% 넘어서</a>
+													
+												</td>
+												<td class="info">뉴시스</td>
+												<td class="date"> 2026.02.19 11:30</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0004591281&office_id=011&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>타임폴리오 &lsquo;TIME 코스피액티브 ETF&rsquo;, 상장 이후 수익률 100...</a>
+													
+												</td>
+												<td class="info">서울경제</td>
+												<td class="date"> 2026.02.19 11:07</td>
+											</tr>
+						
+						
+										</tbody>
+									</table>
+									
+									<div class="link_area">
+										<a href="#" class="_moreBtn" onClick="toggleList(this, '0160002602230'); return false;" data-count="1">관련뉴스 <em>1</em>건 더보기<span class="ico_down"></span></a>
+									</div>																	
+									
+								</td>
+							</tr>
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0006220818&office_id=018&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>WON 반도체밸류체인액티브ETF, 1년 수익률 173% &lsquo;1위&rsquo;</a>
+									
+								</td>
+								<td class="info">이데일리</td>
+								<td class="date"> 2026.02.19 13:59</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0002602225&office_id=016&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>미래에셋, &lsquo;TIGER 배당커버드콜액티브&rsquo; 상반기 월 2％ 수준 특별 ...</a>
+									
+								</td>
+								<td class="info">헤럴드경제</td>
+								<td class="date"> 2026.02.19 13:59</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							 class="relation_tit"
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0005479750&office_id=014&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>미래에셋 &quot;&lsquo;TIGER 배당커버드콜액티브&rsquo;, 상반기 월 2% 수준 특별...</a>
+									
+								</td>
+								<td class="info">파이낸셜뉴스</td>
+								<td class="date"> 2026.02.19 13:49</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+ 						
+
+						
+	 						<tr class="relation_lst _clusterId0140005479750">
+								<td colspan="3">
+									<table class="type5">
+										<caption>연관기사 목록</caption>
+										<colgroup>
+											<col>
+											<col width="130px">
+											<col width="110px">
+										</colgroup>
+										<tbody>
+						
+						
+											<tr  >
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0001242241&office_id=215&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>미래에셋 &lsquo;TIGER 배당커버드콜액티브&rsquo;, 상반기 월 2% 수준 특별...</a>
+													
+												</td>
+												<td class="info">한국경제TV</td>
+												<td class="date"> 2026.02.19 10:55</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0013775233&office_id=003&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>미래에셋, TIGER 배당커버드콜액티브 상반기 월 최대 2% 특별배당</a>
+													
+												</td>
+												<td class="info">뉴시스</td>
+												<td class="date"> 2026.02.19 10:38</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0005723027&office_id=277&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>'TIGER 배당커버드콜액티브', 상반기 월 2% 수준 특별배당 실시</a>
+													
+												</td>
+												<td class="info">아시아경제</td>
+												<td class="date"> 2026.02.19 10:37</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0003060799&office_id=119&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>미래에셋, &lsquo;TIGER 배당커버드콜액티브&rsquo; 상반기 월 2%대 특별배당...</a>
+													
+												</td>
+												<td class="info">데일리안</td>
+												<td class="date"> 2026.02.19 10:36</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0006220696&office_id=018&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>TIGER 배당커버드콜액티브, 상반기 월 2% 특별배당 실시</a>
+													
+												</td>
+												<td class="info">이데일리</td>
+												<td class="date"> 2026.02.19 10:34</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0005319450&office_id=008&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>TIGER 배당커버드콜액티브 ETF, 상반기 월 2% 특별배당 실시</a>
+													
+												</td>
+												<td class="info">머니투데이</td>
+												<td class="date"> 2026.02.19 10:18</td>
+											</tr>
+						
+						
+										</tbody>
+									</table>
+									
+									<div class="link_area">
+										<a href="#" class="_moreBtn" onClick="toggleList(this, '0140005479750'); return false;" data-count="5">관련뉴스 <em>5</em>건 더보기<span class="ico_down"></span></a>
+									</div>																	
+									
+								</td>
+							</tr>
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0006220808&office_id=018&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>연휴 끝낸 코스피, 5600선 지키며 강세&hellip;코스닥도 4%대 &uarr;</a>
+									
+								</td>
+								<td class="info">이데일리</td>
+								<td class="date"> 2026.02.19 13:48</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							 class="relation_tit"
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0000103559&office_id=024&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>&ldquo;최고 성능 먼저, 나머지는 보완&rdquo;&hellip;눈길 끄는 엔비디아 메모리 조달.....</a>
+									
+								</td>
+								<td class="info">매경이코노미</td>
+								<td class="date"> 2026.02.19 13:48</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+ 						
+
+						
+	 						<tr class="relation_lst _clusterId0240000103559">
+								<td colspan="3">
+									<table class="type5">
+										<caption>연관기사 목록</caption>
+										<colgroup>
+											<col>
+											<col width="130px">
+											<col width="110px">
+										</colgroup>
+										<tbody>
+						
+						
+											<tr  >
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0003011528&office_id=029&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>&ldquo;삼성 &lsquo;최상위 빈&rsquo; 주도권 잡나&rdquo;&hellip;엔비디아, HBM4 &lsquo;투 트랙&rsquo; ...</a>
+													
+												</td>
+												<td class="info">디지털타임스</td>
+												<td class="date"> 2026.02.19 13:22</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0006220771&office_id=018&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>엔비디아, HBM4 '최고 성능' 우선 전략 짠다&hellip;삼성전자 기대감</a>
+													
+												</td>
+												<td class="info">이데일리</td>
+												<td class="date"> 2026.02.19 11:39</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0002602178&office_id=016&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>엔비디아, HBM4 &lsquo;듀얼 전략&rsquo;&hellip;삼전, 최상위 점령 기대</a>
+													
+												</td>
+												<td class="info">헤럴드경제</td>
+												<td class="date"> 2026.02.19 11:32</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0005723042&office_id=277&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>&quot;삼성이 더 비싸다&quot;&hellip;엔비디아 HBM4 '하이엔드 vs 가성비' 투트...</a>
+													
+												</td>
+												<td class="info">아시아경제</td>
+												<td class="date"> 2026.02.19 10:51</td>
+											</tr>
+						
+						
+ 					
+ 						
+
+						
+						
+											<tr  class="hide_news none">
+												<td class="title">
+													<a href="/item/news_read.naver?article_id=0002602034&office_id=016&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclustsub','','',event);" target=_top><span class="ico_reply"></span>엔비디아, HBM4 &lsquo;듀얼 전략&rsquo;&hellip;삼성전자, 최상위 제품 점령 기대</a>
+													
+												</td>
+												<td class="info">헤럴드경제</td>
+												<td class="date"> 2026.02.19 10:04</td>
+											</tr>
+						
+						
+										</tbody>
+									</table>
+									
+									<div class="link_area">
+										<a href="#" class="_moreBtn" onClick="toggleList(this, '0240000103559'); return false;" data-count="4">관련뉴스 <em>4</em>건 더보기<span class="ico_down"></span></a>
+									</div>																	
+									
+								</td>
+							</tr>
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0003618944&office_id=081&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>[서울데이터랩]미래에셋증권 13.96% 급등하며 시장 이목 집중</a>
+									
+								</td>
+								<td class="info">서울신문</td>
+								<td class="date"> 2026.02.19 13:37</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							
+		 							
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0000335690&office_id=449&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>[경제를 부탁해]설 연휴 이후 코스피 상황은?</a>
+									<span class="r_vod"><span class="blind">동영상기사</span></span>
+								</td>
+								<td class="info">채널A</td>
+								<td class="date"> 2026.02.19 13:31</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+					 					
+ 				
+ 					
+ 						
+ 							
+ 							<tr 
+ 									
+		 							
+		 							 class="last"
+		 							
+		 						 >	 						
+	 							<td class="title">
+									<a href="/item/news_read.naver?article_id=0004591307&office_id=011&code=000660&page=1&sm=" class="tit" onClick="clickcr(this,'stn.nbdyclust','','',event);" target=_top>19만전자&middot;90만닉스 찍더니 &ldquo;코스피 7870 간다&rdquo;&hellip;투톱 질주에 증권...</a>
+									
+								</td>
+								<td class="info">서울경제</td>
+								<td class="date"> 2026.02.19 13:22</td>
+ 							</tr>	 					
+ 						
+
+						
+						
+						
+ 					
+					 					
+ 				
+				</tbody>
+			</table>
+ 						
+			<!--- 종목뉴스 끝--->
+			<!--- 페이지 네비게이션 시작--->
+			
+			<table summary="페이지 네비게이션 리스트" class="Nnavi" align="center">
+				<caption>페이지 네비게이션</caption>
+				<tr>
+					
+						
+		                
+		                <td class="on">
+				<a href="/item/news_news.naver?code=000660&amp;page=1"  onclick=clickcr(this,'stn.npag','','',event);>1</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=2"  onclick=clickcr(this,'stn.npag','','',event);>2</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=3"  onclick=clickcr(this,'stn.npag','','',event);>3</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=4"  onclick=clickcr(this,'stn.npag','','',event);>4</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=5"  onclick=clickcr(this,'stn.npag','','',event);>5</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=6"  onclick=clickcr(this,'stn.npag','','',event);>6</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=7"  onclick=clickcr(this,'stn.npag','','',event);>7</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=8"  onclick=clickcr(this,'stn.npag','','',event);>8</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=9"  onclick=clickcr(this,'stn.npag','','',event);>9</a>
+				</td>
+<td>
+				<a href="/item/news_news.naver?code=000660&amp;page=10"  onclick=clickcr(this,'stn.npag','','',event);>10</a>
+				</td>
+
+		                <td class="pgR">
+				<a href="/item/news_news.naver?code=000660&amp;page=11"  onclick=clickcr(this,'stn.npag','','',event);>
+				다음<img src="https://ssl.pstatic.net/static/n/cmn/bu_pgarR.gif" width="3" height="5" alt="" border="0">
+				</a>
+				</td>
+
+		                <td class="pgRR">
+				<a href="/item/news_news.naver?code=000660&amp;page=200"  onclick=clickcr(this,'stn.npag','','',event);>맨뒤
+				<img src="https://ssl.pstatic.net/static/n/cmn/bu_pgarRR.gif" width="8" height="5" alt="" border="0">
+				</a>
+				</td>
+
+		            
+				</tr>
+			</table>
+			
+
+
+	<script type="text/javascript" src="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/js/ntm.js"></script>
+	<script type="text/javascript" src="https://ssl.pstatic.net/imgstock/static.pc/20260203165825/js/nLog.js"></script>
+    <script type="text/javascript">
+        ;(function(){
+            var eventType = "onpageshow" in window ? "pageshow" : "load";
+            jindo.$Fn(function(){
+                lcs_do();
+            }).attach(window, eventType);
+        })();
+	</script>	
+
+
+<script type="text/javascript">
+	jindo.$Fn(function(){
+		parentHeightResize();
+
+		// _replaceNewsLink class 하위의 a 태그 조회 후 redirect
+		jindo.$$("._replaceNewsLink a").forEach(function(ele){
+			var urls = ele.href.split("?");
+			if (urls[0].indexOf("/news_read.naver") > 0 || urls[0].indexOf("/newsRead.naver") > 0) {
+				var param = jindo.$S(urls[1]).parseString();
+				var oid = param.office_id ? param.office_id : param.officeId;
+				var aid = param.article_id ? param.article_id : param.articleId;
+
+				ele.target = "_blank";
+				ele.href = jindo.$S("https://n.news.naver.com/mnews/article/%s/%s").format(oid, aid);
+			}
+		});
+
+	}).attach(window, 'load');
+</script>
+<script>
+	var targetWindow = window.top;
+	var targetOrigin = location.protocol+'//'+location.host;
+
+	function parentHeightResize(height) {
+		window.scrollTo(0, 0);
+		targetWindow.postMessage({
+			"type":"syncHeight",
+			"height": (height) ? height : document.body.offsetHeight
+		}, targetOrigin);
+	}
+
+	function parentScrollTo(to) {
+		targetWindow.postMessage({
+			"type":"syncScrollTo",
+			"to": to
+		}, targetOrigin);
+	}
+
+	// iframe의 사이즈가 갱신되기 위해서 dom load되기전 300으로 먼저 수정
+	parentHeightResize(300);
+</script>
+</body>

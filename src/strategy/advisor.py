@@ -4,10 +4,12 @@ import sys
 import json
 import time
 import requests
+import urllib.parse
 import datetime
 import google.generativeai as genai
 from collections import Counter
 import re
+from bs4 import BeautifulSoup
 
 # Add parent directory to path to allow imports from src/trade
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -126,8 +128,9 @@ class GeminiAgent:
         2. Sentinel Signals (Top Picks): {json.dumps(sentinel_signals, ensure_ascii=False, indent=2)}
         
         Requirement:
-        - Analyze the top picks based on their signals and scores.
-        - Provide actionable advice (Buy/Watch/Sell) referencing their specific strengths (Trend, Foreign, etc).
+        - Analyze the top picks based on their signals, scores, AND specific news.
+        - **IMPORTANT**: If 'news' data is present, you MUST cite the relevant news title and source in your analysis (e.g., "Basis: [Source] Title...").
+        - Provide actionable advice (Buy/Watch/Sell) referencing technicals (Sentinel) and fundamentals (News).
         - Keep it brief (bullet points).
         - Tone: Professional, objective.
         """
@@ -210,13 +213,83 @@ class StrategyAdvisor:
 
     def fetch_specific_news(self, code, stock_name):
         """
-        Fetches specific news for a stock (Simple implementation using Naver Finance Search).
-        Returns a list of titles.
+        Fetches specific news for a stock.
+        Priority 1: Naver Search (Mobile) - Broader coverage
+        Priority 2: Naver Finance (Item News) - Specific to stock
         """
-        # For MVP, we'll try to use the research_scraper's logic or simple requests
-        # This is a placeholder for the "2nd Priority Check"
-        # In a real scenario, this would scrape 'item/news.naver'
-        return []
+        news_list = []
+        
+        # --- Priority 1: Naver Mobile Search ---
+        try:
+            encoded_query = urllib.parse.quote(stock_name)
+            url = f"https://m.search.naver.com/search.naver?where=m_news&query={encoded_query}&sm=mtb_jum&sort=1"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+            }
+            
+            res = requests.get(url, headers=headers, timeout=3)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            
+            groups = soup.select('.group_news')
+            for g in groups[:3]: # Top 3 items
+                # Naver Mobile structure uses dynamic classes. 
+                # Strategy: Find the anchor tag with the longest text (likely the title)
+                links = g.find_all('a')
+                if not links: continue
+                
+                # Filter out small icon links or buttons
+                valid_links = [a for a in links if len(a.get_text(strip=True)) > 10]
+                
+                if valid_links:
+                    # Usually the first long link is the title in the card
+                    title_tag = valid_links[0]
+                    title = title_tag.get_text(strip=True)
+                    link = title_tag['href']
+                    
+                    # Try to find source (usually a short link/span before the title, or inside .press class)
+                    source = "NaverSearch"
+                    try:
+                        press = g.select_one('.press')
+                        if press: source = press.get_text(strip=True)
+                    except: pass
+                    
+                    news_list.append({'title': f"[{source}] {title}", 'link': link})
+                    
+        except Exception as e:
+            print(f"[Advisor] Naver Search Fetch Failed for {stock_name}: {e}")
+
+        # --- Priority 2: Fallback to Naver Finance if Search failed ---
+        if not news_list:
+            try:
+                # url = f"https://finance.naver.com/item/news_news.naver?code={code}&page=1"
+                # headers = {
+                #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                #     "Referer": f"https://finance.naver.com/item/main.naver?code={code}"
+                # }
+                
+                # res = requests.get(url, headers=headers, timeout=3)
+                # res.encoding = 'EUC-KR'
+                # soup = BeautifulSoup(res.text, 'html.parser')
+                
+                # titles = soup.select('.title')
+                # if not titles: titles = soup.select('.tit')
+                # if not titles: 
+                #     links = soup.find_all('a', class_='tit')
+                #     if links: titles = links
+                
+                # for t in titles[:3]:
+                #     a_tag = len(t.find_all('a')) > 0 and t.find('a') or (t.name == 'a' and t)
+                    
+                #     if a_tag:
+                #         title = a_tag.get_text(strip=True)
+                #         link = "https://finance.naver.com" + a_tag['href']
+                #         news_list.append({'title': title, 'link': link})
+                # --- Simplified Fallback (Commented out to rely on search for now as per user request to SWITCH) ---
+                pass
+            except Exception as e:
+                print(f"[Advisor] Naver Finance Fallback Failed: {e}")
+            
+        return news_list
 
     def analyze_candidates(self, candidates):
         """
@@ -285,9 +358,12 @@ class StrategyAdvisor:
         # 4. Top 10 Filtering
         top_picks = results[:10]
         
-        # 5. News Integration (Mock for now, can expand)
-        # for pick in top_picks:
-        #     pick['news'] = self.fetch_specific_news(pick['code'], pick['name'])
+        # 5. News Integration (Real-time)
+        print(f"[Advisor] Fetching news for Top {len(top_picks)} candidates...")
+        for pick in top_picks:
+             # Add a small delay to be polite
+             time.sleep(0.2) 
+             pick['news'] = self.fetch_specific_news(pick['code'], pick['name'])
             
         return top_picks
 

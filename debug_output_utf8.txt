@@ -1,0 +1,11 @@
+--- Testing against Stock: 삼성전자 ---
+'오늘' -> FAIL: Exact Match in STOPWORDS
+'공시' -> FAIL: Exact Match in STOPWORDS
+'뉴스' -> FAIL: Exact Match in STOPWORDS
+'삼성전자' -> FAIL: Contains Stock Name '삼성전자'
+'오늘도' -> FAIL: Exact Match in STOPWORDS
+'이거' -> FAIL: Exact Match in STOPWORDS
+'이제' -> PASS: Valid Keyword
+
+Unicode Check: '오늘' == STOPWORDS['오늘']? True
+'오늘' hex: ['c624', 'b298']

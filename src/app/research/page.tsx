@@ -60,7 +60,7 @@ type FiveDayStock = {
 
 const Sparkline = ({ data }: { data: number[] }) => {
     if (!data || data.length === 0) return null;
-    const width = 150;
+    const width = 200; // Increased width for better visibility
     const height = 30;
 
     const dataMin = Math.min(...data);
@@ -85,25 +85,35 @@ const Sparkline = ({ data }: { data: number[] }) => {
     }).join(' ');
 
     return (
-        <svg width={width} height={height} style={{ overflow: 'visible' }}>
-            <polyline
-                fill="none"
-                stroke={data[data.length - 1] >= data[0] ? 'red' : 'blue'}
-                strokeWidth="2"
-                points={points}
-            />
-            {/* Zero line only if within range */}
-            {min < 0 && max > 0 && (
-                <line
-                    x1="0"
-                    y1={height - ((0 - min) / range) * height}
-                    x2={width}
-                    y2={height - ((0 - min) / range) * height}
-                    stroke="#ddd"
-                    strokeDasharray="2"
+        <Group gap="xs" style={{ width: width + 60 }}> {/* Extra space for labels */}
+            <Text size="xs" c="dimmed" style={{ minWidth: 30, textAlign: 'right' }}>
+                {data[0].toLocaleString()}
+            </Text>
+            <svg width={width} height={height} style={{ overflow: 'visible' }}>
+                <polyline
+                    fill="none"
+                    stroke={data[data.length - 1] >= data[0] ? 'red' : 'blue'}
+                    strokeWidth="2"
+                    points={points}
                 />
-            )}
-        </svg>
+
+                {/* Min/Max Text Labels on SVG for better context if needed, but side labels are cleaner */}
+                {/* Zero line only if within range */}
+                {min < 0 && max > 0 && (
+                    <line
+                        x1="0"
+                        y1={height - ((0 - min) / range) * height}
+                        x2={width}
+                        y2={height - ((0 - min) / range) * height}
+                        stroke="#ddd"
+                        strokeDasharray="2"
+                    />
+                )}
+            </svg>
+            <Text size="xs" fw={700} c={data[data.length - 1] >= data[0] ? 'red' : 'blue'} style={{ minWidth: 30 }}>
+                {data[data.length - 1].toLocaleString()}
+            </Text>
+        </Group>
     );
 };
 
@@ -830,9 +840,9 @@ export default function Home() {
                                     <div key={marketType} style={{ marginBottom: 40 }}>
                                         <Text fw={700} size="xl" mb="md" c="blue.7">{marketType} (5일 누적)</Text>
                                         <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}>
-                                            <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
+                                            <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-default)' }}>
                                                 <Table.Tr>
-                                                    <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                    <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-default)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
                                                         <Group gap="xs">
                                                             종목명
                                                             {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
@@ -856,7 +866,7 @@ export default function Home() {
                                                     }}
                                                         onClick={() => handleCopyAndOpen(stock.code, stock.name)}
                                                     >
-                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-default)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
                                                             {stock.name} <Text span c="dimmed" size="xs">{stock.code}</Text>
                                                         </Table.Td>
                                                         <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>
@@ -907,9 +917,9 @@ export default function Home() {
                                     <div key={marketType} style={{ marginBottom: 40 }}>
                                         <Text fw={700} size="xl" mb="md" c="cyan.7">{marketType} (3일 누적)</Text>
                                         <Table striped highlightOnHover withTableBorder style={{ minWidth: 1000 }}>
-                                            <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-body)' }}>
+                                            <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-default)' }}>
                                                 <Table.Tr>
-                                                    <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-body)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                    <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-default)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
                                                         <Group gap="xs">
                                                             종목명
                                                             {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
@@ -933,7 +943,7 @@ export default function Home() {
                                                     }}
                                                         onClick={() => handleCopyAndOpen(stock.code, stock.name)}
                                                     >
-                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-default)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
                                                             {stock.name} <Text span c="dimmed" size="xs">{stock.code}</Text>
                                                         </Table.Td>
                                                         <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>

@@ -36,6 +36,16 @@ def test_advisor():
     
     print("\n=== Detailed Results ===")
     print(json.dumps(results, indent=2, ensure_ascii=False))
+    
+    # Verification
+    print("\n=== Verification ===")
+    for item in results:
+        news_count = len(item.get('news', []))
+        print(f"Stock: {item['name']} - News Count: {news_count}")
+        if news_count > 0:
+            print(f"  First News: {item['news'][0]['title']} ({item['news'][0]['link']})")
+        else:
+            print(f"  WARNING: No news found for {item['name']}")
 
 if __name__ == "__main__":
     test_advisor()

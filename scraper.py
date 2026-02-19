@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import time
 import os
 import sys
-from src.sentinel import SentinelV, GeminiAgent
+from src.sentinel_fixed import SentinelV, GeminiAgent
 
 import re
 

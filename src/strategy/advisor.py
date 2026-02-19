@@ -120,19 +120,21 @@ class GeminiAgent:
         msg_date = datetime.datetime.now().strftime('%Y-%m-%d')
         prompt = f"""
         Role: Senior Stock Analyst (using Gemini 2.5 Flash Lite)
-        Task: Write a concise "Trading Guide" (매매 가이드).
+        Task: Write a "Trading Guide" (매매 가이드) in a **Narrative/Descriptive Style** (서술형).
         Current Date: {msg_date}
         
         Data Sources:
         1. Market Context: {market_context}
-        2. Sentinel Signals (Top Picks): {json.dumps(sentinel_signals, ensure_ascii=False, indent=2)}
+        2. Top Picks ( Signals & News): {json.dumps(sentinel_signals, ensure_ascii=False, indent=2)}
         
         Requirement:
-        - Analyze the top picks based on their signals, scores, AND specific news.
-        - **IMPORTANT**: If 'news' data is present, you MUST cite the relevant news title and source in your analysis (e.g., "Basis: [Source] Title...").
-        - Provide actionable advice (Buy/Watch/Sell) referencing technicals (Sentinel) and fundamentals (News).
-        - Keep it brief (bullet points).
-        - Tone: Professional, objective.
+        - Do NOT use simple bullet points for the main analysis. Write cohesive paragraphs (2-3 sentences per stock or group) that explain the "Why".
+        - **Structure**:
+            1. **Market/Sector Overview**: Brief context if applicable.
+            2. **Top Candidate Analysis**: For the top recommended stocks, explicitly state your **Prediction** (예측), **Argument/Reasoning** (주장/근거), and **Why** based on the News and Signal.
+            3. **Risks/Disclosures**: Mention any critical risks found in the news.
+        - **Tone**: Persuasive technical analysis, professional, objective.
+        - **Language**: Korean (Natural, Expert tone).
         """
         
         try:
@@ -371,19 +373,33 @@ class StrategyAdvisor:
         """
         Generates the final human-readable report string.
         """
-        analysis_results = self.analyze_candidates(candidates)
+        # 1. Analyze ALL candidates first
+        all_results = self.analyze_candidates(candidates)
         
-        # 1. Ask Gemini for the narrative part
-        market_context = f"Analyzed {len(candidates)} stocks. Found {len(analysis_results)} actionable items."
-        gemini_guide = self.gemini.generate_trading_guide(market_context, analysis_results)
+        # 2. Filter for Report (Top 6 + Sells)
+        # - Top 6 by Score
+        top_6 = all_results[:6]
         
-        # 2. Add specific Action Items
+        # - Forced Include: Any SELL action in portfolio, even if not in Top 6
+        forced_sells = [
+            item for item in all_results[6:] 
+            if item['action'] == "SELL_EXECUTE"
+        ]
+        
+        final_report_items = top_6 + forced_sells
+        
+        # 3. Ask Gemini for the narrative part (Filtered Context)
+        market_context = f"Analyzed {len(candidates)} stocks. Reporting Top {len(final_report_items)} items."
+        gemini_guide = self.gemini.generate_trading_guide(market_context, final_report_items)
+        
+        # 4. Add specific Action Items
         report = f"{gemini_guide}\n\n"
-        report += "📋 **Action Items (Portfolio Integrated)**\n"
+        report += "📋 **Action Items (Top 6 + Critical Sells)**\n"
         
-        for item in analysis_results:
+        for item in final_report_items:
             icon = "🔴" if "BUY" in item['action'] else "🔵"
             if item['action'] == "WATCH": icon = "👀"
+            if item['action'] == "SELL_EXECUTE": icon = "🚨" # Distinct icon for sell
             
             portfolio_tag = " [보유중]" if item['in_portfolio'] else ""
             
@@ -391,4 +407,4 @@ class StrategyAdvisor:
             report += f"   - Signal: {item['signal']} (Score: {item['score']})\n"
             report += f"   - Price: {item['price']} -> Target: {int(item['target_price'])}\n"
             
-        return report, analysis_results
+        return report, final_report_items

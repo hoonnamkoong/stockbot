@@ -1228,6 +1228,15 @@ if __name__ == "__main__":
                 
                 sentinel_data = [] # For Gemini Integration
                 
+                # [DEBUG] Check SentinelV Origin
+                import inspect
+                print(f"[DEBUG] SentinelV Class: {SentinelV}")
+                try:
+                    print(f"[DEBUG] SentinelV File: {inspect.getfile(SentinelV)}")
+                    print(f"[DEBUG] analyze_stock signature: {inspect.signature(SentinelV.analyze_stock)}")
+                except Exception as e:
+                    print(f"[DEBUG] Inspection failed: {e}")
+                
                 # Re-analyze all data for signals
                 for stock in all_data:
                     signal, reason = sentinel.analyze_stock(stock, threshold=threshold)

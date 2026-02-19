@@ -1221,8 +1221,8 @@ if __name__ == "__main__":
     # --- Consolidated Analysis & Notification (V8.0) ---
     try:
         from src.telegram_manager import TelegramManager
-        from src.features.sentinel_v import SentinelV
-        from src.features.gemini_agent import GeminiAgent
+        # from src.features.sentinel_v import SentinelV  <-- REMOVED (Inlined)
+        # from src.features.gemini_agent import GeminiAgent <-- REMOVED (Inlined)
         
         try:
             tg_manager = TelegramManager()

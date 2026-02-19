@@ -10,199 +10,12 @@ import google.generativeai as genai
 import re
 
 # VERSION
-SCRAPER_VERSION = "9.1 (Inlined Sentinel)"
+SCRAPER_VERSION = "9.2 (Strategy Advisor)"
+
+# --- Strategy Advisor ---
+from src.strategy.advisor import StrategyAdvisor
 
 # --- SentinelV & GeminiAgent (Inlined for Stability) ---
-class SentinelV:
-    """
-    Technical Analysis Sentinel (Updated V9.0 - Inlined)
-    Analyzes stock data to generate BUY/SELL signals based on reinforced logic.
-    """
-    def __init__(self):
-        self.history_file = 'data/sentinel_history.json'
-        self.history = self._load_history()
-
-    def _load_history(self):
-        if os.path.exists(self.history_file):
-            try:
-                with open(self.history_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except:
-                return {}
-        return {}
-
-    def analyze_stock(self, stock, threshold=None):
-        """
-        Analyzes a single stock and returns (signal, reason).
-        Signal: "BUY_STRONG", "BUY", "SELL", "SELL_STRONG", or "None"
-        threshold: The dynamic post count criteria used for this run (e.g., 40, 60, 100).
-        """
-        signal = "None"
-        reason = ""
-
-        # Default fallback if threshold not provided
-        if threshold is None:
-            # Simple time-based fallback (KST)
-            current_hour = (datetime.utcnow().hour + 9) % 24
-            if 9 <= current_hour < 12: threshold = 40
-            elif 12 <= current_hour < 14: threshold = 60
-            elif 14 <= current_hour < 24: threshold = 100
-            else: threshold = 10
-
-
-        try:
-            name = stock.get('name', '')
-            price = float(stock.get('price', 0))
-            change_rate = float(str(stock.get('change_rate', '0')).replace('%', ''))
-            
-            # Foreign Rate Parsing
-            fr_str = str(stock.get('foreign_rate', '0')).replace('%', '')
-            foreign_rate = float(fr_str) if fr_str else 0.0
-            
-            pfr_str = str(stock.get('prev_foreign_rate', '0')).replace('%', '')
-            prev_foreign_rate = float(pfr_str) if pfr_str else 0.0
-            
-            consecutive = int(stock.get('consecutive_days', 0))
-            posts_count = int(stock.get('recent_posts_count', 0))
-            
-            # Volume Check (Simple heuristic if avg unavailable)
-            # If 'volume' is a raw number.
-            volume = float(stock.get('volume', 0))
-
-            # Logic Reinforcement
-            
-            # 1. BUY_STRONG: Proven Trend + Institutional/Foreign Interest
-            # - Consecutive 3+ days
-            # - Foreign ownership increasing
-            # - Positive price action
-            # - High Community Interest (At least meeting the dashboard threshold)
-            if consecutive >= 3 and foreign_rate > prev_foreign_rate and change_rate > 0 and posts_count >= threshold:
-                signal = "BUY_STRONG"
-                reason = f"3일 연속+외인확대({foreign_rate}%)+Buzz({posts_count})"
-
-            # 2. BUY: Volume Breakout or Sudden Spike
-            elif change_rate >= 15.0:
-                 signal = "BUY"
-                 reason = f"급등세 포착 (+{change_rate}%)"
-            elif change_rate > 5.0 and foreign_rate > prev_foreign_rate + 0.1 and posts_count >= (threshold * 1.5):
-                 signal = "BUY"
-                 reason = f"상승세+외인수급+강한토론({posts_count})"
-
-            # 3. SELL: Foreign Exodus or Trend Break
-            elif foreign_rate < prev_foreign_rate - 0.5:
-                signal = "SELL"
-                reason = f"외인 대량 이탈 ({prev_foreign_rate}% -> {foreign_rate}%)"
-            elif change_rate < -5.0 and foreign_rate < prev_foreign_rate and posts_count >= threshold:
-                signal = "SELL"
-                reason = f"하락세 전환 + 외인 매도 동반"
-
-        except Exception as e:
-            # print(f"Sentinel Analysis Error for {stock.get('name')}: {e}")
-            pass
-
-        return signal, reason
-
-class GeminiAgent:
-    """
-    AI Insight Agent using Google Gemini Model.
-    Target: gemini-2.5-flash-lite
-    """
-    def __init__(self):
-        self.api_key = os.environ.get('GOOGLE_API_KEY')
-        if not self.api_key:
-            print("[GeminiAgent] Warning: GOOGLE_API_KEY not found.")
-            self.model = None
-            return
-
-        genai.configure(api_key=self.api_key)
-        # Using the specific model ID requested by verification
-        self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
-
-    def generate_risk_assessment(self, symbol, signal_type, technical_reason, keywords, summary):
-        """Generates a short risk assessment for SELL signals."""
-        if not self.model: return "AI Not Configured"
-
-        prompt = f"""
-        Analyze the SELL signal for stock '{symbol}'.
-        Signal: {signal_type}
-        Reason: {technical_reason}
-        Recent Buzz Keywords: {keywords}
-        Community Summary: {summary}
-
-        Provide a 1-sentence risk assessment relative to the sell signal.
-        Start with "Gemini 2.5 Opinion: "
-        """
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text.strip()
-        except Exception as e:
-            return f"Analysis Failed: {str(e)}"
-
-    def generate_trading_guide(self, all_data, sentinel_signals=None):
-        """
-        Generates a comprehensive trading guide.
-        Integrates Sentinel-V signals if provided.
-        """
-        if not self.model: return "AI Not Configured"
-
-        # 1. Prepare Market Data Summary
-        sorted_stocks = sorted(all_data, key=lambda x: float(str(x.get('change_rate','0')).replace('%','')), reverse=True)[:10]
-        market_context = ""
-        for s in sorted_stocks:
-            market_context += f"- {s.get('name')}: {s.get('price')} ({s.get('change_rate')}), Keywords: {s.get('top_keywords')}"
-
-        # 2. Sentinel Signals Context
-        signal_context = ""
-        if sentinel_signals:
-            signal_context = "[Sentinel-V Detected Signals]"
-            for s in sentinel_signals:
-                signal_context += f"- {s['name']}: {s['signal']} ({s['reason']})"
-        
-        # 3. Load Research/News Data
-        research_context = ""
-        try:
-            if os.path.exists('data/latest_research.json'):
-                with open('data/latest_research.json', 'r', encoding='utf-8') as f:
-                    research_data = json.load(f)
-                    items = research_data.get('company', {}).get('items', [])[:5] + research_data.get('invest', {}).get('items', [])[:3]
-                    for item in items:
-                        research_context += f"- [Report] {item.get('title')} (Date: {item.get('date')}) -> Trend: {item.get('body_summary', '')[:50]}..."
-        except:
-            pass
-
-        # 4. Construct Prompt
-        prompt = f"""
-        Role: Senior Stock Analyst (using Gemini 2.5 Flash Lite)
-        Task: Write a concise "Trading Guide" (매매 가이드).
-        
-        Data Sources:
-        {market_context}
-        
-        {signal_context}
-        
-        [Recent Reports]
-        {research_context}
-        
-        Requirements:
-        1. **Signal Validation**: If there are Sentinel-V signals, explicitly analyze them. Agree or Disagree based on favorable/unfavorable news or buzz.
-        2. **Top Picks**: Select 3 stocks (prioritize those with Sentinel Buy signals OR strong News support).
-        3. Format:
-           📌 **[Stock Name]** | Action: [Buy/Hold/Watch]
-           → 💡 Basis: [Technical + Sentinel Signal + News]. *Cite sources.*
-           → 🎯 Strategy: [Entry/Exit suggestion]
-        
-        4. Tone: Professional, objective, and actionable.
-        5. Language: Korean.
-        """
-        
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text.strip()
-        except Exception as e:
-            return f"Trading Guide Generation Failed: {str(e)}"
-
-
-
 # --- Keyword Extraction Helper ---
 STOPWORDS = {
     '오늘', '어제', '내일', '지금', '현재', '실시간', '속보', '긴급',
@@ -1411,73 +1224,28 @@ if __name__ == "__main__":
                     if len(kosdaq_items) > 5: kosdaq_msg += f"<i>... and {len(kosdaq_items)-5} more on Dashboard</i>\n"
                     tg_manager.send_message(kosdaq_msg)
 
-                # 3. Sentinel-V Signals (Integrated)
-                sentinel = SentinelV()
-                buy_signals = []
-                sell_signals = []
-                
-                sentinel_data = [] # For Gemini Integration
-                
-                # [DEBUG] Check SentinelV Origin
-                import inspect
-                print(f"[DEBUG] SentinelV Class: {SentinelV}")
+                # 3. Strategy Advisor Analysis & Report (V9.2)
                 try:
-                    print(f"[DEBUG] SentinelV File: {inspect.getfile(SentinelV)}")
-                    print(f"[DEBUG] analyze_stock signature: {inspect.signature(SentinelV.analyze_stock)}")
-                except Exception as e:
-                    print(f"[DEBUG] Inspection failed: {e}")
-                
-                # Re-analyze all data for signals
-                for stock in all_data:
-                    signal, reason = sentinel.analyze_stock(stock, threshold=threshold)
-                    if "BUY" in signal:
-                        buy_signals.append(f"🔴 <b>매수 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
-                        sentinel_data.append({'name': stock['name'], 'signal': signal, 'reason': reason})
-                    elif "SELL" in signal:
-                        # [V8.1] Expert Opinion Injection
-                        try:
-                            summary = stock.get('posts_summary', '요약 없음')
-                            keywords = stock.get('top_keywords', '키워드 없음')
-                            ai_opinion = gemini.generate_risk_assessment(
-                                symbol=stock['name'],
-                                signal_type=signal,
-                                technical_reason=reason,
-                                keywords=keywords,
-                                summary=summary
-                            )
-                            sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ <i>Reason: {reason}</i>\n   └ 🧠 <b>AI 의견</b>: {ai_opinion}")
-                        except Exception as e:
-                            print(f"[Warning] AI Opinion Failed: {e}")
-                            sell_signals.append(f"🔵 <b>매도 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
-                
-                if buy_signals or sell_signals:
-                    signal_msg = "⚡ <b>[Sentinel-V Signals]</b>\n" + "\n".join(buy_signals + sell_signals)
-                    tg_manager.send_message(signal_msg)
-
-                # 4. Expert Guide (Detailed)
-                try:
-                    gemini = GeminiAgent()
-                    if gemini.model:
-                        print("[System] Generating Trading Guide...")
-                        guide_text = gemini.generate_trading_guide(all_data, sentinel_signals=sentinel_data)
-                        
-                        # Split guide if too long
-                        if len(guide_text) > 3000:
-                            parts = [guide_text[i:i+3000] for i in range(0, len(guide_text), 3000)]
-                            for i, part in enumerate(parts):
-                                tg_manager.send_message(f"🧠 <b>[Expert Guide {i+1}/{len(parts)}]</b>\n{part}")
-                        else:
-                            tg_manager.send_message(f"🧠 <b>[Expert Guide]</b>\n{guide_text}")
+                    advisor = StrategyAdvisor()
+                    print("[System] Generating Strategy Report...")
+                    
+                    report_text, analysis_results = advisor.generate_report(all_data)
+                    
+                    # Split report if too long
+                    if len(report_text) > 3500:
+                         parts = [report_text[i:i+3500] for i in range(0, len(report_text), 3500)]
+                         for i, part in enumerate(parts):
+                             tg_manager.send_message(f"🧠 <b>[Strategic Guide {i+1}/{len(parts)}]</b>\n{part}")
                     else:
-                        print("[Warning] Gemini Model not initialized (Check API Key).")
-                        tg_manager.send_message("⚠️ <b>[System Warning]</b>\nGemini AI 모델 초기화 실패.\nGitHub Secrets의 <code>GOOGLE_API_KEY</code>를 확인해주세요.")
-                except Exception as user_e:
-                    print(f"Gemini Error: {user_e}")
-                    tg_manager.send_message(f"⚠️ <b>[System Error]</b>\nGemini 가이드 생성 실패: {user_e}")
-
-                # 5. Dashboard Link (Separate small msg)
-                dash_msg = f"👉 <b>Dashboard</b>: {os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app')}"
-                tg_manager.send_message(dash_msg)
+                        tg_manager.send_message(f"🧠 <b>[Strategic Guide]</b>\n{report_text}")
+                        
+                    # 4. Dashboard Link
+                    dash_msg = f"👉 <b>Dashboard</b>: {os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app')}"
+                    tg_manager.send_message(dash_msg)
+                    
+                except Exception as e:
+                    print(f"[ERROR] Strategy Advisor Failed: {e}")
+                    tg_manager.send_message(f"⚠️ <b>[System Error]</b>\n전략 리포트 생성 실패: {e}")
                     
             except Exception as e:
                 print(f"[ERROR] Notification Logic Failed: {e}")

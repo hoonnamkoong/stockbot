@@ -5,7 +5,7 @@ from datetime import datetime
 
 class SentinelV:
     """
-    Technical Analysis Sentinel
+    Technical Analysis Sentinel (Updated V9.0)
     Analyzes stock data to generate BUY/SELL signals based on reinforced logic.
     """
     def __init__(self):

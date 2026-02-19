@@ -1257,9 +1257,13 @@ if __name__ == "__main__":
 
                 # 4. Expert Guide (Detailed)
                 try:
+                # 4. Expert Guide (Detailed)
+                try:
                     gemini = GeminiAgent()
                     if gemini.model:
+                        print("[System] Generating Trading Guide...")
                         guide_text = gemini.generate_trading_guide(all_data, sentinel_signals=sentinel_data)
+                        
                         # Split guide if too long
                         if len(guide_text) > 3000:
                             parts = [guide_text[i:i+3000] for i in range(0, len(guide_text), 3000)]
@@ -1267,8 +1271,12 @@ if __name__ == "__main__":
                                 tg_manager.send_message(f"🧠 <b>[Expert Guide {i+1}/{len(parts)}]</b>\n{part}")
                         else:
                             tg_manager.send_message(f"🧠 <b>[Expert Guide]</b>\n{guide_text}")
+                    else:
+                        print("[Warning] Gemini Model not initialized (Check API Key).")
+                        tg_manager.send_message("⚠️ <b>[System Warning]</b>\nGemini AI 모델 초기화 실패.\nGitHub Secrets의 <code>GOOGLE_API_KEY</code>를 확인해주세요.")
                 except Exception as user_e:
                     print(f"Gemini Error: {user_e}")
+                    tg_manager.send_message(f"⚠️ <b>[System Error]</b>\nGemini 가이드 생성 실패: {user_e}")
 
                 # 5. Dashboard Link (Separate small msg)
                 dash_msg = f"👉 <b>Dashboard</b>: {os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app')}"

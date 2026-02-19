@@ -60,7 +60,7 @@ type FiveDayStock = {
 
 const Sparkline = ({ data }: { data: number[] }) => {
     if (!data || data.length === 0) return null;
-    const width = 100;
+    const width = 150;
     const height = 30;
 
     const dataMin = Math.min(...data);
@@ -856,7 +856,7 @@ export default function Home() {
                                                     }}
                                                         onClick={() => handleCopyAndOpen(stock.code, stock.name)}
                                                     >
-                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'inherit', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
                                                             {stock.name} <Text span c="dimmed" size="xs">{stock.code}</Text>
                                                         </Table.Td>
                                                         <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>
@@ -873,7 +873,7 @@ export default function Home() {
                                                         <Table.Td>{stock.total_posts}개</Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 150 }}>
                                                                 {(stock.sparkline_price || []).map((v: any, i: number) => (
                                                                     <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
                                                                 ))}
@@ -881,7 +881,7 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_posts || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 150 }}>
                                                                 {(stock.sparkline_posts || []).map((v: any, i: number) => (
                                                                     <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
                                                                 ))}
@@ -933,7 +933,7 @@ export default function Home() {
                                                     }}
                                                         onClick={() => handleCopyAndOpen(stock.code, stock.name)}
                                                     >
-                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'inherit', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                        <Table.Td style={{ fontWeight: 700, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2, boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
                                                             {stock.name} <Text span c="dimmed" size="xs">{stock.code}</Text>
                                                         </Table.Td>
                                                         <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>
@@ -951,7 +951,7 @@ export default function Home() {
                                                         <Table.Td>{stock.total_posts}개</Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_price || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 150 }}>
                                                                 {(stock.sparkline_price || []).map((v: any, i: number) => (
                                                                     <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
                                                                 ))}
@@ -959,7 +959,7 @@ export default function Home() {
                                                         </Table.Td>
                                                         <Table.Td>
                                                             <Sparkline data={stock.sparkline_posts || []} />
-                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 100 }}>
+                                                            <Group gap={0} mt={4} justify="space-between" style={{ width: 150 }}>
                                                                 {(stock.sparkline_posts || []).map((v: any, i: number) => (
                                                                     <Text key={i} size="xs" c="dimmed" style={{ fontSize: '10px' }}>{Number(v).toLocaleString()}</Text>
                                                                 ))}

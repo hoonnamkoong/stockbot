@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import time
 import os
 import sys
+from src.sentinel import SentinelV, GeminiAgent
 
 import re
 
@@ -1225,11 +1226,14 @@ if __name__ == "__main__":
                 buy_signals = []
                 sell_signals = []
                 
+                sentinel_data = [] # For Gemini Integration
+                
                 # Re-analyze all data for signals
                 for stock in all_data:
-                    signal, reason = sentinel.analyze_stock(stock)
+                    signal, reason = sentinel.analyze_stock(stock, threshold=threshold)
                     if "BUY" in signal:
                         buy_signals.append(f"🔴 <b>매수 신호</b>: {stock['name']} ({signal})\n   └ <i>{reason}</i>")
+                        sentinel_data.append({'name': stock['name'], 'signal': signal, 'reason': reason})
                     elif "SELL" in signal:
                         # [V8.1] Expert Opinion Injection
                         try:
@@ -1255,7 +1259,7 @@ if __name__ == "__main__":
                 try:
                     gemini = GeminiAgent()
                     if gemini.model:
-                        guide_text = gemini.generate_trading_guide(all_data)
+                        guide_text = gemini.generate_trading_guide(all_data, sentinel_signals=sentinel_data)
                         # Split guide if too long
                         if len(guide_text) > 3000:
                             parts = [guide_text[i:i+3000] for i in range(0, len(guide_text), 3000)]

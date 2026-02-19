@@ -855,7 +855,7 @@ def fetch_post_body(link_suffix):
 
 import analyzer
 from src import research_scraper
-from src.features.gemini_agent import GeminiAgent  # [NEW] Import Gemini Agent
+# from src.features.gemini_agent import GeminiAgent  # [NEW] Import Gemini Agent <-- REMOVED (Inlined)
 # from src import utils # Removed V7.0 (Legacy)
 
 def load_env_manual(filepath=".env.local"):

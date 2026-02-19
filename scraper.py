@@ -1257,8 +1257,6 @@ if __name__ == "__main__":
 
                 # 4. Expert Guide (Detailed)
                 try:
-                # 4. Expert Guide (Detailed)
-                try:
                     gemini = GeminiAgent()
                     if gemini.model:
                         print("[System] Generating Trading Guide...")

@@ -129,9 +129,11 @@ class GeminiAgent:
         
         Requirement:
         - Do NOT use simple bullet points for the main analysis. Write cohesive paragraphs (2-3 sentences per stock or group) that explain the "Why".
+        - **PRIORITY**: If there are 'SELL' signals for stocks marked as '[보유중]' (In Portfolio), analyze if they are urgent risk management or profit-taking.
+        - **RIDE THE WINNER**: If a stock is at high profit but the 'Signal' says HOLD/BUY (strong momentum), encourage holding it longer while watching for a trend reversal. Do not suggest selling just because it's up 10%.
         - **Structure**:
             1. **Market/Sector Overview**: Brief context if applicable.
-            2. **Top Candidate Analysis**: For the top recommended stocks, explicitly state your **Prediction** (예측), **Argument/Reasoning** (주장/근거), and **Why** based on the News and Signal.
+            2. **Portfolio Management & Top Candidate Analysis**: For the top recommended stocks AND held stocks with sell/hold signals, explicitly state your **Prediction** (예측), **Argument/Reasoning** (주장/근거), and **Why** based on the News, Signal, and Profit Rate.
             3. **Risks/Disclosures**: Mention any critical risks found in the news.
         - **Tone**: Persuasive technical analysis, professional, objective.
         - **Language**: Korean (Natural, Expert tone).
@@ -297,35 +299,77 @@ class StrategyAdvisor:
         """
         Main Logic:
         1. Calculate Sentinel Score for all candidates.
-        2. Rank and pick Top 10.
-        3. Apply Portfolio Logic (Filter Sells if not held).
+        2. Merge Portfolio stocks into candidates to ensure they are monitored.
+        3. Rank and pick Top 10.
         4. Generate Final Recommendations.
         """
         print("[Advisor] Analyzing Candidates...")
         
+        # 1. Ensure Portfolio stocks are in the candidate list
+        existing_codes = {c.get('code') for c in candidates}
+        for code, info in self.portfolio.items():
+            if code not in existing_codes:
+                candidates.append({
+                    'code': code,
+                    'name': info['name'],
+                    'price': info['current_price'],
+                    'change_rate': '0%', # Fallback
+                    'source': 'portfolio'
+                })
+
         results = []
         
         for stock in candidates:
-            # 1. Sentinel Analysis
+            code = stock.get('code')
+            name = stock.get('name')
+            
+            # 1. Improved Price Fetching (Handle 'price' or 'close' or '현재가')
+            try:
+                current_price = float(str(stock.get('price') or stock.get('close') or stock.get('현재가', 0)).replace(',', ''))
+            except:
+                current_price = 0.0
+                
+            # 2. Daily Change Rate (Momentum)
+            try:
+                today_change = float(str(stock.get('change_rate', '0')).replace('%', '').replace(',', ''))
+            except:
+                today_change = 0.0
+
+            # 3. Sentinel Analysis
             analysis = self.sentinel.analyze_stock(stock)
             signal = analysis['signal']
             score = analysis['score']
             
-            code = stock.get('code')
-            name = stock.get('name')
-            current_price = float(stock.get('close', 0))
-            
-            # 2. Portfolio Logic
+            # 4. Portfolio Logic & Dynamic Sell Trigger
             in_portfolio = code in self.portfolio
+            p_info = self.portfolio.get(code)
             
             action = "WATCH"
             target_price = 0
             
+            # [Dynamic] Profit-Taking & Stop-Loss Logic
+            if in_portfolio:
+                profit_rate = p_info.get('profit_rate', 0)
+                
+                # --- Dynamic Profit Taking ---
+                if profit_rate >= 10.0:
+                    # If momentum is still strong (> 2% rise today) or technicals are strong
+                    if today_change > 2.0 or signal == "BUY_STRONG":
+                        signal = "HOLD" # Ride the winner
+                        analysis['custom_reason'] = f"Riding Winner (+{profit_rate:.1f}%) - Momentum is strong ({today_change:+.1f}%)"
+                    else:
+                        signal = "SELL"
+                        analysis['custom_reason'] = f"Profit Taking Goal (+10%) - Current: {profit_rate:.1f}%, Momentum slowing ({today_change:+.1f}%)"
+                
+                # --- Fixed Stop Loss (Risk Control) ---
+                elif profit_rate <= -7.0:
+                    signal = "SELL"
+                    analysis['custom_reason'] = f"Stop Loss (SL: -7%) - Current: {profit_rate:.1f}%"
+
             # [User Rule] Sell Signal Logic
             if signal == "SELL":
                 if in_portfolio:
                     action = "SELL_EXECUTE"
-                    # Simple rule: Current Price
                     target_price = current_price 
                 else:
                     # [User Rule] "If Sell Signal and Not Held -> Do not include in report"
@@ -341,7 +385,7 @@ class StrategyAdvisor:
                 # Simple Target: +5% (MVP)
                 target_price = current_price * 1.05
             
-            # Store Result
+            # Store Result (Include Portfolio Metadata for Gemini)
             results.append({
                 'code': code,
                 'name': name,
@@ -351,7 +395,10 @@ class StrategyAdvisor:
                 'action': action,
                 'target_price': target_price,
                 'in_portfolio': in_portfolio,
-                'factors': analysis['factors']
+                'profit_rate': p_info['profit_rate'] if in_portfolio else 0,
+                'today_change': today_change,
+                'factors': analysis['factors'],
+                'custom_reason': analysis.get('custom_reason', '')
             })
             
         # 3. Rank by Score

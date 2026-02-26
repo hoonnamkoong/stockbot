@@ -989,33 +989,36 @@ export default function Home() {
                             // --- TABLE VIEW ---
                             <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
                                 <ScrollArea>
-                                    <Table striped highlightOnHover>
-                                        <Table.Thead>
+                                    <Table striped highlightOnHover withTableBorder>
+                                        <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 3, backgroundColor: 'var(--mantine-color-default)' }}>
                                             <Table.Tr>
-                                                <ThSort sortKey="market">시장구분</ThSort>
-                                                <ThSort sortKey="code">code</ThSort>
-                                                <ThSort sortKey="name">종목명</ThSort>
+                                                <Table.Th onClick={() => handleSort('name')} style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 4, backgroundColor: 'var(--mantine-color-default)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
+                                                    <Group gap="xs">
+                                                        종목명
+                                                        {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />)}
+                                                    </Group>
+                                                </Table.Th>
+                                                <ThSort sortKey="market">시장</ThSort>
+                                                <ThSort sortKey="code">코드</ThSort>
                                                 <ThSort sortKey="price">현재가</ThSort>
-                                                <ThSort sortKey="foreign_rate">현재_외국인비중</ThSort>
-                                                <ThSort sortKey="prev_close">어제_종가</ThSort>
-                                                <ThSort sortKey="prev_foreign_rate">어제_외국인비중</ThSort>
                                                 <ThSort sortKey="change_rate">등락률</ThSort>
                                                 <ThSort sortKey="foreign_change_rate">외인변화</ThSort>
-                                                <ThSort sortKey="recent_posts_count">당일_게시글수</ThSort>
+                                                <ThSort sortKey="recent_posts_count">게시글</ThSort>
+                                                <ThSort sortKey="sentiment">감정</ThSort>
+                                                <ThSort sortKey="consecutive_days">연속</ThSort>
                                                 <Table.Th style={{ width: '20%' }}>게시물_요약</Table.Th>
-                                                <ThSort sortKey="sentiment">감정분석</ThSort>
-                                                <ThSort sortKey="top_keywords">Top_Keywords</ThSort>
-                                                <ThSort sortKey="consecutive_days">연속_등록</ThSort>
-                                                <Table.Th>latest_post</Table.Th>
+                                                <ThSort sortKey="foreign_rate">외인비중</ThSort>
+                                                <ThSort sortKey="prev_close">전일종가</ThSort>
+                                                <ThSort sortKey="prev_foreign_rate">전일외인</ThSort>
+                                                <ThSort sortKey="top_keywords">Keywords</ThSort>
+                                                <Table.Th>Latest Post</Table.Th>
                                             </Table.Tr>
                                         </Table.Thead>
                                         <Table.Tbody>
                                             {sortedStocks.length > 0 ? (
                                                 sortedStocks.map((stock) => (
                                                     <Table.Tr key={stock.code} style={{ cursor: 'pointer' }} onClick={() => handleCopyAndOpen(stock.code, stock.name)}>
-                                                        <Table.Td><Badge size="xs" variant="outline" color={stock.market === 'KOSPI' ? 'blue' : 'green'}>{stock.market}</Badge></Table.Td>
-                                                        <Table.Td><Text span c="dimmed" size="xs">{stock.code}</Text></Table.Td>
-                                                        <Table.Td fw={700} style={{ position: 'relative' }}>
+                                                        <Table.Td fw={700} style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'var(--mantine-color-default)', boxShadow: '2px 0 5px rgba(0,0,0,0.1)' }}>
                                                             <Group gap={8} wrap="nowrap">
                                                                 <a
                                                                     href={`https://finance.naver.com/item/main.naver?code=${stock.code}`}
@@ -1026,7 +1029,6 @@ export default function Home() {
                                                                 >
                                                                     {stock.name}
                                                                 </a>
-                                                                {/* Trade Button */}
                                                                 <ActionIcon
                                                                     size="sm"
                                                                     variant="light"
@@ -1038,15 +1040,11 @@ export default function Home() {
                                                                 >
                                                                     <IconCoin size={12} />
                                                                 </ActionIcon>
-                                                                {/* Badges */}
-                                                                {stock.source === 'volume' && <Badge size="xs" color="gray" variant="outline">Vol</Badge>}
-                                                                {stock.source === 'rising' && <Badge size="xs" color="red" variant="outline">Rise</Badge>}
                                                             </Group>
                                                         </Table.Td>
+                                                        <Table.Td><Badge size="xs" variant="outline" color={stock.market === 'KOSPI' ? 'blue' : 'green'}>{stock.market}</Badge></Table.Td>
+                                                        <Table.Td><Text span c="dimmed" size="xs">{stock.code}</Text></Table.Td>
                                                         <Table.Td>{Number(stock.price).toLocaleString()}원</Table.Td>
-                                                        <Table.Td>{stock.foreign_rate || '-'}</Table.Td>
-                                                        <Table.Td>{stock.prev_close ? Number(stock.prev_close).toLocaleString() + '원' : '-'}</Table.Td>
-                                                        <Table.Td>{stock.prev_foreign_rate || '-'}</Table.Td>
                                                         <Table.Td c={Number(stock.change_rate.replace('%', '')) > 0 ? 'red' : 'blue'}>
                                                             {stock.change_rate}
                                                         </Table.Td>
@@ -1058,9 +1056,6 @@ export default function Home() {
                                                                 {stock.recent_posts_count}
                                                             </Badge>
                                                         </Table.Td>
-                                                        <Table.Td style={{ fontSize: '0.85em', color: 'var(--mantine-color-dimmed)', lineHeight: '1.3', minWidth: '200px' }}>
-                                                            {stock.posts_summary}
-                                                        </Table.Td>
                                                         <Table.Td style={{ whiteSpace: 'nowrap' }}>
                                                             <Badge
                                                                 color={stock.sentiment?.includes("Positive") ? "blue" : stock.sentiment?.includes("Negative") ? "red" : "gray"}
@@ -1070,13 +1065,19 @@ export default function Home() {
                                                                 {stock.sentiment?.split(' ')[0] || '-'}
                                                             </Badge>
                                                         </Table.Td>
-                                                        <Table.Td style={{ whiteSpace: 'nowrap', color: 'var(--mantine-color-dimmed)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock.top_keywords}</Table.Td>
                                                         <Table.Td>
                                                             {stock.consecutive_days && stock.consecutive_days > 1 ?
                                                                 <Badge color="orange" size="xs">{stock.consecutive_days}일 연속</Badge>
                                                                 : <Text size="xs" c="dimmed">New</Text>
                                                             }
                                                         </Table.Td>
+                                                        <Table.Td style={{ fontSize: '0.85em', color: 'var(--mantine-color-dimmed)', lineHeight: '1.3', minWidth: '200px' }}>
+                                                            {stock.posts_summary}
+                                                        </Table.Td>
+                                                        <Table.Td>{stock.foreign_rate || '-'}</Table.Td>
+                                                        <Table.Td>{stock.prev_close ? Number(stock.prev_close).toLocaleString() + '원' : '-'}</Table.Td>
+                                                        <Table.Td>{stock.prev_foreign_rate || '-'}</Table.Td>
+                                                        <Table.Td style={{ whiteSpace: 'nowrap', color: 'var(--mantine-color-dimmed)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock.top_keywords}</Table.Td>
                                                         <Table.Td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85em' }}>
                                                             {stock.latest_post || '-'}
                                                         </Table.Td>

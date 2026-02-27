@@ -1173,7 +1173,13 @@ if __name__ == "__main__":
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
 
         # --- Consolidated Notification ---
-        if all_data and tg_manager:
+        # Send Telegram only if it's near the top of the hour (e.g., 00~05 mins) OR if it's exactly 15:30
+        is_top_of_hour = (0 <= now_kst.minute <= 5)
+        is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 35) 
+        
+        should_send_telegram = is_top_of_hour or is_market_close
+
+        if all_data and tg_manager and should_send_telegram:
             try:
                 print("[System] Generating Consolidated Telegram Report...")
                 
@@ -1279,8 +1285,10 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"[ERROR] Notification Logic Failed: {e}")
                 
-        elif not all_data and tg_manager:
+        elif not all_data and tg_manager and should_send_telegram:
             tg_manager.send_no_data_alert(threshold)
+        elif not should_send_telegram:
+            print(f"[System] Skipped Telegram notification because current time ({now_kst.strftime('%H:%M')}) is not top of the hour.")
 
     except Exception as e:
         print(f"Failed in consolidated section: {e}")

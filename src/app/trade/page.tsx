@@ -39,6 +39,7 @@ export default function TradePage() {
     const [loading, setLoading] = useState(false);
     const [orderLoading, setOrderLoading] = useState(false);
     const [notification, setNotification] = useState<{ title: string, msg: string, color: string } | null>(null);
+    const [geminiBalance, setGeminiBalance] = useState<any>(null);
 
     // Order Form
     const [orderType, setOrderType] = useState<string | null>('buy');
@@ -154,10 +155,20 @@ export default function TradePage() {
         return stock ? stock.name : code;
     };
 
+    const fetchGeminiBalance = async () => {
+        try {
+            const res = await axios.get('/api/portfolio/gemini');
+            setGeminiBalance(res.data);
+        } catch (e) {
+            console.error("Gemini Fetch Error", e);
+        }
+    };
+
     useEffect(() => {
         fetchBalance();
         fetchStocks();
         fetchReservations();
+        fetchGeminiBalance();
     }, []);
 
     // [Real-time Execution] Poll schedule endpoint every 30 seconds while page is open.
@@ -167,6 +178,7 @@ export default function TradePage() {
             await axios.get('/api/trade/schedule');
             fetchReservations(); // Refresh list after check
             fetchBalance();      // Refresh balance if trade happened
+            fetchGeminiBalance();
         } catch (e) {
             console.error("Schedule Poller Error", e);
         }
@@ -359,12 +371,16 @@ export default function TradePage() {
                 <Stack gap="lg">
                     {/* 1. Portfolio Section */}
                     {renderPortfolio()}
+                    {renderGeminiPortfolio()}
                     {/* 2. Trading Section */}
                     {renderTrading()}
                 </Stack>
             ) : (
                 <Group grow align="flex-start">
-                    {renderPortfolio()}
+                    <Stack>
+                        {renderPortfolio()}
+                        {renderGeminiPortfolio()}
+                    </Stack>
                     {renderTrading()}
                 </Group>
             )}
@@ -532,6 +548,87 @@ export default function TradePage() {
                     </Paper>
                 )}
             </Stack>
+        );
+    }
+
+    function renderGeminiPortfolio() {
+        if (!geminiBalance) return null;
+        const holdingsArr = Object.entries(geminiBalance.holdings).map(([code, h]: any) => ({
+            code,
+            ...h
+        }));
+
+        const totalInvestment = holdingsArr.reduce((sum, h) => sum + (h.qty * h.avg_price), 0);
+        const totalAsset = geminiBalance.cash + totalInvestment;
+        const profitRate = ((totalAsset - 3000000) / 3000000) * 100;
+
+        return (
+            <Paper p="md" withBorder radius="md" mt="md" style={{ borderColor: '#e599f7', borderWidth: 2 }}>
+                <Group justify="space-between" mb="xs">
+                    <Title order={4} c="grape">✨ Gemini Portfolio (Paper Trading)</Title>
+                    <Badge color="grape" variant="light">Automated AI</Badge>
+                </Group>
+
+                <Text size="sm" c="dimmed" mb="md">
+                    가상 자본금 3,000,000원으로 AI가 100% 자동 분산 투자합니다. 실계좌 권한은 없습니다.
+                </Text>
+
+                <Group justify="space-between" mb="md" align="flex-end">
+                    <Stack gap={0}>
+                        <Text size="sm" c="dimmed">예수금 잔액</Text>
+                        <Title order={3}>{Math.round(geminiBalance.cash).toLocaleString()} 원</Title>
+                    </Stack>
+                    <Group gap="xs">
+                        <Button variant="light" color="grape" size="xs" onClick={fetchGeminiBalance}>Refresh</Button>
+                    </Group>
+                </Group>
+
+                <Group grow mb="md">
+                    <Stack gap={0}>
+                        <Text size="sm" c="dimmed">총 자산 평가액 (매입가 기준)</Text>
+                        <Text fw={700}>{Math.round(totalAsset).toLocaleString()} 원</Text>
+                    </Stack>
+                    <Stack gap={0}>
+                        <Text size="sm" c="dimmed">가상 수익률</Text>
+                        <Text fw={700} c={profitRate > 0 ? 'red' : profitRate < 0 ? 'blue' : 'dimmed'}>
+                            {profitRate > 0 ? '+' : ''}{profitRate.toFixed(2)}%
+                        </Text>
+                    </Stack>
+                </Group>
+
+                <ScrollArea>
+                    <Table striped highlightOnHover style={{ minWidth: 400 }}>
+                        <Table.Thead>
+                            <Table.Tr>
+                                <Table.Th>종목</Table.Th>
+                                <Table.Th>수량</Table.Th>
+                                <Table.Th>평균매입가</Table.Th>
+                                <Table.Th>보유일수</Table.Th>
+                            </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                            {holdingsArr.length === 0 && (
+                                <Table.Tr>
+                                    <Table.Td colSpan={4} align="center">보유 주식 없음</Table.Td>
+                                </Table.Tr>
+                            )}
+                            {holdingsArr.map((h: any) => (
+                                <Table.Tr key={h.code}>
+                                    <Table.Td>
+                                        <Stack gap={0}>
+                                            <Text size="sm" fw={500}>{h.name}</Text>
+                                            <Text size="xs" c="dimmed">{h.code}</Text>
+                                        </Stack>
+                                    </Table.Td>
+                                    <Table.Td>{h.qty}</Table.Td>
+                                    <Table.Td>{Math.round(h.avg_price).toLocaleString()} 원</Table.Td>
+                                    <Table.Td>{h.days_held} 일</Table.Td>
+                                </Table.Tr>
+                            ))}
+                        </Table.Tbody>
+                    </Table>
+                </ScrollArea>
+            </Paper>
         );
     }
 

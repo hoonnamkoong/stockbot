@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
-        const filePath = path.join(process.cwd(), 'data', 'gemini_portfolio.json');
+        const branch = 'db-data';
+        const url = `https://raw.githubusercontent.com/hoonnamkoong/stockbot/${branch}/data/gemini_portfolio.json`;
 
-        if (!fs.existsSync(filePath)) {
+        const res = await fetch(url, { cache: 'no-store' });
+
+        if (!res.ok) {
+            // File might not exist yet if scraper hasn't pushed
             return NextResponse.json({
                 cash: 3000000,
                 holdings: {},
@@ -15,11 +19,10 @@ export async function GET() {
             });
         }
 
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        const data = JSON.parse(fileContent);
+        const data = await res.json();
         return NextResponse.json(data);
     } catch (error) {
-        console.error('Error reading gemini portfolio data:', error);
+        console.error('Error reading gemini portfolio data from GitHub:', error);
         return NextResponse.json({ error: 'Failed to read gemini portfolio data' }, { status: 500 });
     }
 }

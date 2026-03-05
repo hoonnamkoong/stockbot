@@ -1316,6 +1316,37 @@ if __name__ == "__main__":
         except Exception as status_e:
             print(f"[ERROR] Failed to save status.json: {status_e}")
 
+        # --- Auto-push gemini_portfolio.json to db-data branch ---
+        try:
+            import subprocess
+            portfolio_path = 'data/gemini_portfolio.json'
+            if os.path.exists(portfolio_path):
+                print("[System] Auto-pushing gemini_portfolio.json to db-data...")
+                current_branch_result = subprocess.run(
+                    ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                    capture_output=True, text=True
+                )
+                current_branch = current_branch_result.stdout.strip()
+
+                subprocess.run(['git', 'config', 'user.name', 'StockBot'], check=False)
+                subprocess.run(['git', 'config', 'user.email', 'bot@stockbot.com'], check=False)
+                subprocess.run(['git', 'checkout', 'db-data'], check=True)
+                subprocess.run(['git', 'pull', 'origin', 'db-data', '--rebase'], check=False)
+                subprocess.run(['git', 'checkout', current_branch, '--', portfolio_path], check=True)
+                subprocess.run(['git', 'add', portfolio_path], check=True)
+                commit_msg = f"bot: update gemini_portfolio {now_kst.strftime('%Y-%m-%d %H:%M')}"
+                subprocess.run(['git', 'commit', '-m', commit_msg], check=False)
+                subprocess.run(['git', 'push', 'origin', 'db-data'], check=True)
+                subprocess.run(['git', 'checkout', current_branch], check=True)
+                print("[System] gemini_portfolio.json pushed to db-data successfully.")
+        except Exception as push_e:
+            print(f"[ERROR] Failed to push gemini_portfolio.json: {push_e}")
+            try:
+                subprocess.run(['git', 'checkout', 'main'], check=False)
+            except:
+                pass
+
+
 
 
 

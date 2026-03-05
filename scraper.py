@@ -1253,35 +1253,6 @@ if __name__ == "__main__":
                     print(f"[ERROR] Strategy Advisor Failed: {e}")
                     tg_manager.send_message(f"⚠️ <b>[System Error]</b>\n전략 리포트 생성 실패: {e}")
                     
-                # --- 4. Gemini Portfolio Simulator (Paper Trading) ---
-                try:
-                    from src.strategy.hybrid_advisor_sandbox import HybridAnalyzerSandbox
-                    from src.trade.gemini_trade import GeminiTrader
-                    
-                    print("[System] Running Gemini Portfolio Simulator...")
-                    # data_path needs to point to the historical combined dataset
-                    sandbox = HybridAnalyzerSandbox(data_path="scraping data/combined_scraping_data.csv")
-                    if sandbox.train_ml_model():
-                        all_ml_probs = sandbox.predict_all(all_data)
-                        
-                        trader = GeminiTrader()
-                        current_data_map = {
-                            pick['code']: {
-                                'price': pick.get('price', 0),
-                                'ml_prob': pick.get('ml_prob', 50.0)
-                            } for pick in all_ml_probs
-                        }
-                            
-                        trader.check_exits(current_data_map)
-                        
-                        # Only buy from top 5 strong ML picks
-                        top_ml_picks = sorted(all_ml_probs, key=lambda x: x['ml_prob'], reverse=True)[:5]
-                        trader.execute_buys(top_ml_picks)
-                        
-                        print("[System] Gemini Portfolio Simulator updated successfully.")
-                except Exception as e:
-                    print(f"[ERROR] Gemini Simulator Failed: {e}")
-                    
             except Exception as e:
                 print(f"[ERROR] Notification Logic Failed: {e}")
                 
@@ -1289,6 +1260,36 @@ if __name__ == "__main__":
             tg_manager.send_no_data_alert(threshold)
         elif not should_send_telegram:
             print(f"[System] Skipped Telegram notification because current time ({now_kst.strftime('%H:%M')}) is not top of the hour.")
+
+        if all_data:
+            # --- 4. Gemini Portfolio Simulator (Paper Trading) ---
+            try:
+                from src.strategy.hybrid_advisor_sandbox import HybridAnalyzerSandbox
+                from src.trade.gemini_trade import GeminiTrader
+                
+                print("[System] Running Gemini Portfolio Simulator...")
+                # data_path needs to point to the historical combined dataset
+                sandbox = HybridAnalyzerSandbox(data_path="scraping data/combined_scraping_data.csv")
+                if sandbox.train_ml_model():
+                    all_ml_probs = sandbox.predict_all(all_data)
+                    
+                    trader = GeminiTrader()
+                    current_data_map = {
+                        pick['code']: {
+                            'price': pick.get('price', 0),
+                            'ml_prob': pick.get('ml_prob', 50.0)
+                        } for pick in all_ml_probs
+                    }
+                        
+                    trader.check_exits(current_data_map)
+                    
+                    # Only buy from top 5 strong ML picks
+                    top_ml_picks = sorted(all_ml_probs, key=lambda x: x['ml_prob'], reverse=True)[:5]
+                    trader.execute_buys(top_ml_picks)
+                    
+                    print("[System] Gemini Portfolio Simulator updated successfully.")
+            except Exception as e:
+                print(f"[ERROR] Gemini Simulator Failed: {e}")
 
     except Exception as e:
         print(f"Failed in consolidated section: {e}")

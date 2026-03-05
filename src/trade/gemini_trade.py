@@ -100,10 +100,23 @@ class GeminiTrader:
         """
         current_date = self._get_current_date()
         
-        # Update days held for existing stocks assuming this is run once a day
+        # Update days held for existing stocks
         if self.state.get('last_update') != current_date:
+            last_dt_str = self.state.get('last_update')
+            days_to_add = 1
+            if last_dt_str:
+                try:
+                    last_dt = datetime.strptime(last_dt_str, '%Y-%m-%d')
+                    curr_dt = datetime.strptime(current_date, '%Y-%m-%d')
+                    days_gap = (curr_dt - last_dt).days
+                    if days_gap > 0:
+                        days_to_add = days_gap
+                except Exception as e:
+                    print(f"Error parsing date: {e}")
+                    pass
+            
             for code in self.state['holdings']:
-                self.state['holdings'][code]['days_held'] += 1
+                self.state['holdings'][code]['days_held'] += days_to_add
             self.state['last_update'] = current_date
             
         for rec in recommendations:

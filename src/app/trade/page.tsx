@@ -596,38 +596,102 @@ export default function TradePage() {
                     </Stack>
                 </Group>
 
-                <ScrollArea>
-                    <Table striped highlightOnHover style={{ minWidth: 400 }}>
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th>종목</Table.Th>
-                                <Table.Th>수량</Table.Th>
-                                <Table.Th>평균매입가</Table.Th>
-                                <Table.Th>보유일수</Table.Th>
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {holdingsArr.length === 0 && (
-                                <Table.Tr>
-                                    <Table.Td colSpan={4} align="center">보유 주식 없음</Table.Td>
-                                </Table.Tr>
-                            )}
-                            {holdingsArr.map((h: any) => (
-                                <Table.Tr key={h.code}>
-                                    <Table.Td>
-                                        <Stack gap={0}>
-                                            <Text size="sm" fw={500}>{h.name}</Text>
-                                            <Text size="xs" c="dimmed">{h.code}</Text>
-                                        </Stack>
-                                    </Table.Td>
-                                    <Table.Td>{h.qty}</Table.Td>
-                                    <Table.Td>{Math.round(h.avg_price).toLocaleString()} 원</Table.Td>
-                                    <Table.Td>{h.days_held} 일</Table.Td>
-                                </Table.Tr>
-                            ))}
-                        </Table.Tbody>
-                    </Table>
-                </ScrollArea>
+                <Tabs defaultValue="holdings" color="grape">
+                    <Tabs.List mb="sm">
+                        <Tabs.Tab value="holdings" leftSection={<IconClock size={14} />}>Holdings</Tabs.Tab>
+                        <Tabs.Tab value="history" leftSection={<IconChartBar size={14} />}>History</Tabs.Tab>
+                    </Tabs.List>
+
+                    <Tabs.Panel value="holdings">
+                        <ScrollArea>
+                            <Table striped highlightOnHover style={{ minWidth: 400 }}>
+                                <Table.Thead>
+                                    <Table.Tr>
+                                        <Table.Th>종목</Table.Th>
+                                        <Table.Th>수량</Table.Th>
+                                        <Table.Th>평균매입가</Table.Th>
+                                        <Table.Th>보유일수</Table.Th>
+                                    </Table.Tr>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                    {holdingsArr.length === 0 && (
+                                        <Table.Tr>
+                                            <Table.Td colSpan={4} align="center">보유 주식 없음</Table.Td>
+                                        </Table.Tr>
+                                    )}
+                                    {holdingsArr.map((h: any) => (
+                                        <Table.Tr key={h.code}>
+                                            <Table.Td>
+                                                <Stack gap={0}>
+                                                    <Text size="sm" fw={500}>{h.name}</Text>
+                                                    <Text size="xs" c="dimmed">{h.code}</Text>
+                                                </Stack>
+                                            </Table.Td>
+                                            <Table.Td>{h.qty}</Table.Td>
+                                            <Table.Td>{Math.round(h.avg_price).toLocaleString()} 원</Table.Td>
+                                            <Table.Td>{h.days_held} 일</Table.Td>
+                                        </Table.Tr>
+                                    ))}
+                                </Table.Tbody>
+                            </Table>
+                        </ScrollArea>
+                    </Tabs.Panel>
+
+                    <Tabs.Panel value="history">
+                        <ScrollArea h={300}>
+                            <Table striped highlightOnHover style={{ minWidth: 500 }}>
+                                <Table.Thead>
+                                    <Table.Tr>
+                                        <Table.Th>날짜</Table.Th>
+                                        <Table.Th>종목</Table.Th>
+                                        <Table.Th>구분</Table.Th>
+                                        <Table.Th>가격</Table.Th>
+                                        <Table.Th>수량</Table.Th>
+                                        <Table.Th>수익률/이유</Table.Th>
+                                    </Table.Tr>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                    {(!geminiBalance.trade_log || geminiBalance.trade_log.length === 0) && (
+                                        <Table.Tr>
+                                            <Table.Td colSpan={6} align="center">매매 내역 없음</Table.Td>
+                                        </Table.Tr>
+                                    )}
+                                    {[...(geminiBalance.trade_log || [])].reverse().map((log: any, idx: number) => (
+                                        <Table.Tr key={idx}>
+                                            <Table.Td width={100}>
+                                                <Text size="xs">{log.date.split(' ')[0]}</Text>
+                                                <Text size="xs" c="dimmed">{log.date.split(' ')[1]}</Text>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Text size="sm" fw={500}>{log.name}</Text>
+                                                <Text size="xs" c="dimmed">{log.code}</Text>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Badge size="sm" color={log.type === 'BUY' ? 'red' : 'blue'}>
+                                                    {log.type}
+                                                </Badge>
+                                            </Table.Td>
+                                            <Table.Td>{Math.round(log.price).toLocaleString()}</Table.Td>
+                                            <Table.Td>{log.qty}</Table.Td>
+                                            <Table.Td>
+                                                <Stack gap={0}>
+                                                    {log.profit_rate !== undefined && (
+                                                        <Text size="xs" fw={700} c={log.profit_rate > 0 ? 'red' : 'blue'}>
+                                                            {log.profit_rate > 0 ? '+' : ''}{log.profit_rate.toFixed(2)}%
+                                                        </Text>
+                                                    )}
+                                                    <Text size="xs" c="dimmed" style={{ maxWidth: 120, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {log.reason || (log.prob ? `Prob: ${log.prob.toFixed(1)}%` : '')}
+                                                    </Text>
+                                                </Stack>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                    ))}
+                                </Table.Tbody>
+                            </Table>
+                        </ScrollArea>
+                    </Tabs.Panel>
+                </Tabs>
             </Paper>
         );
     }

@@ -36,8 +36,10 @@ class GeminiTrader:
             json.dump(self.state, f, ensure_ascii=False, indent=2)
             
     def _get_current_date(self):
-        # KST Current Date
-        return datetime.utcnow().strftime('%Y-%m-%d')
+        # KST Current Date (+9 hours)
+        from datetime import timezone, timedelta
+        kst = timezone(timedelta(hours=9))
+        return datetime.now(kst).strftime('%Y-%m-%d')
         
     def check_exits(self, current_data):
         """

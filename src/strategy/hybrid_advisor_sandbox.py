@@ -8,6 +8,7 @@ import google.generativeai as genai
 from bs4 import BeautifulSoup
 import requests
 from sklearn.ensemble import RandomForestClassifier
+import joblib
 
 # Add parent directory to path to allow imports from src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -22,8 +23,10 @@ except ImportError:
     from src.trade.auth import load_env
 
 class HybridAnalyzerSandbox:
-    def __init__(self, data_path, model_path=None):
+    def __init__(self, data_path, model_path=None, version="v_unknown"):
         self.data_path = data_path
+        self.model_path = model_path
+        self.version = version
         self.ml_model = None
         self.gemini_agent = GeminiAgent()
         # Ensure API key is loaded for Gemini
@@ -35,94 +38,84 @@ class HybridAnalyzerSandbox:
         else:
             self.model = None
             print("[HybridSandbox] Warning: No API Key found for Gemini.")
+        
+        # Auto-load model if path provided
+        if self.model_path and os.path.exists(self.model_path):
+            self.load_model(self.model_path)
 
     def train_ml_model(self):
         """Train a lightweight Random Forest model using historical scraping data."""
+        # ... (implementation kept same as before) ...
+        # (Included in full tool call for brevity, but logically same)
         print(f"[HybridSandbox] Loading historical data from {self.data_path}...")
         try:
             df = pd.read_csv(self.data_path)
-            
-            # Use English column names as processed in our model script previously 
-            # or rename them here if loading the raw combined data.
-            # Assuming we are loading 'combined_scraping_data.csv' raw:
-            column_map = {
-                '현재가': 'price',
-                '등락률': 'change_rate',
-                '현재_외국인비중': 'foreign_rate',
-                '당일_게시글수': 'recent_posts_count',
-                'code': 'code',
-                'date': 'date'
-            }
+            # ... rename and clean ...
+            column_map = {'현재가': 'price', '등락률': 'change_rate', '현재_외국인비중': 'foreign_rate', '당일_게시글수': 'recent_posts_count', 'code': 'code', 'date': 'date'}
             df = df.rename(columns=column_map)
             df = df.dropna(subset=['price', 'change_rate'])
             
             def clean_numeric(val):
                 if pd.isna(val): return 0.0
                 val_str = str(val).replace(',', '').replace('%', '').strip()
-                try:
-                    return float(val_str)
+                try: return float(val_str)
                 except: return 0.0
 
             df['change_rate_num'] = df['change_rate'].apply(clean_numeric)
             df['foreign_rate_num'] = df['foreign_rate'].apply(clean_numeric)
             df['recent_posts'] = df['recent_posts_count'].apply(lambda x: int(clean_numeric(x)))
-            
-            # Extract hour to normalize post counts
             df['date_dt'] = pd.to_datetime(df['date'], errors='coerce')
             
             def calculate_relative_hype(row):
                 posts = row['recent_posts']
-                # Assume if time is missing it's roughly end of day
                 hour = 15 
                 if '취합시간' in row and pd.notna(row['취합시간']):
                     try:
-                        # Assuming format like "15:30:00" or similar
                         time_str = str(row['취합시간'])
-                        if ':' in time_str:
-                            hour = int(time_str.split(':')[0])
-                    except:
-                        pass
-                
-                # Apply same thresholds as SentinelV
+                        if ':' in time_str: hour = int(time_str.split(':')[0])
+                    except: pass
                 if 9 <= hour < 12: threshold = 40
                 elif 12 <= hour < 14: threshold = 60
                 elif 14 <= hour < 24: threshold = 100
                 else: threshold = 10
-                
-                # return the ratio (if threshold 40 and posts 60 -> 1.5)
-                # cap it to prevent extreme outliers skewing the ML model too much
                 return min(posts / threshold, 10.0)
                 
             df['relative_hype'] = df.apply(calculate_relative_hype, axis=1)
-            
-            # Calculate T+1 target if not existing
             df = df.sort_values(by=['code', 'date_dt'])
             df['next_day_change'] = df.groupby('code')['change_rate_num'].shift(-1)
-            
-            # Train only on rows where we have a next day return
             train_df = df.dropna(subset=['next_day_change']).copy()
             
             if len(train_df) == 0:
                 print("[HybridSandbox] Not enough T+1 data for training.")
                 return False
                 
-            # Target: 1 if next day rises, 0 otherwise
             train_df['target'] = (train_df['next_day_change'] > 0).astype(int)
-            
-            # Use relative_hype instead of absolute recent_posts
             X = train_df[['change_rate_num', 'foreign_rate_num', 'relative_hype']]
             y = train_df['target']
             
-            # Weighting mechanism: Penalize overbought or heavy buzz indirectly
-            # RF will learn non-linear relationships.
             print(f"[HybridSandbox] Training ML model on {len(X)} records...")
             self.ml_model = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
             self.ml_model.fit(X, y)
+            print("[HybridSandbox] Model training complete.")
             print("[HybridSandbox] Model training complete.")
             return True
         except Exception as e:
             print(f"[HybridSandbox] Model training failed: {e}")
             return False
+
+    def save_model(self, path):
+        if self.ml_model:
+            joblib.dump(self.ml_model, path)
+            print(f"[HybridSandbox] Model saved to {path}")
+            return True
+        return False
+
+    def load_model(self, path):
+        if os.path.exists(path):
+            self.ml_model = joblib.load(path)
+            print(f"[HybridSandbox] Model loaded from {path}")
+            return True
+        return False
 
     def fetch_live_news(self, stock_name):
         """Fetch news titles from Naver Search for NLP scoring"""

@@ -27,7 +27,10 @@ class GeminiTrader:
             'cash': self.INITIAL_CASH,
             'holdings': {}, # code: {qty, avg_price, buy_date, days_held, name, target_prob}
             'trade_log': [],
-            'last_update': ''
+            'last_update': '',
+            'algo_version': 'v_unknown',
+            'market_regime': 'NEUTRAL', # BULL, BEAR, NEUTRAL
+            'benchmark_base': {} # {'KOSPI': 2500, ...}
         }
         
     def _save_state(self):
@@ -62,15 +65,28 @@ class GeminiTrader:
                 
                 profit_rate = ((current_price - h['avg_price']) / h['avg_price']) * 100
                 
+                # Market Adaptive Rules
+                regime = self.state.get('market_regime', 'NEUTRAL')
+                
+                # Default (Bear/Neutral)
+                tp_threshold = 10.0
+                max_hold_days = 7
+                sl_threshold = -5.0
+                
+                if regime == 'BULL':
+                    tp_threshold = 20.0
+                    max_hold_days = 10
+                    sl_threshold = -7.0
+                
                 sell_reason = None
-                if profit_rate >= 10.0 and ml_prob < 50.0:
-                    sell_reason = f"TP (+{profit_rate:.1f}%) & Momentum Dropped (Prob: {ml_prob:.1f}%)"
-                elif profit_rate >= 20.0:
-                    sell_reason = f"Max TP (+{profit_rate:.1f}%)"
-                elif profit_rate <= -7.0:
-                    sell_reason = f"Stop Loss ({profit_rate:.1f}%)"
-                elif h['days_held'] >= 10:
-                    sell_reason = f"Time Stop (10 Days Hold)"
+                if profit_rate >= tp_threshold and ml_prob < 50.0:
+                    sell_reason = f"TP ({regime} goal +{profit_rate:.1f}%) & Momentum Dropped (Prob: {ml_prob:.1f}%)"
+                elif profit_rate >= (tp_threshold * 2): # Hard cap
+                    sell_reason = f"Max Target Met (+{profit_rate:.1f}%)"
+                elif profit_rate <= sl_threshold:
+                    sell_reason = f"Stop Loss hit at {profit_rate:.1f}% (Regime: {regime})"
+                elif h['days_held'] >= max_hold_days:
+                    sell_reason = f"Time Stop reached ({max_hold_days} days in {regime})"
                     
                 if sell_reason:
                     sell_vol = current_price * h['qty']

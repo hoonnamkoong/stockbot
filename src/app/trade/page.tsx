@@ -40,6 +40,7 @@ export default function TradePage() {
     const [orderLoading, setOrderLoading] = useState(false);
     const [notification, setNotification] = useState<{ title: string, msg: string, color: string } | null>(null);
     const [geminiBalance, setGeminiBalance] = useState<any>(null);
+    const [geminiLoading, setGeminiLoading] = useState(false);
 
     // Order Form
     const [orderType, setOrderType] = useState<string | null>('buy');
@@ -156,11 +157,14 @@ export default function TradePage() {
     };
 
     const fetchGeminiBalance = async () => {
+        setGeminiLoading(true);
         try {
             const res = await axios.get('/api/portfolio/gemini');
             setGeminiBalance(res.data);
         } catch (e) {
             console.error("Gemini Fetch Error", e);
+        } finally {
+            setGeminiLoading(false);
         }
     };
 
@@ -552,14 +556,14 @@ export default function TradePage() {
     }
 
     function renderGeminiPortfolio() {
-        if (!geminiBalance) return null;
-        const holdingsArr = Object.entries(geminiBalance.holdings).map(([code, h]: any) => ({
+        // ALWAYS return a Paper shell so the section doesn't visually "disappear"
+        const holdingsArr = geminiBalance?.holdings ? Object.entries(geminiBalance.holdings).map(([code, h]: any) => ({
             code,
             ...h
-        }));
+        })) : [];
 
-        const totalInvestment = holdingsArr.reduce((sum, h) => sum + (h.qty * h.avg_price), 0);
-        const totalAsset = geminiBalance.cash + totalInvestment;
+        const totalInvestment = holdingsArr.reduce((sum, h: any) => sum + (h.qty * h.avg_price), 0);
+        const totalAsset = (geminiBalance?.cash || 3000000) + totalInvestment;
         const profitRate = ((totalAsset - 3000000) / 3000000) * 100;
 
         return (
@@ -576,7 +580,9 @@ export default function TradePage() {
                 <Group justify="space-between" mb="md" align="flex-end">
                     <Stack gap={0}>
                         <Text size="sm" c="dimmed">예수금 잔액</Text>
-                        <Title order={3}>{Math.round(geminiBalance.cash).toLocaleString()} 원</Title>
+                        <Title order={3}>
+                            {geminiLoading ? '...' : (Math.round(geminiBalance?.cash || 3000000).toLocaleString() + ' 원')}
+                        </Title>
                     </Stack>
                     <Group gap="xs">
                         <Button variant="light" color="grape" size="xs" onClick={fetchGeminiBalance}>Refresh</Button>
@@ -651,12 +657,14 @@ export default function TradePage() {
                                     </Table.Tr>
                                 </Table.Thead>
                                 <Table.Tbody>
-                                    {(!geminiBalance.trade_log || geminiBalance.trade_log.length === 0) && (
+                                    {(!geminiBalance?.trade_log || geminiBalance.trade_log.length === 0) && (
                                         <Table.Tr>
-                                            <Table.Td colSpan={6} align="center">매매 내역 없음</Table.Td>
+                                            <Table.Td colSpan={6} align="center">
+                                                {geminiLoading ? '로딩 중...' : '매매 내역 없음'}
+                                            </Table.Td>
                                         </Table.Tr>
                                     )}
-                                    {[...(geminiBalance.trade_log || [])].reverse().map((log: any, idx: number) => (
+                                    {[...(geminiBalance?.trade_log || [])].reverse().map((log: any, idx: number) => (
                                         <Table.Tr key={idx}>
                                             <Table.Td width={100}>
                                                 <Text size="xs">{log.date.split(' ')[0]}</Text>

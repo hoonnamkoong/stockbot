@@ -75,7 +75,8 @@ jobs:
           mkdir -p data
           
           # Try to download existing monthly report from db-data branch
-            "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}" \
+          curl -sfL "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}" \
+            -o "data/${MONTHLY_FILE}" \
             || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
             
       - name: Restore Previous Data (db-data)

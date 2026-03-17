@@ -43,9 +43,10 @@ function delay(ms: number) {
 }
 
 async function getAccessToken(): Promise<string | null> {
-    // 1. Check Memory Cache First
     const now = new Date().getTime();
-    if (ACCESS_TOKEN && now < EXPIRES_AT - 600000) {
+
+    // 1. Check Memory Cache First
+    if (ACCESS_TOKEN && now < EXPIRES_AT - 3600000) {
         return ACCESS_TOKEN;
     }
 
@@ -56,13 +57,13 @@ async function getAccessToken(): Promise<string | null> {
 
     TOKEN_PROMISE = (async () => {
         try {
-            // 3. Try Local File Cache (/tmp/kis_token.json) - Fast for warmed lambdas
+            // 3. Try Local File Cache (/tmp/kis_token.json)
             const TOKEN_FILE_LOCAL_SHARED = path.join(os.tmpdir(), 'kis_token.json');
             try {
                 if (fs.existsSync(TOKEN_FILE_LOCAL_SHARED)) {
                     const localData = JSON.parse(fs.readFileSync(TOKEN_FILE_LOCAL_SHARED, 'utf-8'));
                     const localExpires = new Date(localData.expires_at).getTime();
-                    if (now < localExpires - 600000) {
+                    if (now < localExpires - 3600000) {
                         console.log("[KIS] Using cached Access Token from local /tmp");
                         ACCESS_TOKEN = localData.access_token;
                         EXPIRES_AT = localExpires;
@@ -74,15 +75,15 @@ async function getAccessToken(): Promise<string | null> {
             // 4. Try GitHub (Persistent Storage)
             try {
                 const { data: ghTokenData } = await fetchFile<{ access_token: string, expires_at: string }>(TOKEN_FILE_GITHUB);
-
                 if (ghTokenData) {
                     const expiresAt = new Date(ghTokenData.expires_at).getTime();
-                    if (now < expiresAt - 600000) {
-                        console.log("[KIS] Using cached Access Token from GitHub");
+                    // Keep using for the day (buffer 1 hour)
+                    if (now < expiresAt - 3600000) {
+                        console.log("[KIS] Using persistent Access Token from GitHub");
                         ACCESS_TOKEN = ghTokenData.access_token;
                         EXPIRES_AT = expiresAt;
                         
-                        // Sync back to local /tmp for faster next access
+                        // Sync to local /tmp
                         try {
                             fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(ghTokenData), 'utf-8');
                         } catch (e) { /* ignore */ }
@@ -111,6 +112,7 @@ async function getAccessToken(): Promise<string | null> {
                 const newToken = res.data.access_token;
                 const expiresIn = res.data.expires_in || 86400; // Default 24h
                 const expiresAtDate = new Date(now + (expiresIn * 1000));
+
                 const tokenData = {
                     access_token: newToken,
                     expires_at: expiresAtDate.toISOString()
@@ -118,25 +120,21 @@ async function getAccessToken(): Promise<string | null> {
 
                 // Update Memory Sync
                 ACCESS_TOKEN = newToken;
-                EXPIRES_AT = new Date(now + (expiresIn * 1000)).getTime();
+                EXPIRES_AT = expiresAtDate.getTime();
 
                 // 6. Save Save Save
-                // Save locally first (immediate)
                 try {
                     fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(tokenData), 'utf-8');
                 } catch (e) { /* ignore */ }
 
-                // Save to GitHub (Wait for it to ensure next call sees it)
-                console.log("[KIS] Saving new token to GitHub...");
+                console.log("[KIS] Saving new token to GitHub for persistence...");
                 await saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token");
-                console.log("[KIS] Token saved to GitHub successfully");
-
+                
                 return newToken;
             } else {
                 throw new Error(`Token Fetch Failed: ${res.status}`);
             }
         } finally {
-            // Always clear the promise so next request can retry if needed
             TOKEN_PROMISE = null;
         }
     })();
@@ -169,14 +167,8 @@ export async function getBalance(): Promise<BalanceData | null> {
 
 
     let cleanAccount = KIS_ACCOUNT_NO.replace(/-/g, '').trim();
-    if (cleanAccount.length === 8) {
-        cleanAccount += '01'; // Default Suffix
-    }
-    if (cleanAccount.length !== 10) {
-        throw new Error(`Invalid Account Number Length: ${cleanAccount.length}. Expected 10 digits (8 account + 2 suffix).`);
-    }
     const cano = cleanAccount.substring(0, 8);
-    const acnt_prdt_cd = cleanAccount.substring(8, 10);
+    const acnt_prdt_cd = cleanAccount.substring(8, 10) || '01'; // Default to '01' if missing
     console.log('[KIS] Account parsed:', { cano, acnt_prdt_cd });
 
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`;
@@ -199,7 +191,7 @@ export async function getBalance(): Promise<BalanceData | null> {
         "ACNT_PRDT_CD": acnt_prdt_cd,
         "AFHR_FLPR_YN": "N",
         "OFL_YN": "N",
-        "INQR_DVSN": "01",
+        "INQR_DVSN": "02", // 02 is correct for Stock Balance (Fixing OPSQ2000)
         "UNPR_DVSN": "01",
         "FUND_STTL_ICLD_YN": "N",
         "FNCG_AMT_AUTO_RDPT_YN": "N",
@@ -275,14 +267,8 @@ export async function placeOrder(code: string, qty: number, price: number, side:
     }
 
     let cleanAccount = KIS_ACCOUNT_NO.replace(/-/g, '').trim();
-    if (cleanAccount.length === 8) {
-        cleanAccount += '01'; // Default Suffix
-    }
-    if (cleanAccount.length !== 10) {
-        throw new Error(`Invalid Account Number Length: ${cleanAccount.length}. Expected 10 digits (8 account + 2 suffix).`);
-    }
     const cano = cleanAccount.substring(0, 8);
-    const acnt_prdt_cd = cleanAccount.substring(8, 10);
+    const acnt_prdt_cd = cleanAccount.substring(8, 10) || '01';
     const isVTS = KIS_BASE_URL.includes('vts');
 
     let tr_id = '';

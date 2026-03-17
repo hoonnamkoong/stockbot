@@ -27,8 +27,14 @@ def place_order(side="buy", code="005930", qty=1, price=0):
     
     url = f"{base_url}/uapi/domestic-stock/v1/trading/order-cash"
     
-    # TR ID
-    tr_id = "VTTC0802U" if side == "buy" else "VTTC0801U"
+    # Determine TR ID (Real vs Virtual)
+    # Buy: REAL: TTTC0802U, VIRTUAL: VTTC0802U
+    # Sell: REAL: TTTC0801U, VIRTUAL: VTTC0801U
+    is_virtual = "vts" in base_url.lower()
+    if side == "buy":
+        tr_id = "VTTC0802U" if is_virtual else "TTTC0802U"
+    else:
+        tr_id = "VTTC0801U" if is_virtual else "TTTC0801U"
 
     headers = {
         "content-type": "application/json; charset=utf-8",

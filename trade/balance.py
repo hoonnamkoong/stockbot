@@ -27,10 +27,10 @@ def check_balance():
     cano = clean_acc[:8]
     acnt_prdt_cd = clean_acc[8:]
 
-    url = f"{base_url}/uapi/domestic-stock/v1/trading/inquire-balance"
-    
-    # TR ID for Mock Investment Balance
-    tr_id = "VTTC8434R" 
+    # Determine TR ID based on URL (Real vs Virtual)
+    # Real: TTTC8434R, Virtual: VTTC8434R
+    is_virtual = "vts" in base_url.lower()
+    tr_id = "VTTC8434R" if is_virtual else "TTTC8434R"
 
     headers = {
         "content-type": "application/json; charset=utf-8",

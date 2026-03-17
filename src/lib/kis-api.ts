@@ -96,7 +96,7 @@ async function getAccessToken(): Promise<string | null> {
             }
 
             // 5. Fetch New Token from KIS
-            console.log("[KIS] Requesting New Access Token from KIS...");
+            console.log(`[KIS] Requesting New Access Token from KIS... (GitHub Cache Fetch failed or GITHUB_PAT is ${process.env.GITHUB_PAT ? 'Present' : 'MISSING'})`);
             const url = `${KIS_BASE_URL}/oauth2/tokenP`;
             const body = {
                 grant_type: 'client_credentials',
@@ -127,8 +127,12 @@ async function getAccessToken(): Promise<string | null> {
                     fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(tokenData), 'utf-8');
                 } catch (e) { /* ignore */ }
 
-                console.log("[KIS] Saving new token to GitHub for persistence...");
-                await saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token");
+                if (process.env.GITHUB_PAT) {
+                    console.log("[KIS] Saving new token to GitHub for persistence...");
+                    await saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token");
+                } else {
+                    console.warn("[KIS] GITHUB_PAT missing - Token will NOT be persisted to GitHub. SMS alerts will continue on every restart.");
+                }
                 
                 return newToken;
             } else {
@@ -157,26 +161,22 @@ export interface BalanceData {
     total_asset: number;
     holdings: HoldingsItem[];
     raw_output2?: any; // For debugging
+    error?: string;
 }
 
 export async function getBalance(): Promise<BalanceData | null> {
     console.log('[KIS] getBalance called');
 
     const token = await getAccessToken();
-    // if (!token) check removed as getAccessToken throws
-
+    if (!token) return { error: "Failed to obtain KIS Access Token" } as any;
 
     let cleanAccount = KIS_ACCOUNT_NO.replace(/-/g, '').trim();
     const cano = cleanAccount.substring(0, 8);
-    const acnt_prdt_cd = cleanAccount.substring(8, 10) || '01'; // Default to '01' if missing
-    console.log('[KIS] Account parsed:', { cano, acnt_prdt_cd });
-
-    const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`;
+    const acnt_prdt_cd = cleanAccount.substring(8, 10) || '01';
+    
     const isVTS = KIS_BASE_URL.includes('vts');
     const tr_id = isVTS ? "VTTC8434R" : "TTTC8434R";
     
-    console.log('[KIS] Request Details:', { url, tr_id, isVTS, baseUrl: KIS_BASE_URL });
-
     const headers = {
         "content-type": "application/json; charset=utf-8",
         "authorization": `Bearer ${token}`,
@@ -186,75 +186,71 @@ export async function getBalance(): Promise<BalanceData | null> {
         "custtype": "P",
     };
 
-    const params = {
-        "CANO": cano,
-        "ACNT_PRDT_CD": acnt_prdt_cd,
-        "AFHR_FLPR_YN": "N",
-        "OFL_YN": "N",
-        "INQR_DVSN": "02", // 02 is correct for Stock Balance (Fixing OPSQ2000)
-        "UNPR_DVSN": "01",
-        "FUND_STTL_ICLD_YN": "N",
-        "FNCG_AMT_AUTO_RDPT_YN": "N",
-        "PRCS_DVSN": "00",
-        "CTX_AREA_FK100": "",
-        "CTX_AREA_NK100": ""
-    };
+    // Try multiple INQR_DVSN if needed
+    const dvsnList = ["02", "01"]; // Try 02 (By Stock) first, then 01 (Consolidated)
+    let lastError = '';
 
-    try {
-        console.log('[KIS] Fetching balance from API...');
-        let res = await axios.get(url, { headers, params });
+    for (const dvsn of dvsnList) {
+        const params = {
+            "CANO": cano,
+            "ACNT_PRDT_CD": acnt_prdt_cd,
+            "AFHR_FLPR_YN": "N",
+            "OFL_YN": "N",
+            "INQR_DVSN": dvsn,
+            "UNPR_DVSN": "01",
+            "FUND_STTL_ICLD_YN": "N",
+            "FNCG_AMT_AUTO_RDPT_YN": "N",
+            "PRCS_DVSN": "00",
+            "CTX_AREA_FK100": "",
+            "CTX_AREA_NK100": ""
+        };
 
-        if (res.data.msg1 && (res.data.msg1.includes('초당') || res.data.msg_cd === 'EGW00133')) {
-            console.log("[KIS] Rate Limit/Gateway Error. Retrying in 1s...");
-            await delay(1100);
-            res = await axios.get(url, { headers, params });
+        try {
+            console.log(`[KIS] Fetching balance (DVSN: ${dvsn})...`);
+            let res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, { headers, params });
+
+            if (res.data.msg1 && (res.data.msg1.includes('초당') || res.data.msg_cd === 'EGW00133')) {
+                await delay(1100);
+                res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, { headers, params });
+            }
+
+            if (res.data.rt_cd === '0') {
+                const output1 = res.data.output1 || [];
+                const output2 = (res.data.output2 || [])[0] || {};
+
+                const holdings: HoldingsItem[] = output1
+                    .map((item: any) => ({
+                        name: item.prdt_name,
+                        qty: parseInt(item.hldg_qty),
+                        price: parseInt(item.prpr),
+                        avg_price: parseFloat(item.pchs_avg_pric),
+                        pl_rate: parseFloat(item.evlu_pfls_rt),
+                        pl_amount: parseInt(item.evlu_pfls_amt),
+                        code: item.pdno
+                    }))
+                    .filter((holding: HoldingsItem) => holding.qty > 0 || holding.pl_amount !== 0);
+
+                return {
+                    deposit: parseInt(output2.prvs_rcdl_excc_amt || output2.dnca_tot_amt || '0'),
+                    total_asset: parseInt(output2.tot_evlu_amt || '0'),
+                    holdings,
+                    raw_output2: output2
+                };
+            } else {
+                lastError = `[KIS] ${res.data.msg1} (${res.data.msg_cd})`;
+                console.warn(`[KIS] DVSN ${dvsn} failed: ${lastError}`);
+                // If it's pure account mismatch, try next DVSN
+                if (res.data.msg_cd === 'OPSQ2000') continue;
+                else break; // Other errors don't need retry with different DVSN
+            }
+        } catch (e: any) {
+            lastError = e.message;
+            console.error(`[KIS] DVSN ${dvsn} exception: ${e.message}`);
+            break;
         }
-
-        if (res.data.rt_cd === '0') {
-            console.log('[KIS] Balance fetched successfully');
-            const output1 = res.data.output1 || [];
-            const output2 = (res.data.output2 || [])[0] || {};
-
-            const holdings: HoldingsItem[] = output1
-                .map((item: any) => ({
-                    name: item.prdt_name,
-                    qty: parseInt(item.hldg_qty),
-                    price: parseInt(item.prpr),
-                    avg_price: parseFloat(item.pchs_avg_pric),
-                    pl_rate: parseFloat(item.evlu_pfls_rt),
-                    pl_amount: parseInt(item.evlu_pfls_amt),
-                    code: item.pdno
-                }))
-                .filter((holding: HoldingsItem) => holding.qty > 0); // Filter out sold stocks
-
-            const result = {
-                // Use prvs_rcdl_excc_amt (D+2 Provisional) for Real-time Buying Power
-                deposit: parseInt(output2.prvs_rcdl_excc_amt || output2.dnca_tot_amt || '0'),
-                total_asset: parseInt(output2.tot_evlu_amt || '0'),
-                holdings,
-                raw_output2: output2
-            };
-
-            console.log('[KIS] Returning balance data:', {
-                deposit: result.deposit,
-                total_asset: result.total_asset,
-                holdingsCount: holdings.length
-            });
-
-            return result;
-        } else {
-            const errorMsg = `[KIS] API Error: ${res.data.msg1} (Code: ${res.data.msg_cd})`;
-            console.error(errorMsg);
-            return { error: errorMsg } as any;
-        }
-    } catch (e: any) {
-        const errorMsg = `[KIS] Exception in getBalance: ${e.message}`;
-        console.error(errorMsg);
-        if (e.response) {
-            console.error("[KIS] Response data:", e.response.data);
-        }
-        return { error: errorMsg } as any;
     }
+
+    return { error: `${lastError} | Acc: ${cano}-${acnt_prdt_cd} | URL: ${KIS_BASE_URL} | PAT: ${process.env.GITHUB_PAT ? 'OK' : 'MISSING'}` } as any;
 }
 
 export async function placeOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {

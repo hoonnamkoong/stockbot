@@ -111,16 +111,14 @@ async function getAccessToken(): Promise<string | null> {
                 const newToken = res.data.access_token;
                 const expiresIn = res.data.expires_in || 86400; // Default 24h
                 const expiresAtDate = new Date(now + (expiresIn * 1000));
-                const expiresAtMs = expiresAtDate.getTime();
-
                 const tokenData = {
                     access_token: newToken,
                     expires_at: expiresAtDate.toISOString()
                 };
 
-                // Update Memory
+                // Update Memory Sync
                 ACCESS_TOKEN = newToken;
-                EXPIRES_AT = expiresAtMs;
+                EXPIRES_AT = new Date(now + (expiresIn * 1000)).getTime();
 
                 // 6. Save Save Save
                 // Save locally first (immediate)
@@ -128,10 +126,10 @@ async function getAccessToken(): Promise<string | null> {
                     fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(tokenData), 'utf-8');
                 } catch (e) { /* ignore */ }
 
-                // Save to GitHub in background
-                saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token").catch(e => {
-                    console.warn("[KIS] GitHub save failed:", e.message);
-                });
+                // Save to GitHub (Wait for it to ensure next call sees it)
+                console.log("[KIS] Saving new token to GitHub...");
+                await saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token");
+                console.log("[KIS] Token saved to GitHub successfully");
 
                 return newToken;
             } else {
@@ -184,6 +182,8 @@ export async function getBalance(): Promise<BalanceData | null> {
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`;
     const isVTS = KIS_BASE_URL.includes('vts');
     const tr_id = isVTS ? "VTTC8434R" : "TTTC8434R";
+    
+    console.log('[KIS] Request Details:', { url, tr_id, isVTS, baseUrl: KIS_BASE_URL });
 
     const headers = {
         "content-type": "application/json; charset=utf-8",

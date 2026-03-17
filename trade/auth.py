@@ -88,20 +88,28 @@ def get_access_token():
             access_token = data.get('access_token')
             expires_at_str = data.get('expires_at')
             if access_token and expires_at_str:
+                # KIS tokens are valid for 24 hours. 
+                # We use a 23-hour buffer to ensure we only get ONE token per day.
+                # This matches the TypeScript implementation in src/lib/kis-api.ts
                 expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
-                # Check if valid (buffer 10 mins)
-                if datetime.now().astimezone() < expires_at - timedelta(minutes=10):
+                
+                # If cached token was issued less than 23 hours ago, reuse it.
+                # Note: KIS doesn't provide issue_at, so we assume expires_at is issue_at + 24h
+                # Actually, let's just use the absolute expiry with a 1-hour margin for safety.
+                if datetime.now().astimezone() < expires_at - timedelta(hours=1):
+                    print(f"Using persistent token (Valid until: {expires_at_str})")
                     return access_token
                 else:
-                    print("Cached token expired (or expiring soon).")
+                    print("Cached token expired (or within 1h margin).")
         except Exception as e:
             print(f"Token validation failed: {e}")
 
-    # 2. Request new token
+    # 4. Request new token
     if not app_key or not app_secret:
         print("Error: credentials missing in .env")
         return None
 
+    # Determine URL (Real vs Virtual)
     url = f"{base_url}/oauth2/tokenP"
     headers = { "content-type": "application/json" }
     body = {
@@ -110,12 +118,13 @@ def get_access_token():
         "appsecret": app_secret
     }
     
+    print(f"Requesting new token from KIS ({'Virtual' if 'vts' in base_url.lower() else 'Real'})...")
     try:
         res = requests.post(url, headers=headers, data=json.dumps(body), timeout=10)
         if res.status_code == 200:
             data = res.json()
             access_token = data.get('access_token')
-            expires_in = data.get('expires_in', 86400)
+            expires_in = data.get('expires_in', 86400) # 24 hours
             
             if access_token:
                 # Save to file
@@ -131,7 +140,7 @@ def get_access_token():
                 with open(token_path, 'w', encoding='utf-8') as f:
                     json.dump(token_data, f, indent=2)
                     
-                print(f"Success! New Access Token retrieved and cached.")
+                print(f"Success! New Access Token retrieved and saved to {token_path}.")
                 return access_token
             else:
                 print(f"Failed to extract access_token: {data}")

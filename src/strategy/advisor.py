@@ -110,7 +110,9 @@ class StrategyAdvisor:
             "authorization": f"Bearer {access_token}",
             "appkey": app_key,
             "appsecret": app_secret,
-            "tr_id": "VTTC8434R",
+            # Determine TR ID based on URL (Real vs Virtual)
+            # Real: TTTC8434R, Virtual: VTTC8434R
+            "tr_id": "VTTC8434R" if "vts" in base_url.lower() else "TTTC8434R",
             "custtype": "P"
         }
         params = {

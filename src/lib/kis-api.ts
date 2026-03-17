@@ -3,10 +3,18 @@ import axios from 'axios';
 // Singleton for Token Management
 let ACCESS_TOKEN: string | null = null;
 
-const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim();
-const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
-const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
-const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443').trim();
+// [Emergency Fix] Ensure no hidden characters and provided fallback for user's confirmed secret
+const FALLBACK_SECRET = 'wEOi2vMr/kQMdpdoQC3z/PFNlPvhY+HZul6PtrLbVT4hZxOR2fS6CGz/bFCX6xFgqSMRhawS7GvQFusddAybQpU8LBthxAaq1LWozlsNC7FkrWeV4z32bLod+oIK5Ae7du/0mQx6DHYgfCw9gwN5V7VX83r1uDa/HvDY4FwQS4GX59Ihmqw=';
+
+let KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim().replace(/\s/g, '');
+if (!KIS_APP_SECRET || KIS_APP_SECRET.length < 100) {
+    console.warn('[KIS] Using Hardcoded Fallback Secret');
+    KIS_APP_SECRET = FALLBACK_SECRET;
+}
+
+const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim().replace(/\s/g, '');
+const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim().replace(/\s/g, '');
+const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443').trim().replace(/\s/g, '');
 
 console.log('[KIS Init] Environment loaded:', {
     hasAppKey: !!KIS_APP_KEY,

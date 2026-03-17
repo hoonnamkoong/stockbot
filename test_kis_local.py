@@ -27,21 +27,11 @@ def get_access_token():
     
     app_key = os.environ.get("KIS_APP_KEY")
     app_secret = os.environ.get("KIS_APP_SECRET")
-    base_url = os.environ.get("KIS_BASE_URL", "https://openapivts.koreainvestment.com:29443")
+    # Force Real URL for this test
+    base_url = "https://openapi.koreainvestment.com:9443"
     
-    # Path to shared token file (sync with src/lib/kis-api.ts)
-    # Check multiple possible locations for robust path resolution
-    possible_paths = [
-        os.path.join(os.getcwd(), 'data', 'kis_token.json'),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'kis_token.json'),
-        os.path.join(os.getcwd(), 'kis_token.json')
-    ]
-    
-    token_path = possible_paths[0]
-    for p in possible_paths:
-        if os.path.exists(p):
-            token_path = p
-            break
+    # Path to shared token file (sync with src/lib/kis.ts)
+    token_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'token.json')
     
     # 1. Try to read from file
     if os.path.exists(token_path):
@@ -115,8 +105,53 @@ def get_access_token():
 
 if __name__ == "__main__":
     print("Testing KIS Authentication...")
+    load_env(".env.local")
     token = get_access_token()
     if token:
         print("✅ Authentication Test Passed.")
+        
+        # Test Balance
+        app_key = os.environ.get("KIS_APP_KEY")
+        app_secret = os.environ.get("KIS_APP_SECRET")
+        acc_no = os.environ.get("KIS_ACCOUNT_NO")
+        base_url = "https://openapi.koreainvestment.com:9443" # Real URL
+        
+        if acc_no and '-' in acc_no:
+            cano, prdt = acc_no.split('-')
+            url = f"{base_url}/uapi/domestic-stock/v1/trading/inquire-balance"
+            headers = {
+                'authorization': f'Bearer {token}',
+                'appkey': app_key,
+                'appsecret': app_secret,
+                'tr_id': 'TTTC8434R',
+                'custtype': 'P',
+                'content-type': 'application/json'
+            }
+            params = {
+                'CANO': cano,
+                'ACNT_PRDT_CD': prdt,
+                'AFHR_FLPR_YN': 'N',
+                'OFL_YN': 'N',
+                'INQR_DVSN': '01',
+                'UNPR_DVSN': '01',
+                'FUND_STTL_ICLD_YN': 'N',
+                'FNCG_AMT_AUTO_RDPT_YN': 'N',
+                'PRCS_DVSN': '00',
+                'CTX_AREA_FK100': '',
+                'CTX_AREA_NK100': ''
+            }
+            print(f"Testing Balance for Account: {acc_no}...")
+            res = requests.get(url, headers=headers, params=params)
+            if res.status_code == 200:
+                data = res.json()
+                print(f"✅ Balance Test Status: {data.get('rt_cd')}")
+                print(f"✅ Message: {data.get('msg1')}")
+                if data.get('output2'):
+                    balance = data.get('output2')[0].get('dnca_tot_amt')
+                    print(f"✅ Actual Balance: {balance} KRW")
+                else:
+                    print(f"⚠️ No output2 data: {data}")
+            else:
+                print(f"❌ Balance Test Failed: {res.status_code} - {res.text}")
     else:
         print("❌ Authentication Failed.")

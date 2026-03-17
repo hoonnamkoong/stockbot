@@ -18,84 +18,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 try:
     from trade.auth import get_access_token, load_env
 except ImportError:
-    # Fallback if running from root
     from src.trade.auth import get_access_token, load_env
 
+from .engine import StrategyEngine
+
 # --- 1. SentinelV Logic (Extracted from scraper.py) ---
-class SentinelV:
-    def __init__(self):
-        self.weights = {
-            'trend': 0.4,
-            'supply': 0.3, # Foreign/Inst
-            'buzz': 0.3    # Search/SNS
-        }
-        
-    def analyze_stock(self, stock, threshold=None):
-        """
-        Calculates a proprietary score (0-100) and returns a Signal.
-        """
-        # 1. Trend Score (40%)
-        trend_score = 0
-        try:
-            p_change = float(str(stock.get('change_rate', '0')).replace('%', ''))
-        except:
-            p_change = 0.0
-        
-        # V9.0: Enhanced Trend Logic
-        if p_change > 2.0: trend_score += 20
-        if p_change > 5.0: trend_score += 10 # Strong momentum
-        if p_change > 15.0: trend_score += 10 # Very strong
-        
-        # Close near high? (Using Price as Close)
-        close = float(stock.get('price', 0))
-        # We don't have 'high' in basic scraper data usually, so skip high/close check or use heuristics
-        # if high > 0 and close >= high * 0.95: trend_score += 10 
-             
-        # 2. Supply Score (30%)
-        supply_score = 0
-        frg_rate = str(stock.get('foreign_rate', '0')).replace('%', '')
-        try:
-            frg = float(frg_rate)
-            if frg > 0: supply_score += 10
-            if frg > 5: supply_score += 10
-        except:
-             pass
-             
-        # 3. Buzz Score (30%)
-        buzz_score = 0
-        # In this scraper context, 'Buzz' is often derived from rank or keywords
-        # Top 10 Volume = High Buzz
-        rec_posts = int(stock.get('recent_posts_count', 0))
-        if rec_posts > 50: buzz_score += 10
-        if rec_posts > 100: buzz_score += 10
-        
-        total_score = trend_score + supply_score + buzz_score
-        
-        # Determine Signal
-        signal = "HOLD"
-        confidence = "LOW"
-        
-        # [Adjusted Logic for Strategy]
-        if total_score >= 60:
-            signal = "BUY_STRONG"
-            confidence = "HIGH"
-        elif total_score >= 40:
-            signal = "BUY"
-            confidence = "MEDIUM"
-        elif p_change < -3.0: # Simple Sell Trigger for now
-            signal = "SELL"
-            confidence = "MEDIUM"
-            
-        return {
-            'signal': signal,
-            'score': total_score,
-            'confidence': confidence,
-            'factors': {
-                'trend': trend_score,
-                'supply': supply_score,
-                'buzz': buzz_score
-            }
-        }
+# SentinelV is now replaced by StrategyEngine in engine.py
 
 # --- 2. Gemini Agent Logic (Extracted from scraper.py) ---
 class GeminiAgent:
@@ -148,9 +76,9 @@ class GeminiAgent:
 # --- 3. Strategy Advisor (The Coordinator) ---
 class StrategyAdvisor:
     def __init__(self):
-        self.sentinel = SentinelV()
+        self.engine = StrategyEngine()
         self.gemini = GeminiAgent()
-        self.portfolio = self.fetch_portfolio()
+        self._cached_portfolio = None
         
     def fetch_portfolio(self):
         """
@@ -295,110 +223,77 @@ class StrategyAdvisor:
             
         return news_list
 
+    def get_portfolio(self):
+        """Returns cached portfolio or fetches new if needed."""
+        if self._cached_portfolio is None:
+            self._cached_portfolio = self.fetch_portfolio()
+        return self._cached_portfolio
+
     def analyze_candidates(self, candidates):
         """
         Main Logic:
-        1. Calculate Sentinel Score for all candidates.
-        2. Merge Portfolio stocks into candidates to ensure they are monitored.
+        1. Calculate Score for all candidates.
+        2. Merge Portfolio stocks into candidates.
         3. Rank and pick Top 10.
         4. Generate Final Recommendations.
         """
         print("[Advisor] Analyzing Candidates...")
+        portfolio = self.get_portfolio()
         
         # 1. Ensure Portfolio stocks are in the candidate list
         existing_codes = {c.get('code') for c in candidates}
-        for code, info in self.portfolio.items():
+        for code, info in portfolio.items():
             if code not in existing_codes:
                 candidates.append({
                     'code': code,
                     'name': info['name'],
                     'price': info['current_price'],
-                    'change_rate': '0%', # Fallback
+                    'change_rate': f"{info['profit_rate']}%", # Approximation
                     'source': 'portfolio'
                 })
 
         results = []
-        
         for stock in candidates:
             code = stock.get('code')
             name = stock.get('name')
             
-            # 1. Improved Price Fetching (Handle 'price' or 'close' or '현재가')
-            try:
-                current_price = float(str(stock.get('price') or stock.get('close') or stock.get('현재가', 0)).replace(',', ''))
-            except:
-                current_price = 0.0
-                
-            # 2. Daily Change Rate (Momentum)
-            try:
-                today_change = float(str(stock.get('change_rate', '0')).replace('%', '').replace(',', ''))
-            except:
-                today_change = 0.0
-
-            # 3. Sentinel Analysis
-            analysis = self.sentinel.analyze_stock(stock)
-            signal = analysis['signal']
-            score = analysis['score']
+            # --- 1. Scoring (Delegated to Engine) ---
+            score, p_change = self.engine.calculate_score(stock)
             
-            # 4. Portfolio Logic & Dynamic Sell Trigger
-            in_portfolio = code in self.portfolio
-            p_info = self.portfolio.get(code)
+            # --- 2. Signal (Delegated to Engine) ---
+            in_portfolio = code in portfolio
+            p_info = portfolio.get(code)
+            profit_rate = p_info.get('profit_rate', 0) if in_portfolio else 0.0
+            
+            signal, confidence = self.engine.get_signal(score, p_change, in_portfolio, profit_rate)
             
             action = "WATCH"
             target_price = 0
             
-            # [Dynamic] Profit-Taking & Stop-Loss Logic
-            if in_portfolio:
-                profit_rate = p_info.get('profit_rate', 0)
-                
-                # --- Dynamic Profit Taking ---
-                if profit_rate >= 10.0:
-                    # If momentum is still strong (> 2% rise today) or technicals are strong
-                    if today_change > 2.0 or signal == "BUY_STRONG":
-                        signal = "HOLD" # Ride the winner
-                        analysis['custom_reason'] = f"Riding Winner (+{profit_rate:.1f}%) - Momentum is strong ({today_change:+.1f}%)"
-                    else:
-                        signal = "SELL"
-                        analysis['custom_reason'] = f"Profit Taking Goal (+10%) - Current: {profit_rate:.1f}%, Momentum slowing ({today_change:+.1f}%)"
-                
-                # --- Fixed Stop Loss (Risk Control) ---
-                elif profit_rate <= -7.0:
-                    signal = "SELL"
-                    analysis['custom_reason'] = f"Stop Loss (SL: -7%) - Current: {profit_rate:.1f}%"
-
-            # [User Rule] Sell Signal Logic
+            # --- 3. Action Assignment ---
             if signal == "SELL":
                 if in_portfolio:
                     action = "SELL_EXECUTE"
-                    target_price = current_price 
+                    target_price = stock.get('price', 0)
                 else:
-                    # [User Rule] "If Sell Signal and Not Held -> Do not include in report"
-                    continue 
-
-            # Buy Signal Logic
+                    continue # Skip non-held sell signals
             elif "BUY" in signal:
-                if in_portfolio:
-                    action = "BUY_MORE" # Accumulate
-                else:
-                    action = "BUY_NEW"
+                action = "BUY_MORE" if in_portfolio else "BUY_NEW"
+                target_price = float(stock.get('price', 0)) * 1.05
                 
-                # Simple Target: +5% (MVP)
-                target_price = current_price * 1.05
-            
-            # Store Result (Include Portfolio Metadata for Gemini)
             results.append({
                 'code': code,
                 'name': name,
-                'price': current_price,
+                'price': stock.get('price', 0),
                 'signal': signal,
                 'score': score,
                 'action': action,
                 'target_price': target_price,
                 'in_portfolio': in_portfolio,
-                'profit_rate': p_info['profit_rate'] if in_portfolio else 0,
-                'today_change': today_change,
-                'factors': analysis['factors'],
-                'custom_reason': analysis.get('custom_reason', '')
+                'profit_rate': profit_rate,
+                'today_change': p_change,
+                'factors': {}, # Detailed factors can be added to engine later
+                'custom_reason': ""
             })
             
         # 3. Rank by Score
@@ -410,8 +305,7 @@ class StrategyAdvisor:
         # 5. News Integration (Real-time)
         print(f"[Advisor] Fetching news for Top {len(top_picks)} candidates...")
         for pick in top_picks:
-             # Add a small delay to be polite
-             time.sleep(0.2) 
+             time.sleep(0.1) 
              pick['news'] = self.fetch_specific_news(pick['code'], pick['name'])
             
         return top_picks

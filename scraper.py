@@ -1275,75 +1275,96 @@ if __name__ == "__main__":
         elif not should_send_telegram:
             print(f"[System] Skipped Telegram notification because current time ({now_kst.strftime('%H:%M')}) is not top of the hour.")
 
-        if all_data:
-            # --- 4. Gemini Portfolio Simulator (Regime-Aware & Static Model) ---
-            try:
-                from src.strategy.hybrid_advisor_sandbox import HybridAnalyzerSandbox
-                from src.trade.gemini_trade import GeminiTrader
-                
-                print("[System] Running Gemini Portfolio Simulator...")
-                
-                # 1. Market Regime Detection (KOSPI/KOSDAQ)
-                def get_market_regime():
-                    try:
-                        url = "https://finance.naver.com/sise/"
-                        res = requests.get(url, timeout=5)
-                        soup = BeautifulSoup(res.text, 'html.parser')
-                        kospi = float(soup.select_one("#KOSPI_now").text.replace(',', ''))
-                        kosdaq = float(soup.select_one("#KOSDAQ_now").text.replace(',', ''))
-                        
-                        # Simplistic regime: If KOSPI is positive today -> BULL (for proof of concept)
-                        # User mentioned current market is BULL.
-                        kospi_change = soup.select_one("#KOSPI_change").text.strip()
-                        is_bull = "+" in kospi_change
-                        
-                        regime = "BULL" if is_bull else "BEAR"
-                        return regime, {"KOSPI": kospi, "KOSDAQ": kosdaq}
-                    except Exception as re_e:
-                        print(f"[Warning] Regime detection failed: {re_e}")
-                        return "NEUTRAL", {"KOSPI": 2500, "KOSDAQ": 800}
+        # --- 4. Gemini Portfolio Simulator (Regime-Aware & Static Model) ---
+        print("\n[System] Entering Gemini Portfolio Simulator...")
+        try:
+            from src.strategy.hybrid_advisor_sandbox import HybridAnalyzerSandbox
+            from src.trade.gemini_trade import GeminiTrader
+            
+            # 1. Market Regime Detection (KOSPI/KOSDAQ)
+            def get_market_regime():
+                try:
+                    url = "https://finance.naver.com/sise/"
+                    res = requests.get(url, timeout=5)
+                    soup = BeautifulSoup(res.text, 'html.parser')
+                    kos_now = soup.select_one("#KOSPI_now")
+                    kospi = float(kos_now.text.replace(',', '')) if kos_now else 2500.0
+                    
+                    daq_now = soup.select_one("#KOSDAQ_now")
+                    kosdaq = float(daq_now.text.replace(',', '')) if daq_now else 800.0
+                    
+                    kospi_change_tag = soup.select_one("#KOSPI_change")
+                    kospi_change = kospi_change_tag.text.strip() if kospi_change_tag else "0"
+                    is_bull = "+" in kospi_change
+                    
+                    regime = "BULL" if is_bull else "BEAR"
+                    return regime, {"KOSPI": kospi, "KOSDAQ": kosdaq}
+                except Exception as re_e:
+                    print(f"  [Warning] Regime detection failed: {re_e}")
+                    return "NEUTRAL", {"KOSPI": 2500, "KOSDAQ": 800}
 
-                regime, indices = get_market_regime()
-                print(f"[System] Detected Market Regime: {regime} (Indices: {indices})")
+            regime, indices = get_market_regime()
+            print(f"  [System] Market Regime: {regime} ({indices})")
 
-                # 2. Load Static Model (v2026-01-02--2026-02-28)
-                model_ver = "v2026-01-02--2026-02-28"
-                model_path = rf"C:\Users\Hoon_DT\gemini\stock\src\strategy\models\{model_ver}.joblib"
-                archive_file = r"C:\Users\Hoon_DT\gemini\stock\scraping data\combined_scraping_data.csv"
+            # 2. Load Static Model
+            model_ver = "v2026-01-02--2026-02-28"
+            model_path = rf"C:\Users\Hoon_DT\gemini\stock\src\strategy\models\{model_ver}.joblib"
+            archive_file = r"C:\Users\Hoon_DT\gemini\stock\scraping data\combined_scraping_data.csv"
+            
+            sandbox = HybridAnalyzerSandbox(data_path=archive_file, model_path=model_path, version=model_ver)
+            
+            if sandbox.ml_model:
+                trader = GeminiTrader()
+                trader.state['algo_version'] = model_ver
+                trader.state['market_regime'] = regime
                 
-                sandbox = HybridAnalyzerSandbox(data_path=archive_file, model_path=model_path, version=model_ver)
+                # Predict ML probabilities for current candidates
+                current_data_map = {}
+                all_ml_probs = []
                 
-                if sandbox.ml_model:
-                    print(f"[System] Using Static Algo Version: {model_ver}")
+                if 'all_data' in locals() and all_data:
+                    print(f"  [System] Running ML predictions for {len(all_data)} trending stocks...")
                     all_ml_probs = sandbox.predict_all(all_data)
-                    
-                    trader = GeminiTrader()
-                    
-                    # Sync state
-                    trader.state['algo_version'] = model_ver
-                    trader.state['market_regime'] = regime
-                    if not trader.state.get('benchmark_base'):
-                        trader.state['benchmark_base'] = indices
-                        print(f"[System] Benchmark baseline set: {indices}")
-                    
-                    current_data_map = {
-                        pick['code']: {
+                    for pick in all_ml_probs:
+                        current_data_map[pick['code']] = {
                             'price': pick.get('price', 0),
                             'ml_prob': pick.get('ml_prob', 50.0)
-                        } for pick in all_ml_probs
-                    }
-                    
-                    # Execute
-                    trader.check_exits(current_data_map)
-                    top_ml_picks = sorted(all_ml_probs, key=lambda x: x['ml_prob'], reverse=True)[:5]
-                    trader.execute_buys(top_ml_picks)
-                    
-                    print("[System] Gemini Portfolio Simulator updated successfully.")
+                        }
                 else:
-                    print("[ERROR] Static model loading failed. Rebalancing skipped.")
-                    
-            except Exception as e:
-                print(f"[ERROR] Gemini Simulator Failed: {e}")
+                    print("  [System] No trending stocks in this run. Checking existing portfolio.")
+
+                # IMPORTANT: Fetch current prices for stocks already in portfolio
+                for code in list(trader.state['holdings'].keys()):
+                    if code not in current_data_map:
+                        try:
+                            h_name = trader.state['holdings'][code].get('name', '')
+                            # print(f"  [System] Fetching price for portfolio stock: {h_name} ({code})")
+                            res_h = requests.get(f"https://finance.naver.com/item/main.naver?code={code}", timeout=5)
+                            soup_h = BeautifulSoup(res_h.text, 'html.parser')
+                            price_tag = soup_h.select_one(".no_today .blind")
+                            if price_tag:
+                                h_price = int(price_tag.text.replace(',', ''))
+                                current_data_map[code] = {
+                                    'price': h_price,
+                                    'ml_prob': 50.0 # Neutral prob if not in trending list
+                                }
+                        except Exception as e:
+                            print(f"  [Warning] Failed to fetch price for {code}: {e}")
+
+                # Execute Portfolio Logic
+                trader.check_exits(current_data_map)
+                
+                top_ml_picks = sorted(all_ml_probs, key=lambda x: x['ml_prob'], reverse=True)[:5]
+                trader.execute_buys(top_ml_picks)
+                
+                print("[System] Gemini Portfolio Simulator run complete.")
+            else:
+                print("  [ERROR] Static model loading failed. Rebalancing skipped.")
+                
+        except Exception as e:
+            print(f"  [ERROR] Gemini Simulator Failed: {e}")
+            import traceback
+            traceback.print_exc()
 
     except Exception as e:
         print(f"Failed in consolidated section: {e}")

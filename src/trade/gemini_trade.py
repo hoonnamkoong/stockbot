@@ -89,6 +89,7 @@ class GeminiTrader:
                     sell_reason = f"Time Stop reached ({max_hold_days} days in {regime})"
                     
                 if sell_reason:
+                    print(f"  [Action] SELL {code} ({h.get('name')}) - Reason: {sell_reason}")
                     sell_vol = current_price * h['qty']
                     fee = sell_vol * self.FEE_SELL
                     net_return = sell_vol - fee
@@ -105,11 +106,18 @@ class GeminiTrader:
                         'reason': sell_reason
                     })
                     codes_to_sell.append(code)
+                else:
+                    print(f"  [Hold] {code} ({h.get('name')}) - Profit: {profit_rate:.1f}%, ML Prob: {ml_prob:.1f}%")
+            else:
+                print(f"  [Skip] {code} ({h.get('name')}) - No today's data to evaluate exit.")
                     
         for c in codes_to_sell:
             del self.state['holdings'][c]
             
-        self._save_state()
+        if codes_to_sell:
+            self._save_state()
+        else:
+            print("  [Result] No exit conditions met.")
         
     def execute_buys(self, recommendations):
         """
@@ -117,6 +125,7 @@ class GeminiTrader:
         [{'code': '...', 'name': '...', 'ml_prob': 85.0, 'price': 10000}]
         """
         current_date = self._get_current_date()
+        print(f"\n[Trader] Executing Buy Logic for {len(recommendations)} candidates...")
         
         # Update days held for existing stocks
         if self.state.get('last_update') != current_date:
@@ -124,7 +133,9 @@ class GeminiTrader:
             days_to_add = 1
             if last_dt_str:
                 try:
-                    last_dt = datetime.strptime(last_dt_str, '%Y-%m-%d')
+                    # Handle full timestamp if present
+                    last_only_date = last_dt_str.split(' ')[0]
+                    last_dt = datetime.strptime(last_only_date, '%Y-%m-%d')
                     curr_dt = datetime.strptime(current_date, '%Y-%m-%d')
                     days_gap = (curr_dt - last_dt).days
                     if days_gap > 0:
@@ -133,10 +144,12 @@ class GeminiTrader:
                     print(f"Error parsing date: {e}")
                     pass
             
+            print(f"  [System] New day detected ({current_date}). Incrementing days_held by {days_to_add}.")
             for code in self.state['holdings']:
                 self.state['holdings'][code]['days_held'] += days_to_add
             self.state['last_update'] = current_date
             
+        buy_count = 0
         for rec in recommendations:
             code = rec.get('code')
             if code in self.state['holdings']:
@@ -170,6 +183,7 @@ class GeminiTrader:
                         'name': rec.get('name', code),
                         'target_prob': prob
                     }
+                    print(f"  [Action] BUY {code} ({rec.get('name')}) - {qty} shares @ {price:,.0f} KRW (ML Prob: {prob:.1f}%)")
                     self.state['trade_log'].append({
                         'date': current_date + " " + datetime.utcnow().strftime('%H:%M:%S'), 
                         'type': 'BUY', 
@@ -180,5 +194,9 @@ class GeminiTrader:
                         'prob': prob,
                         'reason': 'ML Strong Buy Signal'
                     })
+                    buy_count += 1
                     
+        if buy_count == 0:
+            print("  [Result] No new buys executed (Threshold or Cash constraint).")
+            
         self._save_state()

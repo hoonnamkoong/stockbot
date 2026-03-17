@@ -6,7 +6,13 @@ let ACCESS_TOKEN: string | null = null;
 const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim();
 const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
 const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
-const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443').trim();
+
+// Automatically detect Virtual vs Real based on account number prefix '5'
+const DEFAULT_URL = KIS_ACCOUNT_NO.startsWith('5') 
+    ? 'https://openapivts.koreainvestment.com:29443' 
+    : 'https://openapi.koreainvestment.com:9443';
+
+const KIS_BASE_URL = (process.env.KIS_BASE_URL || DEFAULT_URL).trim();
 
 console.log('[KIS Init] Environment loaded:', {
     hasAppKey: !!KIS_APP_KEY,
@@ -15,6 +21,7 @@ console.log('[KIS Init] Environment loaded:', {
     hasAppSecret: !!KIS_APP_SECRET,
     secretLen: KIS_APP_SECRET.length,
     hasAccountNo: !!KIS_ACCOUNT_NO,
+    accountPrefix: KIS_ACCOUNT_NO.substring(0, 1),
     baseUrl: KIS_BASE_URL
 });
 

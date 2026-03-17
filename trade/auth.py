@@ -44,28 +44,58 @@ def get_access_token():
             break
     
     # 1. Try to read from file
+    data = None
     if os.path.exists(token_path):
         try:
             with open(token_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                access_token = data.get('access_token')
-                expires_at_str = data.get('expires_at')
-                
-                if access_token and expires_at_str:
-                    # Parse ISO format (e.g., 2026-01-06T10:20:30.000Z)
-                    # Python 3.7+ supports fromisoformat, but let's be safe with basic parsing if needed or use dateutil
-                    # Simple string comparison works for ISO8601 if in UTC, but safest to parse.
-                    # '2026-01-06T10:20:30.000Z' might contain Z.
-                    expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
-                    
-                    # Check if valid (buffer 1 min)
-                    if datetime.now().astimezone() < expires_at - timedelta(minutes=1):
-                        # print("Using cached token")
-                        return access_token
-                    else:
-                        print("Cached token expired.")
         except Exception as e:
-            print(f"Failed to read token cache: {e}")
+            print(f"Failed to read local token cache: {e}")
+
+    # 2. If local missing or expired, try GitHub (Directly via URL if possible, or skip)
+    if not data:
+        print("Local token cache missing. Trying GitHub...")
+        try:
+            # We can try the raw URL first. If it's private, this might fail without auth.
+            # But the actions often have GITHUB_TOKEN.
+            repo_owner = "hoonnamkoong"
+            repo_name = "stockbot"
+            branch = "db-data"
+            gh_url = f"https://raw.githubusercontent.com/{repo_owner}/{repo_name}/{branch}/data/kis_token.json"
+            
+            headers = {}
+            # If in GitHub Actions, we might have GITHUB_TOKEN
+            gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+            if gh_token:
+                headers["Authorization"] = f"token {gh_token}"
+            
+            res = requests.get(gh_url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                print("Successfully fetched token cache from GitHub.")
+                # Save locally for next time
+                try:
+                    os.makedirs(os.path.dirname(token_path), exist_ok=True)
+                    with open(token_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2)
+                except: pass
+        except Exception as e:
+            print(f"Failed to fetch from GitHub: {e}")
+
+    # 3. Validate Token
+    if data:
+        try:
+            access_token = data.get('access_token')
+            expires_at_str = data.get('expires_at')
+            if access_token and expires_at_str:
+                expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+                # Check if valid (buffer 10 mins)
+                if datetime.now().astimezone() < expires_at - timedelta(minutes=10):
+                    return access_token
+                else:
+                    print("Cached token expired (or expiring soon).")
+        except Exception as e:
+            print(f"Token validation failed: {e}")
 
     # 2. Request new token
     if not app_key or not app_secret:

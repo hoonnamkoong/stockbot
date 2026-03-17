@@ -2,6 +2,8 @@ import axios from 'axios';
 
 // Singleton for Token Management
 let ACCESS_TOKEN: string | null = null;
+let EXPIRES_AT: number = 0;
+let TOKEN_PROMISE: Promise<string | null> | null = null;
 
 // [Emergency Fix] Ensure no hidden characters and provided fallback for user's confirmed secret
 const FALLBACK_SECRET = 'wEOi2vMr/kQMdpdoQC3z/PFNlPvhY+HZul6PtrLbVT4hZxOR2fS6CGz/bFCX6xFgqSMRhawS7GvQFusddAybQpU8LBthxAaq1LWozlsNC7FkrWeV4z32bLod+oIK5Ae7du/0mQx6DHYgfCw9gwN5V7VX83r1uDa/HvDY4FwQS4GX59Ihmqw=';
@@ -41,80 +43,107 @@ function delay(ms: number) {
 }
 
 async function getAccessToken(): Promise<string | null> {
-    // 1. Try to read from GitHub (Persistent Storage) first
-    try {
-        const { data: ghTokenData } = await fetchFile<{ access_token: string, expires_at: string }>(TOKEN_FILE_GITHUB);
-
-        if (ghTokenData) {
-            const now = new Date().getTime();
-            const expiresAt = new Date(ghTokenData.expires_at).getTime();
-
-            // Give 10 minute buffer to be safe
-            if (now < expiresAt - 600000) {
-                console.log("[KIS] Using cached Access Token from GitHub");
-                return ghTokenData.access_token;
-            } else {
-                console.log("[KIS] GitHub cached token expired, refreshing...");
-            }
-        }
-    } catch (e) {
-        console.warn("[KIS] Failed to check GitHub token cache:", e);
+    // 1. Check Memory Cache First
+    const now = new Date().getTime();
+    if (ACCESS_TOKEN && now < EXPIRES_AT - 600000) {
+        return ACCESS_TOKEN;
     }
 
-    // 2. Fetch New Token from KIS
-    console.log("[KIS] Requesting New Access Token from KIS...");
-    const url = `${KIS_BASE_URL}/oauth2/tokenP`;
-    const body = {
-        grant_type: 'client_credentials',
-        appkey: KIS_APP_KEY,
-        appsecret: KIS_APP_SECRET
-    };
+    // 2. Concurrency Control: If a request is already in flight, wait for it
+    if (TOKEN_PROMISE) {
+        return TOKEN_PROMISE;
+    }
 
-    try {
-        const res = await axios.post(url, body, {
-            headers: { 'content-type': 'application/json' }
-        });
+    TOKEN_PROMISE = (async () => {
+        try {
+            // 3. Try Local File Cache (/tmp/kis_token.json) - Fast for warmed lambdas
+            const TOKEN_FILE_LOCAL_SHARED = path.join(os.tmpdir(), 'kis_token.json');
+            try {
+                if (fs.existsSync(TOKEN_FILE_LOCAL_SHARED)) {
+                    const localData = JSON.parse(fs.readFileSync(TOKEN_FILE_LOCAL_SHARED, 'utf-8'));
+                    const localExpires = new Date(localData.expires_at).getTime();
+                    if (now < localExpires - 600000) {
+                        console.log("[KIS] Using cached Access Token from local /tmp");
+                        ACCESS_TOKEN = localData.access_token;
+                        EXPIRES_AT = localExpires;
+                        return ACCESS_TOKEN;
+                    }
+                }
+            } catch (e) { /* ignore */ }
 
-        if (res.status === 200 && res.data.access_token) {
-            const newToken = res.data.access_token;
-            const expiresIn = res.data.expires_in || 86400; // Default 24h
+            // 4. Try GitHub (Persistent Storage)
+            try {
+                const { data: ghTokenData } = await fetchFile<{ access_token: string, expires_at: string }>(TOKEN_FILE_GITHUB);
 
-            // Calculate expiration time
-            const now = new Date();
-            const expiresAt = new Date(now.getTime() + (expiresIn * 1000));
+                if (ghTokenData) {
+                    const expiresAt = new Date(ghTokenData.expires_at).getTime();
+                    if (now < expiresAt - 600000) {
+                        console.log("[KIS] Using cached Access Token from GitHub");
+                        ACCESS_TOKEN = ghTokenData.access_token;
+                        EXPIRES_AT = expiresAt;
+                        
+                        // Sync back to local /tmp for faster next access
+                        try {
+                            fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(ghTokenData), 'utf-8');
+                        } catch (e) { /* ignore */ }
+                        
+                        return ACCESS_TOKEN;
+                    }
+                }
+            } catch (e) {
+                console.warn("[KIS] GitHub cache missing or expired.");
+            }
 
-            const tokenData = {
-                access_token: newToken,
-                expires_at: expiresAt.toISOString()
+            // 5. Fetch New Token from KIS
+            console.log("[KIS] Requesting New Access Token from KIS...");
+            const url = `${KIS_BASE_URL}/oauth2/tokenP`;
+            const body = {
+                grant_type: 'client_credentials',
+                appkey: KIS_APP_KEY,
+                appsecret: KIS_APP_SECRET
             };
 
-            // 3. Save to GitHub (Persistent)
-            // Fire and forget - don't block return
-            saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token").then(success => {
-                if (success) console.log("[KIS] Token saved to GitHub successfully");
-                else console.warn("[KIS] Failed to save token to GitHub");
+            const res = await axios.post(url, body, {
+                headers: { 'content-type': 'application/json' }
             });
 
-            // 4. Save to Local (Ephemeral/Fast Cache)
-            try {
-                const dir = path.dirname(TOKEN_FILE_LOCAL);
-                if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-                fs.writeFileSync(TOKEN_FILE_LOCAL, JSON.stringify(tokenData, null, 2), 'utf-8');
-            } catch (e) { /* ignore local save error */ }
+            if (res.status === 200 && res.data.access_token) {
+                const newToken = res.data.access_token;
+                const expiresIn = res.data.expires_in || 86400; // Default 24h
+                const expiresAtDate = new Date(now + (expiresIn * 1000));
+                const expiresAtMs = expiresAtDate.getTime();
 
-            return newToken;
-        } else {
-            console.error(`[KIS] Token Fetch Failed: Status ${res.status}`, res.data);
-            throw new Error(`Token Fetch Failed: ${res.status} - ${JSON.stringify(res.data)}`);
+                const tokenData = {
+                    access_token: newToken,
+                    expires_at: expiresAtDate.toISOString()
+                };
+
+                // Update Memory
+                ACCESS_TOKEN = newToken;
+                EXPIRES_AT = expiresAtMs;
+
+                // 6. Save Save Save
+                // Save locally first (immediate)
+                try {
+                    fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(tokenData), 'utf-8');
+                } catch (e) { /* ignore */ }
+
+                // Save to GitHub in background
+                saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token").catch(e => {
+                    console.warn("[KIS] GitHub save failed:", e.message);
+                });
+
+                return newToken;
+            } else {
+                throw new Error(`Token Fetch Failed: ${res.status}`);
+            }
+        } finally {
+            // Always clear the promise so next request can retry if needed
+            TOKEN_PROMISE = null;
         }
-    } catch (error: any) {
-        console.error(`[KIS] Token Fetch Exception:`, error.message);
-        if (error.response) {
-            console.error("[KIS] Error Response:", error.response.data);
-            throw new Error(`Token Fetch Exception: ${error.message} - ${JSON.stringify(error.response.data)}`);
-        }
-        throw new Error(`Token Fetch Exception: ${error.message}`);
-    }
+    })();
+
+    return TOKEN_PROMISE;
 }
 
 export interface HoldingsItem {

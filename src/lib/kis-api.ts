@@ -39,25 +39,28 @@ function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function getAccessToken(): Promise<string | null> {
-    // 1. Try to read from GitHub (Persistent Storage) first
-    try {
-        const { data: ghTokenData } = await fetchFile<{ access_token: string, expires_at: string }>(TOKEN_FILE_GITHUB);
+async function getAccessToken(forceRefresh = false): Promise<string | null> {
+    if (!forceRefresh) {
+        // 1. Try to read from GitHub (Persistent Storage) first
+        try {
+            const { data: ghTokenData } = await fetchFile<{ access_token: string, expires_at: string }>(TOKEN_FILE_GITHUB);
+            if (ghTokenData) {
+                const now = new Date().getTime();
+                const expiresAt = new Date(ghTokenData.expires_at).getTime();
 
-        if (ghTokenData) {
-            const now = new Date().getTime();
-            const expiresAt = new Date(ghTokenData.expires_at).getTime();
-
-            // Give 10 minute buffer to be safe
-            if (now < expiresAt - 600000) {
-                console.log("[KIS] Using cached Access Token from GitHub");
-                return ghTokenData.access_token;
-            } else {
-                console.log("[KIS] GitHub cached token expired, refreshing...");
+                // Give 10 minute buffer to be safe
+                if (now < expiresAt - 600000) {
+                    console.log("[KIS] Using cached Access Token from GitHub");
+                    return ghTokenData.access_token;
+                } else {
+                    console.log("[KIS] GitHub cached token expired, refreshing...");
+                }
             }
+        } catch (e) {
+            console.warn("[KIS] Failed to check GitHub token cache:", e);
         }
-    } catch (e) {
-        console.warn("[KIS] Failed to check GitHub token cache:", e);
+    } else {
+        console.log("[KIS] Force Refreshing Access Token...");
     }
 
     // 2. Fetch New Token from KIS
@@ -136,9 +139,7 @@ export interface BalanceData {
 export async function getBalance(): Promise<BalanceData | null> {
     console.log('[KIS] getBalance called');
 
-    const token = await getAccessToken();
-    // if (!token) check removed as getAccessToken throws
-
+    let token = await getAccessToken();
 
     let cleanAccount = KIS_ACCOUNT_NO.replace(/-/g, '').trim();
     if (cleanAccount.length === 8) {
@@ -155,37 +156,53 @@ export async function getBalance(): Promise<BalanceData | null> {
     const isVTS = KIS_BASE_URL.includes('vts');
     const tr_id = isVTS ? "VTTC8434R" : "TTTC8434R";
 
-    const headers = {
-        "content-type": "application/json; charset=utf-8",
-        "authorization": `Bearer ${token}`,
-        "appkey": KIS_APP_KEY,
-        "appsecret": KIS_APP_SECRET,
-        "tr_id": tr_id,
-        "custtype": "P",
-    };
+    const fetchBalance = async (tokenStr: string) => {
+        const headers = {
+            "content-type": "application/json; charset=utf-8",
+            "authorization": `Bearer ${tokenStr}`,
+            "appkey": KIS_APP_KEY,
+            "appsecret": KIS_APP_SECRET,
+            "tr_id": tr_id,
+            "custtype": "P",
+        };
 
-    const params = {
-        "CANO": cano,
-        "ACNT_PRDT_CD": acnt_prdt_cd,
-        "AFHR_FLPR_YN": "N",
-        "OFL_YN": "N",
-        "INQR_DVSN": "01",
-        "UNPR_DVSN": "01",
-        "FUND_STTL_ICLD_YN": "N",
-        "FNCG_AMT_AUTO_RDPT_YN": "N",
-        "PRCS_DVSN": "00",
-        "CTX_AREA_FK100": "",
-        "CTX_AREA_NK100": ""
+        const params = {
+            "CANO": cano,
+            "ACNT_PRDT_CD": acnt_prdt_cd,
+            "AFHR_FLPR_YN": "N",
+            "OFL_YN": "N",
+            "INQR_DVSN": "01",
+            "UNPR_DVSN": "01",
+            "FUND_STTL_ICLD_YN": "N",
+            "FNCG_AMT_AUTO_RDPT_YN": "N",
+            "PRCS_DVSN": "00",
+            "CTX_AREA_FK100": "",
+            "CTX_AREA_NK100": ""
+        };
+
+        return axios.get(url, { headers, params });
     };
 
     try {
         console.log('[KIS] Fetching balance from API...');
-        let res = await axios.get(url, { headers, params });
+        if (!token) throw new Error("AccessToken missing");
+        
+        let res = await fetchBalance(token);
 
+        // 1. Handle Rate Limit / Gateway
         if (res.data.msg1 && (res.data.msg1.includes('초당') || res.data.msg_cd === 'EGW00133')) {
-            console.log("[KIS] Rate Limit/Gateway Error. Retrying in 1s...");
+            console.log("[KIS] Rate Limit/Gateway Error. Retrying in 1.1s...");
             await delay(1100);
-            res = await axios.get(url, { headers, params });
+            res = await fetchBalance(token);
+        }
+
+        // 2. Handle Expired Token (EGW00123)
+        if (res.data.msg_cd === 'EGW00123' || (res.data.msg1 && res.data.msg1.includes('만료'))) {
+            console.log("[KIS] Token Expired on server. Force refreshing and retrying...");
+            const newToken = await getAccessToken(true);
+            if (newToken) {
+                res = await fetchBalance(newToken);
+            }
         }
 
         if (res.data.rt_cd === '0') {

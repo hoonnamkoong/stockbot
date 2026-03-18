@@ -80,6 +80,7 @@ jobs:
             || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
             
       - name: Restore Previous Data (db-data)
+        if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
           mkdir -p data
           if git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_temp 2>/dev/null; then
@@ -96,6 +97,7 @@ jobs:
           fi
 
       - name: Run Scraper
+        if: steps.market_check.outputs.is_market_closed == 'false'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -117,6 +119,7 @@ jobs:
           python src/trade_executor.py
 
       - name: Commit and Push Data (db-data)
+        if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
           git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_repo
           

@@ -1306,10 +1306,15 @@ if __name__ == "__main__":
             regime, indices = get_market_regime()
             print(f"  [System] Market Regime: {regime} ({indices})")
 
-            # 2. Load Static Model
+            # 2. Load Static Model (Dynamic Path for CI/CD)
             model_ver = "v2026-01-02--2026-02-28"
-            model_path = rf"C:\Users\Hoon_DT\gemini\stock\src\strategy\models\{model_ver}.joblib"
-            archive_file = r"C:\Users\Hoon_DT\gemini\stock\scraping data\combined_scraping_data.csv"
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(base_dir, "src", "strategy", "models", f"{model_ver}.joblib")
+            archive_file = os.path.join(base_dir, "scraping data", "combined_scraping_data.csv")
+            
+            # Fallback for CI if archive file doesn't exist (can use latest stock data as proxy if needed, but for now just check existence)
+            if not os.path.exists(archive_file):
+                print(f"  [Warning] Archive file not found at {archive_file}. AI Simulator might have limited context.")
             
             sandbox = HybridAnalyzerSandbox(data_path=archive_file, model_path=model_path, version=model_ver)
             

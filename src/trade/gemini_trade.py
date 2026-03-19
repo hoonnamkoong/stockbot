@@ -16,13 +16,31 @@ class GeminiTrader:
 
     def _load_state(self):
         if os.path.exists(self.portfolio_file):
-            try:
-                with open(self.portfolio_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception as e:
-                print(f"Error loading gemini portfolio: {e}")
-                
-        # Initialize defaults if not exists
+            if os.path.getsize(self.portfolio_file) > 0:
+                try:
+                    with open(self.portfolio_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        print(f"[Trader] Portfolio loaded successfully: cash={data.get('cash')}, holdings={len(data.get('holdings', {}))}")
+                        return data
+                except Exception as e:
+                    # File is corrupt (not empty but invalid JSON)
+                    error_msg = f"‼️ [Critical] Portfolio JSON is corrupt: {e}. Starting fresh to avoid halt."
+                    print(error_msg)
+                    try:
+                        from src.telegram_manager import TelegramManager
+                        TelegramManager().send_message(f"⚠️ <b>포트폴리오 JSON 손상</b>\n파일: {self.portfolio_file}\n사유: {e}\n→ 기본값(300만원)으로 재시작합니다.")
+                    except: pass
+            else:
+                # File exists but is 0 bytes — known issue from empty GitHub push
+                print(f"[Trader] WARN: Portfolio file {self.portfolio_file} is 0 bytes. Initializing with defaults.")
+                try:
+                    from src.telegram_manager import TelegramManager
+                    TelegramManager().send_message(f"⚠️ <b>포트폴리오 파일 0바이트</b>\n파일: {self.portfolio_file}\n→ 기본값(300만원)으로 초기화합니다. 매매는 계속 진행됩니다.")
+                except: pass
+        else:
+            print(f"[Trader] Portfolio file not found. Starting fresh with {self.INITIAL_CASH:,} KRW.")
+
+        # Initialize defaults if not exists or file was corrupted/empty
         return {
             'cash': self.INITIAL_CASH,
             'holdings': {}, # code: {qty, avg_price, buy_date, days_held, name, target_prob}

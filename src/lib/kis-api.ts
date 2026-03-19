@@ -46,61 +46,77 @@ function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function getAccessToken(): Promise<string | null> {
-    const now = new Date().getTime();
+async function getAccessToken(forceRefresh = false): Promise<string | null> {
+    const now = new Date();
+    const nowTime = now.getTime();
 
     // 1. Check Memory Cache First
-    if (ACCESS_TOKEN && now < EXPIRES_AT - 3600000) {
+    if (!forceRefresh && ACCESS_TOKEN && nowTime < EXPIRES_AT - 3600000) {
         return ACCESS_TOKEN;
     }
 
-    // 2. Concurrency Control: If a request is already in flight, wait for it
-    if (TOKEN_PROMISE) {
+    // 2. Concurrency Control
+    if (TOKEN_PROMISE && !forceRefresh) {
         return TOKEN_PROMISE;
     }
 
     TOKEN_PROMISE = (async () => {
         try {
-            // 3. Try Local File Cache (/tmp/kis_token.json)
             const TOKEN_FILE_LOCAL_SHARED = path.join(os.tmpdir(), 'kis_token.json');
-            try {
-                if (fs.existsSync(TOKEN_FILE_LOCAL_SHARED)) {
-                    const localData = JSON.parse(fs.readFileSync(TOKEN_FILE_LOCAL_SHARED, 'utf-8'));
-                    const localExpires = new Date(localData.expires_at).getTime();
-                    if (now < localExpires - 3600000) {
-                        console.log("[KIS] Using cached Access Token from local /tmp");
-                        ACCESS_TOKEN = localData.access_token;
-                        EXPIRES_AT = localExpires;
-                        return ACCESS_TOKEN;
-                    }
-                }
-            } catch (e) { /* ignore */ }
+            
+            if (!forceRefresh) {
+                // 3. Try Local File Cache
+                try {
+                    if (fs.existsSync(TOKEN_FILE_LOCAL_SHARED)) {
+                        const localData = JSON.parse(fs.readFileSync(TOKEN_FILE_LOCAL_SHARED, 'utf-8'));
+                        
+                        // Policy: If issued TODAY, use it
+                        if (localData.issued_at) {
+                            const issuedAt = new Date(localData.issued_at);
+                            if (issuedAt.toDateString() === now.toDateString()) {
+                                console.log("[KIS] Using cached Access Token (Issued TODAY)");
+                                ACCESS_TOKEN = localData.access_token;
+                                EXPIRES_AT = new Date(localData.expires_at).getTime();
+                                return ACCESS_TOKEN;
+                            }
+                        }
 
-            // 4. Try GitHub (Persistent Storage)
-            try {
-                const { data: ghTokenData } = await fetchFile<{ access_token: string, expires_at: string }>(TOKEN_FILE_GITHUB);
-                if (ghTokenData) {
-                    const expiresAt = new Date(ghTokenData.expires_at).getTime();
-                    // Keep using for the day (buffer 1 hour)
-                    if (now < expiresAt - 3600000) {
-                        console.log("[KIS] Using persistent Access Token from GitHub");
-                        ACCESS_TOKEN = ghTokenData.access_token;
-                        EXPIRES_AT = expiresAt;
-                        
-                        // Sync to local /tmp
-                        try {
-                            fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(ghTokenData), 'utf-8');
-                        } catch (e) { /* ignore */ }
-                        
-                        return ACCESS_TOKEN;
+                        const localExpires = new Date(localData.expires_at).getTime();
+                        if (nowTime < localExpires - 3600000) {
+                            console.log("[KIS] Using cached Access Token (Not expired)");
+                            ACCESS_TOKEN = localData.access_token;
+                            EXPIRES_AT = localExpires;
+                            return ACCESS_TOKEN;
+                        }
                     }
+                } catch (e) { /* ignore */ }
+
+                // 4. Try GitHub
+                try {
+                    const { data: ghTokenData } = await fetchFile<{ access_token: string, issued_at?: string, expires_at: string }>(TOKEN_FILE_GITHUB);
+                    if (ghTokenData) {
+                        const issuedAt = ghTokenData.issued_at ? new Date(ghTokenData.issued_at) : null;
+                        const expiresAt = new Date(ghTokenData.expires_at).getTime();
+
+                        if (nowTime < expiresAt - 3600000) {
+                            console.log("[KIS] Using persistent Access Token (Valid until: " + new Date(expiresAt).toISOString() + ")");
+                            ACCESS_TOKEN = ghTokenData.access_token;
+                            EXPIRES_AT = expiresAt;
+                            
+                            try {
+                                fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(ghTokenData), 'utf-8');
+                            } catch (e) { /* ignore */ }
+                            
+                            return ACCESS_TOKEN;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("[KIS] GitHub cache missing or expired.");
                 }
-            } catch (e) {
-                console.warn("[KIS] GitHub cache missing or expired.");
             }
 
             // 5. Fetch New Token from KIS
-            console.log(`[KIS] Requesting New Access Token from KIS... (GitHub Cache Fetch failed or GITHUB_PAT is ${process.env.GITHUB_PAT ? 'Present' : 'MISSING'})`);
+            console.log(`[KIS] Requesting NEW Access Token from KIS... (Force: ${forceRefresh})`);
             const url = `${KIS_BASE_URL}/oauth2/tokenP`;
             const body = {
                 grant_type: 'client_credentials',
@@ -114,28 +130,25 @@ async function getAccessToken(): Promise<string | null> {
 
             if (res.status === 200 && res.data.access_token) {
                 const newToken = res.data.access_token;
-                const expiresIn = res.data.expires_in || 86400; // Default 24h
-                const expiresAtDate = new Date(now + (expiresIn * 1000));
+                const expiresIn = res.data.expires_in || 86400;
+                const expiresAtDate = new Date(nowTime + (expiresIn * 1000));
 
                 const tokenData = {
                     access_token: newToken,
+                    issued_at: now.toISOString(),
                     expires_at: expiresAtDate.toISOString()
                 };
 
-                // Update Memory Sync
                 ACCESS_TOKEN = newToken;
                 EXPIRES_AT = expiresAtDate.getTime();
 
-                // 6. Save Save Save
                 try {
                     fs.writeFileSync(TOKEN_FILE_LOCAL_SHARED, JSON.stringify(tokenData), 'utf-8');
                 } catch (e) { /* ignore */ }
 
                 if (process.env.GITHUB_PAT) {
-                    console.log("[KIS] Saving new token to GitHub for persistence...");
+                    console.log("[KIS] Saving new token to GitHub...");
                     await saveFile(TOKEN_FILE_GITHUB, tokenData, "Update KIS Access Token");
-                } else {
-                    console.warn("[KIS] GITHUB_PAT missing - Token will NOT be persisted to GitHub. SMS alerts will continue on every restart.");
                 }
                 
                 return newToken;
@@ -213,6 +226,16 @@ export async function getBalance(): Promise<BalanceData | null> {
             console.log(`[KIS] Fetching balance (DVSN: ${dvsn})...`);
             let res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, { headers, params });
 
+            // Handle 401 Unauthorized
+            if (res.status === 401 || (res.data && res.data.msg_cd === 'EGW00121')) {
+                console.warn("[KIS] Unauthorized (401). Refreshing token...");
+                const newToken = await getAccessToken(true);
+                if (newToken) {
+                    headers.authorization = `Bearer ${newToken}`;
+                    res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, { headers, params });
+                }
+            }
+
             if (res.data.msg1 && (res.data.msg1.includes('초당') || res.data.msg_cd === 'EGW00133')) {
                 await delay(1100);
                 res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, { headers, params });
@@ -248,6 +271,16 @@ export async function getBalance(): Promise<BalanceData | null> {
                 else break; // Other errors don't need retry with different DVSN
             }
         } catch (e: any) {
+            // Handle axial error for 401
+            if (e.response && e.response.status === 401) {
+                console.warn("[KIS] axios error 401. Refreshing token...");
+                const newToken = await getAccessToken(true);
+                if (newToken) {
+                    headers.authorization = `Bearer ${newToken}`;
+                    // Recursive retry once or just return error for simplicity? Let's try once.
+                    return getBalance(); 
+                }
+            }
             lastError = e.message;
             console.error(`[KIS] DVSN ${dvsn} exception: ${e.message}`);
             break;
@@ -305,7 +338,17 @@ export async function placeOrder(code: string, qty: number, price: number, side:
     for (let i = 0; i < 3; i++) {
         try {
             console.log(`[KIS] Sending Order (Attempt ${i + 1})...`);
-            const res = await axios.post(url, body, { headers });
+            let res = await axios.post(url, body, { headers });
+
+            // Handle 401 Unauthorized
+            if (res.status === 401 || (res.data && res.data.msg_cd === 'EGW00121')) {
+                console.warn("[KIS] Order Unauthorized (401). Refreshing token...");
+                const newToken = await getAccessToken(true);
+                if (newToken) {
+                    headers.authorization = `Bearer ${newToken}`;
+                    res = await axios.post(url, body, { headers });
+                }
+            }
 
             if (res.data.msg1 && (res.data.msg1.includes('초당') || res.data.msg_cd === 'EGW00133')) {
                 console.log(`[KIS] Order Rate Limit/Gateway Error: ${res.data.msg1}. Retrying in 1s...`);
@@ -318,11 +361,18 @@ export async function placeOrder(code: string, qty: number, price: number, side:
                 return res.data.output;
             } else {
                 console.error(`[KIS] Order API Error: ${res.data.msg1} (Code: ${res.data.msg_cd})`);
-                // If it's not a rate limit, throw immediately? No, maybe retry helps? 
-                // Usually business errors (no balance) won't be fixed by retry, but let's throw.
                 throw new Error(res.data.msg1);
             }
         } catch (e: any) {
+            // Handle axios 401
+            if (e.response && e.response.status === 401) {
+                console.warn("[KIS] Order axios error 401. Refreshing token...");
+                const newToken = await getAccessToken(true);
+                if (newToken) {
+                    headers.authorization = `Bearer ${newToken}`;
+                    continue; // Retry next loop
+                }
+            }
             console.error(`[KIS] Order Exception (Attempt ${i + 1}): ${e.message}`);
             if (i === 2) throw new Error(e.message || "Order Failed");
             await delay(1000);

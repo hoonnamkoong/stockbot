@@ -108,6 +108,15 @@ class GeminiTrader:
                     
                 if sell_reason:
                     print(f"  [Action] SELL {code} ({h.get('name')}) - Reason: {sell_reason}")
+                    
+                    # --- Telegram Notification ---
+                    try:
+                        from src.telegram_manager import TelegramManager
+                        pnl_pct = profit_rate
+                        msg = f"📉 <b>제미나이 매도 체결</b>\n종목: {h.get('name')} ({code})\n수량: {h['qty']}주\n가격: {current_price:,.0f}원\n수익률: {pnl_pct:+.2f}%\n사유: {sell_reason}"
+                        TelegramManager().send_message(msg)
+                    except: pass
+
                     sell_vol = current_price * h['qty']
                     fee = sell_vol * self.FEE_SELL
                     net_return = sell_vol - fee
@@ -202,6 +211,14 @@ class GeminiTrader:
                         'target_prob': prob
                     }
                     print(f"  [Action] BUY {code} ({rec.get('name')}) - {qty} shares @ {price:,.0f} KRW (ML Prob: {prob:.1f}%)")
+                    
+                    # --- Telegram Notification ---
+                    try:
+                        from src.telegram_manager import TelegramManager
+                        msg = f"📈 <b>제미나이 매수 체결</b>\n종목: {rec.get('name')} ({code})\n수량: {qty}주\n가격: {price:,.0f}원\nML확률: {prob:.1f}%"
+                        TelegramManager().send_message(msg)
+                    except: pass
+
                     self.state['trade_log'].append({
                         'date': current_date + " " + datetime.utcnow().strftime('%H:%M:%S'), 
                         'type': 'BUY', 

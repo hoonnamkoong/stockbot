@@ -110,7 +110,7 @@ jobs:
 
           app_key = os.environ.get("KIS_APP_KEY", "")
           app_secret = os.environ.get("KIS_APP_SECRET", "")
-          base_url = os.environ.get("KIS_BASE_URL", "https://openapi.koreainvestment.com:9443")
+          base_url = (os.environ.get("KIS_BASE_URL") or "https://openapi.koreainvestment.com:9443").strip().rstrip("/")
 
           token_path = "data/kis_token.json"
           os.makedirs("data", exist_ok=True)

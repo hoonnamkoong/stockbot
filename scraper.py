@@ -1363,6 +1363,15 @@ if __name__ == "__main__":
                 trader.execute_buys(top_ml_picks)
                 
                 print("[System] Gemini Portfolio Simulator run complete.")
+                
+                # --- Final Summary Notification ---
+                try:
+                    from src.telegram_manager import TelegramManager
+                    cash_val = trader.state.get('cash', 0)
+                    holdings_count = len(trader.state.get('holdings', {}))
+                    msg = f"🏁 <b>제미나이 시뮬레이터 완료</b>\n현금 잔액: {cash_val:,.0f}원\n보유 종목: {holdings_count}개\n\n대시보드: https://stockbot-phi.vercel.app"
+                    TelegramManager().send_message(msg)
+                except: pass
             else:
                 print("  [ERROR] Static model loading failed. Rebalancing skipped.")
                 

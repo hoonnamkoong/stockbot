@@ -64,7 +64,7 @@ jobs:
       - name: Install dependencies
         if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
-                    pip install -r requirements-scraper.txt
+          pip install -r requirements-scraper.txt
           pip install openpyxl
 
       - name: Download Existing Monthly Report
@@ -96,78 +96,25 @@ jobs:
             echo "[Info] db-data branch not found or empty, starting fresh"
           fi
 
-      - name: Refresh KIS Token to GitHub Cache
-        if: steps.market_check.outputs.is_market_closed == 'false'
-        env:
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python3 << 'EOF'
-          import os, json, requests
-          from datetime import datetime, timedelta, timezone
-
-          app_key = os.environ.get("KIS_APP_KEY", "")
-          app_secret = os.environ.get("KIS_APP_SECRET", "")
-          base_url = (os.environ.get("KIS_BASE_URL") or "https://openapi.koreainvestment.com:9443").strip().rstrip("/")
-
-          token_path = "data/kis_token.json"
-          os.makedirs("data", exist_ok=True)
-
-          # Check if already issued today
-          now = datetime.now(timezone(timedelta(hours=9)))
-          if os.path.exists(token_path) and os.path.getsize(token_path) > 0:
-              try:
-                  with open(token_path, 'r') as f:
-                      existing = json.load(f)
-                  issued = datetime.fromisoformat(existing.get('issued_at', '2000-01-01').replace('Z', '+00:00'))
-                  if issued.date() == now.date() and existing.get('access_token', '').startswith('eyJ'):
-                      print(f"[Token] Already issued today ({issued.isoformat()}). Skipping.")
-                      exit(0)
-              except: pass
-
-          print("[Token] Requesting new KIS access token...")
-          url = f"{base_url}/oauth2/tokenP"
-          res = requests.post(url, headers={"content-type": "application/json"}, json={
-              "grant_type": "client_credentials",
-              "appkey": app_key,
-              "appsecret": app_secret
-          }, timeout=15)
-
-          if res.status_code == 200 and res.json().get('access_token'):
-              data = res.json()
-              token_data = {
-                  "access_token": data['access_token'],
-                  "issued_at": now.isoformat(),
-                  "expires_at": (now + timedelta(seconds=data.get('expires_in', 86400))).isoformat()
-              }
-              with open(token_path, 'w') as f:
-                  json.dump(token_data, f, indent=2)
-              print(f"[Token] Saved new token to {token_path} (issued: {token_data['issued_at']})")
-          else:
-              print(f"[Token] FAILED to get token: {res.status_code} {res.text}")
-          EOF
-
       - name: Run Scraper
         if: steps.market_check.outputs.is_market_closed == 'false'
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${ { secrets.TELEGRAM_BOT_TOKEN } }
+          TELEGRAM_CHAT_ID: ${ { secrets.TELEGRAM_CHAT_ID } }
+          GITHUB_TOKEN: ${ { secrets.GITHUB_TOKEN } }
           DASHBOARD_URL: "https://stockbot-phi.vercel.app"
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
+          GOOGLE_API_KEY: ${ { secrets.GEMINI_KEY } }
         run: |
           python scraper.py
 
       - name: Run Trade Executor (Reservations)
         if: steps.market_check.outputs.is_market_closed == 'false'
         env:
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
-          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KIS_APP_KEY: ${ { secrets.KIS_APP_KEY } }
+          KIS_APP_SECRET: ${ { secrets.KIS_APP_SECRET } }
+          KIS_ACCOUNT_NO: ${ { secrets.KIS_ACCOUNT_NO } }
+          KIS_BASE_URL: ${ { secrets.KIS_BASE_URL } }
+          GITHUB_TOKEN: ${ { secrets.GITHUB_TOKEN } }
         run: |
           python src/trade_executor.py
 
@@ -189,13 +136,13 @@ jobs:
           git add .
           git status
           git commit -m "data: Update stock data (Isolated Branch)" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data
+          git push https://x-access-token:${ { secrets.GITHUB_TOKEN } }@github.com/hoonnamkoong/stockbot.git db-data
 
       - name: Notify on Failure
         if: failure()
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${ { secrets.TELEGRAM_BOT_TOKEN } }
+          TELEGRAM_CHAT_ID: ${ { secrets.TELEGRAM_CHAT_ID } }
         run: |
           curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \

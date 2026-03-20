@@ -1,31 +1,33 @@
 name: Stock Scraper Schedule
 
-
 on:
+  schedule:
+    - cron: '0 0-9 * * 1-5'
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'data/**'
-      - 'trending_*.csv'
-      - 'trending_*.xlsx'
-      - 'reports.json'
-      - '*.md'
-
 
 jobs:
   scrape-and-report:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-scraper.txt
+
       - name: Check if market is closed (Weekend or Holiday)
         id: market_check
         run: |
           pip install holidays
-          
           python3 << 'EOF'
           import holidays
           from datetime import datetime
@@ -35,4 +37,31 @@ jobs:
           today = datetime.now()
           day_of_week = today.weekday()  # 0=Mon, 6=Sun
           
-          is_weekend = day_of_week >= 5  # 5=Sat, 6=Sun 
+          is_weekend = day_of_week >= 5  # 5=Sat, 6=Sun
+          is_holiday = today in kr_holidays
+          is_market_closed = False
+          
+          print(f"is_market_closed={str(is_market_closed).lower()}")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"is_market_closed={str(is_market_closed).lower()}\n")
+          EOF
+
+      - name: Run Scraper
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+        run: |
+          python scraper.py
+
+      - name: Commit and push changes
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/*.csv data/*.xlsx reports.json trending_*.csv trending_*.xlsx
+          git commit -m "Auto-update stock data and reports" || echo "No changes to commit"
+          git push

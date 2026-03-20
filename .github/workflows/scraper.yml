@@ -47,7 +47,7 @@ jobs:
           EOF
 
       - name: Run Scraper
-        if: steps.market_check.outputs.is_market_closed == 'false'
+       if: steps.market_check.outputs.is_market_closed == 'false' # is_market_closed=false
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

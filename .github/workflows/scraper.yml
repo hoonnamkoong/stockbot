@@ -64,7 +64,7 @@ jobs:
       - name: Install dependencies
         if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
-          pip install -r requirements.txt
+                    pip install -r requirements-scraper.txt
           pip install openpyxl
 
       - name: Download Existing Monthly Report

@@ -4,10 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       force_run:
-        description: 'Bypass market holiday check (Force execution)'
+        description: 'Bypass market holiday check'
         required: false
-        default: false
-        type: boolean
+        default: 'false'
   push:
     branches:
       - main
@@ -35,9 +34,13 @@ jobs:
           from datetime import datetime
           import os
           
-          # [Fix] Correctly handle boolean input from GitHub Actions
-          force_run_input = "${{ github.event.inputs.force_run }}".lower() == "true"
-          
+          force_run = "${{ github.event.inputs.force_run }}"
+          if force_run == 'true':
+              print("Force run requested. Bypassing market check.")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=false\n')
+              exit(0)
+
           kr_holidays = holidays.KR()
           today = datetime.now()
           day_of_week = today.weekday()  # 0=Mon, 6=Sun
@@ -45,11 +48,7 @@ jobs:
           is_weekend = day_of_week >= 5  # 5=Sat, 6=Sun
           is_holiday = today.strftime('%Y-%m-%d') in kr_holidays
           
-          if force_run_input:
-              print("FORCE_RUN=true detected. Bypassing market check.")
-              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                  f.write('is_market_closed=false\n')
-          elif is_weekend:
+          if is_weekend:
               print(f"Weekend detected (day={day_of_week}). Market closed.")
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                   f.write('is_market_closed=true\n')
@@ -77,7 +76,7 @@ jobs:
       - name: Install dependencies
         if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
-          pip install -r requirements-scraper.txt
+          pip install -r requirements.txt
           pip install openpyxl
 
       - name: Download Existing Monthly Report
@@ -88,7 +87,9 @@ jobs:
           mkdir -p data
           
           # Try to download existing monthly report from db-data branch
-          curl -sfL "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}"             -o "data/${MONTHLY_FILE}"             || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
+          curl -sfL "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}" \
+            -o "data/${MONTHLY_FILE}" \
+            || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
             
       - name: Restore Previous Data (db-data)
         if: steps.market_check.outputs.is_market_closed == 'false'
@@ -147,7 +148,7 @@ jobs:
           git config user.email "bot@stockbot.com"
           git add .
           git status
-          git commit -m "data: Update stock data (Isolated Branch)" || echo "No changes to commit"
+          git commit -m "data: Update stock data (Isolated Branch - Force: ${{ github.event.inputs.force_run }})" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data
 
       - name: Notify on Failure

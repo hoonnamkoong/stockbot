@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Card, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover, Grid, Flex, SegmentedControl, Divider, ActionIcon, Checkbox } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover, Grid, Flex, SegmentedControl, Divider, ActionIcon, Checkbox } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown, IconSettings, IconCoin, IconCopy } from '@tabler/icons-react';
 import QuickOrderModal from '../components/QuickOrderModal';
@@ -172,7 +172,6 @@ export default function Home() {
     };
 
 
-    // Update Time Slots labels based on actual reports
     useEffect(() => {
         fetchData();
         fetchVersion();
@@ -203,8 +202,7 @@ export default function Home() {
         addSystemLog("🔄 데이터 새로고침 시작...");
         try {
             const timeMap = new Date().getTime();
-            // Mapping slot to filename
-            let filename = 'latest_stocks.json';
+                let filename = 'latest_stocks.json';
 
             const stockUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/${filename}?t=${timeMap}`;
 
@@ -529,8 +527,8 @@ export default function Home() {
                     <IconRobot size={isMobile ? 24 : 30} color="#228be6" />
                     <Title order={3} size={isMobile ? 'h5' : 'h3'}>
                         {isMobile
-                            ? `StockBot ${versionInfo?.version || 'v28-schedule-12pm'}`
-                            : `StockBot ${versionInfo?.version || 'v28-schedule-12pm'} (Deployed ${versionInfo?.timestamp ? new Date(versionInfo.timestamp).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }).replace(/\. /g, '/').replace('.', '') : 'N/A'} KST)`
+                            ? `StockBot ${versionInfo?.version || 'v10.6-stable'}`
+                            : `StockBot ${versionInfo?.version || 'v10.6-stable'} (Deployed ${versionInfo?.timestamp ? new Date(versionInfo.timestamp).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }).replace(/\. /g, '/').replace('.', '') : 'N/A'} KST)`
                         }
                     </Title>
                     <Group ml="auto" gap={isMobile ? 'xs' : 'md'}>

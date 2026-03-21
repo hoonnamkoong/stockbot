@@ -1197,11 +1197,12 @@ if __name__ == "__main__":
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
 
         # --- Consolidated Notification ---
-        # Send Telegram only if it's near the top of the hour (e.g., 00~05 mins) OR if it's exactly 15:30
-        is_top_of_hour = (0 <= now_kst.minute <= 5)
-        is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 35) 
+        # Extend window to 25 mins due to GitHub Action delays. Send on FORCE_RUN unconditionally.
+        is_top_of_hour = (0 <= now_kst.minute <= 25)
+        is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 55) 
         
-        should_send_telegram = is_top_of_hour or is_market_close
+        # force_run_env is True when triggered manually with BYPASS
+        should_send_telegram = is_top_of_hour or is_market_close or force_run_env
 
         if all_data and tg_manager and should_send_telegram:
             try:

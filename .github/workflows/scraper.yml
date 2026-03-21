@@ -37,6 +37,7 @@ jobs:
       - name: Check if market is closed (Weekend or Holiday)
         id: market_check
         run: |
+          pip install holidays
           python3 << 'EOF'
           import holidays
           from datetime import datetime

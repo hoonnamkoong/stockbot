@@ -1197,8 +1197,8 @@ if __name__ == "__main__":
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
 
         # --- Consolidated Notification ---
-        # Extend window to 25 mins due to GitHub Action delays. Send on FORCE_RUN unconditionally.
-        is_top_of_hour = (0 <= now_kst.minute <= 25)
+        # Extend window to 15 mins due to GitHub Action delays. Send on FORCE_RUN unconditionally.
+        is_top_of_hour = (0 <= now_kst.minute <= 15)
         is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 55) 
         
         # force_run_env is True when triggered manually with BYPASS

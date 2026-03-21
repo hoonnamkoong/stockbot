@@ -20,9 +20,9 @@ def load_env(env_path=None):
                 k, v = line.split('=', 1)
                 os.environ[k.strip()] = v.strip()
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-def get_access_token():
+def get_access_token(force_refresh=False):
     load_env()
     
     app_key = os.environ.get("KIS_APP_KEY")
@@ -30,7 +30,6 @@ def get_access_token():
     base_url = os.environ.get("KIS_BASE_URL", "https://openapivts.koreainvestment.com:29443")
     
     # Path to shared token file (sync with src/lib/kis-api.ts)
-    # Check multiple possible locations for robust path resolution
     possible_paths = [
         os.path.join(os.getcwd(), 'data', 'kis_token.json'),
         os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'kis_token.json'),
@@ -43,70 +42,88 @@ def get_access_token():
             token_path = p
             break
     
-    # 1. Try to read from file
     data = None
-    if os.path.exists(token_path):
-        try:
-            with open(token_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except Exception as e:
-            print(f"Failed to read local token cache: {e}")
-
-    # 2. If local missing or expired, try GitHub (Directly via URL if possible, or skip)
-    if not data:
-        print("Local token cache missing. Trying GitHub...")
-        try:
-            # We can try the raw URL first. If it's private, this might fail without auth.
-            # But the actions often have GITHUB_TOKEN.
-            repo_owner = "hoonnamkoong"
-            repo_name = "stockbot"
-            branch = "db-data"
-            gh_url = f"https://raw.githubusercontent.com/{repo_owner}/{repo_name}/{branch}/data/kis_token.json"
-            
-            headers = {}
-            # If in GitHub Actions, we might have GITHUB_TOKEN
-            gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
-            if gh_token:
-                headers["Authorization"] = f"token {gh_token}"
-            
-            res = requests.get(gh_url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
-                print("Successfully fetched token cache from GitHub.")
-                # Save locally for next time
+    if not force_refresh:
+        # 1. Try to read from local file FIRST
+        for p in possible_paths:
+            if os.path.exists(p):
                 try:
-                    os.makedirs(os.path.dirname(token_path), exist_ok=True)
-                    with open(token_path, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=2)
-                except: pass
-        except Exception as e:
-            print(f"Failed to fetch from GitHub: {e}")
+                    if os.path.exists(p) and os.path.getsize(p) > 0:
+                        with open(p, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            print(f"Checking token from local cache: {p}")
+                            break
+                    else:
+                        if os.path.exists(p):
+                            print(f"Token file {p} is empty. Skipping cache.")
+                except Exception as e:
+                    print(f"Failed to read local token cache at {p}: {e}")
 
-    # 3. Validate Token
-    if data:
-        try:
-            access_token = data.get('access_token')
-            expires_at_str = data.get('expires_at')
-            if access_token and expires_at_str:
-                # KIS tokens are valid for 24 hours. 
-                # We use a 23-hour buffer to ensure we only get ONE token per day.
-                # This matches the TypeScript implementation in src/lib/kis-api.ts
-                expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+        # 2. If local missing, try GitHub (Only as a fallback)
+        if not data:
+            print("Local token cache missing. Trying GitHub...")
+            try:
+                repo_owner = "hoonnamkoong"
+                repo_name = "stockbot"
+                branch = "db-data"
+                gh_url = f"https://raw.githubusercontent.com/{repo_owner}/{repo_name}/{branch}/data/kis_token.json"
                 
-                # If cached token was issued less than 23 hours ago, reuse it.
-                # Note: KIS doesn't provide issue_at, so we assume expires_at is issue_at + 24h
-                # Actually, let's just use the absolute expiry with a 1-hour margin for safety.
-                if datetime.now().astimezone() < expires_at - timedelta(hours=1):
-                    print(f"Using persistent token (Valid until: {expires_at_str})")
-                    return access_token
+                headers = {}
+                gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+                if gh_token:
+                    headers["Authorization"] = f"token {gh_token}"
+                
+                res = requests.get(gh_url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    print("Successfully fetched token cache from GitHub.")
+                    # Save locally for next time
+                    try:
+                        os.makedirs(os.path.dirname(token_path), exist_ok=True)
+                        with open(token_path, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, indent=2)
+                    except: pass
                 else:
-                    print("Cached token expired (or within 1h margin).")
-        except Exception as e:
-            print(f"Token validation failed: {e}")
+                    print(f"GitHub fetch failed: Status {res.status_code}")
+            except Exception as e:
+                print(f"Failed to fetch from GitHub: {e}")
+
+        # 3. Validate Token: Check if issued TODAY
+        if data:
+            try:
+                access_token = data.get('access_token')
+                issued_at_str = data.get('issued_at')
+                expires_at_str = data.get('expires_at')
+                
+                if access_token:
+                    now = datetime.now().astimezone()
+                    
+                    # Policy 1: If issued today (calendar date), reuse it.
+                    if issued_at_str:
+                        issued_at = datetime.fromisoformat(issued_at_str.replace('Z', '+00:00'))
+                        if issued_at.date() == now.date():
+                            print(f"Using token issued TODAY ({issued_at_str})")
+                            return access_token
+                    
+                    # Policy 2: Fallback to expiry check if issued_at is missing
+                    if expires_at_str:
+                        expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+                        if now < expires_at - timedelta(hours=1):
+                            print(f"Using persistent token (Valid until: {expires_at_str})")
+                            return access_token
+                    
+                if not access_token:
+                    print("No valid access_token found in cache.")
+                else:
+                    print("Cached token was either issued on a different day or is near expiry.")
+            except Exception as e:
+                print(f"Token validation failed: {e}")
+    else:
+        print("Force-refresh requested. Requesting new token from KIS...")
 
     # 4. Request new token
     if not app_key or not app_secret:
-        print("Error: credentials missing in .env")
+        print("Error: KIS credentials missing in environment variables.")
         return None
 
     # Determine URL (Real vs Virtual)
@@ -118,37 +135,43 @@ def get_access_token():
         "appsecret": app_secret
     }
     
-    print(f"Requesting new token from KIS ({'Virtual' if 'vts' in base_url.lower() else 'Real'})...")
+    print(f"Requesting NEW token from KIS ({'Virtual' if 'vts' in base_url.lower() else 'Real'})...")
     try:
         res = requests.post(url, headers=headers, data=json.dumps(body), timeout=10)
         if res.status_code == 200:
             data = res.json()
             access_token = data.get('access_token')
-            expires_in = data.get('expires_in', 86400) # 24 hours
+            expires_in = data.get('expires_in', 86400) # 通常 24 hours
             
             if access_token:
-                # Save to file
-                expires_at = datetime.now().astimezone() + timedelta(seconds=expires_in)
+                now = datetime.now().astimezone()
+                expires_at = now + timedelta(seconds=expires_in)
                 token_data = {
                     "access_token": access_token,
+                    "issued_at": now.isoformat(),
                     "expires_at": expires_at.isoformat()
                 }
                 
                 # Ensure data dir exists
                 os.makedirs(os.path.dirname(token_path), exist_ok=True)
                 
-                with open(token_path, 'w', encoding='utf-8') as f:
-                    json.dump(token_data, f, indent=2)
-                    
-                print(f"Success! New Access Token retrieved and saved to {token_path}.")
-                return access_token
+                # Double-check structure before saving
+                if access_token and len(access_token) > 20:
+                    with open(token_path, 'w', encoding='utf-8') as f:
+                        json.dump(token_data, f, indent=2)
+                    print(f"Success! New Access Token retrieved and saved to {token_path}.")
+                    return access_token
+                else:
+                    raise ValueError("Invalid access_token received from KIS")
             else:
-                print(f"Failed to extract access_token: {data}")
+                print(f"Failed to extract access_token from response: {data}")
         else:
-            print(f"Error {res.status_code}: {res.text}")
+            print(f"KIS API Error {res.status_code}: {res.text}")
             
     except Exception as e:
         print(f"Token Fetch Exception: {e}")
+        
+    return None
         
     return None
 

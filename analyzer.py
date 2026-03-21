@@ -165,7 +165,7 @@ def analyze_sentiment(df):
                         score *= 0.2
                     
                     # Bonus: Prediction Keywords
-                    prediction_keywords = ['목표', '예상', '전망', '된다', '간다', '분석', '이유']
+                    prediction_keywords = ['목표', '예상', '전망', '분석', '이유']
                     if any(kw in body for kw in prediction_keywords):
                         score += 2000
                 else: 
@@ -245,8 +245,14 @@ def compare_with_history(current_df):
     가장 최근에 저장된 CSV 파일과 비교하여 '연속 포착(is_consecutive)' 여부를 확인합니다.
     """
     try:
-        # 현재 디렉토리의 csv 파일 목록 검색
-        files = [f for f in os.listdir('.') if f.startswith('trending_stocks_') and f.endswith('.csv')]
+        # Look in the 'data' directory (restored from db-data branch)
+        data_dir = 'data'
+        if not os.path.exists(data_dir):
+            current_df['is_last_captured'] = False
+            return current_df
+            
+        # Search for files with the new prefix: trending_integrated_
+        files = [f for f in os.listdir(data_dir) if f.startswith('trending_integrated_') and (f.endswith('.xlsx') or f.endswith('.csv'))]
         if not files:
             current_df['is_last_captured'] = False
             return current_df
@@ -285,12 +291,15 @@ def compare_with_history(current_df):
              current_df['is_last_captured'] = False
              return current_df
              
-        last_file = target_file
+        last_file = os.path.join(data_dir, target_file)
         # 주의: 이 함수는 save_to_csv 호출 '전'에 불려야 함.
         
         print(f"Comparing with history file: {last_file}")
         try:
-             history_df = pd.read_csv(last_file)
+             if last_file.endswith('.xlsx'):
+                 history_df = pd.read_excel(last_file)
+             else:
+                 history_df = pd.read_csv(last_file)
         except:
              # 빈 파일 등 에러 처리
              history_df = pd.DataFrame(columns=['code'])

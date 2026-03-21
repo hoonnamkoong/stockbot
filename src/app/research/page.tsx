@@ -120,9 +120,9 @@ const WORKFLOW_ID = 'scraper.yml';
 
 export default function Home() {
     const [opened, { toggle }] = useDisclosure();
-    const [stocks, setStocks] = useState([]);
-    const [fiveDayData, setFiveDayData] = useState([]);
-    const [threeDayData, setThreeDayData] = useState([]);
+    const [stocks, setStocks] = useState<any[]>([]);
+    const [fiveDayData, setFiveDayData] = useState<any[]>([]);
+    const [threeDayData, setThreeDayData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState('');
     const [activeTab, setActiveTab] = useState('ALL');
@@ -132,10 +132,10 @@ export default function Home() {
     const [githubToken, setGithubToken] = useState('');
     const [forceRun, setForceRun] = useState(false);
     const [workflowStatus, setWorkflowStatus] = useState('idle');
-    const [workflowLogs, setWorkflowLogs] = useState([]);
+    const [workflowLogs, setWorkflowLogs] = useState<any[]>([]);
     const theme = useMantineTheme();
     const isMobile = useMediaQuery('(max-width: ' + theme.breakpoints.sm + ')');
-    const [reports, setReports] = useState([]);
+    const [reports, setReports] = useState<any[]>([]);
     const [versionInfo, setVersionInfo] = useState(null);
     const [quickOrderOpen, setQuickOrderOpen] = useState(false);
     const [selectedQuickStock, setSelectedQuickStock] = useState({ code: '', name: '' });
@@ -203,7 +203,7 @@ export default function Home() {
             }
         } catch (e) { console.error('Failed to fetch version:', e); }
     };
-    const [systemLogs, setSystemLogs] = useState([]);
+    const [systemLogs, setSystemLogs] = useState<any[]>([]);
     const addSystemLog = (msg) => { setSystemLogs(prev => ['[' + new Date().toLocaleTimeString() + '] ' + msg, ...prev]); };
     const fetchData = async (slot = 'latest') => {
         setLoading(true);

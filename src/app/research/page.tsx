@@ -139,12 +139,12 @@ export default function Home() {
     const [versionInfo, setVersionInfo] = useState(null);
     const [quickOrderOpen, setQuickOrderOpen] = useState(false);
     const [selectedQuickStock, setSelectedQuickStock] = useState({ code: '', name: '' });
-    const handleCopyAndOpen = (code, name = '') => {
+    const handleCopyAndOpen = (code: string, name: string = '') => {
         navigator.clipboard.writeText(code);
         setSelectedQuickStock({ code, name: name || code });
         setQuickOrderOpen(true);
     };
-    const openQuickOrder = (stock) => {
+    const openQuickOrder = (stock: any) => {
         setSelectedQuickStock({ code: stock.code, name: stock.name });
         setQuickOrderOpen(true);
     };
@@ -163,7 +163,7 @@ export default function Home() {
                 { label: '13:00', value: '1300' },
                 { label: '15:00 (마감)', value: '1500' },
             ];
-            const parseReportDate = (dateStr) => {
+            const parseReportDate = (dateStr: string) => {
                 try {
                     const timePart = dateStr.split(' ')[1];
                     const [hour] = timePart.split(':').map(Number);

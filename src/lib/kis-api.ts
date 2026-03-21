@@ -98,8 +98,8 @@ async function getAccessToken(forceRefresh = false): Promise<string | null> {
                         const issuedAt = ghTokenData.issued_at ? new Date(ghTokenData.issued_at) : null;
                         const expiresAt = new Date(ghTokenData.expires_at).getTime();
 
-                        if (nowTime < expiresAt - 3600000) {
-                            console.log("[KIS] Using persistent Access Token (Valid until: " + new Date(expiresAt).toISOString() + ")");
+                        if ((issuedAt && issuedAt.toDateString() === now.toDateString()) || (nowTime < expiresAt - 3600000)) {
+                            console.log("[KIS] Using persistent Access Token from GitHub");
                             ACCESS_TOKEN = ghTokenData.access_token;
                             EXPIRES_AT = expiresAt;
                             

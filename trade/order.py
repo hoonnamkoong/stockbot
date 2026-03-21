@@ -62,11 +62,20 @@ def place_order(side="buy", code="005930", qty=1, price=0):
     print(f"\n[Order] Placing {side.upper()} Order: {code} x {qty} @ {price}")
     
     # Retry Loop
-    max_retries = 5 # Increased retries
+    max_retries = 5 
     for i in range(max_retries):
         try:
             res = requests.post(url, headers=headers, data=json.dumps(params), timeout=10)
             
+            # Handle 401 Unauthorized (Token expired or invalid)
+            if res.status_code == 401:
+                print(f"Unauthorized (401). Refreshing token and retrying ({i+1}/{max_retries})...")
+                access_token = get_access_token(force_refresh=True)
+                if not access_token:
+                    raise Exception("Failed to refresh access token during 401 retry.")
+                headers["authorization"] = f"Bearer {access_token}"
+                continue
+
             data = {}
             try:
                 data = res.json()
@@ -83,14 +92,13 @@ def place_order(side="buy", code="005930", qty=1, price=0):
                 print(f"Message: {msg1}")
                 return # Success
 
-            # Case B: Rate Limit (Any Status)
-            # Codes: EGW00133, EGW00201 (TPS Exceeded), or text match
+            # Case B: Rate Limit 
             if '초당' in msg1 or msg_cd in ['EGW00133', 'EGW00201'] or res.status_code == 429:
                 print(f"Rate Limit hit ({msg1}). Retrying {i+1}/{max_retries}...")
-                time.sleep(1.5 + (i * 0.5)) # Exponential backoff
+                time.sleep(1.5 + (i * 0.5)) 
                 continue
 
-            # Case C: Known Business Errors (don't retry usually, but logging helps)
+            # Case C: Known Business Errors
             if data.get('rt_cd') != '0':
                 raise Exception(f"API Error: {msg1} (Code: {msg_cd})")
 

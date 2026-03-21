@@ -16,31 +16,27 @@ class GeminiTrader:
 
     def _load_state(self):
         if os.path.exists(self.portfolio_file):
-            if os.path.getsize(self.portfolio_file) > 0:
-                try:
+            try:
+                if os.path.getsize(self.portfolio_file) > 0:
                     with open(self.portfolio_file, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        print(f"[Trader] Portfolio loaded successfully: cash={data.get('cash')}, holdings={len(data.get('holdings', {}))}")
-                        return data
-                except Exception as e:
-                    # File is corrupt (not empty but invalid JSON)
-                    error_msg = f"‼️ [Critical] Portfolio JSON is corrupt: {e}. Starting fresh to avoid halt."
-                    print(error_msg)
-                    try:
-                        from src.telegram_manager import TelegramManager
-                        TelegramManager().send_message(f"⚠️ <b>포트폴리오 JSON 손상</b>\n파일: {self.portfolio_file}\n사유: {e}\n→ 기본값(300만원)으로 재시작합니다.")
-                    except: pass
-            else:
-                # File exists but is 0 bytes — known issue from empty GitHub push
-                print(f"[Trader] WARN: Portfolio file {self.portfolio_file} is 0 bytes. Initializing with defaults.")
+                        return json.load(f)
+                else:
+                    # File exists but is 0 bytes
+                    raise ValueError("Portfolio file is empty (0 bytes).")
+            except Exception as e:
+                error_msg = f"‼️ [Critical] Portfolio Load Failed: {e}"
+                print(error_msg)
+                # Proactively notify Telegram if possible
                 try:
                     from src.telegram_manager import TelegramManager
-                    TelegramManager().send_message(f"⚠️ <b>포트폴리오 파일 0바이트</b>\n파일: {self.portfolio_file}\n→ 기본값(300만원)으로 초기화합니다. 매매는 계속 진행됩니다.")
+                    notifier = TelegramManager()
+                    notifier.send_message(f"⚠️ <b>데이터 손상 감지</b>\n포트폴리오 파일({self.portfolio_file})이 손상되었습니다. 자동 매매를 일시 중지합니다.\n사유: {e}")
                 except: pass
-        else:
-            print(f"[Trader] Portfolio file not found. Starting fresh with {self.INITIAL_CASH:,} KRW.")
-
-        # Initialize defaults if not exists or file was corrupted/empty
+                
+                # Stop execution to prevent overwriting with defaults
+                raise RuntimeError("Halting to prevent data loss. Manual investigation required.")
+                
+        # Initialize defaults if not exists
         return {
             'cash': self.INITIAL_CASH,
             'holdings': {}, # code: {qty, avg_price, buy_date, days_held, name, target_prob}
@@ -108,15 +104,6 @@ class GeminiTrader:
                     
                 if sell_reason:
                     print(f"  [Action] SELL {code} ({h.get('name')}) - Reason: {sell_reason}")
-                    
-                    # --- Telegram Notification ---
-                    try:
-                        from src.telegram_manager import TelegramManager
-                        pnl_pct = profit_rate
-                        msg = f"📉 <b>제미나이 매도 체결</b>\n종목: {h.get('name')} ({code})\n수량: {h['qty']}주\n가격: {current_price:,.0f}원\n수익률: {pnl_pct:+.2f}%\n사유: {sell_reason}"
-                        TelegramManager().send_message(msg)
-                    except: pass
-
                     sell_vol = current_price * h['qty']
                     fee = sell_vol * self.FEE_SELL
                     net_return = sell_vol - fee
@@ -211,14 +198,6 @@ class GeminiTrader:
                         'target_prob': prob
                     }
                     print(f"  [Action] BUY {code} ({rec.get('name')}) - {qty} shares @ {price:,.0f} KRW (ML Prob: {prob:.1f}%)")
-                    
-                    # --- Telegram Notification ---
-                    try:
-                        from src.telegram_manager import TelegramManager
-                        msg = f"📈 <b>제미나이 매수 체결</b>\n종목: {rec.get('name')} ({code})\n수량: {qty}주\n가격: {price:,.0f}원\nML확률: {prob:.1f}%"
-                        TelegramManager().send_message(msg)
-                    except: pass
-
                     self.state['trade_log'].append({
                         'date': current_date + " " + datetime.utcnow().strftime('%H:%M:%S'), 
                         'type': 'BUY', 

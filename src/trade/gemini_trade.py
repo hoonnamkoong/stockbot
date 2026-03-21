@@ -14,29 +14,7 @@ class GeminiTrader:
         
         self.state = self._load_state()
 
-    def _load_state(self):
-        if os.path.exists(self.portfolio_file):
-            try:
-                if os.path.getsize(self.portfolio_file) > 0:
-                    with open(self.portfolio_file, 'r', encoding='utf-8') as f:
-                        return json.load(f)
-                else:
-                    # File exists but is 0 bytes
-                    raise ValueError("Portfolio file is empty (0 bytes).")
-            except Exception as e:
-                error_msg = f"‼️ [Critical] Portfolio Load Failed: {e}"
-                print(error_msg)
-                # Proactively notify Telegram if possible
-                try:
-                    from src.telegram_manager import TelegramManager
-                    notifier = TelegramManager()
-                    notifier.send_message(f"⚠️ <b>데이터 손상 감지</b>\n포트폴리오 파일({self.portfolio_file})이 손상되었습니다. 자동 매매를 일시 중지합니다.\n사유: {e}")
-                except: pass
-                
-                # Stop execution to prevent overwriting with defaults
-                raise RuntimeError("Halting to prevent data loss. Manual investigation required.")
-                
-        # Initialize defaults if not exists
+    def _get_default_state(self):
         return {
             'cash': self.INITIAL_CASH,
             'holdings': {}, # code: {qty, avg_price, buy_date, days_held, name, target_prob}
@@ -46,6 +24,30 @@ class GeminiTrader:
             'market_regime': 'NEUTRAL', # BULL, BEAR, NEUTRAL
             'benchmark_base': {} # {'KOSPI': 2500, ...}
         }
+        
+    def _load_state(self):
+        if os.path.exists(self.portfolio_file):
+            try:
+                if os.path.getsize(self.portfolio_file) > 0:
+                    with open(self.portfolio_file, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                else:
+                    # File exists but is 0 bytes
+                    print("⚠️ [Warning] Portfolio file is empty (0 bytes). Reverting to defaults.")
+                    # Proactively notify Telegram once
+                    try:
+                        from src.telegram_manager import TelegramManager
+                        notifier = TelegramManager()
+                        notifier.send_message(f"⚠️ <b>데이터 유실 감지</b>\n포트폴리오 파일({self.portfolio_file})이 0바이트입니다. 임시로 기본 잔고(300만)를 로드합니다. 데이터 확인이 필요합니다.")
+                    except: pass
+                    return self._get_default_state()
+            except Exception as e:
+                error_msg = f"‼️ [Critical] Portfolio Load Failed: {e}"
+                print(error_msg)
+                return self._get_default_state()
+                
+        # Initialize defaults if not exists
+        return self._get_default_state()
         
     def _save_state(self):
         os.makedirs('data', exist_ok=True)

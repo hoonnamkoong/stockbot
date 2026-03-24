@@ -111,8 +111,11 @@ class GeminiTrader:
                     net_return = sell_vol - fee
                     
                     self.state['cash'] += net_return
+                    from datetime import timezone, timedelta
+                    kst_tz = timezone(timedelta(hours=9))
+                    current_time_kst = datetime.now(kst_tz).strftime('%H:%M:%S')
                     self.state['trade_log'].append({
-                        'date': current_date + " " + datetime.utcnow().strftime('%H:%M:%S'), 
+                        'date': current_date + " " + current_time_kst, 
                         'type': 'SELL', 
                         'code': code, 
                         'name': h.get('name', code),
@@ -200,8 +203,11 @@ class GeminiTrader:
                         'target_prob': prob
                     }
                     print(f"  [Action] BUY {code} ({rec.get('name')}) - {qty} shares @ {price:,.0f} KRW (ML Prob: {prob:.1f}%)")
+                    from datetime import timezone, timedelta
+                    kst_tz = timezone(timedelta(hours=9))
+                    current_time_kst = datetime.now(kst_tz).strftime('%H:%M:%S')
                     self.state['trade_log'].append({
-                        'date': current_date + " " + datetime.utcnow().strftime('%H:%M:%S'), 
+                        'date': current_date + " " + current_time_kst, 
                         'type': 'BUY', 
                         'code': code, 
                         'name': rec.get('name', code),

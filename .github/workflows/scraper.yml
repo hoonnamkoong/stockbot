@@ -1,6 +1,10 @@
 name: Stock Scraper Schedule
 
 on:
+  schedule:
+    - cron: '0 0-7 * * 1-5' # 9 AM to 4 PM KST (Mon-Fri) [Grand Protocol Verified]
+  repository_dispatch:
+    types: [tasker_trigger]
   workflow_dispatch:
     inputs:
       force_run:
@@ -116,6 +120,7 @@ jobs:
           DASHBOARD_URL: "https://stockbot-phi.vercel.app"
           GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
           FORCE_RUN: ${{ github.event.inputs.force_run }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           python scraper.py
 

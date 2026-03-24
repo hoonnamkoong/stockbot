@@ -39,6 +39,25 @@ STOPWORDS = {
     '공시', '뉴스', '속보', '특징주', '단독', '상보', '종합', '오후', '오전'
 }
 
+# --- Telegram Notification Guard (Grand Protocol v12) ---
+class TelegramNotificationGuard:
+    @staticmethod
+    def should_send(now_kst):
+        is_top_of_hour = (0 <= now_kst.minute <= 5)
+        is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 55)
+        
+        # Event triggers: repository_dispatch, workflow_dispatch, or manual FORCE_RUN
+        is_forced = os.environ.get('FORCE_RUN', 'false').lower() == 'true'
+        event_name = os.environ.get('GITHUB_EVENT_NAME', 'unknown')
+        is_event_trigger = event_name in ['repository_dispatch', 'workflow_dispatch']
+        
+        # Decouple Time-based vs Event-based
+        if is_top_of_hour or is_market_close:
+            return True, "Scheduled"
+        if is_forced or is_event_trigger:
+            return True, f"Event ({event_name})"
+        return False, None
+
 def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
     """
     Extracts meaningful keywords from post titles,
@@ -1196,13 +1215,11 @@ if __name__ == "__main__":
             with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
 
-        # --- Consolidated Notification ---
-        # Extend window to 15 mins due to GitHub Action delays. Send on FORCE_RUN unconditionally.
-        is_top_of_hour = (0 <= now_kst.minute <= 15)
-        is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 55) 
+        # [TELEGRAM SCHEDULE V12] Using Unified Notification Guard (Grand Protocol)
+        should_send_telegram, trigger_reason = TelegramNotificationGuard.should_send(now_kst)
         
-        # force_run_env is True when triggered manually with BYPASS
-        should_send_telegram = is_top_of_hour or is_market_close or force_run_env
+        if trigger_reason:
+            print(f"[System] Notification Triggered by: {trigger_reason}")
 
         if all_data and tg_manager and should_send_telegram:
             try:

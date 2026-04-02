@@ -314,9 +314,6 @@ def get_top_trending_stocks(market_type='KOSPI'):
     except Exception as e:
         print(f"Error fetching trending stocks for {market_type}: {e}")
         return []
-    except Exception as e:
-        print(f"Error fetching trending stocks for {market_type}: {e}")
-        return []
 
 
 def get_top_rising_stocks(market_type='KOSPI'):
@@ -384,69 +381,6 @@ def get_top_rising_stocks(market_type='KOSPI'):
         return []
 
 
-def get_top_rising_stocks(market_type='KOSPI'):
-    """
-    네이버 금융 상승률 상위(Top Rising) 종목 리스트를 가져옵니다.
-    market_type: 'KOSPI' or 'KOSDAQ'
-    """
-    sosok = '0' if market_type == 'KOSPI' else '1'
-    url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}" 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    }
-    
-    exclude_keywords = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
-
-    try:
-        print(f"[DEBUG] Fetching {market_type} Rising stocks...", flush=True)
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.content.decode('euc-kr', 'replace'), 'html.parser')
-        
-        table = soup.select_one('table.type_2')
-        if not table: return []
-
-        rows = table.select('tr')
-        data = []
-        for row in rows:
-            cols = row.select('td')
-            if len(cols) < 10: continue
-
-            try:
-                name_tag = cols[1].select_one('a')
-                if not name_tag: continue
-                name = name_tag.get_text(strip=True)
-                
-                is_excluded = False
-                for kw in exclude_keywords:
-                    if kw in name.upper():
-                        is_excluded = True
-                        break
-                if is_excluded: continue
-
-                url_suffix = name_tag['href']
-                code = url_suffix.split('code=')[-1]
-                
-                price_str = cols[2].get_text(strip=True).replace(',', '')
-                current_price = int(price_str) if price_str.isdigit() else 0
-                
-                change_rate = cols[4].get_text(strip=True).strip()
-                
-                stock_info = {
-                    'market': market_type,
-                    'code': code,
-                    'name': name,
-                    'price': current_price,
-                    'change_rate': change_rate,
-                    'source': 'rising'
-                }
-                data.append(stock_info)
-            except:
-                continue
-
-        return data[:35] # Top 35 as requested
-    except Exception as e:
-        print(f"Error fetching Rising stocks: {e}")
-        return []
 def get_stock_details(code):
     """
     특정 종목의 상세 정보(전일종가, 외국인소진율 이력 등)를 가져옵니다.
@@ -875,8 +809,22 @@ def append_to_monthly_report(df_kr, now_kst):
         return None, 0
 
 if __name__ == "__main__":
-    # 0. Load Environment Variables
+    # 0. Load Environment Variables & Validate [Grand Protocol v12]
     load_env_manual()
+    
+    try:
+        from src.config_validator import validate_scraper, mask_sensitive
+        is_val_ok, missing_vars = validate_scraper()
+        if not is_val_ok:
+            print("\n" + "!" * 60)
+            print("[FATAL] 필수 환경 변수 검증 실패 - 시스템을 중단합니다.")
+            for m in missing_vars: print(f"  ❌ {m}")
+            print("!" * 60)
+            sys.exit(1) # Silent Failure 방지
+            
+        print(f"[Scraper] 환경 변수 검증 통과. (Gemini Key: {mask_sensitive(os.environ.get('GEMINI_KEY') or os.environ.get('GOOGLE_API_KEY', ''))})")
+    except ImportError:
+        print("[Scraper] ⚠️  ConfigValidator 로드 실패. 기본 체크로 진행합니다.")
     
     # --- Branch Recovery (V9.5) ---
     try:
@@ -922,14 +870,25 @@ if __name__ == "__main__":
         
     print(f"[System] Threshold determined: {threshold} posts (based on hour {current_hour})")
 
-    # --- 0. Initialize Telegram Manager (V7.0) ---
+    # --- [Grand Protocol] 환경 변수 사전 검증 ---
     try:
-        from src.telegram_manager import TelegramManager
-        tg_manager = TelegramManager()
-        # Dashboard Link moved to end
+        from src.config_validator import validate_scraper
+        _scraper_ok, _scraper_missing = validate_scraper()
+        if not _scraper_ok:
+            print("[System] ⚠️  일부 환경 변수 누락. 해당 기능은 비활성화됩니다.")
+    except Exception as _cv_err:
+        print(f"[System] ConfigValidator 로드 실패: {_cv_err}")
+
+    # --- [Grand Protocol] NotificationService 초기화 (단일 진입점) ---
+    try:
+        from src.notification.notification_service import NotificationService
+        notif_service = NotificationService()
     except Exception as e:
-        print(f"[System] Failed to initialize TelegramManager: {e}")
-        tg_manager = None
+        print(f"[System] NotificationService 초기화 실패: {e}")
+        notif_service = None
+
+    # 하위 호환성: 기존 tg_manager 변수도 유지
+    tg_manager = notif_service._tg if (notif_service and notif_service.is_available) else None
     # 2. Research Briefing (Enabled)
     # --- 0. Research Report Scraping (Disabled V8.0) ---
     print("\n[Research] Research Report Scraping is DISABLED (V8.0).")
@@ -1074,15 +1033,16 @@ if __name__ == "__main__":
                 print(f"{stock_ref['name']} generated an exception: {exc}")
 
     print(f"\n[System] Final Collected Items: {len(all_data)}")
-    # --- Consolidated Analysis & Notification (V8.0) ---
+    # --- Consolidated Analysis & Notification (V12 - Silent Failure Overhaul) ---
     try:
-        from src.telegram_manager import TelegramManager
-        # from src.features.sentinel_v import SentinelV  <-- REMOVED (Inlined)
-        # from src.features.gemini_agent import GeminiAgent <-- REMOVED (Inlined)
+        from src.notification.notification_service import NotificationService
+        notif_service = NotificationService()
         
+        from src.telegram_manager import TelegramManager
         try:
             tg_manager = TelegramManager()
-        except:
+        except Exception:
+            print("[Scraper] ⚠️  TelegramManager 초기화 실패 (NotificationService가 있다면 폴백 가능)")
             tg_manager = None
             
         import json
@@ -1215,93 +1175,67 @@ if __name__ == "__main__":
             with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
 
-        # [TELEGRAM SCHEDULE V12] Using Unified Notification Guard (Grand Protocol)
+        # [TELEGRAM V12 — Grand Protocol] Unified Notification Guard
         should_send_telegram, trigger_reason = TelegramNotificationGuard.should_send(now_kst)
-        
+
         if trigger_reason:
             print(f"[System] Notification Triggered by: {trigger_reason}")
 
-        if all_data and tg_manager and should_send_telegram:
+        if all_data and should_send_telegram:
+            print("[System] Generating Consolidated Telegram Report via NotificationService...")
+
+            records = result_df_kr.to_dict('records') if not result_df_kr.empty else []
+            kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
+            kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
+
+            # ── 전략 리포트 생성 (알림과 분리) ─────────────────────────────
+            advisor_report_text = ""
             try:
-                print("[System] Generating Consolidated Telegram Report...")
-                
-                # 1. KOSPI Report
-                records = result_df_kr.to_dict('records')
-                kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
-                if kospi_items:
-                    # Header Style: [KOSPI] Top 5 (토론 급등) (v7.0)
-                    kospi_msg = f"📉 <b>[KOSPI] Top {min(len(kospi_items), 5)} (토론 급등)</b>\n\n"
-                    for item in kospi_items[:5]: # Show Top 5
-                        name = item['종목명']
-                        # Price/Change might be int or str, handle safely
-                        try:
-                            price = f"{int(item.get('현재가', 0)):,}"
-                        except:
-                            price = item.get('현재가', '0')
-                            
-                        change = item['등락률']
-                        posts = item['당일_게시글수']
-                        summary = item.get('게시물_요약', '요약 없음')
-                        
-                        kospi_msg += f"🔥 <b>{name}</b> ({price}원 | {change})\n"
-                        kospi_msg += f"💬 {posts}개 의견\n"
-                        kospi_msg += f"📝 {summary}\n\n"
-                        
-                    if len(kospi_items) > 5: kospi_msg += f"<i>... and {len(kospi_items)-5} more on Dashboard</i>\n"
-                    tg_manager.send_message(kospi_msg)
-
-                # 2. KOSDAQ Report
-                kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
-                if kosdaq_items:
-                    kosdaq_msg = f"📈 <b>[KOSDAQ] Top {min(len(kosdaq_items), 5)} (토론 급등)</b>\n\n"
-                    for item in kosdaq_items[:5]: # Show Top 5
-                        name = item['종목명']
-                        try:
-                            price = f"{int(item.get('현재가', 0)):,}"
-                        except:
-                            price = item.get('현재가', '0')
-                            
-                        change = item['등락률']
-                        posts = item['당일_게시글수']
-                        summary = item.get('게시물_요약', '요약 없음')
-                        
-                        kosdaq_msg += f"🔥 <b>{name}</b> ({price}원 | {change})\n"
-                        kosdaq_msg += f"💬 {posts}개 의견\n"
-                        kosdaq_msg += f"📝 {summary}\n\n"
-
-                    if len(kosdaq_items) > 5: kosdaq_msg += f"<i>... and {len(kosdaq_items)-5} more on Dashboard</i>\n"
-                    tg_manager.send_message(kosdaq_msg)
-
-                # 3. Strategy Advisor Analysis & Report (V9.2)
-                try:
-                    advisor = StrategyAdvisor()
-                    print("[System] Generating Strategy Report...")
-                    
-                    report_text, analysis_results = advisor.generate_report(all_data)
-                    
-                    # Split report if too long
-                    if len(report_text) > 3500:
-                         parts = [report_text[i:i+3500] for i in range(0, len(report_text), 3500)]
-                         for i, part in enumerate(parts):
-                             tg_manager.send_message(f"🧠 <b>[Strategic Guide {i+1}/{len(parts)}]</b>\n{part}")
-                    else:
-                        tg_manager.send_message(f"🧠 <b>[Strategic Guide]</b>\n{report_text}")
-                        
-                    # 4. Dashboard Link
-                    dash_msg = f"👉 <b>Dashboard</b>: {os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app')}"
-                    tg_manager.send_message(dash_msg)
-                    
-                except Exception as e:
-                    print(f"[ERROR] Strategy Advisor Failed: {e}")
-                    tg_manager.send_message(f"⚠️ <b>[System Error]</b>\n전략 리포트 생성 실패: {e}")
-                    
+                advisor = StrategyAdvisor()
+                print("[System] Generating Strategy Report...")
+                advisor_report_text, _ = advisor.generate_report(all_data)
             except Exception as e:
-                print(f"[ERROR] Notification Logic Failed: {e}")
-                
-        elif not all_data and tg_manager and should_send_telegram:
-            tg_manager.send_no_data_alert(threshold)
+                print(f"[ERROR] Strategy Advisor Failed: {type(e).__name__}: {e}")
+                advisor_report_text = f"[전략 리포트 생성 실패: {type(e).__name__}]"
+
+            # ── NotificationService 를 통한 전송 (Traceback 가시화 적용) ────────
+            report_success = False
+            if notif_service and notif_service.is_available:
+                report_success = notif_service.send_hourly_report(
+                    kospi_records=kospi_items,
+                    kosdaq_records=kosdaq_items,
+                    advisor_report_text=advisor_report_text,
+                    dashboard_url=os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app'),
+                )
+            elif tg_manager:
+                print("[System] Fallback: Using tg_manager directly.")
+                try:
+                    tg_manager.send_market_report('KOSPI', kospi_items)
+                    tg_manager.send_market_report('KOSDAQ', kosdaq_items)
+                    if advisor_report_text:
+                        tg_manager.send_message(f"🧠 <b>[Strategic Guide]</b>\n{advisor_report_text[:3500]}")
+                    report_success = True
+                except Exception:
+                    print("[Fallback] 전송 실패!")
+                    traceback.print_exc()
+
+            if not report_success:
+                print("\n[Scraper] ❌ [CRITICAL] 알림 전송 실패가 감지되었습니다. 로그를 확인하세요.")
+                # 알림이 치명적 기능이므로 실패 시 명시적으로 종료 코드 1 반환
+                sys.exit(1)
+            else:
+                print("[Scraper] ✅ 텔레그램 리포트 전송 완료.")
+
+        elif not all_data and should_send_telegram:
+            if notif_service and notif_service.is_available:
+                notif_service.send_no_data_alert(threshold)
+            elif tg_manager:
+                try:
+                    tg_manager.send_no_data_alert(threshold)
+                except Exception as e:
+                    print(f"[System] No-data alert 전송 실패: {e}")
         elif not should_send_telegram:
-            print(f"[System] Skipped Telegram notification because current time ({now_kst.strftime('%H:%M')}) is not top of the hour.")
+            print(f"[System] Skipped notification (not top of hour): {now_kst.strftime('%H:%M')}")
 
         # --- 4. Gemini Portfolio Simulator (Regime-Aware & Static Model) ---
         print("\n[System] Entering Gemini Portfolio Simulator...")

@@ -316,7 +316,7 @@ export default function TradePage() {
                     });
                     if (res.data.success) {
                         const odno = res.data.data.ODNO;
-                        showNotify('Success', `주문 송신됨 No: ${odno}`, 'teal');
+                        // Removed early showNotify 'Success' to rely only on actual order_status.json polling
                         fetchBalance(); // Refresh
                         if (odno) setTrackingOrders(prev => [...prev, odno]);
                     }
@@ -815,8 +815,8 @@ export default function TradePage() {
                         </Stack>
 
                         <Tabs.Panel value="immediate" pt="md">
-                            <Button fullWidth size="lg" loading={orderLoading} onClick={() => handleOrder(false)}>
-                                Submit Order
+                            <Button fullWidth size="lg" loading={orderLoading} onClick={() => handleOrder(false)} disabled={orderLoading}>
+                                {orderLoading ? '처리 중...' : 'Submit Order'}
                             </Button>
                             
                             {/* Live Status Trackers */}
@@ -832,7 +832,7 @@ export default function TradePage() {
                                                       status === 'PROCESSING' ? 'blue' : 'gray';
                                         const label = status === 'SUCCESS' ? '체결 완료' : 
                                                       status === 'FAILED' ? '거절/오류' : 
-                                                      status === 'PROCESSING' ? '모바일 접수' : '송신됨 (대기 중)';
+                                                      status === 'PROCESSING' ? '모바일 접수' : '명령 송신 완료 (모바일 응답 대기 중...)';
                                         
                                         return (
                                             <Paper key={odno} p="xs" withBorder>
@@ -855,8 +855,8 @@ export default function TradePage() {
                             <Text size="xs" c="dimmed" mt="xs">
                                 * Local browser reservation.
                             </Text>
-                            <Button fullWidth size="lg" mt="md" color="violet" loading={orderLoading} onClick={() => handleOrder(true)}>
-                                Schedule Order
+                            <Button fullWidth size="lg" mt="md" color="violet" loading={orderLoading} onClick={() => handleOrder(true)} disabled={orderLoading}>
+                                {orderLoading ? '처리 중...' : 'Schedule Order'}
                             </Button>
                         </Tabs.Panel>
                     </Tabs>

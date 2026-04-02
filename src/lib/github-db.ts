@@ -40,12 +40,14 @@ export async function fetchFile<T>(path: string): Promise<{ data: T | null, sha:
     }
 
     try {
-        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?ref=${BRANCH}`;
+        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?ref=${BRANCH}&t=${Date.now()}`;
         const res = await axios.get<GitHubFileResponse>(url, {
             headers: {
                 'Authorization': `Bearer ${GITHUB_TOKEN}`,
                 'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'StockBot-Vercel/1.0 (https://github.com/hoonnamkoong/stockbot)'
+                'User-Agent': 'StockBot-Vercel/1.0 (https://github.com/hoonnamkoong/stockbot)',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
             }
         });
 

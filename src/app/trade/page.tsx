@@ -323,7 +323,7 @@ export default function TradePage() {
                     });
                     if (res.data.success) {
                         const odno = res.data.data.ODNO;
-                        // Removed early showNotify 'Success' to rely only on actual order_status.json polling
+                        showNotify('명령 송신 완료', '명령이 모바일로 전송되었습니다. 체결 결과를 기다립니다.', 'blue');
                         fetchBalance(); // Refresh
                         if (odno) setTrackingOrders(prev => [...prev, odno]);
                     }

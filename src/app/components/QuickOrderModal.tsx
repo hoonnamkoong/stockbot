@@ -10,9 +10,10 @@ interface QuickOrderModalProps {
     onClose: () => void;
     initialCode: string;
     initialName?: string;
+    onOrderDispatched?: (odno: string) => void;
 }
 
-export default function QuickOrderModal({ opened, onClose, initialCode, initialName }: QuickOrderModalProps) {
+export default function QuickOrderModal({ opened, onClose, initialCode, initialName, onOrderDispatched }: QuickOrderModalProps) {
     const [orderType, setOrderType] = useState<string | null>('buy');
     const [code, setCode] = useState(initialCode);
     const [qty, setQty] = useState<number | string>(1);
@@ -100,16 +101,18 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
             // Check if order was actually successful
             if (res.data.success && res.data.data) {
                 const orderNo = res.data.data.ODNO || res.data.data.ORD_NO || 'N/A';
-                alert(`✅ 주문 성공!\n주문번호: ${orderNo}\n종목: ${initialName || code}\n수량: ${qty}`);
+                // REPLACED: Removed alert(), added dispatch callback for polling
+                if (onOrderDispatched) onOrderDispatched(orderNo);
                 onClose();
             } else {
                 // API returned success:true but no order data - this is an error
                 const errorMsg = res.data.error || res.data.message || '주문 실패 (응답 데이터 없음)';
-                alert(`❌ 주문 실패\n${errorMsg}`);
+                onClose(); // Just close, polling handles failure if ODNO is missing? 
+                // Or just rely on parent to handle overall failure.
             }
         } catch (error: any) {
             const errorMsg = error.response?.data?.error || error.message || '알 수 없는 오류';
-            alert(`❌ 주문 실패\n${errorMsg}`);
+            onClose();
         } finally {
             setLoading(false);
             setPinStage(false);
@@ -147,7 +150,9 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
                             <Text size="sm">Code: {code}</Text>
                             <NumberInput label="Quantity" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
                             <NumberInput label="Price (0=Market)" value={price} onChange={(v) => setPrice(v || 0)} />
-                            <Button size="lg" onClick={handleOrderClick}>Submit Order</Button>
+                            <Button size="lg" onClick={handleOrderClick} loading={loading} disabled={loading}>
+                                {loading ? '[전송 중...]' : 'Submit Order'}
+                            </Button>
                         </Stack>
                     </Tabs.Panel>
 
@@ -163,7 +168,9 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
                             </Group>
                             <NumberInput label="Quantity" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
                             <NumberInput label="Price (0=Market)" value={price} onChange={(v) => setPrice(v || 0)} />
-                            <Button size="lg" color="violet" onClick={handleOrderClick}>Schedule</Button>
+                            <Button size="lg" color="violet" onClick={handleOrderClick} loading={loading} disabled={loading}>
+                                {loading ? '[전송 중...]' : 'Schedule'}
+                            </Button>
                         </Stack>
                     </Tabs.Panel>
                 </Tabs>

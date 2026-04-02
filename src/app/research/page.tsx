@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover, Grid, Flex, SegmentedControl, Divider, ActionIcon, Checkbox } from '@mantine/core';
-import { useDisclosure, useMediaQuery } from '@mantine/hooks';
+import { AppShell, Burger, Group, Title, Button, Table, Text, Badge, Modal, useMantineTheme, ScrollArea, Tabs, PasswordInput, Paper, UnstyledButton, Center, Tooltip, Popover, Grid, Flex, SegmentedControl, Divider, ActionIcon, Checkbox, Notification } from '@mantine/core';
+import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import { IconRefresh, IconRobot, IconNews, IconCheck, IconSelector, IconChevronUp, IconChevronDown, IconSettings, IconCoin, IconCopy } from '@tabler/icons-react';
 import QuickOrderModal from '../components/QuickOrderModal';
+import axios from 'axios';
 import { clsx } from 'clsx';
 import { signOut } from 'next-auth/react';
 
@@ -157,6 +158,48 @@ export default function Home() {
     // Quick Order State
     const [quickOrderOpen, setQuickOrderOpen] = useState(false);
     const [selectedQuickStock, setSelectedQuickStock] = useState<{ code: string, name: string }>({ code: '', name: '' });
+    const [notification, setNotification] = useState<{ title: string, msg: string, color: string } | null>(null);
+    const [trackingOrders, setTrackingOrders] = useState<string[]>([]);
+    const [orderStatuses, setOrderStatuses] = useState<Record<string, any>>({});
+    const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
+
+    const showNotify = (title: string, msg: string, color: string) => {
+        setNotification({ title, msg, color });
+        setTimeout(() => setNotification(null), 5000);
+    };
+
+    // [Real-time Status Feed] Poll order_status.json every 5 seconds
+    const orderStatusPoller = useInterval(async () => {
+        if (trackingOrders.length === 0) return;
+        try {
+            const res = await axios.get(`/api/trade/order-status?t=${Date.now()}`);
+            const data = res.data.data;
+            if (data) {
+                setOrderStatuses(data);
+                trackingOrders.forEach(odno => {
+                    const obj = data[odno];
+                    if (obj) {
+                        const statusKey = `${odno}-${obj.status}`;
+                        if (!notifiedOrders.has(statusKey)) {
+                            if (obj.status === 'SUCCESS') showNotify('체결 성공 ✅', `주문번호: ${odno}`, 'teal');
+                            else if (obj.status === 'FAILED') showNotify('주문 실패 ❌', `${obj.msg || '알 수 없는 오류'}`, 'red');
+                            else if (obj.status === 'PROCESSING') showNotify('주문 진행 중 ⏳', '모바일에서 주문을 접수했습니다.', 'blue');
+                            
+                            setNotifiedOrders(prev => new Set(prev).add(statusKey));
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Status poll error', e);
+        }
+    }, 5000);
+
+    useEffect(() => {
+        if (trackingOrders.length > 0) orderStatusPoller.start();
+        else orderStatusPoller.stop();
+        return () => orderStatusPoller.stop();
+    }, [trackingOrders]);
 
     const handleCopyAndOpen = (code: string, name: string = '') => {
         navigator.clipboard.writeText(code);
@@ -520,7 +563,20 @@ export default function Home() {
                 onClose={() => setQuickOrderOpen(false)}
                 initialCode={selectedQuickStock.code}
                 initialName={selectedQuickStock.name}
+                onOrderDispatched={(odno) => {
+                    showNotify('명령 송신 완료', '명령이 모바일로 전송되었습니다. 체결 결과를 기다립니다.', 'blue');
+                    if (odno) setTrackingOrders(prev => [...prev, odno]);
+                }}
             />
+            {notification && (
+                <Notification
+                    title={notification.title} color={notification.color}
+                    onClose={() => setNotification(null)}
+                    style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}
+                >
+                    {notification.msg}
+                </Notification>
+            )}
             <AppShell.Header>
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />

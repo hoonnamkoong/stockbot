@@ -11,20 +11,9 @@ let ACCESS_TOKEN: string | null = null;
 let EXPIRES_AT: number = 0;
 let TOKEN_PROMISE: Promise<string | null> | null = null;
 
-const FALLBACK_SECRET = 'wEOi2vMr/kQMdpdoQC3z/PFNlPvhY+HZul6PtrLbVT4hZxOR2fS6CGz/bFCX6xFgqSMRhawS7GvQFusddAybQpU8LBthxAaq1LWozlsNC7FkrWeV4z32bLod+oIK5Ae7du/0mQx6DHYgfCw9gwN5V7VX83r1uDa/HvDY4FwQS4GX59Ihmqw=';
-const FALLBACK_ACCOUNT = '43719326-01';
-
-let KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').replace(/[\r\n\s]+/g, '');
-if (!KIS_APP_SECRET || KIS_APP_SECRET.length < 100) {
-    KIS_APP_SECRET = FALLBACK_SECRET;
-}
-
+const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').replace(/[\r\n\s]+/g, '');
 const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').replace(/[\r\n\s]+/g, '');
-
-let KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').replace(/[\r\n\s]+/g, '');
-if (!KIS_ACCOUNT_NO || KIS_ACCOUNT_NO === '-01') {
-    KIS_ACCOUNT_NO = FALLBACK_ACCOUNT;
-}
+const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').replace(/[\r\n\s]+/g, '');
 
 const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443').replace(/[\r\n\s]+/g, '');
 

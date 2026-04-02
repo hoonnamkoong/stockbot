@@ -10,7 +10,7 @@ def load_env(env_path=None):
         env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 
     if not os.path.exists(env_path):
-        print(f"Error: .env file not found at {env_path}")
+        pass # 파일이 없으면 에러를 뱉지 말고 자연스럽게 넘어감
         return
     with open(env_path, 'r', encoding='utf-8') as f:
         for line in f:

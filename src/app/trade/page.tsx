@@ -138,7 +138,14 @@ export default function TradePage() {
     const fetchReservations = async () => {
         try {
             const res = await axios.get('/api/trade/reservation');
-            setReservations(res.data.reservations || []);
+            const resList = res.data.reservations || [];
+            setReservations(resList);
+
+            // Auto-track reservations that are dispatched but not yet reported as complete
+            const dispatchedIds = resList.filter((r:any) => r.status === 'DISPATCHED').map((r:any) => r.id);
+            if (dispatchedIds.length > 0) {
+                setTrackingOrders(prev => Array.from(new Set([...prev, ...dispatchedIds])));
+            }
         } catch (error) {
             console.error("Failed to load reservations");
         }
@@ -569,11 +576,22 @@ export default function TradePage() {
                                         <Table.Th>Time</Table.Th>
                                         <Table.Th>Stock</Table.Th>
                                         <Table.Th>Type</Table.Th>
-                                        <Table.Th>Action</Table.Th>
+                                        <Table.Th>Status/Action</Table.Th>
                                     </Table.Tr>
                                 </Table.Thead>
                                 <Table.Tbody>
-                                    {reservations.map((r) => (
+                                    {reservations.map((r) => {
+                                        const liveStatus = orderStatuses[r.id];
+                                        const finalStatus = liveStatus?.status || r.status || 'RESERVED';
+
+                                        let statusColor = 'blue';
+                                        let statusLabel = '매매 예약 완료 (대기 중)';
+                                        
+                                        if (finalStatus === 'SUCCESS') { statusColor = 'teal'; statusLabel = '체결 성공'; }
+                                        else if (finalStatus === 'FAILED') { statusColor = 'red'; statusLabel = '체결 실패'; }
+                                        else if (finalStatus === 'DISPATCHED') { statusColor = 'yellow'; statusLabel = '명령 송신 완료 (모바일 응답 대기)'; }
+
+                                        return (
                                         <Table.Tr key={r.id}>
                                             <Table.Td>
                                                 {new Date(r.targetTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -586,12 +604,17 @@ export default function TradePage() {
                                             </Table.Td>
                                             <Table.Td>{Number(r.price) === 0 ? 'Mkt' : r.price}</Table.Td>
                                             <Table.Td>
-                                                <Button color="red" size="xs" variant="outline" onClick={() => cancelReservation(r.id)}>
-                                                    Cancel
-                                                </Button>
+                                                <Stack gap={5}>
+                                                    <Badge color={statusColor} variant="light">{statusLabel}</Badge>
+                                                    {(!r.status || r.status === 'RESERVED') && (
+                                                        <Button color="red" size="xs" variant="outline" onClick={() => cancelReservation(r.id)}>
+                                                            Cancel
+                                                        </Button>
+                                                    )}
+                                                </Stack>
                                             </Table.Td>
                                         </Table.Tr>
-                                    ))}
+                                    )})}
                                 </Table.Tbody>
                             </Table>
                         </ScrollArea>

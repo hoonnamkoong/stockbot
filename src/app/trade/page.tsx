@@ -61,8 +61,12 @@ export default function TradePage() {
     const [selectedHoldings, setSelectedHoldings] = useState<string[]>([]);
     const pinContainerRef = useRef<HTMLDivElement>(null);
 
-    // Reservations
     const [reservations, setReservations] = useState<any[]>([]);
+
+    // Order Status Polling loop (Closed-Loop)
+    const [orderStatuses, setOrderStatuses] = useState<Record<string, any>>({});
+    const [trackingOrders, setTrackingOrders] = useState<string[]>([]);
+    const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (pinModalOpen) {
@@ -193,6 +197,46 @@ export default function TradePage() {
         return () => schedulePoller.stop();
     }, []);
 
+    // [Real-time Status Feed] Poll order_status.json every 5 seconds
+    const orderStatusPoller = useInterval(async () => {
+        if (trackingOrders.length === 0) return;
+        try {
+            const res = await axios.get(`/api/trade/order-status?t=${Date.now()}`);
+            const data = res.data.data;
+            if (data) {
+                setOrderStatuses(data);
+                trackingOrders.forEach(odno => {
+                    const obj = data[odno];
+                    if (obj) {
+                        const statusKey = `${odno}-${obj.status}`;
+                        if (!notifiedOrders.has(statusKey)) {
+                            if (obj.status === 'SUCCESS') showNotify('체결 성공 ✅', `주문번호: ${odno}`, 'teal');
+                            else if (obj.status === 'FAILED') showNotify('주문 실패 ❌', `${obj.msg || '알 수 없는 오류'}`, 'red');
+                            else if (obj.status === 'PROCESSING') showNotify('주문 진행 중 ⏳', '모바일에서 주문을 접수했습니다.', 'blue');
+                            
+                            setNotifiedOrders(prev => new Set(prev).add(statusKey));
+                            if (obj.status === 'SUCCESS' || obj.status === 'FAILED') {
+                                fetchBalance(); // Refresh immediately on completion
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Status poll error', e);
+        }
+    }, 5000);
+
+    useEffect(() => {
+        // Start poller if there are things to track
+        if (trackingOrders.length > 0) {
+            orderStatusPoller.start();
+        } else {
+            orderStatusPoller.stop();
+        }
+        return () => orderStatusPoller.stop();
+    }, [trackingOrders]);
+
     const showNotify = (title: string, msg: string, color: string) => {
         setNotification({ title, msg, color });
         setTimeout(() => setNotification(null), 5000);
@@ -271,8 +315,10 @@ export default function TradePage() {
                         code, qty, price, side: orderType, pin
                     });
                     if (res.data.success) {
-                        showNotify('Success', `Order Placed! No: ${res.data.data.ODNO}`, 'teal');
+                        const odno = res.data.data.ODNO;
+                        showNotify('Success', `주문 송신됨 No: ${odno}`, 'teal');
                         fetchBalance(); // Refresh
+                        if (odno) setTrackingOrders(prev => [...prev, odno]);
                     }
                 }
             }
@@ -772,6 +818,33 @@ export default function TradePage() {
                             <Button fullWidth size="lg" loading={orderLoading} onClick={() => handleOrder(false)}>
                                 Submit Order
                             </Button>
+                            
+                            {/* Live Status Trackers */}
+                            {trackingOrders.length > 0 && (
+                                <Stack mt="md" gap="xs">
+                                    <Text size="sm" fw={500}>실시간 체결 결과 대기 중...</Text>
+                                    {trackingOrders.map(odno => {
+                                        const statusObj = orderStatuses[odno];
+                                        const status = statusObj?.status || 'PENDING';
+                                        
+                                        const color = status === 'SUCCESS' ? 'teal' : 
+                                                      status === 'FAILED' ? 'red' : 
+                                                      status === 'PROCESSING' ? 'blue' : 'gray';
+                                        const label = status === 'SUCCESS' ? '체결 완료' : 
+                                                      status === 'FAILED' ? '거절/오류' : 
+                                                      status === 'PROCESSING' ? '모바일 접수' : '송신됨 (대기 중)';
+                                        
+                                        return (
+                                            <Paper key={odno} p="xs" withBorder>
+                                                <Group justify="space-between">
+                                                    <Text size="xs">{odno}</Text>
+                                                    <Badge color={color} variant="light">{label}</Badge>
+                                                </Group>
+                                            </Paper>
+                                        );
+                                    })}
+                                </Stack>
+                            )}
                         </Tabs.Panel>
 
                         <Tabs.Panel value="reservation" pt="md">

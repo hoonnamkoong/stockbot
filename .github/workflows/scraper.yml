@@ -119,8 +119,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DASHBOARD_URL: "https://stockbot-phi.vercel.app"
           GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
-          FORCE_RUN: ${{ github.event.inputs.force_run }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          FORCE_RUN: "${{ github.event.inputs.force_run }}"
+          GITHUB_EVENT_NAME: "${{ github.event_name }}"
         run: |
           python scraper.py
 
@@ -132,6 +132,8 @@ jobs:
           KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
           KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_RUN: "${{ github.event.inputs.force_run }}"
+          GITHUB_EVENT_NAME: "${{ github.event_name }}"
         run: |
           python src/trade_executor.py
 

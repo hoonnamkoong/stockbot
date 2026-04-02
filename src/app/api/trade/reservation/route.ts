@@ -90,14 +90,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: `Target time (${timeStr}) has passed. Please choose a future time.` }, { status: 400 });
         }
 
-        const newRes = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        const newRes: any = {
+            id: `CMD_RSV_${Date.now()}`,
             code,
             qty: safeQty,
             price: safePrice,
             side: side || 'buy',
             targetTime: target.toISOString(),
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            status: 'RESERVED',
+            isExecuted: false
         };
 
         // Save to GitHub

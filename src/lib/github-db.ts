@@ -116,3 +116,14 @@ export async function appendCommand(command: any): Promise<boolean> {
         return false;
     }
 }
+
+// ORDER STATUS WRAPPERS (Hybrid Feedback Loop)
+const ORDER_STATUS_PATH = 'data/order_status.json';
+
+export async function fetchOrderStatus(): Promise<{ data: Record<string, any> | null, sha: string }> {
+    return await fetchFile<Record<string, any>>(ORDER_STATUS_PATH);
+}
+
+export async function updateOrderStatus(newStatusDict: Record<string, any>, sha?: string): Promise<boolean> {
+    return await saveFile(ORDER_STATUS_PATH, newStatusDict, "Update order status from mobile agent", sha);
+}

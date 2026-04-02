@@ -1,0 +1,102 @@
+import requests
+import json
+import os
+import pprint
+from auth import get_access_token, load_env
+
+def check_balance():
+    # 1. Get Token
+    access_token = get_access_token()
+    if not access_token:
+        return
+
+    # 2. Config
+    load_env()
+    app_key = os.environ.get("KIS_APP_KEY")
+    app_secret = os.environ.get("KIS_APP_SECRET")
+    account_no_full = os.environ.get("KIS_ACCOUNT_NO") # 50158945-01
+    base_url = os.environ.get("KIS_BASE_URL")
+    
+    if not account_no_full:
+        print("Error: Account No missing.")
+        return
+
+    # Split Account No (Front 8 digits, Back 2 digits)
+    # Assumes format "12345678-01" or "1234567801"
+    clean_acc = account_no_full.replace('-', '')
+    cano = clean_acc[:8]
+    acnt_prdt_cd = clean_acc[8:]
+
+    # Determine TR ID based on URL (Real vs Virtual)
+    # Real: TTTC8434R, Virtual: VTTC8434R
+    is_virtual = "vts" in base_url.lower()
+    tr_id = "VTTC8434R" if is_virtual else "TTTC8434R"
+
+    headers = {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {access_token}",
+        "appkey": app_key,
+        "appsecret": app_secret,
+        "tr_id": tr_id,
+        "custtype": "P", # Personal
+    }
+    
+    params = {
+        "CANO": cano,
+        "ACNT_PRDT_CD": acnt_prdt_cd,
+        "AFHR_FLPR_YN": "N",
+        "OFL_YN": "N",
+        "INQR_DVSN": "02", # 01: Loan, 02: Evaluated Balance
+        "UNPR_DVSN": "01",
+        "FUND_STTL_ICLD_YN": "N",
+        "FNCG_AMT_AUTO_RDPT_YN": "N",
+        "PRCS_DVSN": "00",
+        "CTX_AREA_FK100": "",
+        "CTX_AREA_NK100": ""
+    }
+    
+    url = f"{base_url}/uapi/domestic-stock/v1/trading/inquire-balance"
+
+    print(f"\n[Balance] Checking Account {cano}-{acnt_prdt_cd}...")
+    
+    try:
+        res = requests.get(url, headers=headers, params=params)
+
+        
+        if res.status_code == 200:
+            data = res.json()
+            # pprint.pprint(data)
+            
+            if data['rt_cd'] == '0':
+                output1 = data.get('output1', []) # Holdings
+                output2 = data.get('output2', []) # Summary
+                
+                print(f"=== Account Summary ===")
+                # output2 is normally a list of 1 dict or just dict? API docs say list usually.
+                if output2:
+                    summary = output2[0]
+                    total_asset = summary.get('tot_evlu_amt', '0')
+                    deposit = summary.get('dnca_tot_amt', '0')
+                    profit = summary.get('evlu_pfls_smtl_amt', '0')
+                    print(f"Total Asset: {total_asset} KRW")
+                    print(f"Deposit (Cash): {deposit} KRW")
+                    print(f"Total Profit/Loss: {profit} KRW")
+                
+                print(f"\n=== Holdings ({len(output1)}) ===")
+                for item in output1:
+                    name = item.get('prdt_name')
+                    qty = item.get('hldg_qty')
+                    cur_price = item.get('prpr')
+                    p_rate = item.get('evlu_pfls_rt')
+                    print(f"[{name}] Qty: {qty}, Price: {cur_price}, P/L: {p_rate}%")
+                    
+            else:
+                print(f"API Error: {data['msg1']} (Code: {data['msg_cd']})")
+        else:
+            print(f"HTTP Error {res.status_code}: {res.text}")
+            
+    except Exception as e:
+        print(f"Exception: {e}")
+
+if __name__ == "__main__":
+    check_balance()

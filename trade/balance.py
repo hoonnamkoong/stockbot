@@ -1,34 +1,43 @@
 import requests
 import json
 import os
-import pprint
+import sys
+import traceback
 from auth import get_access_token, load_env
 
 def check_balance():
     # 1. Get Token
-    access_token = get_access_token()
-    if not access_token:
-        return
+    try:
+        access_token = get_access_token()
+        if not access_token:
+            print("[Balance] ❌ Access Token 발급 실패.")
+            sys.exit(1)
+    except Exception:
+        print("[Balance] ❌ 토큰 발급 중 예외 발생")
+        traceback.print_exc()
+        sys.exit(1)
 
     # 2. Config
     load_env()
     app_key = os.environ.get("KIS_APP_KEY")
     app_secret = os.environ.get("KIS_APP_SECRET")
-    account_no_full = os.environ.get("KIS_ACCOUNT_NO") # 50158945-01
+    account_no_full = os.environ.get("KIS_ACCOUNT_NO", "").strip()
     base_url = os.environ.get("KIS_BASE_URL")
     
     if not account_no_full:
-        print("Error: Account No missing.")
-        return
+        print("[Balance] ❌ KIS_ACCOUNT_NO 환경 변수가 없습니다.")
+        sys.exit(1)
 
-    # Split Account No (Front 8 digits, Back 2 digits)
-    # Assumes format "12345678-01" or "1234567801"
-    clean_acc = account_no_full.replace('-', '')
+    # ─── 계좌번호 파싱 (8자리-2자리 엄격 분리) ───
+    clean_acc = account_no_full.replace('-', '').replace(' ', '')
+    if len(clean_acc) < 10:
+        print(f"[Balance] ❌ 계좌번호 형식이 올바르지 않습니다 (10자리 미만: {account_no_full})")
+        sys.exit(1)
+        
     cano = clean_acc[:8]
-    acnt_prdt_cd = clean_acc[8:]
+    acnt_prdt_cd = clean_acc[8:10] # 정확히 2자리만 사용
 
-    # Determine TR ID based on URL (Real vs Virtual)
-    # Real: TTTC8434R, Virtual: VTTC8434R
+    # Determine TR ID
     is_virtual = "vts" in base_url.lower()
     tr_id = "VTTC8434R" if is_virtual else "TTTC8434R"
 
@@ -38,7 +47,7 @@ def check_balance():
         "appkey": app_key,
         "appsecret": app_secret,
         "tr_id": tr_id,
-        "custtype": "P", # Personal
+        "custtype": "P",
     }
     
     params = {
@@ -46,7 +55,7 @@ def check_balance():
         "ACNT_PRDT_CD": acnt_prdt_cd,
         "AFHR_FLPR_YN": "N",
         "OFL_YN": "N",
-        "INQR_DVSN": "02", # 01: Loan, 02: Evaluated Balance
+        "INQR_DVSN": "02",
         "UNPR_DVSN": "01",
         "FUND_STTL_ICLD_YN": "N",
         "FNCG_AMT_AUTO_RDPT_YN": "N",
@@ -55,45 +64,48 @@ def check_balance():
         "CTX_AREA_NK100": ""
     }
     
-    print(f"\n[Balance] Checking Account {cano}-{acnt_prdt_cd}...")
+    url = f"{base_url}/uapi/domestic-stock/v1/trading/inquire-balance"
+
+    print(f"\n[Balance] API 호출 시도: {cano}-{acnt_prdt_cd} ({'모의' if is_virtual else '실전'})")
     
     try:
-        res = requests.get(url, headers=headers, params=params)
+        res = requests.get(url, headers=headers, params=params, timeout=10)
         
-        if res.status_code == 200:
-            data = res.json()
-            # pprint.pprint(data)
+        # HTTP 상태 코드 확인
+        if res.status_code != 200:
+            print(f"[Balance] ❌ HTTP Error {res.status_code}")
+            print(f"Response: {res.text}")
+            sys.exit(1)
             
-            if data['rt_cd'] == '0':
-                output1 = data.get('output1', []) # Holdings
-                output2 = data.get('output2', []) # Summary
-                
-                print(f"=== Account Summary ===")
-                # output2 is normally a list of 1 dict or just dict? API docs say list usually.
-                if output2:
-                    summary = output2[0]
-                    total_asset = summary.get('tot_evlu_amt', '0')
-                    deposit = summary.get('dnca_tot_amt', '0')
-                    profit = summary.get('evlu_pfls_smtl_amt', '0')
-                    print(f"Total Asset: {total_asset} KRW")
-                    print(f"Deposit (Cash): {deposit} KRW")
-                    print(f"Total Profit/Loss: {profit} KRW")
-                
-                print(f"\n=== Holdings ({len(output1)}) ===")
-                for item in output1:
-                    name = item.get('prdt_name')
-                    qty = item.get('hldg_qty')
-                    cur_price = item.get('prpr')
-                    p_rate = item.get('evlu_pfls_rt')
-                    print(f"[{name}] Qty: {qty}, Price: {cur_price}, P/L: {p_rate}%")
-                    
-            else:
-                print(f"API Error: {data['msg1']} (Code: {data['msg_cd']})")
-        else:
-            print(f"HTTP Error {res.status_code}: {res.text}")
+        data = res.json()
+        
+        # KIS API 로직 응답 확인 (rt_cd)
+        if data.get('rt_cd') != '0':
+            msg = data.get('msg1', 'Unknown Error')
+            code = data.get('msg_cd', 'NoCode')
+            print(f"[Balance] ❌ KIS API Error: {msg} (Code: {code})")
+            # 상세 응답 본문 출력 (보안 주의: 민감 정보 제거 확인됨)
+            sys.exit(1)
+
+        # 성공 시 데이터 처리
+        output1 = data.get('output1', [])
+        output2 = data.get('output2', [])
+        
+        print(f"=== Account Summary ===")
+        if output2:
+            summary = output2[0]
+            print(f"Total Asset: {summary.get('tot_evlu_amt', '0')} KRW")
+            print(f"Deposit: {summary.get('dnca_tot_amt', '0')} KRW")
+            print(f"Total Profit/Loss: {summary.get('evlu_pfls_smtl_amt', '0')} KRW")
+        
+        print(f"\n=== Holdings ({len(output1)}) ===")
+        for item in output1:
+            print(f"[{item.get('prdt_name')}] Qty: {item.get('hldg_qty')}, Price: {item.get('prpr')}, P/L: {item.get('evlu_pfls_rt')}%")
             
     except Exception as e:
-        print(f"Exception: {e}")
+        print(f"[Balance] ❌ 예상치 못한 예외 발생")
+        traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     check_balance()

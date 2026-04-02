@@ -25,8 +25,8 @@ from datetime import datetime, timedelta, timezone
 def get_access_token(force_refresh=False):
     load_env()
     
-    app_key = os.environ.get("KIS_APP_KEY")
-    app_secret = os.environ.get("KIS_APP_SECRET")
+    app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
+    app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
     base_url = os.environ.get("KIS_BASE_URL", "https://openapivts.koreainvestment.com:29443")
     
     # Path to shared token file (sync with src/lib/kis-api.ts)
@@ -133,8 +133,13 @@ def get_access_token(force_refresh=False):
 
     # Determine URL (Real vs Virtual)
     url = f"{base_url}/oauth2/tokenP"
-    headers = { "content-type": "application/json" }
-    body = {
+    
+    # [긴급 지시] 확실한 헤더 명시 및 JSON 전송 규격화
+    headers = { 
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json"
+    }
+    payload = {
         "grant_type": "client_credentials",
         "appkey": app_key,
         "appsecret": app_secret
@@ -143,7 +148,8 @@ def get_access_token(force_refresh=False):
     print(f"Requesting NEW token from KIS ({'Virtual' if 'vts' in base_url.lower() else 'Real'})...")
     print(f"[Debug] Request URL: {url}")
     try:
-        res = requests.post(url, headers=headers, data=json.dumps(body), timeout=10)
+        # data=json.dumps 대신 더 안전하고 권장되는 json= 파라미터 사용
+        res = requests.post(url, headers=headers, json=payload, timeout=10)
         
         # [긴급 지시] 응답 본문 강제 노출
         print(f"[Debug] KIS Response Status: {res.status_code}")
@@ -153,6 +159,9 @@ def get_access_token(force_refresh=False):
             try:
                 data = res.json()
             except Exception as json_err:
+                # [로직 방어] HTML 반환 시 가시적인 원인 분석 노출
+                if "<html" in res.text.lower() or "<h1>error" in res.text.lower():
+                    print(f"[Debug] ❌ KIS 서버 게이트웨이 에러: 요청 포맷 또는 IP 차단 의심")
                 print(f"[Debug] ❌ JSON 파싱 에러 발생: {json_err}. 위 Response Text를 확인하세요.")
                 return None
                 

@@ -101,3 +101,18 @@ export async function fetchReservations(): Promise<{ list: Reservation[], sha: s
 export async function updateReservations(newList: Reservation[], message: string, sha?: string): Promise<boolean> {
     return saveFile(RESERVATIONS_PATH, newList, message, sha);
 }
+
+// COMMAND SPECIFIC WRAPPERS
+const COMMANDS_PATH = 'data/commands.json';
+
+export async function appendCommand(command: any): Promise<boolean> {
+    try {
+        const { data, sha } = await fetchFile<any[]>(COMMANDS_PATH);
+        const list = data || [];
+        list.push({ ...command, timestamp: new Date().toISOString() });
+        return await saveFile(COMMANDS_PATH, list, "Append trade command");
+    } catch (error) {
+        console.error("[GitHubDB] Failed to append command", error);
+        return false;
+    }
+}

@@ -25,6 +25,21 @@ if (!KIS_ACCOUNT_NO || KIS_ACCOUNT_NO === '-01') {
 
 const KIS_BASE_URL = (process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443').replace(/[\r\n\s]+/g, '');
 
+// [Emergency Fix] WAF Bypass Headers
+const WAF_HEADERS = {
+  "Content-Type": "application/json; charset=utf-8",
+  "Accept": "application/json, text/plain, */*",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Origin": "https://openapi.koreainvestment.com:9443",
+  "Referer": "https://openapi.koreainvestment.com:9443/",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Connection": "keep-alive",
+  "Sec-Fetch-Dest": "empty",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Site": "cross-site",
+  "Cache-Control": "no-cache"
+};
+
 console.log('[KIS Init] Final Environment:', {
     hasAppKey: !!KIS_APP_KEY,
     hasAppSecret: !!KIS_APP_SECRET,
@@ -125,10 +140,7 @@ async function getAccessToken(forceRefresh = false): Promise<string | null> {
             };
 
             const res = await axios.post(url, body, {
-                headers: { 
-                    'Content-Type': 'application/json; charset=utf-8',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
+                headers: { ...WAF_HEADERS }
             });
 
             // [Emergency Fix] HTML/Text Response Handler
@@ -205,13 +217,12 @@ export async function getBalance(): Promise<BalanceData | null> {
     const tr_id = isVTS ? "VTTC8434R" : "TTTC8434R";
     
     const headers = {
-        "content-type": "application/json; charset=utf-8",
+        ...WAF_HEADERS,
         "authorization": `Bearer ${token}`,
         "appkey": KIS_APP_KEY,
         "appsecret": KIS_APP_SECRET,
         "tr_id": tr_id,
-        "custtype": "P",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "custtype": "P"
     };
 
     // Try multiple INQR_DVSN if needed
@@ -332,14 +343,13 @@ export async function placeOrder(code: string, qty: number, price: number, side:
     const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`;
 
     const headers = {
-        "content-type": "application/json; charset=utf-8",
+        ...WAF_HEADERS,
         "authorization": `Bearer ${token}`,
         "appkey": KIS_APP_KEY,
         "appsecret": KIS_APP_SECRET,
         "tr_id": tr_id,
         "custtype": "P",
-        "hashkey": "",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "hashkey": ""
     };
 
     const ord_dvsn = price === 0 ? "01" : "00";

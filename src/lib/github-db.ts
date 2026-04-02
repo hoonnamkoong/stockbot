@@ -41,7 +41,13 @@ export async function fetchFile<T>(path: string): Promise<{ data: T | null, sha:
         });
 
         const content = Buffer.from(res.data.content, 'base64').toString('utf-8');
-        return { data: JSON.parse(content), sha: res.data.sha };
+        let parsedData = null;
+        try {
+            parsedData = JSON.parse(content);
+        } catch (parseError: any) {
+            console.warn(`[GitHubDB] JSON parse error for ${path}: ${parseError.message}. Returning null data.`);
+        }
+        return { data: parsedData, sha: res.data.sha };
     } catch (error: any) {
         if (error.response?.status === 404) {
             return { data: null, sha: '' };

@@ -35,7 +35,7 @@ SCRAPER_REQUIRED = {
 # trade_executor.py / KIS API 에 필요한 시크릿
 TRADE_REQUIRED = {
     'DASHBOARD_URL': 'Vercel API Base URL (프록시 용)',
-    'TRADE_PIN':     'Vercel API 매매 승인 핀 번호',
+    'WEBHOOK_SECRET': 'Vercel API 매매 웹훅 통신용 시크릿',
 }
 
 

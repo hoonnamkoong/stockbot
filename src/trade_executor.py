@@ -29,7 +29,7 @@ def _validate_trade_env_strict() -> bool:
         return True
     except ImportError:
         # 폴백: 직접 검증 (Vercel Proxy 용)
-        required = ['TRADE_PIN', 'DASHBOARD_URL']
+        required = ['WEBHOOK_SECRET', 'DASHBOARD_URL']
         for k in required:
             if not os.environ.get(k):
                 print(f"[TradeExecutor] ❌ 필수 환경 변수 누락: {k}")
@@ -44,13 +44,13 @@ def _validate_trade_env_strict() -> bool:
 import requests
 
 def place_order_via_vercel(side, code, qty, price):
-    trade_pin = os.environ.get("TRADE_PIN")
+    webhook_secret = os.environ.get("WEBHOOK_SECRET")
     dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
     url = f"{dashboard_url}/api/trade"
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {trade_pin}"
+        "Authorization": f"Bearer {webhook_secret}"
     }
     payload = {
         "side": side,

@@ -113,12 +113,12 @@ class GeminiTrader:
                     
                     # [Vercel Proxy] 매도 웹훅 발송
                     try:
-                        trade_pin = os.environ.get("TRADE_PIN", "")
+                        webhook_secret = os.environ.get("WEBHOOK_SECRET", "")
                         dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
                         url = f"{dashboard_url}/api/trade"
-                        if trade_pin:
+                        if webhook_secret:
                             payload = {"side": "sell", "code": code, "qty": h['qty'], "price": current_price}
-                            requests.post(url, headers={"Authorization": f"Bearer {trade_pin}"}, json=payload, timeout=5)
+                            requests.post(url, headers={"Authorization": f"Bearer {webhook_secret}"}, json=payload, timeout=5)
                             print(f"    -> Vercel 매도 요청 완료: {code}")
                     except Exception as e:
                         print(f"    -> Vercel 매도 요청 실패: {e}")
@@ -220,12 +220,12 @@ class GeminiTrader:
                     
                     # [Vercel Proxy] 매수 웹훅 발송
                     try:
-                        trade_pin = os.environ.get("TRADE_PIN", "")
+                        webhook_secret = os.environ.get("WEBHOOK_SECRET", "")
                         dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
                         url = f"{dashboard_url}/api/trade"
-                        if trade_pin:
+                        if webhook_secret:
                             payload = {"side": "buy", "code": code, "qty": qty, "price": int(price)}
-                            requests.post(url, headers={"Authorization": f"Bearer {trade_pin}"}, json=payload, timeout=5)
+                            requests.post(url, headers={"Authorization": f"Bearer {webhook_secret}"}, json=payload, timeout=5)
                             print(f"    -> Vercel 매수 요청 완료: {code}")
                     except Exception as e:
                         print(f"    -> Vercel 매수 요청 실패: {e}")

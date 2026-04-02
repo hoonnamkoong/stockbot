@@ -302,7 +302,7 @@ export default function TradePage() {
                         failCount++;
                     }
                 }
-                showNotify('Bulk Action Complete', `Success: ${successCount}, Failed: ${failCount}`, 'teal');
+                showNotify('송신 완료', '명령이 모바일로 전송되었습니다. 체결 결과를 기다립니다.', 'blue');
                 fetchBalance();
                 if (bulkMode === 'reservation') {
                     fetchReservations(); // Refresh reservation list
@@ -315,7 +315,7 @@ export default function TradePage() {
                     const res = await axios.post('/api/trade/reservation', {
                         code, qty, price, hour: resHour, minute: resMin, side: orderType, pin
                     });
-                    showNotify('Success', res.data.message, 'green');
+                    showNotify('송신 완료', '명령이 모바일로 전송되었습니다. 체결 결과를 기다립니다.', 'blue');
                     fetchReservations(); // Refresh List
                 } else {
                     const res = await axios.post('/api/trade/order', {
@@ -839,7 +839,7 @@ export default function TradePage() {
 
                         <Tabs.Panel value="immediate" pt="md">
                             <Button fullWidth size="lg" loading={orderLoading} onClick={() => handleOrder(false)} disabled={orderLoading}>
-                                {orderLoading ? '처리 중...' : 'Submit Order'}
+                                {orderLoading ? '[전송 중...]' : 'Submit Order'}
                             </Button>
                             
                             {/* Live Status Trackers */}
@@ -879,7 +879,7 @@ export default function TradePage() {
                                 * Local browser reservation.
                             </Text>
                             <Button fullWidth size="lg" mt="md" color="violet" loading={orderLoading} onClick={() => handleOrder(true)} disabled={orderLoading}>
-                                {orderLoading ? '처리 중...' : 'Schedule Order'}
+                                {orderLoading ? '[전송 중...]' : 'Schedule Order'}
                             </Button>
                         </Tabs.Panel>
                     </Tabs>

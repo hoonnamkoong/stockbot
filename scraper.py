@@ -43,12 +43,12 @@ STOPWORDS = {
 class TelegramNotificationGuard:
     @staticmethod
     def should_send(now_kst):
-        is_top_of_hour = (0 <= now_kst.minute <= 5)
+        is_top_of_hour = (0 <= now_kst.minute <= 10)
         is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 55)
         
         # Event triggers: repository_dispatch, workflow_dispatch, or manual FORCE_RUN
-        is_forced = os.environ.get('FORCE_RUN', 'false').lower() == 'true'
-        event_name = os.environ.get('GITHUB_EVENT_NAME', 'unknown')
+        is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
+        event_name = os.environ.get('GITHUB_EVENT_NAME', 'unknown').strip()
         is_event_trigger = event_name in ['repository_dispatch', 'workflow_dispatch']
         
         # Decouple Time-based vs Event-based
@@ -634,7 +634,11 @@ def load_env_manual(filepath=".env.local"):
             for line in f:
                 if line.strip() and not line.startswith('#'):
                     key, val = line.strip().split('=', 1)
-                    os.environ[key] = val.strip().strip('"').strip("'")
+                    key = key.strip()
+                    val = val.strip().strip('"').strip("'")
+                    # 환경 변수가 시스템에 명시적으로 잡혀있지 않을 때만 설정 (일원화)
+                    if key not in os.environ:
+                        os.environ[key] = val
 
 # --- Helper Functions (Added for V6.7 Fix) ---
 def get_current_kst_time():
@@ -809,6 +813,10 @@ def append_to_monthly_report(df_kr, now_kst):
         return None, 0
 
 if __name__ == "__main__":
+    import time
+    start_time_perf = time.perf_counter()
+    print("[System] 스크래핑 프로세스 시작")
+
     # 0. Load Environment Variables & Validate [Grand Protocol v12]
     load_env_manual()
     
@@ -842,7 +850,7 @@ if __name__ == "__main__":
     current_hour = now_kst.hour
     
     # --- Force Run Support (V10.0) ---
-    force_run_env = os.environ.get('FORCE_RUN', 'false').lower() == 'true'
+    force_run_env = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
     
     if force_run_env:
         print("[System] FORCE_RUN=true detected. Threshold set to 1 and bypassing market check.")
@@ -1012,9 +1020,9 @@ if __name__ == "__main__":
             return None
 
     # Use ThreadPoolExecutor for Parallel Scraping
-    print(f"\n[System] Starting detailed analysis with Parallel Processing (Workers: 4)...")
+    print(f"\n[System] Starting detailed analysis with Parallel Processing (Workers: 10)...")
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         # Prepare arguments for map/submit
         # We need to pass stock, yesterday_codes, and threshold to each call
         future_to_stock = {
@@ -1360,6 +1368,10 @@ if __name__ == "__main__":
 
         # Auto-push is now handled by scraper.yml workflow for better security and stability.
         pass
+
+        end_time_perf = time.perf_counter()
+        elapsed_time = end_time_perf - start_time_perf
+        print(f"\n[System] 스크래핑 프로세스 완전 종료 (Execution Time: {elapsed_time:.2f} seconds)")
 
 
 

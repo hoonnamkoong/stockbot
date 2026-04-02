@@ -19,9 +19,9 @@ def check_balance():
 
     # 2. Config
     load_env()
-    app_key = os.environ.get("KIS_APP_KEY")
-    app_secret = os.environ.get("KIS_APP_SECRET")
-    account_no_full = os.environ.get("KIS_ACCOUNT_NO", "").strip()
+    app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
+    app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
+    account_no_full = os.environ.get("KIS_ACCOUNT_NO", "").strip().replace("\n", "")
     base_url = os.environ.get("KIS_BASE_URL")
     
     if not account_no_full:

@@ -101,6 +101,17 @@ def main():
     now_utc = datetime.now(timezone.utc)
     print(f"\n[TradeExecutor] 실행 — {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")
 
+    # --- KIS 잔고 조회 강제 실행 (사용자 긴급 지시) ---
+    print("\n[TradeExecutor] (강제 지시) KIS 계좌 잔고 조회 루틴 강제 실행...")
+    try:
+        from balance import check_balance
+        check_balance()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[TradeExecutor] KIS 잔고 조회 강제 실행 중 실패: {e}")
+    # ------------------------------------------------
+
     # 1. 환경 변수 엄격 검증
     if not _validate_trade_env_strict():
         print("[TradeExecutor] ❌ 치명적 오류: 환경 변수 미비. Workflow를 중단합니다.")

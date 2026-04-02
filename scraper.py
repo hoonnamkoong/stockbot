@@ -1203,6 +1203,8 @@ if __name__ == "__main__":
                 print("[System] Generating Strategy Report...")
                 advisor_report_text, _ = advisor.generate_report(all_data)
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"[ERROR] Strategy Advisor Failed: {type(e).__name__}: {e}")
                 advisor_report_text = f"[전략 리포트 생성 실패: {type(e).__name__}]"
 
@@ -1241,6 +1243,8 @@ if __name__ == "__main__":
                 try:
                     tg_manager.send_no_data_alert(threshold)
                 except Exception as e:
+                    import traceback
+                    traceback.print_exc()
                     print(f"[System] No-data alert 전송 실패: {e}")
         elif not should_send_telegram:
             print(f"[System] Skipped notification (not top of hour): {now_kst.strftime('%H:%M')}")
@@ -1342,7 +1346,10 @@ if __name__ == "__main__":
             traceback.print_exc()
 
     except Exception as e:
-        print(f"Failed in consolidated section: {e}")
+        print(f"\n[CRITICAL ERROR] Failed in consolidated section: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
     finally:

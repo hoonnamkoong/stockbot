@@ -141,10 +141,21 @@ def get_access_token(force_refresh=False):
     }
     
     print(f"Requesting NEW token from KIS ({'Virtual' if 'vts' in base_url.lower() else 'Real'})...")
+    print(f"[Debug] Request URL: {url}")
     try:
         res = requests.post(url, headers=headers, data=json.dumps(body), timeout=10)
+        
+        # [긴급 지시] 응답 본문 강제 노출
+        print(f"[Debug] KIS Response Status: {res.status_code}")
+        print(f"[Debug] KIS Response Text: {res.text}")
+
         if res.status_code == 200:
-            data = res.json()
+            try:
+                data = res.json()
+            except Exception as json_err:
+                print(f"[Debug] ❌ JSON 파싱 에러 발생: {json_err}. 위 Response Text를 확인하세요.")
+                return None
+                
             access_token = data.get('access_token')
             expires_in = data.get('expires_in', 86400) # 通常 24 hours
             

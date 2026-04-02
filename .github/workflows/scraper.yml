@@ -121,7 +121,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
-          TRADE_PIN: ${{ secrets.TRADE_PIN }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           python scraper.py
 
@@ -129,7 +129,7 @@ jobs:
         if: steps.market_check.outputs.is_market_closed == 'false'
         env:
           DASHBOARD_URL: "https://stockbot-phi.vercel.app"
-          TRADE_PIN: ${{ secrets.TRADE_PIN }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
           GITHUB_EVENT_NAME: "${{ github.event_name }}"

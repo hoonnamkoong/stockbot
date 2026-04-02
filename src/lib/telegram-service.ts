@@ -4,7 +4,7 @@ import axios from 'axios';
 const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || '').replace(/[\r\n\s]+/g, '');
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || '').replace(/[\r\n\s]+/g, '');
 
-export async function sendTelegramCommand(side: 'buy' | 'sell', code: string, qty: number, price: number): Promise<boolean> {
+export async function sendTelegramCommand(side: 'buy' | 'sell' | 'reserve_buy' | 'reserve_sell' | string, code: string, qty: number, price: number): Promise<boolean> {
     if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN.length < 10) {
         throw new Error('[Security Exception] TELEGRAM_BOT_TOKEN is missing or invalid in environment variables.');
     }

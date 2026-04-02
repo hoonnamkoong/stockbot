@@ -44,7 +44,8 @@ export async function fetchFile<T>(path: string): Promise<{ data: T | null, sha:
         const res = await axios.get<GitHubFileResponse>(url, {
             headers: {
                 'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json'
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'StockBot-Vercel/1.0 (https://github.com/hoonnamkoong/stockbot)'
             }
         });
 
@@ -95,7 +96,8 @@ export async function saveFile(path: string, data: any, message: string, sha?: s
         }, {
             headers: {
                 'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json'
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'StockBot-Vercel/1.0 (https://github.com/hoonnamkoong/stockbot)'
             }
         });
 

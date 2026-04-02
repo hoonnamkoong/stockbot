@@ -4,8 +4,14 @@ const REPO_OWNER = 'hoonnamkoong';
 const REPO_NAME = 'stockbot';
 const BRANCH = 'db-data';
 
-// Ensure GITHUB_PAT is set in Vercel Environment Variables
-const GITHUB_TOKEN = (process.env.GITHUB_PAT || '').replace(/[\r\n\s]+/g, '');
+// Ensure GITHUB_PAT is set and cleansed
+const GITHUB_TOKEN = (process.env.GITHUB_PAT || '').trim().replace(/[\r\n\s]+/g, '');
+
+if (!GITHUB_TOKEN) {
+    console.warn('[GitHubDB] WARNING: GITHUB_PAT is NOT SET or EMPTY.');
+} else {
+    console.log(`[GitHubDB] GITHUB_PAT detected (Cleaned, Length: ${GITHUB_TOKEN.length})`);
+}
 
 export interface Reservation {
     id: string;
@@ -52,9 +58,17 @@ export async function fetchFile<T>(path: string): Promise<{ data: T | null, sha:
         return { data: parsedData, sha: res.data.sha };
     } catch (error: any) {
         if (error.response?.status === 404) {
+            console.warn(`[GitHubDB] File NOT FOUND (404): ${path} on branch ${BRANCH}`);
             return { data: null, sha: '' };
         }
-        console.error(`[GitHubDB] Failed to fetch ${path}:`, error.message);
+        
+        if (error.response?.status === 401) {
+            console.error(`[GitHubDB] AUTHENTICATION FAILED (401): Check your GITHUB_PAT. Path: ${path}`);
+        } else if (error.response?.status === 403) {
+            console.error(`[GitHubDB] PERMISSION DENIED (403): Token might lack 'repo' scope. Path: ${path}`);
+        } else {
+            console.error(`[GitHubDB] Failed to fetch ${path} (${error.response?.status || 'Unknown'}):`, error.message);
+        }
         throw error;
     }
 }

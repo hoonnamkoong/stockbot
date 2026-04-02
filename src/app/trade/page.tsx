@@ -7,7 +7,7 @@ import {
     Table, Badge, Button, Tabs, TextInput, NumberInput,
     Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea
 } from '@mantine/core';
-import { IconCoin, IconClock, IconChartBar } from '@tabler/icons-react';
+import { IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, IconAlertTriangle } from '@tabler/icons-react';
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
 
@@ -68,6 +68,11 @@ export default function TradePage() {
     const [trackingOrders, setTrackingOrders] = useState<string[]>([]);
     const [notifiedOrders, setNotifiedOrders] = useState<Set<string>>(new Set());
 
+    // Diagnosis State
+    const [diagnosisModalOpen, setDiagnosisModalOpen] = useState(false);
+    const [diagnosisLoading, setDiagnosisLoading] = useState(false);
+    const [diagnosisResults, setDiagnosisResults] = useState<any>(null);
+
     useEffect(() => {
         if (pinModalOpen) {
             // "Shotgun" focus approach to guarantee input focus
@@ -103,24 +108,46 @@ export default function TradePage() {
         }
     };
 
-    const fetchBalance = async () => {
+    const fetchBalance = async (retryCount = 0) => {
         setLoading(true);
         try {
             // Add timestamp to prevent browser caching
             const res = await axios.get(`/api/trade/account-balance?t=${Date.now()}`);
             if (res.data.error) {
-                // API returned 200 but with error payload
-                console.error('[Trade] API Error:', res.data.error);
-                showNotify('API Error', res.data.error, 'red');
+                // API returned 200 but with error payload (e.g. "Waiting for sync")
+                if (res.data.sync_status === 'waiting') {
+                    setBalance(res.data); // This shows "Waiting for mobile sync" in UI
+                } else {
+                    console.error('[Trade] API Error:', res.data.error);
+                    showNotify('API Error', res.data.error, 'red');
+                }
             } else {
                 setBalance(res.data);
             }
         } catch (error: any) {
             console.error(error);
-            const detail = error.response?.data?.error || error.message || 'Unknown error';
-            showNotify('Fetch Error', `잔고 조회 실패: ${detail}`, 'red');
+            if (retryCount < 2) {
+                console.log(`Retrying fetchBalance... (${retryCount + 1})`);
+                setTimeout(() => fetchBalance(retryCount + 1), 2000);
+            } else {
+                const detail = error.response?.data?.error || error.message || 'Unknown error';
+                showNotify('Fetch Error', `잔고 조회 실패 (GitHub 확인 필요): ${detail}`, 'red');
+            }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const runDiagnosis = async () => {
+        setDiagnosisLoading(true);
+        setDiagnosisModalOpen(true);
+        try {
+            const res = await axios.get('/api/debug/test-connection');
+            setDiagnosisResults(res.data);
+        } catch (e: any) {
+            setDiagnosisResults({ error: e.message });
+        } finally {
+            setDiagnosisLoading(false);
         }
     };
 
@@ -211,7 +238,7 @@ export default function TradePage() {
             const res = await axios.get(`/api/trade/order-status?t=${Date.now()}`);
             const data = res.data.data;
             if (data) {
-                setOrderStatuses(data);
+                setOrderStatuses(prev => ({ ...prev, ...data })); // Merge for persistence
                 trackingOrders.forEach(odno => {
                     const obj = data[odno];
                     if (obj) {
@@ -223,14 +250,15 @@ export default function TradePage() {
                             
                             setNotifiedOrders(prev => new Set(prev).add(statusKey));
                             if (obj.status === 'SUCCESS' || obj.status === 'FAILED') {
-                                fetchBalance(); // Refresh immediately on completion
+                                setTimeout(() => fetchBalance(), 1000); // Trigger balance refresh
                             }
                         }
                     }
                 });
             }
-        } catch (e) {
-            console.error('Status poll error', e);
+        } catch (e: any) {
+            console.error('Status poll error', e.message);
+            // Don't stop poller on single error, just logout
         }
     }, 5000);
 
@@ -385,10 +413,55 @@ export default function TradePage() {
                 </Stack>
             </Modal>
 
+            <Modal opened={diagnosisModalOpen} onClose={() => setDiagnosisModalOpen(false)} title="System Diagnostics" size="md">
+                <LoadingOverlay visible={diagnosisLoading} />
+                <Stack>
+                    {diagnosisResults ? (
+                        <>
+                            <Paper withBorder p="xs">
+                                <Group justify="space-between">
+                                    <Text fw={500}>GitHub Connection</Text>
+                                    <Badge color={diagnosisResults.github?.status === 'ok' ? 'green' : (diagnosisResults.github?.status === 'warning' ? 'orange' : 'red')}>
+                                        {diagnosisResults.github?.status?.toUpperCase() || 'N/A'}
+                                    </Badge>
+                                </Group>
+                                <Text size="sm" c="dimmed" mt={4}>{diagnosisResults.github?.message}</Text>
+                            </Paper>
+                            <Paper withBorder p="xs">
+                                <Group justify="space-between">
+                                    <Text fw={500}>KIS API Tunnel</Text>
+                                    <Badge color={diagnosisResults.kis?.status === 'ok' ? 'green' : (diagnosisResults.kis?.status === 'blocked' ? 'orange' : 'red')}>
+                                        {diagnosisResults.kis?.status?.toUpperCase() || 'N/A'}
+                                    </Badge>
+                                </Group>
+                                <Text size="sm" c="dimmed" mt={4}>{diagnosisResults.kis?.message}</Text>
+                                {diagnosisResults.kis?.status === 'blocked' && (
+                                    <Text size="xs" color="orange" mt={5}>* Vercel IP 차단 중입니다. 주문은 모바일에서 처리되므로 정상이지만, 직접 시세 조회 등은 불가능할 수 있습니다.</Text>
+                                )}
+                            </Paper>
+                            <Paper withBorder p="xs" bg="gray.0">
+                                <Text size="xs" fw={700} mb={5}>Environment Check</Text>
+                                <Group gap="xs">
+                                    <Badge size="xs" color={diagnosisResults.env?.hasGithubPat ? 'green' : 'red'} variant="outline">GITHUB_PAT</Badge>
+                                    <Badge size="xs" color={diagnosisResults.env?.hasKisAppKey ? 'green' : 'red'} variant="outline">KIS_APP_KEY</Badge>
+                                    <Badge size="xs" color={diagnosisResults.env?.hasKisAppSecret ? 'green' : 'red'} variant="outline">KIS_SECRET</Badge>
+                                    <Badge size="xs" color={diagnosisResults.env?.hasKisAccNo ? 'green' : 'red'} variant="outline">KIS_ACC_NO</Badge>
+                                </Group>
+                            </Paper>
+                        </>
+                    ) : (
+                        <Text ta="center">진단 데이터를 불러오는 중...</Text>
+                    )}
+                    <Button fullWidth onClick={runDiagnosis}>Re-Run Diagnosis</Button>
+                </Stack>
+            </Modal>
+
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Trading</Title>
                 <Group gap={5}>
-                    {/* Mobile Deep Link with specific Intent */}
+                    <Button variant="light" color="indigo" size="sm" leftSection={<IconActivity size={20} />} onClick={runDiagnosis}>
+                        Check
+                    </Button>
                     <Button
                         component="a"
                         onClick={() => {
@@ -457,7 +530,7 @@ export default function TradePage() {
                             <Title order={3}>{balance?.deposit.toLocaleString()} 원</Title>
                         </Stack>
                         <Group gap="xs">
-                            <Button variant="light" size="xs" onClick={fetchBalance}>Refresh</Button>
+                            <Button variant="light" size="xs" onClick={() => fetchBalance()}>Refresh</Button>
                         </Group>
                     </Group>
 

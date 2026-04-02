@@ -34,10 +34,8 @@ SCRAPER_REQUIRED = {
 
 # trade_executor.py / KIS API 에 필요한 시크릿
 TRADE_REQUIRED = {
-    'KIS_APP_KEY':    'KIS 앱 키',
-    'KIS_APP_SECRET': 'KIS 앱 시크릿',
-    'KIS_ACCOUNT_NO': 'KIS 계좌번호',
-    'KIS_BASE_URL':   'KIS API Base URL',
+    'DASHBOARD_URL': 'Vercel API Base URL (프록시 용)',
+    'TRADE_PIN':     'Vercel API 매매 승인 핀 번호',
 }
 
 

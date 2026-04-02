@@ -121,20 +121,15 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
-          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
+          TRADE_PIN: ${{ secrets.TRADE_PIN }}
         run: |
           python scraper.py
 
       - name: Run Trade Executor (Reservations)
         if: steps.market_check.outputs.is_market_closed == 'false'
         env:
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
-          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
+          DASHBOARD_URL: "https://stockbot-phi.vercel.app"
+          TRADE_PIN: ${{ secrets.TRADE_PIN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
           GITHUB_EVENT_NAME: "${{ github.event_name }}"

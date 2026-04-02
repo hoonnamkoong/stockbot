@@ -12,10 +12,12 @@ export interface Reservation {
     code: string;
     qty: string;
     price: string;
-    side: 'buy' | 'sell';
+    side: 'buy' | 'sell' | string;
     targetTime: string;
     createdAt: string;
     pin?: string;
+    status?: 'RESERVED' | 'DISPATCHED' | 'SUCCESS' | 'FAILED';
+    isExecuted?: boolean;
 }
 
 interface GitHubFileResponse {

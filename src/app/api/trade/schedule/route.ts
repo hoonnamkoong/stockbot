@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchReservations, updateReservations } from '@/lib/github-db';
-import { placeOrder } from '@/lib/kis-api';
-
+import { sendTelegramCommand } from '@/lib/telegram-service';
 // Vercel Cron routes are GET
 export const dynamic = 'force-dynamic';
 
@@ -40,24 +39,38 @@ export async function GET(request: Request) {
                 continue; // Remove stale
             }
 
-            // Execute
-            console.log(`[Scheduler] Executing reservation ${res.id}: ${res.side} ${res.code}`);
+            // Execute Hybrid Mode
+            console.log(`[Scheduler] Dispatching reservation ${res.id}: ${res.side} ${res.code} via Telegram`);
             try {
-                const output = await placeOrder(res.code, Number(res.qty), Number(res.price), res.side);
-                executedIds.push(res.id);
-                results.push({ id: res.id, status: 'success', output });
+                // Determine telegram action
+                const mobileAction = res.side.toLowerCase() === 'buy' ? 'reserve_buy' : 'reserve_sell';
+                
+                // Send push
+                const success = await sendTelegramCommand(mobileAction, res.code, Number(res.qty), Number(res.price));
+                
+                if (success) {
+                    executedIds.push(res.id);
+                    res.status = 'DISPATCHED';
+                    res.isExecuted = true;
+                    remainingList.push(res); // Keep in list so UI picks up DISPATCHED status
+                    results.push({ id: res.id, status: 'dispatched', via: 'telegram' });
+                } else {
+                    throw new Error("Telegram dispatch returned false");
+                }
             } catch (e: any) {
                 const errorMsg = e.message || "Unknown Error";
-                console.error(`[Scheduler] Failed to execute ${res.id}:`, errorMsg);
+                console.error(`[Scheduler] Failed to dispatch ${res.id}:`, errorMsg);
                 failedIds.push(res.id);
-                remainingList.push(res); // Keep in list to retry
+                // Even if it failed to dispatch, maybe we should keep it around to retry or at least show FAILED.
+                res.status = 'FAILED';
+                remainingList.push(res); 
                 results.push({ id: res.id, status: 'failed', error: errorMsg });
             }
         }
 
         // Update GitHub
         let githubStatus = 'skipped';
-        if (executedIds.length > 0 || list.length !== remainingList.length) {
+        if (executedIds.length > 0 || failedIds.length > 0 || list.length !== remainingList.length) {
             const success = await updateReservations(remainingList, `Scheduler: Processed ${executedIds.length} orders`, sha);
             githubStatus = success ? 'updated' : 'failed_update';
             if (!success) {

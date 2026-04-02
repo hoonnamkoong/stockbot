@@ -5,7 +5,7 @@ const REPO_NAME = 'stockbot';
 const BRANCH = 'db-data';
 
 // Ensure GITHUB_PAT is set in Vercel Environment Variables
-const GITHUB_TOKEN = process.env.GITHUB_PAT;
+const GITHUB_TOKEN = (process.env.GITHUB_PAT || '').replace(/[\r\n\s]+/g, '');
 
 export interface Reservation {
     id: string;

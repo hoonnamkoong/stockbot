@@ -124,6 +124,11 @@ def get_access_token(force_refresh=False):
     # 4. Request new token
     if not app_key or not app_secret:
         print("Error: KIS credentials missing in environment variables.")
+        # [디버깅 강화] KIS 관련 환경 변수 목록 출력
+        kis_keys = {k: ("HIDDEN" if v else "EMPTY") for k, v in os.environ.items() if k.startswith("KIS_")}
+        print(f"[Debug] 현재 KIS 관련 환경 변수 상태: {kis_keys}")
+        if 'KIS_APP_KEY' not in os.environ:
+            print("[Debug] 'KIS_APP_KEY' 자체가 os.environ에 없습니다. (GitHub Actions env 블록 누락 의심)")
         return None
 
     # Determine URL (Real vs Virtual)

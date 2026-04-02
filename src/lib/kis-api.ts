@@ -125,8 +125,17 @@ async function getAccessToken(forceRefresh = false): Promise<string | null> {
             };
 
             const res = await axios.post(url, body, {
-                headers: { 'content-type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
             });
+
+            // [Emergency Fix] HTML/Text Response Handler
+            if (typeof res.data === 'string' && res.data.toLowerCase().includes('<html')) {
+                console.error("[KIS] Token HTML WAF Block:", res.data);
+                throw new Error(`Token WAF Error: ${res.data.substring(0, 100)}...`);
+            }
 
             if (res.status === 200 && res.data.access_token) {
                 const newToken = res.data.access_token;
@@ -201,6 +210,7 @@ export async function getBalance(): Promise<BalanceData | null> {
         "appsecret": KIS_APP_SECRET,
         "tr_id": tr_id,
         "custtype": "P",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     };
 
     // Try multiple INQR_DVSN if needed
@@ -225,6 +235,13 @@ export async function getBalance(): Promise<BalanceData | null> {
         try {
             console.log(`[KIS] Fetching balance (DVSN: ${dvsn})...`);
             let res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, { headers, params });
+
+            // [Emergency Fix] WAF/HTML Error handling
+            if (typeof res.data === 'string' && res.data.toLowerCase().includes('<html')) {
+                console.error(`[KIS] Balance HTML WAF Block (DVSN: ${dvsn}):`, res.data);
+                lastError = "WAF Blocked (HTML Returned)";
+                break;
+            }
 
             // Handle 401 Unauthorized
             if (res.status === 401 || (res.data && res.data.msg_cd === 'EGW00121')) {
@@ -320,7 +337,8 @@ export async function placeOrder(code: string, qty: number, price: number, side:
         "appsecret": KIS_APP_SECRET,
         "tr_id": tr_id,
         "custtype": "P",
-        "hashkey": ""
+        "hashkey": "",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     };
 
     const ord_dvsn = price === 0 ? "01" : "00";
@@ -339,6 +357,12 @@ export async function placeOrder(code: string, qty: number, price: number, side:
         try {
             console.log(`[KIS] Sending Order (Attempt ${i + 1})...`);
             let res = await axios.post(url, body, { headers });
+
+            // [Emergency Fix] WAF/HTML Error handling
+            if (typeof res.data === 'string' && res.data.toLowerCase().includes('<html')) {
+                console.error(`[KIS] Order HTML WAF Block:`, res.data);
+                throw new Error("WAF Blocked (HTML Returned)");
+            }
 
             // Handle 401 Unauthorized
             if (res.status === 401 || (res.data && res.data.msg_cd === 'EGW00121')) {

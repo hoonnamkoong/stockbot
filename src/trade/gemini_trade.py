@@ -1,5 +1,6 @@
 import os
 import json
+import requests
 from datetime import datetime
 
 class GeminiTrader:
@@ -110,6 +111,19 @@ class GeminiTrader:
                     fee = sell_vol * self.FEE_SELL
                     net_return = sell_vol - fee
                     
+                    # [Vercel Proxy] 매도 웹훅 발송
+                    try:
+                        trade_pin = os.environ.get("TRADE_PIN", "")
+                        dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
+                        url = f"{dashboard_url}/api/trade"
+                        if trade_pin:
+                            payload = {"side": "sell", "code": code, "qty": h['qty'], "price": current_price}
+                            requests.post(url, headers={"Authorization": f"Bearer {trade_pin}"}, json=payload, timeout=5)
+                            print(f"    -> Vercel 매도 요청 완료: {code}")
+                    except Exception as e:
+                        print(f"    -> Vercel 매도 요청 실패: {e}")
+                    
+                    
                     self.state['cash'] += net_return
                     from datetime import timezone, timedelta
                     kst_tz = timezone(timedelta(hours=9))
@@ -203,6 +217,19 @@ class GeminiTrader:
                         'target_prob': prob
                     }
                     print(f"  [Action] BUY {code} ({rec.get('name')}) - {qty} shares @ {price:,.0f} KRW (ML Prob: {prob:.1f}%)")
+                    
+                    # [Vercel Proxy] 매수 웹훅 발송
+                    try:
+                        trade_pin = os.environ.get("TRADE_PIN", "")
+                        dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
+                        url = f"{dashboard_url}/api/trade"
+                        if trade_pin:
+                            payload = {"side": "buy", "code": code, "qty": qty, "price": int(price)}
+                            requests.post(url, headers={"Authorization": f"Bearer {trade_pin}"}, json=payload, timeout=5)
+                            print(f"    -> Vercel 매수 요청 완료: {code}")
+                    except Exception as e:
+                        print(f"    -> Vercel 매수 요청 실패: {e}")
+
                     from datetime import timezone, timedelta
                     kst_tz = timezone(timedelta(hours=9))
                     current_time_kst = datetime.now(kst_tz).strftime('%H:%M:%S')

@@ -28,8 +28,8 @@ def _validate_trade_env_strict() -> bool:
             return False
         return True
     except ImportError:
-        # 폴백: 직접 검증
-        required = ['KIS_APP_KEY', 'KIS_APP_SECRET', 'KIS_ACCOUNT_NO', 'KIS_BASE_URL']
+        # 폴백: 직접 검증 (Vercel Proxy 용)
+        required = ['TRADE_PIN', 'DASHBOARD_URL']
         for k in required:
             if not os.environ.get(k):
                 print(f"[TradeExecutor] ❌ 필수 환경 변수 누락: {k}")
@@ -39,14 +39,34 @@ def _validate_trade_env_strict() -> bool:
 
 # ─── place_order 임포트 ───────────────────────────────────────────────────────
 
-try:
-    from order import place_order
-    _ORDER_AVAILABLE = True
-except ImportError as _e:
-    print(f"[TradeExecutor] ⚠️  place_order 임포트 실패 (Trade 기능 제한): {_e}")
-    _ORDER_AVAILABLE = False
-    def place_order(side, code, qty, price):
-        raise RuntimeError("place_order 모듈 로드 실패로 주문을 실행할 수 없습니다.")
+# ─── place_order 대규모 수정 (Vercel Proxy 위임) ──────────────────────────
+
+import requests
+
+def place_order_via_vercel(side, code, qty, price):
+    trade_pin = os.environ.get("TRADE_PIN")
+    dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
+    url = f"{dashboard_url}/api/trade"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {trade_pin}"
+    }
+    payload = {
+        "side": side,
+        "code": code,
+        "qty": qty,
+        "price": price
+    }
+    
+    print(f"[TradeExecutor] Sending Webhook to Vercel: {url} | payload: {payload}")
+    # 타임아웃 15초(Vercel Severless 특성 고려)
+    res = requests.post(url, headers=headers, json=payload, timeout=15)
+    
+    if res.status_code != 200:
+        print(f"[TradeExecutor] ❌ Vercel API Error: {res.status_code} - {res.text}")
+        raise RuntimeError(f"Vercel API failed with {res.status_code}")
+    print(f"[TradeExecutor] ✅ Vercel API 응답: {res.text}")
 
 
 # ─── 파일 경로 상수 ───────────────────────────────────────────────────────────
@@ -101,15 +121,8 @@ def main():
     now_utc = datetime.now(timezone.utc)
     print(f"\n[TradeExecutor] 실행 — {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")
 
-    # --- KIS 잔고 조회 강제 실행 (사용자 긴급 지시) ---
-    print("\n[TradeExecutor] (강제 지시) KIS 계좌 잔고 조회 루틴 강제 실행...")
-    try:
-        from balance import check_balance
-        check_balance()
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"[TradeExecutor] KIS 잔고 조회 강제 실행 중 실패: {e}")
+    # --- KIS 잔고 조회 의존성 제거 (Vercel Proxy) ---
+    print("\n[TradeExecutor] 로컬에서의 KIS 직접 호출 방식을 제거하고 Vercel Proxy로 이관되었습니다.")
     # ------------------------------------------------
 
     # 1. 환경 변수 엄격 검증
@@ -117,10 +130,8 @@ def main():
         print("[TradeExecutor] ❌ 치명적 오류: 환경 변수 미비. Workflow를 중단합니다.")
         sys.exit(1) # Silent Failure 방지
 
-    # 2. 주문 모듈 확인
-    if not _ORDER_AVAILABLE:
-        print("[TradeExecutor] ❌ 치명적 오류: 주문 모듈(order.py) 로드 불가.")
-        sys.exit(1)
+    # 2. 주문 모듈 확인 (제거됨 - Vercel 프록시가 대신함)
+    pass
 
     # 3. 예약 목록 처리
     reservations = load_reservations()
@@ -160,8 +171,8 @@ def main():
             qty   = int(res.get('qty', 1))
             price = int(res.get('price', 0))
 
-            print(f"  [Execute] 예약 {res_id}: {side.upper()} {code} {qty}주")
-            place_order(side=side, code=code, qty=qty, price=price)
+            print(f"  [Execute] 예약 {res_id}: {side.upper()} {code} {qty}주 -> Vercel Proxy 요청")
+            place_order_via_vercel(side=side, code=code, qty=qty, price=price)
 
             append_order_history({
                 'id': res_id, 'executed_at': now_utc.isoformat(),

@@ -33,14 +33,14 @@ interface GitHubFileResponse {
 }
 
 // GENERIC FILE OPERATIONS
-export async function fetchFile<T>(path: string): Promise<{ data: T | null, sha: string }> {
+export async function fetchFile<T>(path: string, branch: string = BRANCH): Promise<{ data: T | null, sha: string }> {
     if (!GITHUB_TOKEN) {
         console.error(`[GitHubDB] GITHUB_PAT missing, cannot fetch ${path}`);
         return { data: null, sha: '' };
     }
 
     try {
-        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?ref=${BRANCH}&t=${Date.now()}`;
+        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}?ref=${branch}&t=${Date.now()}`;
         const res = await axios.get<GitHubFileResponse>(url, {
             headers: {
                 'Authorization': `Bearer ${GITHUB_TOKEN}`,

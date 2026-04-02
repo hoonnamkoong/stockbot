@@ -29,7 +29,7 @@ export async function getBalance(): Promise<BalanceData | null> {
     console.log('[HybridAPI] getBalance called (fetching from GitHub DB portfolio.json)');
 
     try {
-        const { data } = await fetchFile<any>('data/portfolio.json');
+        const { data } = await fetchFile<any>('data/portfolio.json', 'main');
         
         if (data && data.output2 && data.output2.length > 0) {
             const output2 = data.output2[0];

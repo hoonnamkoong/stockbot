@@ -11,13 +11,15 @@ export async function GET() {
         const balance = await getBalance();
         console.log('[Balance API] getBalance returned:', balance ? 'data' : 'null');
 
-        // Check if it's an error object (weak type check but works given the change)
+        // Hybrid Mode: '모바일 동기화 대기 중' is not an error but a state
         if (balance && (balance as any).error) {
+            if ((balance as any).sync_status === 'waiting') {
+                return NextResponse.json(balance, { status: 200 }); // Status 200 because it's a valid UI state now
+            }
             return NextResponse.json({
                 error: `KIS API Failed: ${(balance as any).error}`,
                 envCheck: {
                     hasKey: !!process.env.KIS_APP_KEY,
-                    keyDebug: `Len:${(process.env.KIS_APP_KEY || '').length} Start:${(process.env.KIS_APP_KEY || '').substring(0, 4)}`,
                     hasSecret: !!process.env.KIS_APP_SECRET,
                     hasAcc: !!process.env.KIS_ACCOUNT_NO,
                     baseUrl: process.env.KIS_BASE_URL,

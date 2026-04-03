@@ -80,13 +80,12 @@ function TradeContent() {
         if (typeof window === 'undefined') return;
         if (!silent) setLoading(true);
         try {
-            const res = await axios.get(`/api/portfolio/real?cb=${Date.now()}&v=55`);
-            console.log("[DEBUG] Real Portfolio Response:", res.data);
-            if (res.data.error) {
-                if (!silent) showNotify('API Error (KIS)', res.data.error, 'red');
-                console.error("KIS API Error:", res.data.error);
-            } else {
-                setBalance(res.data);
+            const res = await fetch(`/api/portfolio/real?v=57&cb=${Date.now()}`);
+            const data = await res.json().catch(() => ({ error: '서버 응답이 JSON이 아닙니다. (HTML 에러 발생)' }));
+            console.log("[DEBUG] Real Portfolio Response:", data);
+            setBalance(data);
+            if (data.error && !silent) {
+                showNotify('API Error (KIS)', data.error, 'red');
             }
         } catch (error: any) {
             if (retryCount < 1) setTimeout(() => fetchBalance(retryCount + 1, silent), 2000);

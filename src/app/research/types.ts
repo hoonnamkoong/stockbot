@@ -22,9 +22,13 @@ export interface Stock {
 export interface FiveDayStock {
     code: string;
     name: string;
+    current_price: number;
+    change_rate: number;
     count: number;
     avg_posts: number;
-    avg_change: number;
+    total_posts: number;
+    price_history: number[];
+    post_history: number[];
 }
 
 export interface VersionInfo {

@@ -134,25 +134,44 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                 <Table highlightOnHover verticalSpacing="xs">
                     <Table.Thead>
                         <Table.Tr>
-                            <Table.Th>Stock</Table.Th>
-                            <Table.Th onClick={() => onSort('count')} style={{ cursor: 'pointer' }}>Count</Table.Th>
-                            <Table.Th onClick={() => onSort('avg_posts')} style={{ cursor: 'pointer' }}>Avg Posts</Table.Th>
-                            <Table.Th onClick={() => onSort('avg_change')} style={{ cursor: 'pointer' }}>Avg Change</Table.Th>
+                            <Table.Th>종목명</Table.Th>
+                            <Table.Th onClick={() => onSort('current_price')} style={{ cursor: 'pointer' }}>현재가</Table.Th>
+                            <Table.Th onClick={() => onSort('change_rate')} style={{ cursor: 'pointer' }}>등락률</Table.Th>
+                            <Table.Th onClick={() => onSort('count')} style={{ cursor: 'pointer' }}>연속 등장</Table.Th>
+                            <Table.Th onClick={() => onSort('avg_posts')} style={{ cursor: 'pointer' }}>평균 게시글</Table.Th>
+                            <Table.Th onClick={() => onSort('total_posts')} style={{ cursor: 'pointer' }}>총 게시글</Table.Th>
+                            <Table.Th>주가 추세 (5D)</Table.Th>
+                            <Table.Th>토론 추세 (5D)</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                         {data.map((s) => (
                             <Table.Tr key={s.code} onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
                                 <Table.Td>
-                                    <Text size="sm" fw={500}>{s.name}</Text>
-                                    <Text size="10px" c="dimmed">{s.code}</Text>
+                                    <Text size="sm" fw={700}>{s.name} <Text span size="xs" c="dimmed" fw={400}>{s.code}</Text></Text>
                                 </Table.Td>
-                                <Table.Td><Badge color={titleColor}>{s.count}</Badge></Table.Td>
-                                <Table.Td><Text size="sm">{s.avg_posts?.toFixed(1)}</Text></Table.Td>
                                 <Table.Td>
-                                    <Text size="sm" c={s.avg_change > 0 ? 'red' : 'blue'}>
-                                        {s.avg_change > 0 ? '+' : ''}{s.avg_change?.toFixed(2)}%
+                                    <Text size="sm" fw={600}>{s.current_price?.toLocaleString()}원</Text>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Text size="sm" fw={600} c={s.change_rate > 0 ? 'red' : s.change_rate < 0 ? 'blue' : 'gray'}>
+                                        {s.change_rate > 0 ? '+' : ''}{s.change_rate?.toFixed(2)}%
                                     </Text>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Badge size="sm" color="gray" variant="filled" radius="xl">{s.count}일 연속</Badge>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Text size="sm" fw={500}>{s.avg_posts?.toFixed(0)}개</Text>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Text size="sm" fw={500}>{s.total_posts?.toLocaleString()}개</Text>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Sparkline data={s.price_history || []} color="#ff4d4f" />
+                                </Table.Td>
+                                <Table.Td>
+                                    <Sparkline data={s.post_history || []} color="#ff4d4f" />
                                 </Table.Td>
                             </Table.Tr>
                         ))}

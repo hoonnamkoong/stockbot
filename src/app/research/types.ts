@@ -27,8 +27,10 @@ export interface FiveDayStock {
     count: number;
     avg_posts: number;
     total_posts: number;
-    price_history: number[];
-    post_history: number[];
+    price_history?: number[];
+    post_history?: number[];
+    sparkline_price?: number[];
+    sparkline_posts?: number[];
 }
 
 export interface VersionInfo {

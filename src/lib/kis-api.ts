@@ -8,6 +8,12 @@ const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
 const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
 const KIS_BASE_URL = process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443';
 
+// Debug Env Vars (safe log)
+const logEnvStatus = () => {
+    console.log(`[KIS-API] Config Status: Key=${KIS_APP_KEY ? 'OK(Len:'+KIS_APP_KEY.length+')' : 'MISSING'}, Secret=${KIS_APP_SECRET ? 'OK' : 'MISSING'}, Acc=${KIS_ACCOUNT_NO ? 'OK' : 'MISSING'}`);
+};
+logEnvStatus();
+
 // Data Paths (Lazy loaded to avoid top-level resolution issues)
 const getVirtualPath = () => path.join(process.cwd(), 'data', 'portfolio_virtual.json');
 // const DUMMY_REAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio.json'); // REMOVED
@@ -57,10 +63,11 @@ async function getAccessToken(): Promise<string> {
             tokenExpiry = now + (res.data.expires_in - 3600) * 1000;
             return cachedToken!;
         }
-        throw new Error('KIS Token issuance failed');
+        throw new Error(`KIS Token issuance failed: ${res.data.msg_cd || ''} ${res.data.msg1 || ''}`);
     } catch (error: any) {
-        console.error('[KIS-API] Token Error:', error.message);
-        throw error;
+        const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+        console.error('[KIS-API] Token Error:', errorDetail);
+        throw new Error(`인증 토큰 발급 실패: ${errorDetail}`);
     }
 }
 
@@ -137,10 +144,12 @@ export async function getRealPortfolio(): Promise<any> {
 
         return portfolio;
     } catch (e: any) {
-        console.error('[KIS-API] getRealPortfolio critical error:', e.response?.data || e.message);
+        const errorBody = e.response?.data;
+        const msg = errorBody?.msg1 || errorBody?.message || e.message;
+        console.error('[KIS-API] getRealPortfolio critical error:', errorBody || e.message);
         return { 
             deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
-            error: `Critical Error: ${e.response?.data?.msg1 || e.message}`, 
+            error: `한투 API 연결 실패: ${msg}`, 
             sync_status: 'error' 
         };
     }

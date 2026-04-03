@@ -7,6 +7,15 @@ const REPO_OWNER = "hoonnamkoong";
 const REPO_NAME = "stockbot";
 const WORKFLOW_ID = "scraper.yml";
 
+const parseNum = (val: any): number => {
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'string') {
+        const cleaned = val.replace(/[^-0-9.]/g, '');
+        return parseFloat(cleaned) || 0;
+    }
+    return 0;
+};
+
 export const useResearchSource = () => {
     const [stocks, setStocks] = useState<Stock[]>([]);
     const [fiveDayData, setFiveDayData] = useState<FiveDayStock[]>([]);
@@ -52,21 +61,21 @@ export const useResearchSource = () => {
                     market: item.market || item['시장'] || item['시장구분'],
                     code: item.code,
                     name: item.name || item['종목명'],
-                    price: item.price || item['현재가'],
-                    current_price: item.price || item['현재가'],
-                    prev_close: item.prev_close || item['어제_종가'] || item['전일종가'],
-                    change_rate: item.change_rate || item['등락률'],
+                    price: parseNum(item.price || item['현재가']),
+                    current_price: parseNum(item.price || item['현재가']),
+                    prev_close: parseNum(item.prev_close || item['어제_종가'] || item['전일종가']),
+                    change_rate: parseNum(item.change_rate || item['등락률']),
                     recent_posts_count: item.recent_posts_count || item['게시글수'] || item['당일_게시글수'] || item['당일 게시글수'],
-                    foreign_rate: item.foreign_rate || item['외인소진율'] || item['현재_외국인비중'],
-                    prev_foreign_rate: item.prev_foreign_rate || item['전일_외국인비중'] || item['어제_외국인비중'],
+                    foreign_rate: parseNum(item.foreign_rate || item['외인소진율'] || item['현재_외국인비중']),
+                    prev_foreign_rate: parseNum(item.prev_foreign_rate || item['전일_외국인비중'] || item['어제_외국인비중']),
                     posts_summary: item.posts_summary || item['게시물_요약'],
                     sentiment: item.sentiment || item['감정분석'],
                     top_keywords: Array.isArray(item.top_keywords) ? item.top_keywords : 
                                  (typeof item.top_keywords === 'string' ? item.top_keywords.split(',').map((k: string) => k.trim()) : 
                                  (item['Top_Keyword'] || item['Top_Keywords'] || [])),
                     is_last_captured: item.is_last_captured || item['연속_등록'],
-                    consecutive_days: item.consecutive_days || (item['연속_등록'] === true ? 2 : 1),
-                    foreign_change_rate: item.foreign_change_rate || item['외국인_변화'] || 0,
+                    consecutive_days: Number(item.consecutive_days) || (item['연속_등록'] === true ? 2 : 1),
+                    foreign_change_rate: parseNum(item.foreign_change_rate || item['외국인_변화'] || 0),
                     latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
                 }));
                 setStocks(mappedData);
@@ -88,13 +97,27 @@ export const useResearchSource = () => {
             const res5 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_5days.json?t=${timeMap}`, { cache: 'no-store' });
             if (res5.ok) {
                 const raw5 = await res5.text();
-                setFiveDayData(JSON.parse(raw5.replace(/\bNaN\b/g, '0')));
+                const mapped5 = JSON.parse(raw5.replace(/\bNaN\b/g, '0')).map((item: any) => ({
+                    ...item,
+                    current_price: parseNum(item.current_price || item.price),
+                    change_rate: parseNum(item.change_rate),
+                    sparkline_price: Array.isArray(item.sparkline_price) ? item.sparkline_price : [],
+                    sparkline_posts: Array.isArray(item.sparkline_posts) ? item.sparkline_posts : []
+                }));
+                setFiveDayData(mapped5);
             }
 
             const res3 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_3days.json?t=${timeMap}`, { cache: 'no-store' });
             if (res3.ok) {
                 const raw3 = await res3.text();
-                setThreeDayData(JSON.parse(raw3.replace(/\bNaN\b/g, '0')));
+                const mapped3 = JSON.parse(raw3.replace(/\bNaN\b/g, '0')).map((item: any) => ({
+                    ...item,
+                    current_price: parseNum(item.current_price || item.price),
+                    change_rate: parseNum(item.change_rate),
+                    sparkline_price: Array.isArray(item.sparkline_price) ? item.sparkline_price : [],
+                    sparkline_posts: Array.isArray(item.sparkline_posts) ? item.sparkline_posts : []
+                }));
+                setThreeDayData(mapped3);
             }
         } catch (e: any) {
             console.error(e);

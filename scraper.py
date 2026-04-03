@@ -19,33 +19,201 @@ SCRAPER_VERSION = "9.2 (Strategy Advisor)"
 from src.strategy.advisor import StrategyAdvisor
 
 # --- SentinelV & GeminiAgent (Inlined for Stability) ---
-# --- Keyword Extraction Helper ---
+# --- Korean NLP Helpers ---
+# Ordered by length (longer first) so longer suffixes match first
+KO_PARTICLES = [
+    # Multi-char particles first (order matters - longest first)
+    '으로부터', '로부터', '으로서', '에서부터', '에서도', '에게서', '에게도',
+    '이라는', '라는', '이라고', '라고', '이라며', '라며', '이지만', '지만',
+    '이지만도', '인데도', '인데', '이고도', '이고', '이며', '이거나', '거나',
+    '이라도', '라도', '에서', '에게', '에도', '에만', '로도', '로만', '으로도',
+    '으로만', '으로', '로서', '부터', '까지', '마저', '조차', '이나마', '나마',
+    '이나', '나', '이든', '든', '은커녕', '는커녕', '이라면', '라면',
+    '들은', '들이', '들의', '들에', '들도', '들만', '들을', '들도',
+    '에서', '에게', '한테', '에게서', '한테서',
+    '이면', '이면서', '면서', '이지', '이라',
+    '하고', '하면', '하지', '하여', '하며', '하니', '하든',
+    '같이', '처럼', '보다', '만큼',
+    '들', '은', '는', '이', '가', '을', '를', '의', '에', '도', '만', '로', '고',
+    '서', '면', '야', '아', '여', '와', '과', '랑',
+]
+
+KO_VERB_ENDINGS = [
+    # Verb/adjective endings
+    '습니다', '입니다', '합니다', '됩니다', '입니다', '겠습니다',
+    '했습니다', '았습니다', '었습니다',
+    '하는군', '하는구나', '하는데', '하더니', '하다가', '합니다만',
+    '한다고', '한다며', '한다고요', '다고요',
+    '네요', '군요', '거든요', '더라고요', '더군요', '잖아요',
+    '세요', '에요', '아요', '어요', '이에요', '이에요',
+    '겠어', '겠지', '겠죠', '것같아', '것같은',
+    '하는지', '하는가', '하는가요', '하는지요',
+    '하자', '하자마자', '할수록', '할지', '할지도',
+    '스럽다', '스러운', '스럽게', '스러워',
+    '다며', '다면서', '다고', '다는', '다던', '다더니',
+    '지않', '지않는', '지않은', '않는', '않은', '않고', '않아',
+    'ㄴ다고', 'ㄴ다며', 'ㄴ다면',
+    '했다고', '했다며', '됐다고', '됐다며',
+    '다고요', '이라고요', '라고요',
+    '더라고', '더군', '더니', '더라',
+    '였나', '였는지', '였던',
+    '었나', '었는지', '었던',
+    '이다', '있다', '없다', '한다', '된다', '된다', '간다', '온다',
+    '같다', '같은', '같아', '같이',
+    '이다', '이야', '이야기',
+    '구나', '군요', '구요',
+    '다면', '다고', '다는', '다든',
+    '었다', '았다', '겠다',
+    '이요', '네', '죠', '죠?', '지요',
+    '합니', '하면', '하고', '하니', '하여',
+    '만큼', '처럼', '마냥', '같이',
+    '때문', '때문에', '탓에', '탓',
+    '입니', '이라', '이야', '이지',
+    '에서', '에가', '에는',
+    '에다', '에다가', '마저', '조차', '까지',
+    '이자', '도록', '토록',
+    '고도', '고나', '곤', '고는',
+    '는데', '은데', '인데', '거든',
+    '어야', '아야', '여야',
+    '어도', '아도', '여도',
+    '는다', '는지', '는가',
+    '지만', '지는', '지도', '지가',
+    '로다', '으로다',
+    '놓고', '두고', '가며',
+    '있는', '없는', '있네', '없네', '있어', '없어',
+    '있는데', '없는데',
+    '다'
+]
+
 STOPWORDS = {
-    '오늘', '어제', '내일', '지금', '현재', '실시간', '속보', '긴급',
+    # 대명사 / 지시어
+    '오늘', '어제', '내일', '지금', '현재', '이번', '저번', '요즘',
+    '여기', '저기', '거기', '이거', '저거', '그거', '이것', '저것', '그것',
+    '나', '저', '제가', '내가', '우리', '너', '네가', '그', '그녀', '저희',
+    '이분', '저분', '그분', '이사람', '저사람', '그사람',
+    # 접속사 / 부사
+    '그리고', '그런데', '그래서', '하지만', '그러나', '또한', '또', '다시',
+    '먼저', '결국', '즉', '즉시', '바로', '과연', '역시', '아직', '이미',
+    '물론', '단지', '단순히', '그냥', '아무', '아무것', '근데', '암튼', '아무튼',
+    '잠깐', '잠시', '조금', '좀', '많이', '매우', '너무', '정말', '진짜',
+    '진심', '완전', '대박', '와', '헐', '어머', '아이고', '맙소사',
+    '솔직히', '사실', '사실은', '그냥', '일단', '우선',
+    # 동사/형용사 기본형
+    '있다', '없다', '하다', '되다', '이다', '같다', '보다', '주다', '가다', '오다',
+    '알다', '모르다', '싶다', '좋다', '나쁘다', '크다', '작다',
+    '많다', '적다', '높다', '낮다', '빠르다', '늦다',
+    # 조동사류
+    '합니다', '입니다', '습니다', '됩니다', '같습니다', '봅니다',
+    # 주식/투자 일반 단어
     '주식', '종목', '매수', '매도', '매매', '투자', '주가', '가격',
     '상한가', '하한가', '급등', '급락', '폭등', '폭락', '상승', '하락',
     '정보', '분석', '전망', '예상', '의견', '생각', '질문', '궁금',
-    '여기', '저기', '이거', '저거', '그거', '뭐', '왜', '어떻게',
-    '진짜', '정말', '완전', '너무', '진심', '대박', '헐', '와',
-    '사람', '분들', '여러분', '우리', '나', '제가', '내가',
-    '합니다', '입니다', '습니다', '됩니다', '같습니다', '봅니다',
-    '하는', '것', '수', '중', '후', '전', '때', '더', '안', '못',
-    '좀', '잘', '다', '또', '그냥', '아직', '이미', '계속', '다시',
-    '보세요', '하세요', '드립니다', '감사', '부탁', '제발',
     '코스피', '코스닥', 'KOSPI', 'KOSDAQ',
-    '원', '만원', '천원', '억', '조', '퍼센트',
-    '오늘도', '오늘은', '어제도', '내일도', '지금은', '현재가', '목표가', '매수가', '매도가',
-    'ㅋㅋ', 'ㅋㅋㅋ', 'ㅋㅋㅋㅋ', 'ㅎㅎ', 'ㅎㅎㅎ', 'ㄷㄷ', 'ㄷㄷㄷ',
-    '공시', '뉴스', '속보', '특징주', '단독', '상보', '종합', '오후', '오전',
-    '근데', '하지만', '그리고', '그래서', '아무튼', '암튼', '이런', '저런', '그런',
-    '아니', '그게', '아니라', '있다', '없다', '있네', '없네', '많이', '조금', '진짜루',
-    '월요일', '화요일', '수요일', '목요일', '금요일', '월욜', '화욜', '수욜', '목욜', '금욜',
-    '이번주', '다음주', '지난주', '내일은', '어제는', '내일도', '어제도',
-    '가자', '가즈아', '살까', '팔까', '살까요', '팔까요', '했네', '했어', '한다', '했다',
-    '하나', '해요', '봐요', '봐라', '본다', '본격', '시작', '마감', '장전', '장후', '시간외'
+    '공시', '뉴스', '특징주', '단독', '상보', '종합', '속보', '긴급',
+    '오후', '오전', '장전', '장후', '시간외', '마감', '시작',
+    '원', '만원', '천원', '억', '조', '억원',
+    '실시간', '현재가', '목표가', '매수가', '매도가',
+    # 요일 / 날짜
+    '월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일',
+    '월욜', '화욜', '수욜', '목욜', '금욜',
+    '오늘도', '어제도', '내일도', '이번주', '다음주', '지난주',
+    # 감탄사
+    'ㅋㅋ', 'ㅋㅋㅋ', 'ㄷㄷ', 'ㄷㄷㄷ', 'ㅎㅎ', 'ㅎㅎㅎ', 'ㅠㅠ', 'ㅜㅜ',
+    # 구어체
+    '가자', '가즈아', '살까', '팔까', '롱', '숏', '존버', '물타기', '불타기',
+    'ㄹㅇ', 'ㅈㄴ', 'ㅅㅂ', 'ㄱㄴ',
 }
 
-# --- Telegram Notification Guard (Grand Protocol v12) ---
+def _strip_korean_suffix(word: str) -> str:
+    """Strip common Korean particles and verb endings to get the root."""
+    # Try verb endings first (longer match wins due to sorted order)
+    for ending in sorted(KO_VERB_ENDINGS, key=len, reverse=True):
+        if word.endswith(ending) and len(word) > len(ending):
+            root = word[:-len(ending)]
+            if len(root) >= 1:  # Keep at least 1 char
+                return root
+    # Then try particles
+    for particle in KO_PARTICLES:
+        if word.endswith(particle) and len(word) > len(particle):
+            root = word[:-len(particle)]
+            if len(root) >= 1:
+                return root
+    return word
+
+
+def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
+    """
+    Extracts meaningful Korean keywords from post titles.
+    Uses suffix stripping before filtering to handle agglutinative Korean.
+    """
+    # Build stock name parts to filter out
+    name_parts = set()
+    if stock_name and len(stock_name) >= 2:
+        name_parts.add(stock_name)
+        name_parts.add(stock_name[:2])
+        if len(stock_name) > 2:
+            name_parts.add(stock_name[-2:])
+    
+    root_freq = {}  # stripped root -> frequency
+    root_surface = {}  # stripped root -> best surface form (shortest)
+
+    for title in titles:
+        # Keep only Korean + English + numbers, replace everything else with space
+        cleaned = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', title)
+        words = cleaned.split()
+        
+        for raw_word in words:
+            if not raw_word:
+                continue
+            
+            # Step 1: Strip Korean particles/endings to get root
+            root = _strip_korean_suffix(raw_word)
+            
+            # Step 2: Length filter (root must be >= 2 chars)
+            if len(root) < 2:
+                continue
+            
+            # Step 3: Digit-only filter
+            if root.isdigit():
+                continue
+            
+            # Step 4: Stopword check (both raw and stripped)
+            if root in STOPWORDS or raw_word in STOPWORDS:
+                continue
+            
+            # Step 5: Skip single-syllable Korean chars (most are particles/noise)
+            # A Korean syllable block is a single char in the range 가-힣
+            if len(root) == 1 and '가' <= root <= '힣':
+                continue
+            
+            # Step 6: Stock name filter
+            if any(part and part in root for part in name_parts):
+                continue
+            
+            # Step 7: Skip if root still ends with a particle (multi-level)
+            # Apply one more pass
+            root2 = _strip_korean_suffix(root)
+            if root2 != root and len(root2) >= 2:
+                root = root2
+            
+            # Step 8: Final stopword re-check after double stripping
+            if root in STOPWORDS:
+                continue
+            
+            # Step 9: Skip common noise patterns
+            # e.g., purely repeat chars like ㅋㅋ
+            if len(set(root)) == 1:
+                continue
+
+            root_freq[root] = root_freq.get(root, 0) + 1
+            # Track the shorter surface form (prefer concise display)
+            if root not in root_surface or len(raw_word) < len(root_surface[root]):
+                root_surface[root] = raw_word
+    
+    # Sort by frequency, then return top N using surface forms
+    sorted_roots = sorted(root_freq.items(), key=lambda x: x[1], reverse=True)
+    return [root_surface.get(root, root) for root, _ in sorted_roots[:max_keywords]]
+
 class TelegramNotificationGuard:
     @staticmethod
     def should_send(now_kst):

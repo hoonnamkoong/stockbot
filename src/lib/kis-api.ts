@@ -137,25 +137,30 @@ export async function getRealPortfolio(): Promise<any> {
         const output1 = res.data.output1 || [];
         const output2 = res.data.output2?.[0] || {};
 
+        // Normalize to match frontend expectations:
+        // Frontend uses: holdings[], h.qty, h.avg_price, h.price, h.pl_rate, h.pl_amount, h.code, h.name
+        const holdings = output1.map((s: any) => ({
+            code: s.pdno,
+            name: s.prdt_name,
+            qty: parseInt(s.hldg_qty || '0'),
+            price: parseInt(s.prpr || '0'),
+            avg_price: parseInt(s.pchs_avg_pric || '0'),
+            pl_amount: parseInt(s.evlu_pfls_amt || '0'),
+            pl_rate: parseFloat(s.evlu_pfls_rt || '0'),
+            total_value: parseInt(s.evlu_amt || '0'),
+        }));
+
         const portfolio = {
-            deposit: parseInt(output2.dnca_tot_amt || '0'), 
-            total_value: parseInt(output2.tot_evlu_amt || '0'), 
-            total_profit: parseInt(output2.evlu_amt_smtl_amt || '0'), 
-            profit_rate: parseFloat(output2.evlu_pftd_rt || '0'), 
-            stocks: output1.map((s: any) => ({
-                code: s.pdno,
-                name: s.prdt_name,
-                quantity: parseInt(s.hldg_qty),
-                price: parseInt(s.prpr),
-                avg_buy_price: parseInt(s.pchs_avg_pric),
-                total_value: parseInt(s.evlu_amt),
-                profit: parseInt(s.evlu_pfls_amt),
-                profit_rate: parseFloat(s.evlu_pfls_rt)
-            })),
+            deposit: parseInt(output2.dnca_tot_amt || '0'),
+            total_value: parseInt(output2.tot_evlu_amt || '0'),
+            total_profit: parseInt(output2.evlu_amt_smtl_amt || '0'),
+            profit_rate: parseFloat(output2.evlu_pftd_rt || '0'),
+            holdings,  // ← consistent with frontend
+            stocks: holdings,  // ← backwards-compat alias
             sync_status: 'success'
         };
 
-        console.log(`[KIS-API] Successfully fetched portfolio: ${portfolio.stocks.length} holdings.`);
+        console.log(`[KIS-API] Successfully fetched portfolio: ${holdings.length} holdings, deposit=${portfolio.deposit}`);
         return portfolio;
     } catch (e: any) {
         const errorBody = e.response?.data;

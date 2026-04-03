@@ -1,0 +1,143 @@
+import React from 'react';
+import { Table, Text, Badge, Group, ActionIcon, ScrollArea, Box } from '@mantine/core';
+import { IconChevronUp, IconChevronDown, IconSelector, IconCoin } from '@tabler/icons-react';
+import { Stock, FiveDayStock, SortConfig } from '../types';
+import { Sparkline } from './Sparkline';
+
+interface StockTableProps {
+    stocks: Stock[];
+    sortConfig: SortConfig;
+    onSort: (key: string) => void;
+    onCellClick: (code: string) => void;
+    onQuickOrder: (stock: Stock) => void;
+}
+
+export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrder }: StockTableProps) => {
+    const SortButton = ({ label, sortKey }: { label: string, sortKey: string }) => (
+        <Table.Th style={{ cursor: 'pointer' }} onClick={() => onSort(sortKey)}>
+            <Group gap="xs" wrap="nowrap">
+                <Text size="xs" fw={700}>{label}</Text>
+                {sortConfig.key === sortKey ? (
+                    sortConfig.direction === 'asc' ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />
+                ) : <IconSelector size={12} />}
+            </Group>
+        </Table.Th>
+    );
+
+    return (
+        <ScrollArea h={600} offsetScrollbars>
+            <Table highlightOnHover verticalSpacing="xs">
+                <Table.Thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 10 }}>
+                    <Table.Tr>
+                        <Table.Th>종목</Table.Th>
+                        <SortButton label="게시글" sortKey="recent_posts_count" />
+                        <SortButton label="현재가" sortKey="current_price" />
+                        <SortButton label="등락률" sortKey="change_rate" />
+                        <SortButton label="외인비중" sortKey="foreign_rate" />
+                        <Table.Th>추세</Table.Th>
+                        <Table.Th>감정/키워드</Table.Th>
+                        <Table.Th>주문</Table.Th>
+                    </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                    {stocks.map((s) => (
+                        <Table.Tr key={s.code}>
+                            <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
+                                <Group gap="xs">
+                                    <Text size="sm" fw={500}>{s.name}</Text>
+                                    <Badge size="xs" variant="outline" color={s.market === 'KOSPI' ? 'blue' : 'cyan'}>{s.code}</Badge>
+                                    {s.consecutive_days > 1 && <Badge size="xs" color="red" variant="filled">Hot {s.consecutive_days}d</Badge>}
+                                </Group>
+                                <Text size="10px" c="dimmed" lineClamp={1}>{s.latest_post}</Text>
+                            </Table.Td>
+                            <Table.Td align="center">
+                                <Badge size="md" color="blue" radius="sm">{s.recent_posts_count}</Badge>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="sm">{s.current_price?.toLocaleString()}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="sm" c={s.change_rate > 0 ? 'red' : s.change_rate < 0 ? 'blue' : 'gray'}>
+                                    {s.change_rate > 0 ? '+' : ''}{s.change_rate}%
+                                </Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Group gap={4}>
+                                    <Text size="sm">{s.foreign_rate}%</Text>
+                                    <Text size="10px" c={s.foreign_change_rate > 0 ? 'red' : 'blue'}>
+                                        ({s.foreign_change_rate > 0 ? '+' : ''}{s.foreign_change_rate})
+                                    </Text>
+                                </Group>
+                            </Table.Td>
+                            <Table.Td>
+                                <Sparkline data={s.price_history || []} color={s.change_rate > 0 ? '#fa5252' : '#228be6'} />
+                            </Table.Td>
+                            <Table.Td>
+                                <Group gap={4}>
+                                    <Badge size="xs" color={s.sentiment === 'Pos' ? 'red' : s.sentiment === 'Neg' ? 'blue' : 'gray'}>{s.sentiment || 'Neutral'}</Badge>
+                                    <Text size="10px" c="dimmed" lineClamp={1}>
+                                        {Array.isArray(s.top_keywords) ? s.top_keywords.join(', ') : (typeof s.top_keywords === 'string' ? s.top_keywords : '')}
+                                    </Text>
+                                </Group>
+                            </Table.Td>
+                            <Table.Td>
+                                <ActionIcon variant="light" color="blue" onClick={() => onQuickOrder(s)}>
+                                    <IconCoin size={16} />
+                                </ActionIcon>
+                            </Table.Td>
+                        </Table.Tr>
+                    ))}
+                </Table.Tbody>
+            </Table>
+        </ScrollArea>
+    );
+};
+
+interface TrendTableProps {
+    data: FiveDayStock[];
+    sortConfig: SortConfig;
+    onSort: (key: string) => void;
+    onCellClick: (code: string) => void;
+    title: string;
+    titleColor: string;
+}
+
+export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, titleColor }: TrendTableProps) => {
+    return (
+        <Box>
+            <Group mb="xs">
+                <Badge color={titleColor} variant="filled">{title}</Badge>
+                <Text size="xs" c="dimmed">{data.length} stocks</Text>
+            </Group>
+            <ScrollArea h={500}>
+                <Table highlightOnHover verticalSpacing="xs">
+                    <Table.Thead>
+                        <Table.Tr>
+                            <Table.Th>Stock</Table.Th>
+                            <Table.Th onClick={() => onSort('count')} style={{ cursor: 'pointer' }}>Count</Table.Th>
+                            <Table.Th onClick={() => onSort('avg_posts')} style={{ cursor: 'pointer' }}>Avg Posts</Table.Th>
+                            <Table.Th onClick={() => onSort('avg_change')} style={{ cursor: 'pointer' }}>Avg Change</Table.Th>
+                        </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                        {data.map((s) => (
+                            <Table.Tr key={s.code} onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
+                                <Table.Td>
+                                    <Text size="sm" fw={500}>{s.name}</Text>
+                                    <Text size="10px" c="dimmed">{s.code}</Text>
+                                </Table.Td>
+                                <Table.Td><Badge color={titleColor}>{s.count}</Badge></Table.Td>
+                                <Table.Td><Text size="sm">{s.avg_posts?.toFixed(1)}</Text></Table.Td>
+                                <Table.Td>
+                                    <Text size="sm" c={s.avg_change > 0 ? 'red' : 'blue'}>
+                                        {s.avg_change > 0 ? '+' : ''}{s.avg_change?.toFixed(2)}%
+                                    </Text>
+                                </Table.Td>
+                            </Table.Tr>
+                        ))}
+                    </Table.Tbody>
+                </Table>
+            </ScrollArea>
+        </Box>
+    );
+};

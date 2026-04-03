@@ -43,24 +43,20 @@ STOPWORDS = {
 class TelegramNotificationGuard:
     @staticmethod
     def should_send(now_kst):
-        # 최우선 검사: FORCE_RUN이 명시적으로 true인 경우 시간/조건 모두 무시
-        is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
-        if is_forced:
-            return True, "Forced Run"
-
-        # 이벤트 기반 트리거
-        event_name = os.environ.get('GITHUB_EVENT_NAME', 'unknown').strip()
-        is_event_trigger = event_name in ['repository_dispatch', 'workflow_dispatch']
-        if is_event_trigger:
-            return True, f"Event ({event_name})"
-
-        # 시간 기반(정기) 트리거
+        # 1. 시간 기반(정기) 트리거 (우선 순위 상향)
+        # 매 정시 0~10분 사이 또는 장마감 브리핑(15:30~15:55)
         is_top_of_hour = (0 <= now_kst.minute <= 10)
         is_market_close = (now_kst.hour == 15 and 30 <= now_kst.minute <= 55)
         
         if is_top_of_hour or is_market_close:
             return True, "Scheduled"
-            
+
+        # 2. 강제 실행 검사: FORCE_RUN이 명시적으로 true인 경우 (디버깅용)
+        is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
+        if is_forced:
+            return True, "Forced Run"
+
+        # 3. 그 외 이벤트(repository_dispatch, workflow_dispatch 등)는 시간 조건을 만족하지 않으면 전송하지 않음
         return False, None
 
 def extract_meaningful_keywords(titles, stock_name, max_keywords=5):

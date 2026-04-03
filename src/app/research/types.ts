@@ -1,0 +1,39 @@
+export interface Stock {
+    code: string;
+    name: string;
+    market: string;
+    price: number;
+    current_price: number;
+    prev_close: number;
+    change_rate: number;
+    recent_posts_count: number;
+    foreign_rate: number;
+    prev_foreign_rate: number;
+    foreign_change_rate: number;
+    posts_summary: string;
+    sentiment: string;
+    top_keywords: string[];
+    is_last_captured: boolean;
+    consecutive_days: number;
+    latest_post: string;
+    price_history?: number[];
+}
+
+export interface FiveDayStock {
+    code: string;
+    name: string;
+    count: number;
+    avg_posts: number;
+    avg_change: number;
+}
+
+export interface VersionInfo {
+    version: string;
+    last_commit: string;
+    deploy_time: string;
+}
+
+export interface SortConfig {
+    key: string | null;
+    direction: 'asc' | 'desc';
+}

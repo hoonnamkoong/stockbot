@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack,
     Table, Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea
+    Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea, Box
 } from '@mantine/core';
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
@@ -31,6 +31,8 @@ interface BalanceData {
     deposit: number;
     total_asset: number;
     holdings: Holding[];
+    error?: string;
+    sync_status?: string;
 }
 
 interface StockItem {
@@ -94,16 +96,18 @@ function TradeContent() {
         }
     }, [showNotify]);
 
-    const fetchGeminiBalance = useCallback(async () => {
+    const fetchGeminiBalance = useCallback(async (type: 'real' | 'virtual' = 'virtual') => {
         if (typeof window === 'undefined') return;
         setGeminiLoading(true);
         try {
-            const res = await axios.get(`/api/portfolio/virtual?t=${Date.now()}`);
-            if (res.data.error) {
-                 console.error("Virtual Portfolio Error:", res.data.error);
-            } else {
-                 setGeminiBalance(res.data);
+            const res = await fetch(`/api/portfolio/${type}?v=57&cb=${Date.now()}`);
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({ error: '서버 응답 오류 (JSON 아님)' }));
+                throw new Error(errorData.error || `HTTP ${res.status}`);
             }
+            const data = await res.json();
+            if (type === 'real') setBalance(data);
+            else setGeminiBalance(data);
         } catch (e) {
             console.error("Gemini Fetch Error", e);
         } finally {
@@ -199,7 +203,12 @@ function TradeContent() {
     function renderPortfolio() {
         return (
             <Paper p="md" withBorder radius="md">
-                <Title order={4} mb="md">My Portfolio (Real)</Title>
+                <Title order={4} mb="sm">My Portfolio (Real)</Title>
+                {balance?.error && (
+                    <Box mb="md" p="xs" style={{ backgroundColor: '#fff5f5', border: '1px solid #ffa8a8', borderRadius: '4px' }}>
+                        <Text size="xs" color="red" fw={700}>⚠️ {balance.error}</Text>
+                    </Box>
+                )}
                 <div style={{ position: 'relative' }}>
                     <LoadingOverlay visible={loading} zIndex={10} overlayProps={{ radius: 'sm', blur: 2 }} />
                     <Group justify="space-between" mb="md" align="flex-end">
@@ -286,7 +295,7 @@ function TradeContent() {
                             ))}
                         </Table.Tbody>
                     </Table>
-                    <Button fullWidth mt="md" size="xs" variant="light" color="grape" onClick={fetchGeminiBalance}>Refresh Simulation</Button>
+                    <Button fullWidth mt="md" size="xs" variant="light" color="grape" onClick={() => fetchGeminiBalance()}>Refresh Simulation</Button>
                 </div>
             </Paper>
         );
@@ -388,7 +397,7 @@ function TradeContent() {
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Trading Dashboard</Title>
                 <Group gap="xs">
-                    <Badge color="pink" variant="filled">v56-crash-fix</Badge>
+                    <Badge color="pink" variant="filled">V57-HOTFIX</Badge>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>Out</Button>
                 </Group>

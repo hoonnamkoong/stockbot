@@ -67,64 +67,80 @@ async function getAccessToken(): Promise<string> {
 /**
  * [REAL] My Portfolio: 한국투자증권 실시간 잔고 조회
  */
-export async function getRealPortfolio(): Promise<PortfolioData> {
+export async function getRealPortfolio(): Promise<any> {
     try {
         const token = await getAccessToken();
-        const [cano, prdt_cd] = KIS_ACCOUNT_NO.split('-');
+        if (!token) throw new Error('KIS API Access Token 발급 실패 (ID/Secret 확인 필요)');
+
+        const appKey = process.env.KIS_APP_KEY;
+        const appSecret = process.env.KIS_APP_SECRET;
+        const accountNo = process.env.KIS_ACCOUNT_NO;
+
+        if (!appKey || !appSecret || !accountNo) {
+            throw new Error(`환경 변수 누락: ${!appKey ? 'KIS_APP_KEY ' : ''}${!appSecret ? 'KIS_APP_SECRET ' : ''}${!accountNo ? 'KIS_ACCOUNT_NO' : ''}`);
+        }
+
+        // 계좌번호 처리 (8자리-2자리 형식 지원)
+        const accParts = accountNo.split('-');
+        const CANO = accParts[0];
+        const ACNT_PRDT_CD = accParts[1] || '01';
+
+        console.log(`[KIS-API] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
 
         const res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
             headers: {
-                'content-type': 'application/json; charset=utf-8',
+                'Content-Type': 'application/json',
                 'authorization': `Bearer ${token}`,
-                'appkey': KIS_APP_KEY,
-                'appsecret': KIS_APP_SECRET,
-                'tr_id': 'TTTC8434R',
-                'custtype': 'P'
+                'appkey': appKey,
+                'appsecret': appSecret,
+                'tr_id': 'TTTC8434R', // 실전투자용 잔고조회
             },
             params: {
-                CANO: cano,
-                ACNT_PRDT_CD: prdt_cd || '01',
-                AFHR_FLPR_YN: 'N',
-                OFL_YN: '',
-                INQR_DVSN: '02',
-                UNPR_DVSN: '01',
-                FUND_STTL_ICRT_YN: 'N',
-                FNCG_AMT_AUTO_RDPT_YN: 'N',
-                PRCS_DVSN: '00',
-                CTX_AREA_FK100: '',
-                CTX_AREA_NK100: ''
+                CANO: CANO,
+                ACNT_PRDT_CD: ACNT_PRDT_CD,
+                AFHR_FLG: 'N',
+                OCCN_TX_FOR_YN: 'N',
             }
         });
 
+        if (res.data.rt_cd !== '0') {
+            const errMsg = res.data.msg1 || 'Unknown KIS Error';
+            console.error('[KIS-API] API Response Error:', errMsg);
+            return { 
+                deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
+                error: `KIS API Error: ${errMsg} (${res.data.rt_cd})`,
+                sync_status: 'error'
+            };
+        }
+
         const data = res.data;
-        if (data.rt_cd !== '0') throw new Error(data.msg1);
-
-        const holdings: HoldingsItem[] = (data.output1 || []).map((item: any) => ({
-            name: item.prdt_name || item.pdno || '',
-            qty: Number(item.hldg_qty || 0),
-            price: Number(item.prpr || 0),
-            avg_price: Number(item.pchs_avg_pric || 0),
-            pl_rate: Number(item.evlu_pfls_rt || 0),
-            pl_amount: Number(item.evlu_pfls_amt || 0),
-            code: item.pdno || ''
-        }));
-
+        const output1 = data.output1 || [];
         const output2 = data.output2?.[0] || {};
-        return {
-            deposit: Number(output2.dnca_tot_amt || 0),
-            total_asset: Number(output2.tot_evlu_amt || 0),
-            holdings,
-            sync_status: 'ok',
-            last_cached: new Date().toISOString()
+
+        const portfolio = {
+            deposit: parseInt(output2.dnca_tot_amt || '0'), // 예수금
+            total_value: parseInt(output2.tot_evlu_amt || '0'), // 총 평가금액
+            total_profit: parseInt(output2.evlu_amt_smtl_amt || '0'), // 총 평가손익
+            profit_rate: parseFloat(output2.evlu_pftd_rt || '0'), // 수익률
+            stocks: output1.map((s: any) => ({
+                code: s.pdno,
+                name: s.prdt_name,
+                quantity: parseInt(s.hldg_qty),
+                price: parseInt(s.prpr),
+                avg_buy_price: parseInt(s.pchs_avg_pric),
+                total_value: parseInt(s.evlu_amt),
+                profit: parseInt(s.evlu_pfls_amt),
+                profit_rate: parseFloat(s.evlu_pfls_rt)
+            })),
+            sync_status: 'success'
         };
+
+        return portfolio;
     } catch (e: any) {
-        console.error('[KIS-API] getRealPortfolio error:', e.message);
-        // Do NOT fallback to dummy data automatically. Return the error.
+        console.error('[KIS-API] getRealPortfolio critical error:', e.response?.data || e.message);
         return { 
-            deposit: 0, 
-            total_asset: 0, 
-            holdings: [], 
-            error: `Real API Error: ${e.message}`, 
+            deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
+            error: `Critical Error: ${e.response?.data?.msg1 || e.message}`, 
             sync_status: 'error' 
         };
     }

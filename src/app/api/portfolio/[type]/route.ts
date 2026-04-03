@@ -13,10 +13,9 @@ export async function GET(
     try {
         if (type === 'real') {
             const portfolio = await getRealPortfolio();
-            return new NextResponse(JSON.stringify(portfolio), {
+            return NextResponse.json(portfolio, {
                 status: 200,
                 headers: {
-                    'Content-Type': 'application/json',
                     'Cache-Control': 'no-store, max-age=0, must-revalidate',
                     'Pragma': 'no-cache',
                     'Expires': '0',
@@ -24,10 +23,9 @@ export async function GET(
             });
         } else if (type === 'virtual') {
             const portfolio = await getVirtualPortfolio();
-            return new NextResponse(JSON.stringify(portfolio), {
+            return NextResponse.json(portfolio, {
                 status: 200,
                 headers: {
-                    'Content-Type': 'application/json',
                     'Cache-Control': 'no-store, max-age=0, must-revalidate',
                     'Pragma': 'no-cache',
                     'Expires': '0',
@@ -38,6 +36,10 @@ export async function GET(
         }
     } catch (error: any) {
         console.error(`[API-Portfolio] ${type} error:`, error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ 
+            error: error.message,
+            sync_status: 'error',
+            timestamp: new Date().toISOString()
+        }, { status: 500 });
     }
 }

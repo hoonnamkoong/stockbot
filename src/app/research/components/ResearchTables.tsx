@@ -29,13 +29,21 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
             <Table highlightOnHover verticalSpacing="xs">
                 <Table.Thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 10 }}>
                     <Table.Tr>
-                        <Table.Th>종목</Table.Th>
-                        <SortButton label="게시글" sortKey="recent_posts_count" />
+                        <Table.Th>종목명</Table.Th>
+                        <SortButton label="시장" sortKey="market" />
+                        <SortButton label="코드" sortKey="code" />
                         <SortButton label="현재가" sortKey="current_price" />
                         <SortButton label="등락률" sortKey="change_rate" />
-                        <SortButton label="외인비중" sortKey="foreign_rate" />
-                        <Table.Th>추세</Table.Th>
-                        <Table.Th>감정/키워드</Table.Th>
+                        <SortButton label="외인변화" sortKey="foreign_change_rate" />
+                        <SortButton label="게시글" sortKey="recent_posts_count" />
+                        <Table.Th>감정</Table.Th>
+                        <Table.Th>연속</Table.Th>
+                        <Table.Th>게시물_요약</Table.Th>
+                        <Table.Th>외인비중</Table.Th>
+                        <Table.Th>전일종가</Table.Th>
+                        <Table.Th>전일외인</Table.Th>
+                        <Table.Th>Keywords</Table.Th>
+                        <Table.Th>Latest Post</Table.Th>
                         <Table.Th>주문</Table.Th>
                     </Table.Tr>
                 </Table.Thead>
@@ -43,42 +51,55 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                     {stocks.map((s) => (
                         <Table.Tr key={s.code}>
                             <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
-                                <Group gap="xs">
-                                    <Text size="sm" fw={500}>{s.name}</Text>
-                                    <Badge size="xs" variant="outline" color={s.market === 'KOSPI' ? 'blue' : 'cyan'}>{s.code}</Badge>
-                                    {s.consecutive_days > 1 && <Badge size="xs" color="red" variant="filled">Hot {s.consecutive_days}d</Badge>}
-                                </Group>
-                                <Text size="10px" c="dimmed" lineClamp={1}>{s.latest_post}</Text>
+                                <Text size="sm" fw={500}>{s.name}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Badge size="xs" variant="outline" color={s.market === 'KOSPI' ? 'blue' : 'cyan'}>{s.market}</Badge>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="xs" c="dimmed">{s.code}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="sm" fw={600}>{s.current_price?.toLocaleString()}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="sm" fw={600} c={s.change_rate > 0 ? 'red' : s.change_rate < 0 ? 'blue' : 'gray'}>
+                                    {s.change_rate > 0 ? '+' : ''}{s.change_rate}%
+                                </Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="xs" c={s.foreign_change_rate > 0 ? 'red' : s.foreign_change_rate < 0 ? 'blue' : 'gray'}>
+                                    {s.foreign_change_rate > 0 ? '+' : ''}{s.foreign_change_rate}
+                                </Text>
                             </Table.Td>
                             <Table.Td align="center">
                                 <Badge size="md" color="blue" radius="sm">{s.recent_posts_count}</Badge>
                             </Table.Td>
                             <Table.Td>
-                                <Text size="sm">{s.current_price?.toLocaleString()}</Text>
+                                <Badge size="xs" color={s.sentiment === 'Pos' ? 'red' : s.sentiment === 'Neg' ? 'blue' : 'gray'}>{s.sentiment || 'Neutral'}</Badge>
                             </Table.Td>
                             <Table.Td>
-                                <Text size="sm" c={s.change_rate > 0 ? 'red' : s.change_rate < 0 ? 'blue' : 'gray'}>
-                                    {s.change_rate > 0 ? '+' : ''}{s.change_rate}%
+                                {s.consecutive_days > 1 && <Badge size="xs" color="red" variant="filled">{s.consecutive_days}d</Badge>}
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="10px" lineClamp={1} style={{ maxWidth: '150px' }}>{s.posts_summary}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="xs">{s.foreign_rate}%</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="xs" c="dimmed">{s.prev_close?.toLocaleString()}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="xs" c="dimmed">{s.prev_foreign_rate}%</Text>
+                            </Table.Td>
+                            <Table.Td>
+                                <Text size="10px" c="dimmed" lineClamp={1}>
+                                    {Array.isArray(s.top_keywords) ? s.top_keywords.join(', ') : s.top_keywords}
                                 </Text>
                             </Table.Td>
                             <Table.Td>
-                                <Group gap={4}>
-                                    <Text size="sm">{s.foreign_rate}%</Text>
-                                    <Text size="10px" c={s.foreign_change_rate > 0 ? 'red' : 'blue'}>
-                                        ({s.foreign_change_rate > 0 ? '+' : ''}{s.foreign_change_rate})
-                                    </Text>
-                                </Group>
-                            </Table.Td>
-                            <Table.Td>
-                                <Sparkline data={s.price_history || []} color={s.change_rate > 0 ? '#fa5252' : '#228be6'} />
-                            </Table.Td>
-                            <Table.Td>
-                                <Group gap={4}>
-                                    <Badge size="xs" color={s.sentiment === 'Pos' ? 'red' : s.sentiment === 'Neg' ? 'blue' : 'gray'}>{s.sentiment || 'Neutral'}</Badge>
-                                    <Text size="10px" c="dimmed" lineClamp={1}>
-                                        {Array.isArray(s.top_keywords) ? s.top_keywords.join(', ') : (typeof s.top_keywords === 'string' ? s.top_keywords : '')}
-                                    </Text>
-                                </Group>
+                                <Text size="10px" lineClamp={1} style={{ maxWidth: '120px' }}>{s.latest_post}</Text>
                             </Table.Td>
                             <Table.Td>
                                 <ActionIcon variant="light" color="blue" onClick={() => onQuickOrder(s)}>

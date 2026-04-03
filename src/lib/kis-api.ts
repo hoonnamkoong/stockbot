@@ -8,8 +8,8 @@ const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
 const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
 const KIS_BASE_URL = process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443';
 
-// Data Paths (Single Source of Truth)
-const VIRTUAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio_virtual.json');
+// Data Paths (Lazy loaded to avoid top-level resolution issues)
+const getVirtualPath = () => path.join(process.cwd(), 'data', 'portfolio_virtual.json');
 // const DUMMY_REAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio.json'); // REMOVED
 
 // Token Cache
@@ -151,7 +151,7 @@ export async function getRealPortfolio(): Promise<any> {
  */
 export async function getVirtualPortfolio(): Promise<PortfolioData> {
     try {
-        const data = await fs.readFile(VIRTUAL_PORTFOLIO_PATH, 'utf-8');
+        const data = await fs.readFile(getVirtualPath(), 'utf-8');
         const json = JSON.parse(data);
         
         // Calculate total asset

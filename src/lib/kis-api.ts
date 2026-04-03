@@ -3,20 +3,28 @@ import fs from 'fs/promises';
 import path from 'path';
 
 // --- KIS API Configurations ---
+const IS_VIRTUAL = process.env.KIS_IS_VIRTUAL === 'true'; // Defaults to false (Real Investment)
 const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim();
 const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
 const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
-const KIS_BASE_URL = process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443';
+
+// Real: https://openapi.koreainvestment.com:9443
+// Virtual: https://openapivts.koreainvestment.com:29443
+const KIS_BASE_URL = process.env.KIS_BASE_URL || 
+    (IS_VIRTUAL 
+        ? 'https://openapivts.koreainvestment.com:29443' 
+        : 'https://openapi.koreainvestment.com:9443');
 
 // Debug Env Vars (safe log)
 const logEnvStatus = () => {
+    console.log(`[KIS-API] Mode: ${IS_VIRTUAL ? 'VIRTUAL (Mock)' : 'REAL (Production)'}`);
+    console.log(`[KIS-API] BaseURL: ${KIS_BASE_URL}`);
     console.log(`[KIS-API] Config Status: Key=${KIS_APP_KEY ? 'OK(Len:'+KIS_APP_KEY.length+')' : 'MISSING'}, Secret=${KIS_APP_SECRET ? 'OK' : 'MISSING'}, Acc=${KIS_ACCOUNT_NO ? 'OK' : 'MISSING'}`);
 };
 logEnvStatus();
 
-// Data Paths (Lazy loaded to avoid top-level resolution issues)
+// Data Paths (Lazy loaded)
 const getVirtualPath = () => path.join(process.cwd(), 'data', 'portfolio_virtual.json');
-// const DUMMY_REAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio.json'); // REMOVED
 
 // Token Cache
 let cachedToken: string | null = null;
@@ -35,7 +43,7 @@ export interface HoldingsItem {
 
 export interface PortfolioData {
     deposit: number;
-    cash?: number; // for virtual
+    cash?: number; 
     total_asset: number;
     holdings: HoldingsItem[] | Record<string, any>;
     trade_log?: any[];
@@ -51,7 +59,12 @@ async function getAccessToken(): Promise<string> {
     const now = Date.now();
     if (cachedToken && now < tokenExpiry) return cachedToken;
 
+    if (!KIS_APP_KEY || !KIS_APP_SECRET) {
+        throw new Error('KIS_APP_KEY 또는 KIS_APP_SECRET이 설정되지 않았습니다.');
+    }
+
     try {
+        console.log(`[KIS-API] Requesting new token from ${KIS_BASE_URL}...`);
         const res = await axios.post(`${KIS_BASE_URL}/oauth2/tokenP`, {
             grant_type: 'client_credentials',
             appkey: KIS_APP_KEY,
@@ -60,13 +73,15 @@ async function getAccessToken(): Promise<string> {
 
         if (res.data.access_token) {
             cachedToken = res.data.access_token;
+            // expires_in is usually 86400 (24h). Submarine 1h for safety.
             tokenExpiry = now + (res.data.expires_in - 3600) * 1000;
+            console.log(`[KIS-API] Token issued successfully. Expires in ${res.data.expires_in}s`);
             return cachedToken!;
         }
         throw new Error(`KIS Token issuance failed: ${res.data.msg_cd || ''} ${res.data.msg1 || ''}`);
     } catch (error: any) {
         const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
-        console.error('[KIS-API] Token Error:', errorDetail);
+        console.error('[KIS-API] Token Issuance Error:', errorDetail);
         throw new Error(`인증 토큰 발급 실패: ${errorDetail}`);
     }
 }
@@ -77,42 +92,41 @@ async function getAccessToken(): Promise<string> {
 export async function getRealPortfolio(): Promise<any> {
     try {
         const token = await getAccessToken();
-        if (!token) throw new Error('KIS API Access Token 발급 실패 (ID/Secret 확인 필요)');
+        if (!token) throw new Error('KIS API Access Token 발급 실패');
 
-        const appKey = process.env.KIS_APP_KEY;
-        const appSecret = process.env.KIS_APP_SECRET;
-        const accountNo = process.env.KIS_ACCOUNT_NO;
-
-        if (!appKey || !appSecret || !accountNo) {
-            throw new Error(`환경 변수 누락: ${!appKey ? 'KIS_APP_KEY ' : ''}${!appSecret ? 'KIS_APP_SECRET ' : ''}${!accountNo ? 'KIS_ACCOUNT_NO' : ''}`);
-        }
-
-        // 계좌번호 처리 (8자리-2자리 형식 지원)
-        const accParts = accountNo.split('-');
+        // Account Number format: 12345678-01
+        const accParts = KIS_ACCOUNT_NO.split('-');
         const CANO = accParts[0];
         const ACNT_PRDT_CD = accParts[1] || '01';
 
-        console.log(`[KIS-API] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
+        // tr_id mapping
+        // 실전: TTTC8434R (주식잔고조회)
+        // 모의: VTTC8434R (주식잔고조회)
+        const tr_id = IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
+
+        console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
 
         const res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
             headers: {
                 'Content-Type': 'application/json',
                 'authorization': `Bearer ${token}`,
-                'appkey': appKey,
-                'appsecret': appSecret,
-                'tr_id': 'TTTC8434R', // 실전투자용 잔고조회
+                'appkey': KIS_APP_KEY,
+                'appsecret': KIS_APP_SECRET,
+                'tr_id': tr_id,
+                'custtype': 'P' // 개인
             },
             params: {
                 CANO: CANO,
                 ACNT_PRDT_CD: ACNT_PRDT_CD,
-                AFHR_FLG: 'N',
-                OCCN_TX_FOR_YN: 'N',
+                AFHR_FLG: 'N', // 시간외단일가여부
+                OCCN_TX_FOR_YN: 'N', // 국내외구분
             }
         });
 
+        // rt_cd '0' is success.
         if (res.data.rt_cd !== '0') {
             const errMsg = res.data.msg1 || 'Unknown KIS Error';
-            console.error('[KIS-API] API Response Error:', errMsg);
+            console.error(`[KIS-API] Balance Inquiry Error [${res.data.rt_cd}]:`, errMsg);
             return { 
                 deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
                 error: `KIS API Error: ${errMsg} (${res.data.rt_cd})`,
@@ -120,15 +134,14 @@ export async function getRealPortfolio(): Promise<any> {
             };
         }
 
-        const data = res.data;
-        const output1 = data.output1 || [];
-        const output2 = data.output2?.[0] || {};
+        const output1 = res.data.output1 || [];
+        const output2 = res.data.output2?.[0] || {};
 
         const portfolio = {
-            deposit: parseInt(output2.dnca_tot_amt || '0'), // 예수금
-            total_value: parseInt(output2.tot_evlu_amt || '0'), // 총 평가금액
-            total_profit: parseInt(output2.evlu_amt_smtl_amt || '0'), // 총 평가손익
-            profit_rate: parseFloat(output2.evlu_pftd_rt || '0'), // 수익률
+            deposit: parseInt(output2.dnca_tot_amt || '0'), 
+            total_value: parseInt(output2.tot_evlu_amt || '0'), 
+            total_profit: parseInt(output2.evlu_amt_smtl_amt || '0'), 
+            profit_rate: parseFloat(output2.evlu_pftd_rt || '0'), 
             stocks: output1.map((s: any) => ({
                 code: s.pdno,
                 name: s.prdt_name,
@@ -142,11 +155,12 @@ export async function getRealPortfolio(): Promise<any> {
             sync_status: 'success'
         };
 
+        console.log(`[KIS-API] Successfully fetched portfolio: ${portfolio.stocks.length} holdings.`);
         return portfolio;
     } catch (e: any) {
         const errorBody = e.response?.data;
         const msg = errorBody?.msg1 || errorBody?.message || e.message;
-        console.error('[KIS-API] getRealPortfolio critical error:', errorBody || e.message);
+        console.error('[KIS-API] getRealPortfolio Critical Error:', errorBody || e.message);
         return { 
             deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
             error: `한투 API 연결 실패: ${msg}`, 
@@ -163,7 +177,6 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
         const data = await fs.readFile(getVirtualPath(), 'utf-8');
         const json = JSON.parse(data);
         
-        // Calculate total asset
         const holdingsMap = json.holdings || {};
         const totalInvestment = Object.values(holdingsMap).reduce((sum: number, h: any) => sum + (h.qty * h.avg_price), 0);
         
@@ -177,25 +190,34 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
             last_cached: new Date().toISOString()
         };
     } catch (e) {
-        // Return default if file missing
         return { deposit: 3000000, cash: 3000000, total_asset: 3000000, holdings: {}, trade_log: [], sync_status: 'ok' };
     }
 }
 
 /**
- * KIS 실거래 주문 집행 (REAL)
+ * KIS 실거래 주문 집행 (REAL/VIRTUAL)
  */
 export async function placeRealOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {
     try {
         const token = await getAccessToken();
         const [cano, prdt_cd] = KIS_ACCOUNT_NO.split('-');
-        const tr_id = side === 'buy' ? 'TTTC0802U' : 'TTTC0801U';
+        
+        // Buy: Real=TTTC0802U, Mock=VTTC0802U
+        // Sell: Real=TTTC0801U, Mock=VTTC0801U
+        let tr_id = '';
+        if (side === 'buy') {
+            tr_id = IS_VIRTUAL ? 'VTTC0802U' : 'TTTC0802U';
+        } else {
+            tr_id = IS_VIRTUAL ? 'VTTC0801U' : 'TTTC0801U';
+        }
+
+        console.log(`[KIS-API] [${tr_id}] Placing ${side} order for ${code}...`);
 
         const res = await axios.post(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, {
             CANO: cano,
             ACNT_PRDT_CD: prdt_cd || '01',
             PDNO: code,
-            ORD_DVSN: price === 0 ? '01' : '00',
+            ORD_DVSN: price === 0 ? '01' : '00', // 01 for Market, 00 for Limit
             ORD_QTY: qty.toString(),
             ORD_UNPR: price.toString()
         }, {
@@ -209,11 +231,14 @@ export async function placeRealOrder(code: string, qty: number, price: number, s
             }
         });
 
-        if (res.data.rt_cd !== '0') throw new Error(res.data.msg1);
+        if (res.data.rt_cd !== '0') {
+             console.error(`[KIS-API] Order Error [${res.data.rt_cd}]:`, res.data.msg1);
+             throw new Error(res.data.msg1);
+        }
 
         return { ODNO: res.data.output.ODNO, status: "SUCCESS", msg: res.data.msg1 };
     } catch (error: any) {
-        console.error('[KIS-API] Real Order Error:', error.message);
+        console.error('[KIS-API] Real Order Critical Error:', error.message);
         throw error;
     }
 }

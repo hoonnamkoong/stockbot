@@ -36,7 +36,13 @@ STOPWORDS = {
     '원', '만원', '천원', '억', '조', '퍼센트',
     '오늘도', '오늘은', '어제도', '내일도', '지금은', '현재가', '목표가', '매수가', '매도가',
     'ㅋㅋ', 'ㅋㅋㅋ', 'ㅋㅋㅋㅋ', 'ㅎㅎ', 'ㅎㅎㅎ', 'ㄷㄷ', 'ㄷㄷㄷ',
-    '공시', '뉴스', '속보', '특징주', '단독', '상보', '종합', '오후', '오전'
+    '공시', '뉴스', '속보', '특징주', '단독', '상보', '종합', '오후', '오전',
+    '근데', '하지만', '그리고', '그래서', '아무튼', '암튼', '이런', '저런', '그런',
+    '아니', '그게', '아니라', '있다', '없다', '있네', '없네', '많이', '조금', '진짜루',
+    '월요일', '화요일', '수요일', '목요일', '금요일', '월욜', '화욜', '수욜', '목욜', '금욜',
+    '이번주', '다음주', '지난주', '내일은', '어제는', '내일도', '어제도',
+    '가자', '가즈아', '살까', '팔까', '살까요', '팔까요', '했네', '했어', '한다', '했다',
+    '하나', '해요', '봐요', '봐라', '본다', '본격', '시작', '마감', '장전', '장후', '시간외'
 }
 
 # --- Telegram Notification Guard (Grand Protocol v12) ---
@@ -64,50 +70,32 @@ def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
     Extracts meaningful keywords from post titles,
     filtering out noise words and the stock name itself.
     """
-    # Break stock name into parts for filtering (e.g., '삼성전자' -> ['삼성전자', '삼성', '전자'])
-    name_parts = set()
-    name_parts.add(stock_name)
-    if len(stock_name) >= 4:
-        name_parts.add(stock_name[:2])
-        name_parts.add(stock_name[2:])
-        name_parts.add(stock_name[:3])
+    # Break stock name into parts for filtering
+    name_parts = {stock_name, stock_name[:2], stock_name[-2:]}
     
     word_freq = {}
     for title in titles:
-        # Remove special chars, keep Korean/English/numbers
+        # Clean special chars but keep Korean/English/Numbers
         cleaned = re.sub(r'[^가-힣a-zA-Z0-9\s]', ' ', title)
         words = cleaned.split()
         
         for word in words:
             word = word.strip()
-            # Skip: empty, single char, pure numbers, stopwords, stock name parts
-            if len(word) <= 1:
-                continue
-            if word.isdigit():
-                continue
-            if word in STOPWORDS or word.lower() in STOPWORDS:
+            # Basic filters: length, digit-only, stopwords
+            if len(word) <= 1 or word.isdigit() or word in STOPWORDS or word.lower() in STOPWORDS:
                 continue
             
-            # Check if word contains any part of the stock name
-            is_name_part = False
-            for part in name_parts:
-                if part in word:
-                    is_name_part = True
-                    break
-            if is_name_part:
+            # Stock name part filter
+            if any(part in word for part in name_parts if len(part) >= 2):
                 continue
             
-            # Simple heuristic to filter verbs/endings (다, 요, 까, 죠, 임, 함)
-            if word.endswith('다') or word.endswith('요') or word.endswith('까') or word.endswith('죠') or word.endswith('임') or word.endswith('함'):
-                continue
-
-            # Skip repetitive chars (ㅋㅋ, ㅎㅎ, ㄷㄷ, etc.)
-            if len(set(word)) == 1:
-                continue
+            # Common endings filter (verbs/adjectives/particles)
+            if re.search(r'(다|요|까|죠|임|함|네|야|어|은|는|이|가|을|를|에|의|로|으로|고|면|서|도|만)$', word):
+                if len(word) <= 3: continue 
             
             word_freq[word] = word_freq.get(word, 0) + 1
     
-    # Sort by frequency (desc), then return top N
+    # Sort and return top N
     sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
     return [w[0] for w in sorted_words[:max_keywords]]
 

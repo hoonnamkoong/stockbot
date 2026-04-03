@@ -387,6 +387,7 @@ function TradeContent() {
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Trading Dashboard</Title>
                 <Group gap="xs">
+                    <Badge color="cyan" variant="filled">v54-final-debug</Badge>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>Out</Button>
                 </Group>

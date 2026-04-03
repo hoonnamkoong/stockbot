@@ -66,7 +66,13 @@ export default function ResearchClient() {
                         StockBot {(versionInfo && typeof versionInfo !== 'string') ? versionInfo.version : 'v10.6-stable'}
                     </Title>
                     <Group ml="auto" gap="xs">
-                        <Button variant="light" color="violet" onClick={openControl} leftSection={<IconSettings size={16} />} hidden={isMobile}>
+                        <Button
+                            variant="light" color="blue" onClick={() => router.push('/trade')}
+                            leftSection={<IconCoin size={16} />}
+                        >
+                            트레이딩 보드
+                        </Button>
+                        <Button variant="light" color="violet" onClick={openControl} leftSection={<IconSettings size={16} />}>
                             스크래퍼 제어
                         </Button>
                         <ActionIcon variant="light" color="violet" size="lg" onClick={openControl} visibleFrom="mobile" hiddenFrom="sm">

@@ -1,8 +1,14 @@
 import React from 'react';
-import { Table, Text, Badge, Group, ActionIcon, ScrollArea, Box } from '@mantine/core';
+import { Table, Text, Badge, Group, ActionIcon, ScrollArea, Box, Button } from '@mantine/core';
 import { IconChevronUp, IconChevronDown, IconSelector, IconCoin } from '@tabler/icons-react';
 import { Stock, FiveDayStock, SortConfig } from '../types';
 import { Sparkline } from './Sparkline';
+
+const parseRate = (val: any) => {
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'string') return parseFloat(val.replace(/[^-0-9.]/g, '')) || 0;
+    return 0;
+};
 
 interface StockTableProps {
     stocks: Stock[];
@@ -50,8 +56,10 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                 <Table.Tbody>
                     {stocks.map((s) => (
                         <Table.Tr key={s.code}>
-                            <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
-                                <Text size="sm" fw={500}>{s.name}</Text>
+                            <Table.Td style={{ cursor: 'pointer' }}>
+                                <Text size="sm" fw={500} component="a" href={`https://finance.naver.com/item/main.naver?code=${s.code}`} target="_blank">
+                                    {s.name}
+                                </Text>
                             </Table.Td>
                             <Table.Td>
                                 <Badge size="xs" variant="outline" color={s.market === 'KOSPI' ? 'blue' : 'cyan'}>{s.market}</Badge>
@@ -63,13 +71,13 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 <Text size="sm" fw={600}>{s.current_price?.toLocaleString()}</Text>
                             </Table.Td>
                             <Table.Td>
-                                <Text size="sm" fw={600} c={s.change_rate > 0 ? 'red' : s.change_rate < 0 ? 'blue' : 'gray'}>
-                                    {s.change_rate > 0 ? '+' : ''}{s.change_rate}%
+                                <Text size="sm" fw={600} c={parseRate(s.change_rate) > 0 ? 'red' : parseRate(s.change_rate) < 0 ? 'blue' : 'gray'}>
+                                    {parseRate(s.change_rate) > 0 ? '+' : ''}{parseRate(s.change_rate).toFixed(2)}%
                                 </Text>
                             </Table.Td>
                             <Table.Td>
-                                <Text size="xs" c={s.foreign_change_rate > 0 ? 'red' : s.foreign_change_rate < 0 ? 'blue' : 'gray'}>
-                                    {s.foreign_change_rate > 0 ? '+' : ''}{s.foreign_change_rate}
+                                <Text size="xs" c={parseRate(s.foreign_change_rate) > 0 ? 'red' : parseRate(s.foreign_change_rate) < 0 ? 'blue' : 'gray'}>
+                                    {parseRate(s.foreign_change_rate) > 0 ? '+' : ''}{parseRate(s.foreign_change_rate)}
                                 </Text>
                             </Table.Td>
                             <Table.Td align="center">
@@ -102,9 +110,12 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 <Text size="10px" lineClamp={1} style={{ maxWidth: '120px' }}>{s.latest_post}</Text>
                             </Table.Td>
                             <Table.Td>
-                                <ActionIcon variant="light" color="blue" onClick={() => onQuickOrder(s)}>
-                                    <IconCoin size={16} />
-                                </ActionIcon>
+                                <Button
+                                    variant="subtle" color="blue" size="xs" onClick={() => onQuickOrder(s)}
+                                    leftSection={<IconCoin size={14} />}
+                                >
+                                    주문
+                                </Button>
                             </Table.Td>
                         </Table.Tr>
                     ))}
@@ -148,14 +159,16 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                         {data.map((s) => (
                             <Table.Tr key={s.code} onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
                                 <Table.Td>
-                                    <Text size="sm" fw={700}>{s.name} <Text span size="xs" c="dimmed" fw={400}>{s.code}</Text></Text>
+                                    <Text size="sm" fw={700} component="a" href={`https://finance.naver.com/item/main.naver?code=${s.code}`} target="_blank" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                        {s.name} <Text span size="xs" c="dimmed" fw={400}>{s.code}</Text>
+                                    </Text>
                                 </Table.Td>
                                 <Table.Td>
                                     <Text size="sm" fw={600}>{s.current_price?.toLocaleString()}원</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Text size="sm" fw={600} c={Number(s.change_rate) > 0 ? 'red' : Number(s.change_rate) < 0 ? 'blue' : 'gray'}>
-                                        {Number(s.change_rate) > 0 ? '+' : ''}{(Number(s.change_rate) || 0).toFixed(2)}%
+                                    <Text size="sm" fw={600} c={parseRate(s.change_rate) > 0 ? 'red' : parseRate(s.change_rate) < 0 ? 'blue' : 'gray'}>
+                                        {parseRate(s.change_rate) > 0 ? '+' : ''}{parseRate(s.change_rate).toFixed(2)}%
                                     </Text>
                                 </Table.Td>
                                 <Table.Td>
@@ -168,10 +181,10 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                     <Text size="sm" fw={500}>{s.total_posts?.toLocaleString()}개</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Sparkline data={s.price_history || []} color="#ff4d4f" />
+                                    <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
                                 </Table.Td>
                                 <Table.Td>
-                                    <Sparkline data={s.post_history || []} color="#ff4d4f" />
+                                    <Sparkline data={s.sparkline_posts || []} color="#228be6" />
                                 </Table.Td>
                             </Table.Tr>
                         ))}

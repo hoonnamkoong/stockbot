@@ -200,6 +200,10 @@ function TradeContent() {
     };
 
     function renderPortfolio() {
+        const deposit = balance?.deposit ?? 0;
+        const totalEval = balance?.holdings?.reduce((sum, h) => sum + ((h.price || 0) * (h.qty || 0)), 0) ?? 0;
+        const totalPL = balance?.holdings?.reduce((sum, h) => sum + (h.pl_amount || 0), 0) ?? 0;
+
         return (
             <Paper p="md" withBorder radius="md">
                 <Title order={4} mb="sm">My Portfolio (Real)</Title>
@@ -213,7 +217,7 @@ function TradeContent() {
                     <Group justify="space-between" mb="md" align="flex-end">
                         <Stack gap={0}>
                             <Text size="sm" c="dimmed">예수금</Text>
-                            <Title order={3}>{(balance?.deposit ?? 0).toLocaleString()} 원</Title>
+                            <Title order={3}>{(Number(deposit) || 0).toLocaleString()} 원</Title>
                         </Stack>
                         <Button variant="light" size="xs" onClick={() => fetchBalance()}>Refresh</Button>
                     </Group>
@@ -221,12 +225,12 @@ function TradeContent() {
                     <Group grow mb="md">
                         <Stack gap={0}>
                             <Text size="sm" c="dimmed">평가금액</Text>
-                            <Text fw={700}>{(balance?.holdings?.reduce((sum, h) => sum + (h.price * h.qty), 0) ?? 0).toLocaleString()} 원</Text>
+                            <Text fw={700}>{(Number(totalEval) || 0).toLocaleString()} 원</Text>
                         </Stack>
                         <Stack gap={0}>
                             <Text size="sm" c="dimmed">평가손익</Text>
-                            <Text fw={700} c={((balance?.holdings?.reduce((sum, h) => sum + h.pl_amount, 0)) ?? 0) >= 0 ? 'red' : 'blue'}>
-                                {(balance?.holdings?.reduce((sum, h) => sum + h.pl_amount, 0) ?? 0).toLocaleString()} 원
+                            <Text fw={700} c={totalPL >= 0 ? 'red' : 'blue'}>
+                                {(Number(totalPL) || 0).toLocaleString()} 원
                             </Text>
                         </Stack>
                     </Group>
@@ -241,7 +245,7 @@ function TradeContent() {
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
-                                {balance?.holdings?.map((h) => (
+                                {balance?.holdings && Array.isArray(balance.holdings) && balance.holdings.map((h) => (
                                     <Table.Tr key={h.code} style={{ cursor: 'pointer' }} onClick={() => setCode(h.code)}>
                                         <Table.Td>
                                             <Text size="sm" fw={500}>{h.name}</Text>
@@ -265,7 +269,8 @@ function TradeContent() {
 
     function renderGeminiPortfolio() {
         const holdingsArr = geminiBalance?.holdings ? Object.entries(geminiBalance.holdings).map(([code, h]: any) => ({ code, ...h })) : [];
-        const totalAsset = (geminiBalance?.cash || 3000000) + holdingsArr.reduce((sum, h: any) => sum + (h.qty * h.avg_price), 0);
+        const cash = Number(geminiBalance?.cash || 3000000);
+        const totalAsset = cash + holdingsArr.reduce((sum, h: any) => sum + ((h.qty || 0) * (h.avg_price || 0)), 0);
         const profitRate = ((totalAsset - 3000000) / 3000000) * 100;
 
         return (
@@ -279,7 +284,7 @@ function TradeContent() {
                     <Group justify="space-between" mb="md" align="flex-end">
                         <Stack gap={0}>
                             <Text size="sm" c="dimmed">자산총계</Text>
-                            <Title order={3}>{Math.round(totalAsset).toLocaleString()} 원</Title>
+                            <Title order={3}>{(Number(Math.round(totalAsset)) || 0).toLocaleString()} 원</Title>
                         </Stack>
                         <Text fw={700} c={profitRate >= 0 ? 'red' : 'blue'}>{profitRate.toFixed(2)}%</Text>
                     </Group>
@@ -289,7 +294,7 @@ function TradeContent() {
                                 <Table.Tr key={h.code}>
                                     <Table.Td>{h.name}</Table.Td>
                                     <Table.Td>{h.qty}주</Table.Td>
-                                    <Table.Td>{Math.round(h.avg_price).toLocaleString()} 원</Table.Td>
+                                    <Table.Td>{(Number(Math.round(h.avg_price)) || 0).toLocaleString()} 원</Table.Td>
                                 </Table.Tr>
                             ))}
                         </Table.Tbody>

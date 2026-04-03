@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table, Text, Badge, Group, ActionIcon, ScrollArea, Box, Button } from '@mantine/core';
+import { Table, Text, Badge, Group, ActionIcon, ScrollArea, Box, Button, Stack } from '@mantine/core';
 import { IconChevronUp, IconChevronDown, IconSelector, IconCoin } from '@tabler/icons-react';
 import { Stock, FiveDayStock, SortConfig } from '../types';
 import { Sparkline } from './Sparkline';
@@ -90,7 +90,7 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 {s.consecutive_days > 1 && <Badge size="xs" color="red" variant="filled">{s.consecutive_days}d</Badge>}
                             </Table.Td>
                             <Table.Td>
-                                <Text size="10px" lineClamp={1} style={{ maxWidth: '150px' }}>{s.posts_summary}</Text>
+                                <Text size="11px" fw={500}>{s.posts_summary}</Text>
                             </Table.Td>
                             <Table.Td>
                                 <Text size="xs">{s.foreign_rate}%</Text>
@@ -181,10 +181,28 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                     <Text size="sm" fw={500}>{s.total_posts?.toLocaleString()}개</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
+                                    <Stack gap={0}>
+                                        <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
+                                        {s.sparkline_price && s.sparkline_price.length > 0 && (
+                                            <Group gap={4} wrap="nowrap">
+                                                <Text size="9px" c="dimmed">{s.sparkline_price[0]?.toLocaleString()}</Text>
+                                                <Text size="9px" c="dimmed">→</Text>
+                                                <Text size="9px" c="blue" fw={700}>{s.sparkline_price[s.sparkline_price.length - 1]?.toLocaleString()}</Text>
+                                            </Group>
+                                        )}
+                                    </Stack>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Sparkline data={s.sparkline_posts || []} color="#228be6" />
+                                    <Stack gap={0}>
+                                        <Sparkline data={s.sparkline_posts || []} color="#228be6" />
+                                        {s.sparkline_posts && s.sparkline_posts.length > 0 && (
+                                            <Group gap={4} wrap="nowrap">
+                                                <Text size="9px" c="dimmed">{s.sparkline_posts[0]}</Text>
+                                                <Text size="9px" c="dimmed">→</Text>
+                                                <Text size="9px" c="blue" fw={700}>{s.sparkline_posts[s.sparkline_posts.length - 1]}</Text>
+                                            </Group>
+                                        )}
+                                    </Stack>
                                 </Table.Td>
                             </Table.Tr>
                         ))}

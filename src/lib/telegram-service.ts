@@ -40,3 +40,20 @@ export async function sendTelegramCommand(side: 'buy' | 'sell' | 'reserve_buy' |
         return false;
     }
 }
+
+/**
+ * 일반 텍스트 메시지 전송
+ */
+export async function sendTelegramMessage(text: string): Promise<boolean> {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return false;
+    try {
+        await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: text
+        });
+        return true;
+    } catch (e: any) {
+        console.error('[Telegram] Error:', e.message);
+        return false;
+    }
+}

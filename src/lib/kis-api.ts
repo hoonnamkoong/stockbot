@@ -10,7 +10,7 @@ const KIS_BASE_URL = process.env.KIS_BASE_URL || 'https://openapi.koreainvestmen
 
 // Data Paths (Single Source of Truth)
 const VIRTUAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio_virtual.json');
-const DUMMY_REAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio.json');
+// const DUMMY_REAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio.json'); // REMOVED
 
 // Token Cache
 let cachedToken: string | null = null;

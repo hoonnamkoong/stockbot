@@ -25,224 +25,176 @@ from .engine import StrategyEngine
 # --- 1. SentinelV Logic (Extracted from scraper.py) ---
 # SentinelV is now replaced by StrategyEngine in engine.py
 
-# --- 2. Gemini Agent Logic (Extracted from scraper.py) ---
+# --- 2. Gemini Agent Logic (Upgraded to 3.0 Pro) ---
 class GeminiAgent:
     def __init__(self):
         load_env()
-        self.api_key = os.environ.get('GOOGLE_API_KEY')
-        if not self.api_key:
-             # Try fallback
-             self.api_key = os.environ.get('GEMINI_KEY')
-             
+        self.api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY')
+        self.model = None
+        
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            # Fallback logic for model selection
+            models_to_try = ['gemini-3.0-pro', 'gemini-1.5-pro', 'gemini-2.5-pro', 'gemini-2.5-flash']
+            for m in models_to_try:
+                try:
+                    self.model = genai.GenerativeModel(m)
+                    # Test initialization
+                    self.model.model_name
+                    print(f"[GeminiAgent] Successfully loaded model: {m}")
+                    break
+                except Exception as e:
+                    print(f"[GeminiAgent] Fallback from {m} due to error or unavailability.")
+            
+            if not self.model:
+                print("[GeminiAgent] Warning: No models were loaded successfully.")
         else:
-            self.model = None
             print("[GeminiAgent] Warning: No API Key found.")
 
-    def generate_trading_guide(self, market_context, sentinel_signals):
-        if not self.model:
-            return "Gemini API Key missing."
-            
-        msg_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        prompt = f"""
-        Role: Senior Stock Analyst (using Gemini 2.5 Flash Lite)
-        Task: Write a "Trading Guide" (매매 가이드) in a **Narrative/Descriptive Style** (서술형).
-        Current Date: {msg_date}
-        
-        Data Sources:
-        1. Market Context: {market_context}
-        2. Top Picks ( Signals & News): {json.dumps(sentinel_signals, ensure_ascii=False, indent=2)}
-        
-        Requirement:
-        - Do NOT use simple bullet points for the main analysis. Write cohesive paragraphs (2-3 sentences per stock or group) that explain the "Why".
-        - **PRIORITY**: If there are 'SELL' signals for stocks marked as '[보유중]' (In Portfolio), analyze if they are urgent risk management or profit-taking.
-        - **RIDE THE WINNER**: If a stock is at high profit but the 'Signal' says HOLD/BUY (strong momentum), encourage holding it longer while watching for a trend reversal. Do not suggest selling just because it's up 10%.
-        - **Structure**:
-            1. **Market/Sector Overview**: Brief context if applicable.
-            2. **Portfolio Management & Top Candidate Analysis**: For the top recommended stocks AND held stocks with sell/hold signals, explicitly state your **Prediction** (예측), **Argument/Reasoning** (주장/근거), and **Why** based on the News, Signal, and Profit Rate.
-            3. **Risks/Disclosures**: Mention any critical risks found in the news.
-        - **Tone**: Persuasive technical analysis, professional, objective.
-        - **Language**: Korean (Natural, Expert tone).
+    def evaluate_momentum(self, stock_info, news_list, dart_info):
         """
+        신규 종목 매수 여부를 결정하는 최종 인공지능 평가 엔진 (JSON 반환 강제)
+        """
+        if not self.model:
+            return {"decision": "REJECTED", "momentum_score": 0, "telegram_narrative": "API Key Error"}
+            
+        prompt = f"""
+        Role: Aggressive Momentum Stock Trader
+        Task: Evaluate if the public frenzy and smart money (foreigners) are justified by an explosive catalyst (News/DART).
         
+        Data:
+        - Target Stock: {json.dumps(stock_info, ensure_ascii=False)}
+        - News Headlines: {json.dumps(news_list, ensure_ascii=False)}
+        - DART Premium: {json.dumps(dart_info, ensure_ascii=False)}
+        
+        Rule:
+        - Analyze if this is a fresh, real catalyst or just a simple thematic noise (Gap & Crap).
+        - Provide a momentum score (1-10). If >= 7, set decision to "APPROVED", else "REJECTED".
+        - 'telegram_narrative' should explicitly write a narrative of WHY the market is crazy about this, predicting tomorrow's opening gap.
+        
+        Output Strictly in valid JSON format:
+        {{
+            "decision": "APPROVED" | "REJECTED",
+            "momentum_score": 8,
+            "catalyst_summary": "Short summary of the core catalyst",
+            "telegram_narrative": "Detailed narrative for telegram report..."
+        }}
+        """
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            # Forcing JSON generation through config if supported, otherwise rely on prompt
+            response = self.model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+            return json.loads(response.text)
         except Exception as e:
-            return f"Gemini Error: {e}"
+            print(f"[GeminiAgent] Momentum Evaluation Error: {e}")
+            return {"decision": "REJECTED", "momentum_score": 0, "telegram_narrative": f"Error: {e}"}
+
+    def generate_trading_guide(self, market_context, sentinel_signals):
+        """기존 보유 종목 보고용 레거시 유지 (원할 경우 고도화 가능)"""
+        if not self.model: return "Gemini API Key missing."
+        prompt = f"Write a narrative trading summary based on: {json.dumps(sentinel_signals, ensure_ascii=False)}. Explain why we sold or held."
+        try:
+            return self.model.generate_content(prompt).text
+        except:
+            return "Error generating generic guide."
 
 # --- 3. Strategy Advisor (The Coordinator) ---
 class StrategyAdvisor:
     def __init__(self):
+        from .virtual_portfolio import VirtualPortfolioManager
+        self.vpm = VirtualPortfolioManager()
         self.engine = StrategyEngine()
         self.gemini = GeminiAgent()
         self._cached_portfolio = None
         
     def fetch_portfolio(self):
         """
-        Fetches current holdings using KIS API logic (from trade/balance.py).
-        Returns a dict: {'005930': {'qty': 10, 'avg_price': 70000}, ...}
+        Fetches virtual holdings from virtual_portfolio.json instead of KIS API.
         """
-        print("[Advisor] Fetching Portfolio...")
+        print("[Advisor] Fetching Virtual Portfolio...")
         holdings = {}
         
-        # Reuse logic from trade/balance.py (simplified)
-        access_token = get_access_token()
-        if not access_token: return {}
-        
-        load_env()
-        app_key = os.environ.get("KIS_APP_KEY")
-        app_secret = os.environ.get("KIS_APP_SECRET")
-        account_no_full = os.environ.get("KIS_ACCOUNT_NO")
-        base_url = os.environ.get("KIS_BASE_URL")
-        
-        if not (account_no_full and base_url): return {}
-
-        clean_acc = account_no_full.replace('-', '')
-        cano = clean_acc[:8]
-        acnt_prdt_cd = clean_acc[8:]
-        
-        url = f"{base_url}/uapi/domestic-stock/v1/trading/inquire-balance"
-        headers = {
-            "content-type": "application/json; charset=utf-8",
-            "authorization": f"Bearer {access_token}",
-            "appkey": app_key,
-            "appsecret": app_secret,
-            # Determine TR ID based on URL (Real vs Virtual)
-            # Real: TTTC8434R, Virtual: VTTC8434R
-            "tr_id": "VTTC8434R" if "vts" in base_url.lower() else "TTTC8434R",
-            "custtype": "P"
-        }
-        params = {
-            "CANO": cano, "ACNT_PRDT_CD": acnt_prdt_cd, "AFHR_FLPR_YN": "N", "OFL_YN": "N",
-            "INQR_DVSN": "02", "UNPR_DVSN": "01", "FUND_STTL_ICLD_YN": "N", 
-            "FNCG_AMT_AUTO_RDPT_YN": "N", "PRCS_DVSN": "00", "CTX_AREA_FK100": "", "CTX_AREA_NK100": ""
-        }
-        
         try:
-            res = requests.get(url, headers=headers, params=params, timeout=5)
-            if res.status_code == 200 and res.json()['rt_cd'] == '0':
-                items = res.json().get('output1', [])
-                for item in items:
-                    code = item.get('pdno') # Product Number (Code)
-                    qty = int(item.get('hldg_qty'))
-                    avg_price = float(item.get('pchs_avg_pric'))
-                    name = item.get('prdt_name')
+            port_data = self.vpm.get_portfolio()
+            for code, info in port_data.items():
+                qty = info.get('quantity', 0)
+                if qty > 0:
+                    avg_price = info.get('average_buy_price', 0.0)
                     
-                    if qty > 0:
-                        holdings[code] = {
-                            'name': name,
-                            'qty': qty,
-                            'avg_price': avg_price,
-                            'current_price': float(item.get('prpr')),
-                            'profit_rate': float(item.get('evlu_pfls_rt'))
-                        }
+                    # Fetch current price from Naver dynamically to compute profit
+                    current_price = avg_price
+                    try:
+                        res = requests.get(f"https://finance.naver.com/item/main.naver?code={code}", timeout=3)
+                        soup = BeautifulSoup(res.text, 'html.parser')
+                        price_tag = soup.select_one(".no_today .blind")
+                        if price_tag:
+                            current_price = float(price_tag.text.replace(',', ''))
+                    except Exception as e:
+                        print(f"[Advisor] Failed to fetch current price for {code}: {e}")
+
+                    profit_rate = ((current_price - avg_price) / avg_price) * 100.0 if avg_price > 0 else 0.0
+                    
+                    holdings[code] = {
+                        'name': info.get('name', 'Unknown'),
+                        'qty': qty,
+                        'avg_price': avg_price,
+                        'current_price': current_price,
+                        'profit_rate': profit_rate
+                    }
         except Exception as e:
-            print(f"[Advisor] Portfolio Fetch Error: {e}")
+            print(f"[Advisor] Virtual Portfolio Fetch Error: {e}")
             
-        print(f"[Advisor] Portfolio loaded: {len(holdings)} items")
+        print(f"[Advisor] Virtual Portfolio loaded: {len(holdings)} items")
         return holdings
 
-    def fetch_specific_news(self, code, stock_name):
-        """
-        Fetches specific news for a stock.
-        Priority 1: Naver Search (Mobile) - Broader coverage
-        Priority 2: Naver Finance (Item News) - Specific to stock
-        """
-        news_list = []
+    def check_dart_filings(self, stock_name, stock_code):
+        load_env()
+        dart_key = os.environ.get('DART_API_KEY')
+        result = {"premium": [], "hard_reject": False, "summary": "No Issues"}
         
-        # --- Priority 1: Naver Mobile Search ---
+        # Hard Reject & Premium Keywords
+        reject_kws = ["전환사채", "신주인수권부사채", "유상증자", "주식등의대량보유상황보고서", "임원ㆍ주요주주특정증권등소유상황보고서"]
+        premium_kws = ["단일판매ㆍ공급계약체결", "자기주식취득", "무상증자"]
+
+        if not dart_key:
+            result["summary"] = "DART API Key Missing (Skipped)"
+            return result
+
         try:
-            encoded_query = urllib.parse.quote(stock_name)
-            url = f"https://m.search.naver.com/search.naver?where=m_news&query={encoded_query}&sm=mtb_jum&sort=1"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
-            }
+            url = f"https://opendart.fss.or.kr/api/list.json?crtfc_key={dart_key}&bgn_de={datetime.datetime.now().strftime('%Y%m%d')}"
+            res = requests.get(url, timeout=3)
             
-            res = requests.get(url, headers=headers, timeout=3)
-            soup = BeautifulSoup(res.text, 'html.parser')
+            naver_url = f"https://finance.naver.com/item/news_notice.naver?code={stock_code}"
+            n_res = requests.get(naver_url, timeout=3)
+            soup = BeautifulSoup(n_res.text, 'html.parser')
+            titles = soup.select('.title a')
             
-            groups = soup.select('.group_news')
-            for g in groups[:3]: # Top 3 items
-                # Naver Mobile structure uses dynamic classes. 
-                # Strategy: Find the anchor tag with the longest text (likely the title)
-                links = g.find_all('a')
-                if not links: continue
-                
-                # Filter out small icon links or buttons
-                valid_links = [a for a in links if len(a.get_text(strip=True)) > 10]
-                
-                if valid_links:
-                    # Usually the first long link is the title in the card
-                    title_tag = valid_links[0]
-                    title = title_tag.get_text(strip=True)
-                    link = title_tag['href']
-                    
-                    # Try to find source (usually a short link/span before the title, or inside .press class)
-                    source = "NaverSearch"
-                    try:
-                        press = g.select_one('.press')
-                        if press: source = press.get_text(strip=True)
-                    except: pass
-                    
-                    news_list.append({'title': f"[{source}] {title}", 'link': link})
+            for t in titles:
+                text = t.get_text(strip=True)
+                if any(k in text for k in reject_kws):
+                    result["hard_reject"] = True
+                    result["summary"] = f"Hard Reject: {text}"
+                    break
+                if any(k in text for k in premium_kws):
+                    result["premium"].append(text)
+                    result["summary"] = f"Premium Filing Found: {text}"
                     
         except Exception as e:
-            print(f"[Advisor] Naver Search Fetch Failed for {stock_name}: {e}")
-
-        # --- Priority 2: Fallback to Naver Finance if Search failed ---
-        if not news_list:
-            try:
-                # url = f"https://finance.naver.com/item/news_news.naver?code={code}&page=1"
-                # headers = {
-                #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                #     "Referer": f"https://finance.naver.com/item/main.naver?code={code}"
-                # }
-                
-                # res = requests.get(url, headers=headers, timeout=3)
-                # res.encoding = 'EUC-KR'
-                # soup = BeautifulSoup(res.text, 'html.parser')
-                
-                # titles = soup.select('.title')
-                # if not titles: titles = soup.select('.tit')
-                # if not titles: 
-                #     links = soup.find_all('a', class_='tit')
-                #     if links: titles = links
-                
-                # for t in titles[:3]:
-                #     a_tag = len(t.find_all('a')) > 0 and t.find('a') or (t.name == 'a' and t)
-                    
-                #     if a_tag:
-                #         title = a_tag.get_text(strip=True)
-                #         link = "https://finance.naver.com" + a_tag['href']
-                #         news_list.append({'title': title, 'link': link})
-                # --- Simplified Fallback (Commented out to rely on search for now as per user request to SWITCH) ---
-                pass
-            except Exception as e:
-                print(f"[Advisor] Naver Finance Fallback Failed: {e}")
+            print(f"[Advisor] DART API Error for {stock_name}: {e}")
+            result["summary"] = f"DART Error Exception (Safe Skip): {e}"
             
-        return news_list
+        return result
 
-    def get_portfolio(self):
-        """Returns cached portfolio or fetches new if needed."""
-        if self._cached_portfolio is None:
-            self._cached_portfolio = self.fetch_portfolio()
-        return self._cached_portfolio
+    def crosscheck_news_keywords(self, news_list, stock_name):
+        return len(news_list) > 0
 
-    def analyze_candidates(self, candidates):
+    def analyze_candidates(self, candidates, allow_buy=True):
         """
-        Main Logic:
-        1. Calculate Score for all candidates.
-        2. Merge Portfolio stocks into candidates.
-        3. Rank and pick Top 10.
-        4. Generate Final Recommendations.
+        Hybrid Engine Logic:
+        1. Evaluate 1st Gate (4 Factors via Engine) for NEW candidates.
         """
-        print("[Advisor] Analyzing Candidates...")
+        print("[Advisor] Running Hybrid Engine Candidate Analysis...")
         portfolio = self.get_portfolio()
         
-        # 1. Ensure Portfolio stocks are in the candidate list
         existing_codes = {c.get('code') for c in candidates}
         for code, info in portfolio.items():
             if code not in existing_codes:
@@ -250,7 +202,7 @@ class StrategyAdvisor:
                     'code': code,
                     'name': info['name'],
                     'price': info['current_price'],
-                    'change_rate': f"{info['profit_rate']}%", # Approximation
+                    'change_rate': 0.0,
                     'source': 'portfolio'
                 })
 
@@ -258,31 +210,71 @@ class StrategyAdvisor:
         for stock in candidates:
             code = stock.get('code')
             name = stock.get('name')
+            in_portfolio = code in portfolio
             
-            # --- 1. Scoring (Delegated to Engine) ---
             score, p_change = self.engine.calculate_score(stock)
             
-            # --- 2. Signal (Delegated to Engine) ---
-            in_portfolio = code in portfolio
             p_info = portfolio.get(code)
             profit_rate = p_info.get('profit_rate', 0) if in_portfolio else 0.0
             
-            signal, confidence = self.engine.get_signal(score, p_change, in_portfolio, profit_rate)
+            post_count_diff_pct = 0.0
+            positive_rate = float(stock.get('positive_rate', 50.0))
+            
+            signal, confidence = self.engine.get_signal(
+                score=score, 
+                p_change=p_change, 
+                in_portfolio=in_portfolio, 
+                profit_rate=profit_rate,
+                post_count_diff_pct=post_count_diff_pct,
+                positive_rate=positive_rate
+            )
             
             action = "WATCH"
             target_price = 0
+            custom_reason = ""
             
-            # --- 3. Action Assignment ---
-            if signal == "SELL":
-                if in_portfolio:
+            if in_portfolio:
+                if "SELL" in signal:
                     action = "SELL_EXECUTE"
-                    target_price = stock.get('price', 0)
-                else:
-                    continue # Skip non-held sell signals
-            elif "BUY" in signal:
-                action = "BUY_MORE" if in_portfolio else "BUY_NEW"
-                target_price = float(stock.get('price', 0)) * 1.05
+                    custom_reason = f"Adaptive Exit: {signal} (Profit: {profit_rate:.2f}%)"
+                    
+                    if signal == "SELL_ALL":
+                        self.vpm.sell_stock(code)
+                    elif signal == "SELL_HALF":
+                        qty = p_info.get('qty', 0)
+                        half_qty = max(1, int(qty / 2))
+                        self.vpm.sell_stock(code, sell_qty=half_qty)
+                        custom_reason += f" [50% Scale-out]"
+                        
+                elif signal == "HOLD":
+                    action = "HOLD"
+                    custom_reason = f"Velocity Hold (Profit: {profit_rate:.2f}%)"
+            # --- New Candidates Evaluation (15:15 Only ideally) ---
+            elif signal == "BUY_CANDIDATE":
+                if not allow_buy:
+                    continue # 장중 모드이므로 매수 후보 발굴 자체를 스킵
                 
+                # 2nd Gate: News & DART
+                news_list = self.fetch_specific_news(code, name)
+                if not self.crosscheck_news_keywords(news_list, name):
+                    action = "REJECTED (No News)"
+                    continue
+                    
+                dart_info = self.check_dart_filings(name, code)
+                if dart_info.get("hard_reject"):
+                    action = f"REJECTED (DART: {dart_info['summary']})"
+                    continue
+                    
+                gemini_eval = self.gemini.evaluate_momentum(stock, news_list, dart_info)
+                if gemini_eval.get("decision") == "APPROVED":
+                    action = "BUY_EXECUTE"
+                    target_price = float(stock.get('price', 0))
+                    custom_reason = gemini_eval.get("telegram_narrative", "Approved by Gemini 3.0")
+                    
+                    self.vpm.buy_stock(code, name, target_price, quantity=20)
+                else:
+                    action = f"REJECTED (AI Score: {gemini_eval.get('momentum_score')})"
+
             results.append({
                 'code': code,
                 'name': name,
@@ -294,10 +286,9 @@ class StrategyAdvisor:
                 'in_portfolio': in_portfolio,
                 'profit_rate': profit_rate,
                 'today_change': p_change,
-                'factors': {}, # Detailed factors can be added to engine later
-                'custom_reason': ""
-            })
-            
+                'factors': stock,
+                'custom_reason': custom_reason
+            })            
         # 3. Rank by Score
         results.sort(key=lambda x: x['score'], reverse=True)
         
@@ -312,12 +303,12 @@ class StrategyAdvisor:
             
         return top_picks
 
-    def generate_report(self, candidates):
+    def generate_report(self, candidates, allow_buy=True):
         """
         Generates the final human-readable report string.
         """
         # 1. Analyze ALL candidates first
-        all_results = self.analyze_candidates(candidates)
+        all_results = self.analyze_candidates(candidates, allow_buy=allow_buy)
         
         # 2. Filter for Report (Top 6 + Sells)
         # - Top 6 by Score

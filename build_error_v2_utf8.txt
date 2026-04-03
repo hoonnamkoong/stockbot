@@ -1,0 +1,73 @@
+﻿
+> stock-dashboard@0.1.0 build
+> next build
+
+   ??Next.js 14.0.0
+   - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+node.exe : (node:15216) [D
+EP_WEBPACK_MODULE_UPDATE_H
+ASH] DeprecationWarning: M
+odule.updateHash: Use new 
+ChunkGraph API
+위치 줄:1 문자:1
++ & "C:\Program Files\node
+js/node.exe" "C:\Program F
+iles\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: ((  
+  node:15216) [D... Chu   
+ nkGraph API:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+(Use `node --trace-depreca
+tion ...` to show where th
+e warning was created)
+ ??Compiled successfully
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/lib/kis-api-legacy.t
+s:8:37
+Type error: Cannot find mo
+dule './github-db' or its 
+corresponding type declara
+tions.
+
+[0m [90m  6 |[39m [36m
+import[39m path [36mfrom
+[39m [32m'path'[39m[33
+m;[39m[0m
+[0m [90m  7 |[39m [36m
+import[39m os [36mfrom[
+39m [32m'os'[39m[33m;[
+39m[0m
+[0m[31m[1m>[22m[39m[
+90m  8 |[39m [36mimport
+[39m { fetchFile[33m,[39
+m saveFile } [36mfrom[39
+m [32m'./github-db'[39m
+[33m;[39m[0m
+[0m [90m    |[39m      
+                          
+     [31m[1m^[22m[39m
+[0m
+[0m [90m  9 |[39m[0m
+[0m [90m 10 |[39m [36m
+let[39m [33mACCESS_TOKEN
+[39m[33m:[39m string [
+33m|[39m [36mnull[39m 
+[33m=[39m [36mnull[39m
+[33m;[39m[0m
+[0m [90m 11 |[39m [36m
+let[39m [33mEXPIRES_AT[
+39m[33m:[39m number [33
+m=[39m [35m0[39m[33m;
+[39m[0m

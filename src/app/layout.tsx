@@ -3,6 +3,8 @@ import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 
 import AuthSessionProvider from './components/AuthSessionProvider';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
     title: 'Stock Dashboard',
     description: 'KIS Trading Dashboard',

@@ -78,7 +78,8 @@ function TradeContent() {
         if (typeof window === 'undefined') return;
         if (!silent) setLoading(true);
         try {
-            const res = await axios.get(`/api/portfolio/real?t=${Date.now()}`);
+            const res = await axios.get(`/api/portfolio/real?cb=${Date.now()}&v=55`);
+            console.log("[DEBUG] Real Portfolio Response:", res.data);
             if (res.data.error) {
                 if (!silent) showNotify('API Error (KIS)', res.data.error, 'red');
                 console.error("KIS API Error:", res.data.error);
@@ -387,7 +388,7 @@ function TradeContent() {
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Trading Dashboard</Title>
                 <Group gap="xs">
-                    <Badge color="cyan" variant="filled">v54-final-debug</Badge>
+                    <Badge color="pink" variant="filled">v55-super-debug</Badge>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>Out</Button>
                 </Group>

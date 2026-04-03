@@ -8,11 +8,11 @@
 
 시스템은 분산형 하이브리드 자동화 구조를 가집니다.
 
-- **Trigger Layer**: `Tasker (Android App)`가 정해진 스케줄(보통 정시)마다 Vercel API(`/api/cron`) 호출.
-- **Orchestration Layer**: `Vercel API`가 호출을 받아 KST 요일 검증(주중만 실행) 후 `GitHub Workflow Dispatch` 실행. (내부 시간 제약 없이 호출 즉시 실행)
-- **Execution Layer**: `GitHub Actions (Ubuntu Runner)`가 Python 스크립트 실행. 
-- **Storage Layer**: `GitHub db-data branch`를 NoSQL 데이터베이스처럼 활용 (JSON/XLSX 저장).
-- **Presentation Layer**: `Next.js 14 (Vercel)` 대시보드가 GitHub의 Raw 데이터를 직접 Fetch하여 시각화.
+- **Trigger Layer**: `Tasker (Android)` 또는 `Cron Job`이 Vercel API(`/api/trade/schedule` 등) 호출.
+- **Execution Layer**: `Vercel Server (Next.js)`가 한국투자증권(KIS) REST API와 **직접 통신**. (중간 매개체 없이 서버-to-서버 직결)
+- **Intelligence Layer**: `Gemini 1.5 Pro/Flash` API를 통해 실시간 전략 수립 및 거래 리포트 자동 생성.
+- **Storage Layer**: 로컬 파일 시스템(`data/*.json`)을 **Single Source of Truth (SSOT)**로 활용. 
+- **Presentation Layer**: `Next.js 14` 대시보드가 통합 API(`/api/portfolio/[type]`)를 통해 실시간 데이터 렌더링.
 
 ---
 
@@ -68,12 +68,11 @@
 
 ## 5. 포트폴리오 및 매매 로직 (Portfolio Logic)
 
-### 5.1 Gemini 가상 매매 (Paper Trading)
 - **초기 자본**: 3,000,000 KRW (가상).
+- **데이터 소스**: `data/portfolio_virtual.json` (단립 소스 관리).
 - **종목 비중**: 자산 대비 최대 **20%** 배분.
 - **BULL**: 익절 20%, 손절 -7%, 보유 10일.
-  - **BEAR/NEUTRAL**: 익절 10%, 손절 -5%, 보유 7일.
-- **매매 타이밍**: 별도의 내부 스케줄 없이, **태스커에 의해 스크래퍼가 실행될 때마다(Run on Trigger)** 즉시 분석 및 매매 로직 집행.
+- **BEAR/NEUTRAL**: 익절 10%, 손절 -5%, 보유 7일.
 - **수수료 체계**: 매수 0.015%, 매도 0.2115% (제비용 포함).
 
 ### 5.2 KIS 실거래 인증 (`auth.py`)
@@ -86,9 +85,9 @@
 
 ### 6.1 기술 스택: Next.js 14 + Mantine 7.x
 - **Trade Page (`/trade`)**:
-  - 잔고 조회: `api/trade/account-balance` 연동.
+  - 잔고 조회: 통합 API `/api/portfolio/[type]` (real, virtual) 연동.
   - 주문 폼: 일반 주문 및 **PIN 번호(4자리)** 기반 보안 확인.
-  - 예약 매매: 클라이언트 측 `useInterval` (30초)을 통한 스케줄 체크 로직.
+  - 가상/실전 모드 선택: `isVirtual` 플래그를 통한 백엔드 분기 처리.
 - **Research Page (`/research`)**:
   - 히스토리 뷰어: `reports.json`을 통해 과거 엑셀/JSON 리포트 인덱싱.
   - 시각화: `Sparkline` 컴포넌트를 사용하여 5일간의 **가격-거래량-토론량** 추이 차트 제공.

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Modal, Tabs, Group, Button, Stack, Select, NumberInput, Text, Badge, LoadingOverlay, PinInput, ThemeIcon } from '@mantine/core';
-import { IconLock, IconShieldLock } from '@tabler/icons-react';
+import { Modal, Tabs, Group, Button, Stack, NumberInput, Text, Badge, LoadingOverlay, PinInput, ThemeIcon, Notification } from '@mantine/core';
+import { IconLock, IconShieldLock, IconCheck, IconX } from '@tabler/icons-react';
 import axios from 'axios';
 
 interface QuickOrderModalProps {
@@ -22,8 +22,9 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
     const [resMin, setResMin] = useState<number | string>(15);
     const [loading, setLoading] = useState(false);
     const [pin, setPin] = useState('');
-    const [pinStage, setPinStage] = useState(false); // If true, show PIN input instead of form
-    const [notification, setNotification] = useState<string | null>(null);
+    const [pinStage, setPinStage] = useState(false);
+    const [notification, setNotification] = useState<{ color: string; msg: string } | null>(null);
+    const [activeTab, setActiveTab] = useState<string | null>('immediate');
     const pinContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -32,91 +33,73 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
             setPinStage(false);
             setPin('');
             setNotification(null);
+            setLoading(false);
         }
     }, [opened, initialCode]);
 
-    const handleOrderClick = () => {
-        setPinStage(true);
-    };
-
     useEffect(() => {
         if (pinStage) {
-            // "Shotgun" approach: Try to focus multiple times to guarantee success
-            // despite React rendering delays, Modal animations (approx 200ms), or browser handling.
             const focusInput = () => {
                 if (pinContainerRef.current) {
-                    // Start from the container and find the real input
                     const input = pinContainerRef.current.querySelector('input:not([type="hidden"])') as HTMLInputElement;
-                    if (input) {
-                        // Force focus
-                        input.focus();
-                        // input.select(); // Optional: select all if needed
-                    }
+                    if (input) input.focus();
                 }
             };
-
-            // 1. Immediate try
             focusInput();
-
-            // 2. Short delay (after render)
             setTimeout(focusInput, 50);
-
-            // 3. Medium delay (during animation)
             setTimeout(focusInput, 200);
-
-            // 4. Long delay (after animation settles)
             setTimeout(focusInput, 500);
         }
     }, [pinStage]);
 
-    const confirmOrder = async () => {
-        setLoading(true);
-        try {
-            const isReservation = (document.querySelector('[data-value="reservation"][data-active="true"]') !== null) || false;
-            // Better to track tab state, but local state 'activeTab' is easier.
-            // Let's rely on a separate state for tab if possible, or just pass it.
-            // Simplified: We need a state for activeTab.
-        } catch (e) {
-            // ...
-        }
+    const handleOrderClick = () => {
+        setNotification(null);
+        setPinStage(true);
     };
 
-    // We need 'activeTab' state to know if it's reservation.
-    const [activeTab, setActiveTab] = useState<string | null>('immediate');
+    const executeOrder = async (completedPin?: string) => {
+        const pinToUse = completedPin || pin;
+        if (pinToUse.length !== 4) return;
 
-    const executeOrder = async () => {
         setLoading(true);
         try {
             let res;
             if (activeTab === 'reservation') {
                 res = await axios.post('/api/trade/reservation', {
-                    code, qty, price, hour: resHour, minute: resMin, side: orderType, pin
+                    code, qty, price, hour: resHour, minute: resMin, side: orderType, pin: pinToUse
                 });
             } else {
                 res = await axios.post('/api/trade/order', {
-                    code, qty, price, side: orderType, pin
+                    code,
+                    name: initialName || code,
+                    qty,
+                    price,
+                    side: orderType,
+                    pin: pinToUse
                 });
             }
 
-            // Check if order was actually successful
-            if (res.data.success && res.data.data) {
-                const orderNo = res.data.data.ODNO || res.data.data.ORD_NO || 'N/A';
-                // REPLACED: Removed alert(), added dispatch callback for polling
-                if (onOrderDispatched) onOrderDispatched(orderNo);
+            if (res.data.success) {
+                const odno = res.data.data?.ODNO || `SIM-${Date.now()}`;
+                if (onOrderDispatched) onOrderDispatched(odno);
                 onClose();
             } else {
-                // API returned success:true but no order data - this is an error
-                const errorMsg = res.data.error || res.data.message || '주문 실패 (응답 데이터 없음)';
-                onClose(); // Just close, polling handles failure if ODNO is missing? 
-                // Or just rely on parent to handle overall failure.
+                const errorMsg = res.data.error || '주문 실패';
+                setNotification({ color: 'red', msg: errorMsg });
+                setPinStage(false);
+                setPin('');
             }
         } catch (error: any) {
             const errorMsg = error.response?.data?.error || error.message || '알 수 없는 오류';
-            onClose();
-        } finally {
-            setLoading(false);
+            if (error.response?.status === 401) {
+                setNotification({ color: 'red', msg: 'PIN 번호가 올바르지 않습니다' });
+            } else {
+                setNotification({ color: 'red', msg: `주문 실패: ${errorMsg}` });
+            }
             setPinStage(false);
             setPin('');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -134,24 +117,35 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
         >
             <LoadingOverlay visible={loading} />
 
+            {notification && (
+                <Notification
+                    color={notification.color}
+                    mb="md"
+                    onClose={() => setNotification(null)}
+                    icon={notification.color === 'red' ? <IconX size={14} /> : <IconCheck size={14} />}
+                >
+                    {notification.msg}
+                </Notification>
+            )}
+
             {!pinStage ? (
                 <Tabs value={activeTab} onChange={setActiveTab}>
                     <Tabs.List mb="md">
-                        <Tabs.Tab value="immediate">Immediate</Tabs.Tab>
-                        <Tabs.Tab value="reservation">Reservation</Tabs.Tab>
+                        <Tabs.Tab value="immediate">즉시 주문</Tabs.Tab>
+                        <Tabs.Tab value="reservation">예약 주문</Tabs.Tab>
                     </Tabs.List>
 
                     <Tabs.Panel value="immediate">
                         <Stack>
                             <Group grow>
-                                <Button color="red" variant={orderType === 'buy' ? 'filled' : 'outline'} onClick={() => setOrderType('buy')}>BUY</Button>
-                                <Button color="blue" variant={orderType === 'sell' ? 'filled' : 'outline'} onClick={() => setOrderType('sell')}>SELL</Button>
+                                <Button color="red" variant={orderType === 'buy' ? 'filled' : 'outline'} onClick={() => setOrderType('buy')}>매수 (BUY)</Button>
+                                <Button color="blue" variant={orderType === 'sell' ? 'filled' : 'outline'} onClick={() => setOrderType('sell')}>매도 (SELL)</Button>
                             </Group>
-                            <Text size="sm">Code: {code}</Text>
-                            <NumberInput label="Quantity" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
-                            <NumberInput label="Price (0=Market)" value={price} onChange={(v) => setPrice(v || 0)} />
-                            <Button size="lg" onClick={handleOrderClick} loading={loading} disabled={loading}>
-                                {loading ? '[전송 중...]' : 'Submit Order'}
+                            <Text size="sm" c="dimmed">종목코드: {code} {initialName ? `(${initialName})` : ''}</Text>
+                            <NumberInput label="수량" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
+                            <NumberInput label="가격 (0 = 시장가)" value={price} onChange={(v) => setPrice(v || 0)} />
+                            <Button size="lg" color={orderType === 'buy' ? 'red' : 'blue'} onClick={handleOrderClick} loading={loading} disabled={loading}>
+                                {orderType === 'buy' ? '매수 주문' : '매도 주문'}
                             </Button>
                         </Stack>
                     </Tabs.Panel>
@@ -159,17 +153,17 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
                     <Tabs.Panel value="reservation">
                         <Stack>
                             <Group grow>
-                                <Button color="red" variant={orderType === 'buy' ? 'filled' : 'outline'} onClick={() => setOrderType('buy')}>BUY</Button>
-                                <Button color="blue" variant={orderType === 'sell' ? 'filled' : 'outline'} onClick={() => setOrderType('sell')}>SELL</Button>
+                                <Button color="red" variant={orderType === 'buy' ? 'filled' : 'outline'} onClick={() => setOrderType('buy')}>매수 (BUY)</Button>
+                                <Button color="blue" variant={orderType === 'sell' ? 'filled' : 'outline'} onClick={() => setOrderType('sell')}>매도 (SELL)</Button>
                             </Group>
                             <Group grow>
-                                <NumberInput label="Hour" value={resHour} onChange={setResHour} min={0} max={23} />
-                                <NumberInput label="Minute" value={resMin} onChange={setResMin} min={0} max={59} />
+                                <NumberInput label="시 (Hour)" value={resHour} onChange={setResHour} min={0} max={23} />
+                                <NumberInput label="분 (Minute)" value={resMin} onChange={setResMin} min={0} max={59} />
                             </Group>
-                            <NumberInput label="Quantity" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
-                            <NumberInput label="Price (0=Market)" value={price} onChange={(v) => setPrice(v || 0)} />
+                            <NumberInput label="수량" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
+                            <NumberInput label="가격 (0 = 시장가)" value={price} onChange={(v) => setPrice(v || 0)} />
                             <Button size="lg" color="violet" onClick={handleOrderClick} loading={loading} disabled={loading}>
-                                {loading ? '[전송 중...]' : 'Schedule'}
+                                예약 등록
                             </Button>
                         </Stack>
                     </Tabs.Panel>
@@ -181,8 +175,16 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
                     </ThemeIcon>
                     <Text fw={700} size="lg">보안 거래 인증</Text>
                     <Text c="dimmed" size="sm" ta="center">안전한 거래를 위해<br />PIN 번호 4자리를 입력해주세요.</Text>
-                    <PinInput length={4} type="number" mask value={pin} onChange={setPin} onComplete={executeOrder} autoFocus />
-                    <Button variant="subtle" onClick={() => setPinStage(false)}>Back</Button>
+                    <PinInput
+                        length={4}
+                        type="number"
+                        mask
+                        value={pin}
+                        onChange={setPin}
+                        onComplete={(val) => executeOrder(val)}
+                        autoFocus
+                    />
+                    <Button variant="subtle" onClick={() => { setPinStage(false); setPin(''); }}>취소</Button>
                 </Stack>
             )}
         </Modal>

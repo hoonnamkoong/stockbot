@@ -154,15 +154,15 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                     <Text size="sm" fw={600}>{s.current_price?.toLocaleString()}원</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Text size="sm" fw={600} c={s.change_rate > 0 ? 'red' : s.change_rate < 0 ? 'blue' : 'gray'}>
-                                        {s.change_rate > 0 ? '+' : ''}{s.change_rate?.toFixed(2)}%
+                                    <Text size="sm" fw={600} c={Number(s.change_rate) > 0 ? 'red' : Number(s.change_rate) < 0 ? 'blue' : 'gray'}>
+                                        {Number(s.change_rate) > 0 ? '+' : ''}{(Number(s.change_rate) || 0).toFixed(2)}%
                                     </Text>
                                 </Table.Td>
                                 <Table.Td>
                                     <Badge size="sm" color="gray" variant="filled" radius="xl">{s.count}일 연속</Badge>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Text size="sm" fw={500}>{s.avg_posts?.toFixed(0)}개</Text>
+                                    <Text size="sm" fw={500}>{(Number(s.avg_posts) || 0).toFixed(0)}개</Text>
                                 </Table.Td>
                                 <Table.Td>
                                     <Text size="sm" fw={500}>{s.total_posts?.toLocaleString()}개</Text>

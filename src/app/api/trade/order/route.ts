@@ -1,53 +1,103 @@
 import { NextResponse } from 'next/server';
-import { placeOrder } from '@/lib/kis-api';
-import path from 'path';
+import { placeRealOrder } from '@/lib/kis-api';
+import { sendTelegramMessage } from '@/lib/telegram-service';
 import fs from 'fs/promises';
+import path from 'path';
+import axios from 'axios';
 
-async function updateOrderHistory(code: string) {
-    try {
-        const filePath = path.join(process.cwd(), 'data', 'order_history.json');
-
-        let history: Record<string, string> = {};
-        try {
-            const data = await fs.readFile(filePath, 'utf-8');
-            history = JSON.parse(data);
-        } catch { }
-
-        const now = new Date();
-        const dateStr = now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false });
-
-        history[code] = dateStr;
-        await fs.writeFile(filePath, JSON.stringify(history, null, 2), 'utf-8');
-    } catch (e: any) {
-        // On Vercel (Read-Only), this will fail. We should NOT fail the order because of this.
-        console.warn("Failed to update order history (likely Read-Only FS):", e.message);
-    }
-}
+const VIRTUAL_PORTFOLIO_PATH = path.join(process.cwd(), 'data', 'portfolio_virtual.json');
+const PIN = process.env.TRADE_PIN || '1234';
 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { code, qty, price, side, pin } = body;
+        const { code, qty, price, side, isVirtual, pin } = body;
 
-        // PIN Verification
-        if (pin !== process.env.TRADE_PIN) {
-            return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
-        }
-
+        // Validation
         if (!code || !qty || !side) {
-            return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+            return NextResponse.json({ error: '필수 파라미터 누락' }, { status: 400 });
         }
 
-        const output = await placeOrder(code, Number(qty), Number(price), side);
-
-        // Track history if BUY
-        if (side === 'buy') {
-            await updateOrderHistory(code);
+        // 1. PIN Verification (for Real trade)
+        if (!isVirtual && pin !== PIN) {
+            return NextResponse.json({ error: 'Invalid TRADING PIN' }, { status: 403 });
         }
 
-        return NextResponse.json({ success: true, data: output });
+        let result: any;
 
+        if (isVirtual) {
+            // [VIRTUAL] Direct JSON Update (SSOT)
+            const data = await fs.readFile(VIRTUAL_PORTFOLIO_PATH, 'utf-8');
+            const portfolio = JSON.parse(data);
+            
+            const tradePrice = Number(price) || 50000; 
+            const totalCost = tradePrice * Number(qty);
+
+            if (side === 'buy') {
+                if (portfolio.cash < totalCost) throw new Error('가상 예수금이 부족합니다.');
+                portfolio.cash -= totalCost;
+                if (!portfolio.holdings[code]) {
+                    portfolio.holdings[code] = { name: code, qty: 0, avg_price: 0, days_held: 0 };
+                }
+                const h = portfolio.holdings[code];
+                const newTotalCost = (h.qty * h.avg_price) + totalCost;
+                h.qty += Number(qty);
+                h.avg_price = newTotalCost / h.qty;
+            } else {
+                if (!portfolio.holdings[code] || portfolio.holdings[code].qty < Number(qty)) {
+                    throw new Error('가상 보유 수량이 부족합니다.');
+                }
+                portfolio.cash += totalCost;
+                portfolio.holdings[code].qty -= Number(qty);
+                if (portfolio.holdings[code].qty === 0) delete portfolio.holdings[code];
+            }
+
+            portfolio.trade_log.push({
+                date: new Date().toISOString(),
+                type: side.toUpperCase(),
+                code,
+                name: code,
+                price: tradePrice,
+                qty: Number(qty),
+                reason: 'Manual Virtual Trade'
+            });
+
+            await fs.writeFile(VIRTUAL_PORTFOLIO_PATH, JSON.stringify(portfolio, null, 2));
+            result = { status: 'SUCCESS', msg: '가상 주문이 로컬 데이터에 반영되었습니다.' };
+        } else {
+            // [REAL] Direct KIS REST API
+            result = await placeRealOrder(code, Number(qty), Number(price), side);
+        }
+
+        // 2. AI Analysis & Telegram Reporting
+        try {
+            const report = await generateAiReport(code, side, isVirtual);
+            await sendTelegramMessage(`[거래봇 알림]\n종목: ${code}\n구분: ${side.toUpperCase()}\n모드: ${isVirtual ? 'VIRTUAL' : 'REAL'}\n\n🤖 AI 코멘트:\n${report}`);
+        } catch (e) {
+            console.error('Report Error:', e);
+        }
+
+        return NextResponse.json({ success: true, data: result });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('[API-Order] Error:', error.message);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+}
+
+async function generateAiReport(code: string, side: string, isVirtual: boolean) {
+    const GEMINI_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY;
+    if (!GEMINI_KEY) return "AI 리포트 기능을 사용할 수 없습니다. (API Key 누락)";
+
+    const prompt = `주식 종목 ${code}를 ${isVirtual ? '가상' : '실전'}으로 ${side === 'buy' ? '매수' : '매도'} 했습니다. 
+    이 거래의 전략적 의미를 4월 모멘텀 알고리즘(Adaptive Attention Momentum) 관점에서 2~3문장으로 분석해줘.`;
+
+    try {
+        const res = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+            { contents: [{ parts: [{ text: prompt }] }] }
+        );
+        return res.data.candidates[0].content.parts[0].text;
+    } catch {
+        return "AI 리포트 생성 중 오류가 발생했습니다.";
     }
 }

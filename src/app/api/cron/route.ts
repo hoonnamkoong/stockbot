@@ -12,7 +12,9 @@ export async function GET(request: Request) {
 
     try {
         // Parse debug params
-        const { searchParams } = new URL(request.url);
+        const urlStr = request.url || '';
+        const parsedUrl = urlStr.startsWith('http') ? new URL(urlStr) : new URL(urlStr, 'http://localhost');
+        const { searchParams } = parsedUrl;
         const debugHour = searchParams.get('hour');
         const debugMinute = searchParams.get('minute');
 

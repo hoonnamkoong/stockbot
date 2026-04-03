@@ -1190,24 +1190,29 @@ if __name__ == "__main__":
         if trigger_reason:
             print(f"[System] Notification Triggered by: {trigger_reason}")
 
+        # ── 전략 리포트 생성 (알림 여부 상관없이 백그라운드로 매번 실행하여 방어 로직 상시 가동) ─────────────────────────────
+        advisor_report_text = ""
+        is_market_close = (now_kst.hour == 15 and 0 <= now_kst.minute <= 30)
+        is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
+        allow_buy = is_market_close or is_forced
+
+        if all_data:
+            try:
+                advisor = StrategyAdvisor()
+                print(f"[System] Generating Strategy Report and running defensive logics (allow_buy={allow_buy})...")
+                advisor_report_text, _ = advisor.generate_report(all_data, allow_buy=allow_buy)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"[ERROR] Strategy Advisor Failed: {type(e).__name__}: {e}")
+                advisor_report_text = f"[전략 리포트 생성 실패: {type(e).__name__}]"
+
         if all_data and should_send_telegram:
             print("[System] Generating Consolidated Telegram Report via NotificationService...")
 
             records = result_df_kr.to_dict('records') if not result_df_kr.empty else []
             kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
             kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
-
-            # ── 전략 리포트 생성 (알림과 분리) ─────────────────────────────
-            advisor_report_text = ""
-            try:
-                advisor = StrategyAdvisor()
-                print("[System] Generating Strategy Report...")
-                advisor_report_text, _ = advisor.generate_report(all_data)
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                print(f"[ERROR] Strategy Advisor Failed: {type(e).__name__}: {e}")
-                advisor_report_text = f"[전략 리포트 생성 실패: {type(e).__name__}]"
 
             # ── NotificationService 를 통한 전송 (Traceback 가시화 적용) ────────
             report_success = False

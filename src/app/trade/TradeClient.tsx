@@ -205,7 +205,7 @@ function TradeContent() {
                     <Group justify="space-between" mb="md" align="flex-end">
                         <Stack gap={0}>
                             <Text size="sm" c="dimmed">예수금</Text>
-                            <Title order={3}>{balance?.deposit.toLocaleString() || 0} 원</Title>
+                            <Title order={3}>{(balance?.deposit ?? 0).toLocaleString()} 원</Title>
                         </Stack>
                         <Button variant="light" size="xs" onClick={() => fetchBalance()}>Refresh</Button>
                     </Group>
@@ -213,12 +213,12 @@ function TradeContent() {
                     <Group grow mb="md">
                         <Stack gap={0}>
                             <Text size="sm" c="dimmed">평가금액</Text>
-                            <Text fw={700}>{balance?.holdings.reduce((sum, h) => sum + (h.price * h.qty), 0).toLocaleString()} 원</Text>
+                            <Text fw={700}>{(balance?.holdings?.reduce((sum, h) => sum + (h.price * h.qty), 0) ?? 0).toLocaleString()} 원</Text>
                         </Stack>
                         <Stack gap={0}>
                             <Text size="sm" c="dimmed">평가손익</Text>
-                            <Text fw={700} c={(balance?.holdings.reduce((sum, h) => sum + h.pl_amount, 0) || 0) >= 0 ? 'red' : 'blue'}>
-                                {balance?.holdings.reduce((sum, h) => sum + h.pl_amount, 0).toLocaleString()} 원
+                            <Text fw={700} c={((balance?.holdings?.reduce((sum, h) => sum + h.pl_amount, 0)) ?? 0) >= 0 ? 'red' : 'blue'}>
+                                {(balance?.holdings?.reduce((sum, h) => sum + h.pl_amount, 0) ?? 0).toLocaleString()} 원
                             </Text>
                         </Stack>
                     </Group>
@@ -233,7 +233,7 @@ function TradeContent() {
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
-                                {balance?.holdings.map((h) => (
+                                {balance?.holdings?.map((h) => (
                                     <Table.Tr key={h.code} style={{ cursor: 'pointer' }} onClick={() => setCode(h.code)}>
                                         <Table.Td>
                                             <Text size="sm" fw={500}>{h.name}</Text>
@@ -241,8 +241,8 @@ function TradeContent() {
                                         </Table.Td>
                                         <Table.Td>{h.qty}</Table.Td>
                                         <Table.Td>
-                                            <Badge color={h.pl_rate > 0 ? 'red' : 'blue'} variant="light">
-                                                {h.pl_rate}%
+                                            <Badge color={(h.pl_rate ?? 0) > 0 ? 'red' : 'blue'} variant="light">
+                                                {h.pl_rate ?? 0}%
                                             </Badge>
                                         </Table.Td>
                                     </Table.Tr>
@@ -388,7 +388,7 @@ function TradeContent() {
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Trading Dashboard</Title>
                 <Group gap="xs">
-                    <Badge color="pink" variant="filled">v55-super-debug</Badge>
+                    <Badge color="pink" variant="filled">v56-crash-fix</Badge>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>Out</Button>
                 </Group>

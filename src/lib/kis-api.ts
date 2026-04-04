@@ -55,6 +55,27 @@ export interface PortfolioData {
 }
 
 /**
+ * KIS HashKey 발급 (POST 요청용 무결성 검증)
+ */
+async function getHashKey(body: any): Promise<string> {
+    const config = getKISConfig();
+    try {
+        const res = await axios.post(`${config.BASE_URL}/uapi/hashkey`, body, {
+            headers: {
+                'content-type': 'application/json',
+                'appkey': config.APP_KEY,
+                'appsecret': config.APP_SECRET,
+            }
+        });
+        if (res.data.HASH) return res.data.HASH;
+        throw new Error('Hashkey 발급에 실패했습니다.');
+    } catch (error: any) {
+        console.error('[KIS-API] Hashkey Error:', error.response?.data || error.message);
+        throw new Error(`Hashkey 생성 실패: ${error.message}`);
+    }
+}
+
+/**
  * KIS OAuth2 Access Token 발급 (Direct)
  */
 async function getAccessToken(): Promise<string> {
@@ -115,6 +136,7 @@ export async function getRealPortfolio(): Promise<any> {
                 'appkey': config.APP_KEY,
                 'appsecret': config.APP_SECRET,
                 'tr_id': tr_id,
+                'tr_cont': 'N',
                 'custtype': 'P'
             },
             params: {
@@ -219,20 +241,26 @@ export async function placeRealOrder(code: string, qty: number, price: number, s
 
         console.log(`[KIS-API] [${tr_id}] Placing ${side} order for ${code}...`);
 
-        const res = await axios.post(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, {
+        const orderBody = {
             CANO: cano,
             ACNT_PRDT_CD: prdt_cd || '01',
             PDNO: code,
             ORD_DVSN: price === 0 ? '01' : '00',
             ORD_QTY: qty.toString(),
             ORD_UNPR: price.toString()
-        }, {
+        };
+
+        const hashkey = await getHashKey(orderBody);
+
+        const res = await axios.post(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, orderBody, {
             headers: {
                 'content-type': 'application/json; charset=utf-8',
                 'authorization': `Bearer ${token}`,
                 'appkey': config.APP_KEY,
                 'appsecret': config.APP_SECRET,
+                'hashkey': hashkey,
                 'tr_id': tr_id,
+                'tr_cont': 'N',
                 'custtype': 'P'
             }
         });

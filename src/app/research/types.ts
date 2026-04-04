@@ -25,6 +25,7 @@ export interface FiveDayStock {
     current_price: number;
     change_rate: number;
     count: number;
+    consecutive_days: number;
     avg_posts: number;
     total_posts: number;
     price_history?: number[];

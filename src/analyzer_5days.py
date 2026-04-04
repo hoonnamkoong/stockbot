@@ -251,19 +251,20 @@ def analyze_cumulative(days=5, silent=False):
             # Let's ensure we pass what the scraper found.
             'prev_close': safe_int(latest_meta.get('prev_close')), 
             'consecutive_days': consecutive_days,
+            'count': consecutive_days, # Alias for frontend
             'total_posts': total_posts,
             'avg_posts': round(avg_posts, 1),
             'std_dev': round(std_dev, 1),
             'price_start': price_start,
             # Price Trend (Value)
-            'sparkline_price': prices[::-1], # Oldest to Newest (may contain 0s)
+            'sparkline_price': ([prices[-1]] * (days - len(prices)) + prices[::-1]) if prices else [0]*days,
             'price_stats': {
                  'min': min(valid_prices) if valid_prices else 0,
                  'max': max(valid_prices) if valid_prices else 0,
                  'avg': int(sum(valid_prices)/len(valid_prices)) if valid_prices else 0
             },
             # Post Trend (Value)
-            'sparkline_posts': posts_list[::-1], # Oldest to Newest
+            'sparkline_posts': ([0] * (days - len(posts_list)) + posts_list[::-1]) if posts_list else [0]*days,
             'post_stats': {
                 'min': min(posts_list) if posts_list else 0,
                 'max': max(posts_list) if posts_list else 0,

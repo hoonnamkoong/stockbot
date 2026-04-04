@@ -32,9 +32,7 @@ const getVirtualPath = () => path.join(process.cwd(), 'data', 'portfolio_virtual
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
 
-const TOKEN_CACHE_PATH = process.env.VERCEL 
-    ? '/tmp/kis_token_cache.json' 
-    : path.join(process.cwd(), 'data', 'kis_token_cache.json');
+const TOKEN_CACHE_PATH = path.join(process.cwd(), 'data', 'kis_token_cache.json');
 
 async function readTokenCache() {
     try {

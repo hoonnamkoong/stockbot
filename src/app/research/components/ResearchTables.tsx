@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table, Text, Badge, Group, ActionIcon, ScrollArea, Box, Button, Stack } from '@mantine/core';
+import { Table, Text, Badge, Group, ActionIcon, ScrollArea, Box, Button, Stack, Tooltip } from '@mantine/core';
 import { IconChevronUp, IconChevronDown, IconSelector, IconCoin } from '@tabler/icons-react';
 import { Stock, FiveDayStock, SortConfig } from '../types';
 import { Sparkline } from './Sparkline';
@@ -99,7 +99,9 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 {s.consecutive_days > 1 && <Badge size="xs" color="red" variant="filled" style={{ flexShrink: 0, minWidth: '40px' }}>{s.consecutive_days}d</Badge>}
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="11px" fw={500} lineClamp={2}>{s.posts_summary}</Text>
+                                <Tooltip label={s.posts_summary} multiline w={300} withArrow position="top">
+                                    <Text size="11px" fw={500} lineClamp={2}>{s.posts_summary}</Text>
+                                </Tooltip>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Text size="xs" fw={700}>{s.foreign_rate}%</Text>
@@ -170,7 +172,7 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                     </Text>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} align="center" style={{ cursor: 'pointer' }}>
-                                    <Badge size="sm" color="gray" variant="filled" radius="xl" style={{ minWidth: '60px' }}>{s.count}일 연속</Badge>
+                                    <Badge size="sm" color="gray" variant="filled" radius="xl" style={{ minWidth: '60px' }}>{s.consecutive_days || 0}일 연속</Badge>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} align="center" style={{ cursor: 'pointer' }}>
                                     <Text size="sm" fw={600}>{(Number(s.avg_posts) || 0).toFixed(0)}개</Text>
@@ -179,27 +181,36 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                     <Text size="sm" fw={600}>{s.total_posts?.toLocaleString()}개</Text>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
-                                    <Stack gap={0} style={{ minWidth: '100px' }}>
-                                        <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
-                                        {s.sparkline_price && s.sparkline_price.length > 0 && (
-                                            <Group gap={4} wrap="nowrap" justify="center">
-                                                <Text size="9px" c="dimmed">{s.sparkline_price[0]?.toLocaleString()}</Text>
-                                                <Text size="9px" c="dimmed">→</Text>
-                                                <Text size="9px" c="blue" fw={700}>{s.sparkline_price[s.sparkline_price.length - 1]?.toLocaleString()}</Text>
-                                            </Group>
-                                        )}
+                                    <Stack gap={2}>
+                                        <Group gap={2} wrap="nowrap" justify="center">
+                                            {(s.sparkline_price || []).map((p: number, idx: number) => (
+                                                <Tooltip key={idx} label={`Day ${5-idx}: ${p?.toLocaleString()}원`}>
+                                                    <Badge 
+                                                        size="xs" 
+                                                        variant="filled" 
+                                                        color={idx === 0 ? "blue" : "gray"}
+                                                        styles={{ label: { fontSize: '9px', padding: '0 2px' } }}
+                                                    >
+                                                        {Math.floor((p||0)/1000)}k
+                                                    </Badge>
+                                                </Tooltip>
+                                            ))}
+                                        </Group>
+                                        <Box h={20}>
+                                            <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
+                                        </Box>
                                     </Stack>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
-                                    <Stack gap={0} style={{ minWidth: '100px' }}>
-                                        <Sparkline data={s.sparkline_posts || []} color="#228be6" />
-                                        {s.sparkline_posts && s.sparkline_posts.length > 0 && (
-                                            <Group gap={4} wrap="nowrap" justify="center">
-                                                <Text size="9px" c="dimmed">{s.sparkline_posts[0]}</Text>
-                                                <Text size="9px" c="dimmed">→</Text>
-                                                <Text size="9px" c="blue" fw={700}>{s.sparkline_posts[s.sparkline_posts.length - 1]}</Text>
-                                            </Group>
-                                        )}
+                                    <Stack gap={2}>
+                                        <Group gap={2} wrap="nowrap" justify="center">
+                                            {(s.sparkline_posts || []).map((p: number, idx: number) => (
+                                                <Badge key={idx} size="xs" color="gray" variant="outline" styles={{ label: { fontSize: '8px' } }}>{p}</Badge>
+                                            ))}
+                                        </Group>
+                                        <Box h={20}>
+                                            <Sparkline data={s.sparkline_posts || []} color="#228be6" />
+                                        </Box>
                                     </Stack>
                                 </Table.Td>
                             </Table.Tr>

@@ -5,12 +5,6 @@
       "use": "@vercel/next"
     }
   ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/"
-    }
-  ],
   "crons": [
     {
       "path": "/api/stocks/refresh",

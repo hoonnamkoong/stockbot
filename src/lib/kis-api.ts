@@ -28,9 +28,48 @@ if (typeof window === 'undefined') logEnvStatus();
 // Data Paths (Lazy loaded)
 const getVirtualPath = () => path.join(process.cwd(), 'data', 'portfolio_virtual.json');
 
-// Token Cache
+// Token Cache (Memory & Disk)
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
+
+const TOKEN_CACHE_PATH = process.env.VERCEL 
+    ? '/tmp/kis_token_cache.json' 
+    : path.join(process.cwd(), 'data', 'kis_token_cache.json');
+
+async function readTokenCache() {
+    try {
+        const data = await fs.readFile(TOKEN_CACHE_PATH, 'utf-8');
+        const cache = JSON.parse(data);
+        // Check if config matches (to avoid using tokens from different accounts if keys changed)
+        const config = getKISConfig();
+        if (cache.appkey === config.APP_KEY && cache.expires_at > Date.now() + 3600000) {
+            return cache;
+        }
+    } catch (e: any) {
+        // Cache miss or read error is fine
+    }
+    return null;
+}
+
+async function writeTokenCache(token: string, expiresIn: number) {
+    try {
+        const config = getKISConfig();
+        const cache = {
+            access_token: token,
+            expires_at: Date.now() + (expiresIn * 1000),
+            appkey: config.APP_KEY,
+            issued_at: new Date().toISOString()
+        };
+        // Ensure data directory exists for local
+        if (!process.env.VERCEL) {
+            await fs.mkdir(path.dirname(TOKEN_CACHE_PATH), { recursive: true });
+        }
+        await fs.writeFile(TOKEN_CACHE_PATH, JSON.stringify(cache, null, 2));
+        console.log(`[KIS-API] Token saved to disk cache: ${TOKEN_CACHE_PATH}`);
+    } catch (e: any) {
+        console.warn(`[KIS-API] Failed to write token cache: ${e.message}`);
+    }
+}
 
 export interface HoldingsItem {
     name: string;
@@ -80,7 +119,20 @@ async function getHashKey(body: any): Promise<string> {
  */
 async function getAccessToken(): Promise<string> {
     const now = Date.now();
-    if (cachedToken && now < tokenExpiry) return cachedToken;
+    
+    // 1. Check Memory Cache
+    if (cachedToken && now < tokenExpiry - 3600000) { // 1 hour safety margin
+        return cachedToken;
+    }
+
+    // 2. Check Disk Cache
+    const diskCache = await readTokenCache();
+    if (diskCache) {
+        console.log(`[KIS-API] Using valid token from disk cache (Expires: ${new Date(diskCache.expires_at).toLocaleString()})`);
+        cachedToken = diskCache.access_token;
+        tokenExpiry = diskCache.expires_at;
+        return cachedToken!;
+    }
 
     const config = getKISConfig();
     if (!config.APP_KEY || !config.APP_SECRET) {
@@ -88,7 +140,7 @@ async function getAccessToken(): Promise<string> {
     }
 
     try {
-        console.log(`[KIS-API] Requesting token from: ${config.BASE_URL}`);
+        console.log(`[KIS-API] No valid cache. Requesting NEW token from: ${config.BASE_URL}`);
         const res = await axios.post(`${config.BASE_URL}/oauth2/tokenP`, {
             grant_type: 'client_credentials',
             appkey: config.APP_KEY,
@@ -97,9 +149,13 @@ async function getAccessToken(): Promise<string> {
 
         if (res.data.access_token) {
             cachedToken = res.data.access_token;
-            // expires_in is usually 86400 (24h). Submarine 1h for safety.
-            tokenExpiry = now + (res.data.expires_in - 3600) * 1000;
-            console.log(`[KIS-API] Token issued successfully. Expires in ${res.data.expires_in}s`);
+            const expiresIn = parseInt(res.data.expires_in);
+            tokenExpiry = now + (expiresIn * 1000);
+            
+            // 3. Save to Disk Cache
+            await writeTokenCache(cachedToken!, expiresIn);
+            
+            console.log(`[KIS-API] NEW Token issued successfully. Expires in ${expiresIn}s`);
             return cachedToken!;
         }
         throw new Error(`KIS Token issuance failed: ${res.data.msg_cd || ''} ${res.data.msg1 || ''}`);

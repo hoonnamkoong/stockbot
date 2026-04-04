@@ -270,99 +270,57 @@ def extract_meaningful_keywords(titles, stock_name, max_keywords=5):
 
 def calculate_long_term_consecutive_days(current_codes):
     """
-    Calculates consecutive days by scanning BACKWARDS from TODAY.
-    It looks for 'trending_integrated_YYYYMMDD_HHMMSS.xlsx' (or .csv) in 'data/'
-    and counts how many consecutive days each stock code appears.
-    [Updated V8.2] Robust CSV reading.
+    Calculates consecutive days using a persistent JSON state.
+    [V9.3] Fixed resetting issue by using db-data/data/consecutive_counts.json
     """
-    consecutive_counts = {code: 1 for code in current_codes} # Default 1 (today)
-    active_codes = set(current_codes)
-    
-    data_dir = 'data'
-    if not os.path.exists(data_dir):
-        return consecutive_counts
-    
-    # Identify unique DATE files
-    pattern = re.compile(r'trending_integrated_(\d{8})_(\d{6})\.(xlsx|csv)$')
-    date_files = {} 
-    
-    for filename in os.listdir(data_dir):
-        match = pattern.match(filename)
-        if match:
-            d_str = match.group(1) # YYYYMMDD
-            t_str = match.group(2) # HHMMSS
-            try:
-                date_obj = datetime.strptime(d_str, '%Y%m%d')
-                date_fmt = date_obj.strftime('%Y-%m-%d')
-                if date_fmt not in date_files:
-                    date_files[date_fmt] = []
-                date_files[date_fmt].append((t_str, os.path.join(data_dir, filename)))
-            except:
-                continue
-            
-    sorted_dates = sorted(date_files.keys(), reverse=True)
-    
+    import json
+    state_path = 'db-data/data/consecutive_counts.json'
     now_kst = datetime.utcnow() + timedelta(hours=9)
     today_str = now_kst.strftime('%Y-%m-%d')
     
-    for d_str in sorted_dates:
-        if d_str == today_str:
-            continue
-        
-        if not active_codes:
-            break 
-        
-        files = sorted(date_files[d_str], key=lambda x: x[0], reverse=True)
-        if not files: continue
-        
-        best_time, filepath = files[0] 
-        
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(state_path), exist_ok=True)
+    
+    # 1. Load existing state
+    state = {}
+    if os.path.exists(state_path):
         try:
-            # We use '종목코드' column. Support fallback.
-            if filepath.endswith('.csv'):
-                try:
-                    df = pd.read_csv(filepath, dtype=str)
-                except UnicodeDecodeError:
-                    df = pd.read_csv(filepath, dtype=str, encoding='cp949')
-            else:
-                df = pd.read_excel(filepath, dtype=str)
-            
-            day_codes = set()
-            
-            # 1. Try standard columns
-            target_cols = ['종목코드', 'Code', 'code', 'Symbol', 'symbol']
-            found_col = None
-            for col in target_cols:
-                if col in df.columns:
-                    found_col = col
-                    break
-            
-            if found_col:
-                day_codes = set(df[found_col].astype(str).str.replace('A', '').str.zfill(6).tolist())
-            else:
-                # 2. Fallback: check index name? or first column?
-                first_col = df.columns[0]
-                sample = df[first_col].head(5).astype(str).tolist()
-                is_code = all(s.isdigit() and len(s)==6 for s in sample if s and s != 'nan')
-                if is_code:
-                    day_codes = set(df[first_col].astype(str).str.zfill(6).tolist())
-
-            if not day_codes:
-                continue
-                 
-            next_active = set()
-            for code in active_codes:
-                if code in day_codes:
-                    consecutive_counts[code] += 1
-                    next_active.add(code)
-                else:
-                    pass 
-            active_codes = next_active
-            
+            with open(state_path, 'r', encoding='utf-8') as f:
+                state = json.load(f)
         except Exception as e:
-            print(f"Error reading {filepath}: {e}")
-            continue
-
+            print(f"[Streak] Error loading state: {e}")
+            state = {}
+            
+    new_state = {}
+    consecutive_counts = {}
+    
+    # 2. Update streaks for current codes
+    for code in current_codes:
+        prev_data = state.get(code, {'count': 0, 'last_date': ''})
+        prev_count = prev_data.get('count', 0)
+        prev_date = prev_data.get('last_date', '')
+        
+        if prev_date == today_str:
+            # Already updated today (multi-run safety)
+            current_count = prev_count
+        else:
+            # New appearance or continued streak
+            current_count = prev_count + 1
+            
+        new_state[code] = {
+            'count': current_count,
+            'last_date': today_str
+        }
+        consecutive_counts[code] = current_count
+        
+    # 3. Save new state (Only contains currently active streaks to keep JSON small)
+    try:
+        with open(state_path, 'w', encoding='utf-8') as f:
+            json.dump(new_state, f, ensure_ascii=False, indent=2)
+        print(f"[Streak] Persistent state saved to {state_path}")
+    except Exception as e:
+        print(f"[Streak] Error saving state: {e}")
+        
     return consecutive_counts
 
 def get_top_trending_stocks(market_type='KOSPI'):

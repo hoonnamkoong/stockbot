@@ -184,7 +184,6 @@ def analyze_cumulative(days=5, silent=False):
         
         for i, date_str in enumerate(target_dates):
             df = daily_dfs.get(date_str)
-            
             found_row = False
             
             if df is not None and not df.empty and 'code' in df.columns:
@@ -203,7 +202,6 @@ def analyze_cumulative(days=5, silent=False):
                             'code': code
                         }
                     
-                    # Count total registered days (appearance count)
                     consecutive_days += 1
                         
                     p_count = safe_int(data.get('recent_posts_count'))
@@ -217,9 +215,11 @@ def analyze_cumulative(days=5, silent=False):
                     prices.append(p_price)
                         
             if not found_row:
-                posts_list.append(0)
+                # Interpolation: use last known values if available, or latest_meta
+                prev_p = prices[-1] if prices else (safe_int(latest_meta.get('price')) if latest_meta else 0)
+                prices.append(prev_p)
+                posts_list.append(0) # Posts should still be 0 if not featured
                 change_rates.append(0.0)
-                prices.append(0)
         
         if not latest_meta:
             continue

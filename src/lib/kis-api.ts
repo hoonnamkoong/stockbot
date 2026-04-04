@@ -160,7 +160,12 @@ async function getAccessToken(): Promise<string> {
         }
         throw new Error(`KIS Token issuance failed: ${res.data.msg_cd || ''} ${res.data.msg1 || ''}`);
     } catch (error: any) {
-        const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+        const errorData = error.response?.data;
+        if (errorData?.error_code === 'EGW00133') {
+            console.warn('[KIS-API] Rate Limit EGW00133: Access token issued too frequently. Wait 1 min.');
+            throw new Error('한투 API 보완: 1분당 1회 토큰 발급 제한에 걸렸습니다. 잠시 후 다시 조회를 눌러주세요.');
+        }
+        const errorDetail = errorData ? JSON.stringify(errorData) : error.message;
         console.error('[KIS-API] Token Issuance Error:', errorDetail);
         throw new Error(`인증 토큰 발급 실패: ${errorDetail}`);
     }
@@ -200,6 +205,10 @@ export async function getRealPortfolio(): Promise<any> {
                 ACNT_PRDT_CD: ACNT_PRDT_CD,
                 AFHR_FLG: 'N',
                 OCCN_TX_FOR_YN: 'N',
+                PRDT_TYPE_CD: '01', // 주식
+                INQR_DVSN: '01',    // 단가순/잔고조회
+                CTX_AREA_FK100: '', // 연속조회키1
+                CTX_AREA_NK100: '', // 연속조회키2
             }
         });
 

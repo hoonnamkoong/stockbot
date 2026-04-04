@@ -190,27 +190,38 @@ export async function getRealPortfolio(): Promise<any> {
         const tr_id = config.IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
         console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
 
-        const res = await axios.get(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
-            headers: {
-                'Content-Type': 'application/json',
-                'authorization': `Bearer ${token}`,
-                'appkey': config.APP_KEY,
-                'appsecret': config.APP_SECRET,
-                'tr_id': tr_id,
-                'tr_cont': 'N',
-                'custtype': 'P'
-            },
-            params: {
-                CANO: CANO,
-                ACNT_PRDT_CD: ACNT_PRDT_CD,
-                AFHR_FLG: 'N',
-                OCCN_TX_FOR_YN: 'N',
-                PRDT_TYPE_CD: '01', // 주식
-                INQR_DVSN: '01',    // 단가순/잔고조회
-                CTX_AREA_FK100: '', // 연속조회키1
-                CTX_AREA_NK100: '', // 연속조회키2
-            }
-        });
+        const fetchBalance = async () => {
+            return await axios.get(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'authorization': `Bearer ${token}`,
+                    'appkey': config.APP_KEY,
+                    'appsecret': config.APP_SECRET,
+                    'tr_id': tr_id,
+                    'tr_cont': 'N',
+                    'custtype': 'P'
+                },
+                params: {
+                    CANO: CANO,
+                    ACNT_PRDT_CD: ACNT_PRDT_CD,
+                    AFHR_FLG: 'N',
+                    OCCN_TX_FOR_YN: 'N',
+                    PRDT_TYPE_CD: '01',
+                    INQR_DVSN: '02',    // Use '02' (Total/Items) for better stability
+                    CTX_AREA_FK100: '',
+                    CTX_AREA_NK100: '',
+                }
+            });
+        };
+
+        let res = await fetchBalance();
+
+        // rt_cd '7' means "Data changed, please inquire again" - AUTO RETRY 1 TIME
+        if (res.data.rt_cd === '7') {
+            console.warn(`[KIS-API] [${tr_id}] Error 7 received. Retrying in 500ms...`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            res = await fetchBalance();
+        }
 
         // rt_cd '0' is success.
         if (res.data.rt_cd !== '0') {

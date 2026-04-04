@@ -180,12 +180,9 @@ export async function getRealPortfolio(): Promise<any> {
         const token = await getAccessToken();
         if (!token) throw new Error('KIS API Access Token 발급 실패');
 
-        if (!config.ACCOUNT_NO) throw new Error('KIS_ACCOUNT_NO 환경변수가 설정되지 않았습니다.');
-        
-        // Account Number format: 12345678-01
-        const accParts = config.ACCOUNT_NO.split('-');
-        const CANO = accParts[0];
-        const ACNT_PRDT_CD = accParts[1] || '01';
+        const [cano, prdt_cd] = config.ACCOUNT_NO.split('-').map(s => s.trim());
+        const CANO = cano;
+        const ACNT_PRDT_CD = prdt_cd || '01';
 
         const tr_id = config.IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
         console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
@@ -207,29 +204,43 @@ export async function getRealPortfolio(): Promise<any> {
                     AFHR_FLG: 'N',
                     OCCN_TX_FOR_YN: 'N',
                     PRDT_TYPE_CD: '01',
-                    INQR_DVSN: '02',    // Use '02' (Total/Items) for better stability
+                    INQR_DVSN: '02',
+                    UNPR_DVSN: '01',
+                    FUND_STTL_ICLD_YN: 'N',
+                    FNCG_AMT_AUTO_RDPT_YN: 'N',
+                    PRCS_DVSN: '00',
                     CTX_AREA_FK100: '',
                     CTX_AREA_NK100: '',
-                }
+                },
+                timeout: 5000 // 5s timeout
             });
         };
 
-        let res = await fetchBalance();
+        let res: any = null;
+        let lastError = '';
+        const maxRetries = 3;
+        const delays = [500, 1000, 2000];
 
-        // rt_cd '7' means "Data changed, please inquire again" - AUTO RETRY 1 TIME
-        if (res.data.rt_cd === '7') {
-            console.warn(`[KIS-API] [${tr_id}] Error 7 received. Retrying in 500ms...`);
-            await new Promise(resolve => setTimeout(resolve, 500));
+        for (let i = 0; i <= maxRetries; i++) {
             res = await fetchBalance();
+            if (res.data.rt_cd === '0') break; // SUCCESS
+
+            if (res.data.rt_cd === '7' && i < maxRetries) {
+                console.warn(`[KIS-API] [${tr_id}] Error 7 (Data changed). Retry ${i+1}/${maxRetries} in ${delays[i]}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delays[i]));
+                continue;
+            }
+            
+            // If it's another error or we ran out of retries
+            lastError = res.data.msg1 || 'Unknown KIS Error';
+            break;
         }
 
-        // rt_cd '0' is success.
         if (res.data.rt_cd !== '0') {
-            const errMsg = res.data.msg1 || 'Unknown KIS Error';
-            console.error(`[KIS-API] Balance Inquiry Error [${res.data.rt_cd}]:`, errMsg);
+            console.error(`[KIS-API] Balance Inquiry Final Error [${res.data.rt_cd}]:`, lastError);
             return { 
                 deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
-                error: `KIS API Error: ${errMsg} (${res.data.rt_cd})`,
+                error: `KIS API Error: ${lastError} (${res.data.rt_cd})`,
                 sync_status: 'error'
             };
         }

@@ -2,26 +2,28 @@ import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
 
-// --- KIS API Configurations ---
-const IS_VIRTUAL = process.env.KIS_IS_VIRTUAL === 'true'; // Defaults to false (Real Investment)
-const KIS_APP_KEY = (process.env.KIS_APP_KEY || '').trim();
-const KIS_APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
-const KIS_ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
+// --- KIS API Configurations (Lazy Load) ---
+const getKISConfig = () => {
+    const IS_VIRTUAL = process.env.KIS_IS_VIRTUAL === 'true'; 
+    const APP_KEY = (process.env.KIS_APP_KEY || '').trim();
+    const APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
+    const ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
+    const BASE_URL = process.env.KIS_BASE_URL || 
+        (IS_VIRTUAL 
+            ? 'https://openapivts.koreainvestment.com:29443' 
+            : 'https://openapi.koreainvestment.com:9443');
 
-// Real: https://openapi.koreainvestment.com:9443
-// Virtual: https://openapivts.koreainvestment.com:29443
-const KIS_BASE_URL = process.env.KIS_BASE_URL || 
-    (IS_VIRTUAL 
-        ? 'https://openapivts.koreainvestment.com:29443' 
-        : 'https://openapi.koreainvestment.com:9443');
-
-// Debug Env Vars (safe log)
-const logEnvStatus = () => {
-    console.log(`[KIS-API] Mode: ${IS_VIRTUAL ? 'VIRTUAL (Mock)' : 'REAL (Production)'}`);
-    console.log(`[KIS-API] BaseURL: ${KIS_BASE_URL}`);
-    console.log(`[KIS-API] Config Status: Key=${KIS_APP_KEY ? 'OK(Len:'+KIS_APP_KEY.length+')' : 'MISSING'}, Secret=${KIS_APP_SECRET ? 'OK' : 'MISSING'}, Acc=${KIS_ACCOUNT_NO ? 'OK' : 'MISSING'}`);
+    return { IS_VIRTUAL, APP_KEY, APP_SECRET, ACCOUNT_NO, BASE_URL };
 };
-logEnvStatus();
+
+const logEnvStatus = () => {
+    const config = getKISConfig();
+    console.log(`[KIS-API] Mode: ${config.IS_VIRTUAL ? 'VIRTUAL (Mock)' : 'REAL (Production)'}`);
+    console.log(`[KIS-API] BaseURL: ${config.BASE_URL}`);
+    console.log(`[KIS-API] Config Status: Key=${config.APP_KEY ? 'OK(Len:'+config.APP_KEY.length+')' : 'MISSING'}, Secret=${config.APP_SECRET ? 'OK' : 'MISSING'}, Acc=${config.ACCOUNT_NO ? 'OK' : 'MISSING'}`);
+};
+// Initial log
+if (typeof window === 'undefined') logEnvStatus();
 
 // Data Paths (Lazy loaded)
 const getVirtualPath = () => path.join(process.cwd(), 'data', 'portfolio_virtual.json');
@@ -59,16 +61,17 @@ async function getAccessToken(): Promise<string> {
     const now = Date.now();
     if (cachedToken && now < tokenExpiry) return cachedToken;
 
-    if (!KIS_APP_KEY || !KIS_APP_SECRET) {
-        throw new Error('KIS_APP_KEY 또는 KIS_APP_SECRET이 설정되지 않았습니다.');
+    const config = getKISConfig();
+    if (!config.APP_KEY || !config.APP_SECRET) {
+        throw new Error(`KIS Credentials Missing (Key:${!!config.APP_KEY}, Secret:${!!config.APP_SECRET}). Check Vercel Env Vars.`);
     }
 
     try {
-        console.log(`[KIS-API] Requesting new token from ${KIS_BASE_URL}...`);
-        const res = await axios.post(`${KIS_BASE_URL}/oauth2/tokenP`, {
+        console.log(`[KIS-API] Requesting token from: ${config.BASE_URL}`);
+        const res = await axios.post(`${config.BASE_URL}/oauth2/tokenP`, {
             grant_type: 'client_credentials',
-            appkey: KIS_APP_KEY,
-            appsecret: KIS_APP_SECRET
+            appkey: config.APP_KEY,
+            appsecret: config.APP_SECRET
         });
 
         if (res.data.access_token) {
@@ -91,35 +94,34 @@ async function getAccessToken(): Promise<string> {
  */
 export async function getRealPortfolio(): Promise<any> {
     try {
+        const config = getKISConfig();
         const token = await getAccessToken();
         if (!token) throw new Error('KIS API Access Token 발급 실패');
 
+        if (!config.ACCOUNT_NO) throw new Error('KIS_ACCOUNT_NO 환경변수가 설정되지 않았습니다.');
+        
         // Account Number format: 12345678-01
-        const accParts = KIS_ACCOUNT_NO.split('-');
+        const accParts = config.ACCOUNT_NO.split('-');
         const CANO = accParts[0];
         const ACNT_PRDT_CD = accParts[1] || '01';
 
-        // tr_id mapping
-        // 실전: TTTC8434R (주식잔고조회)
-        // 모의: VTTC8434R (주식잔고조회)
-        const tr_id = IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
-
+        const tr_id = config.IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
         console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
 
-        const res = await axios.get(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
+        const res = await axios.get(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
             headers: {
                 'Content-Type': 'application/json',
                 'authorization': `Bearer ${token}`,
-                'appkey': KIS_APP_KEY,
-                'appsecret': KIS_APP_SECRET,
+                'appkey': config.APP_KEY,
+                'appsecret': config.APP_SECRET,
                 'tr_id': tr_id,
-                'custtype': 'P' // 개인
+                'custtype': 'P'
             },
             params: {
                 CANO: CANO,
                 ACNT_PRDT_CD: ACNT_PRDT_CD,
-                AFHR_FLG: 'N', // 시간외단일가여부
-                OCCN_TX_FOR_YN: 'N', // 국내외구분
+                AFHR_FLG: 'N',
+                OCCN_TX_FOR_YN: 'N',
             }
         });
 
@@ -204,33 +206,32 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
  */
 export async function placeRealOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {
     try {
+        const config = getKISConfig();
         const token = await getAccessToken();
-        const [cano, prdt_cd] = KIS_ACCOUNT_NO.split('-');
+        const [cano, prdt_cd] = config.ACCOUNT_NO.split('-');
         
-        // Buy: Real=TTTC0802U, Mock=VTTC0802U
-        // Sell: Real=TTTC0801U, Mock=VTTC0801U
         let tr_id = '';
         if (side === 'buy') {
-            tr_id = IS_VIRTUAL ? 'VTTC0802U' : 'TTTC0802U';
+            tr_id = config.IS_VIRTUAL ? 'VTTC0802U' : 'TTTC0802U';
         } else {
-            tr_id = IS_VIRTUAL ? 'VTTC0801U' : 'TTTC0801U';
+            tr_id = config.IS_VIRTUAL ? 'VTTC0801U' : 'TTTC0801U';
         }
 
         console.log(`[KIS-API] [${tr_id}] Placing ${side} order for ${code}...`);
 
-        const res = await axios.post(`${KIS_BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, {
+        const res = await axios.post(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, {
             CANO: cano,
             ACNT_PRDT_CD: prdt_cd || '01',
             PDNO: code,
-            ORD_DVSN: price === 0 ? '01' : '00', // 01 for Market, 00 for Limit
+            ORD_DVSN: price === 0 ? '01' : '00',
             ORD_QTY: qty.toString(),
             ORD_UNPR: price.toString()
         }, {
             headers: {
                 'content-type': 'application/json; charset=utf-8',
                 'authorization': `Bearer ${token}`,
-                'appkey': KIS_APP_KEY,
-                'appsecret': KIS_APP_SECRET,
+                'appkey': config.APP_KEY,
+                'appsecret': config.APP_SECRET,
                 'tr_id': tr_id,
                 'custtype': 'P'
             }

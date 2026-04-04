@@ -8,9 +8,9 @@ export async function GET(
     request: Request,
     { params }: { params: { type: string } }
 ) {
-    const { type } = params;
-
     try {
+        const { type } = params;
+
         if (type === 'real') {
             const portfolio = await getRealPortfolio();
             return NextResponse.json(portfolio, {
@@ -35,11 +35,14 @@ export async function GET(
             return NextResponse.json({ error: 'Invalid portfolio type' }, { status: 400 });
         }
     } catch (error: any) {
-        console.error(`[API-Portfolio] ${type} error:`, error.message);
-        return NextResponse.json({ 
-            error: error.message,
+        console.error(`[API-Portfolio] Critical handler error:`, error.message);
+        return new Response(JSON.stringify({ 
+            error: error.message || 'Internal Server Error',
             sync_status: 'error',
             timestamp: new Date().toISOString()
-        }, { status: 500 });
+        }), { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }

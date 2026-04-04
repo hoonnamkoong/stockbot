@@ -92,7 +92,7 @@ async function writeTokenCache(token: string, expiresIn: number) {
         } catch (e) {}
 
         // 2. GitHub Persistence (On Vercel)
-        const ghToken = process.env.GITHUB_TOKEN;
+        const ghToken = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
         if (process.env.VERCEL && ghToken) {
             try {
                 const owner = "hoonnamkoong";

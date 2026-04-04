@@ -182,6 +182,9 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
                                     <Stack gap={2}>
+                                        <Box h={20}>
+                                            <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
+                                        </Box>
                                         <Group gap={2} wrap="nowrap" justify="center">
                                             {(s.sparkline_price || []).map((p: number, idx: number) => (
                                                 <Tooltip key={idx} label={`Day ${5-idx}: ${p?.toLocaleString()}원`}>
@@ -196,21 +199,18 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                                 </Tooltip>
                                             ))}
                                         </Group>
-                                        <Box h={20}>
-                                            <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
-                                        </Box>
                                     </Stack>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
                                     <Stack gap={2}>
+                                        <Box h={20}>
+                                            <Sparkline data={s.sparkline_posts || []} color="#228be6" />
+                                        </Box>
                                         <Group gap={2} wrap="nowrap" justify="center">
                                             {(s.sparkline_posts || []).map((p: number, idx: number) => (
                                                 <Badge key={idx} size="xs" color="gray" variant="outline" styles={{ label: { fontSize: '8px' } }}>{p}</Badge>
                                             ))}
                                         </Group>
-                                        <Box h={20}>
-                                            <Sparkline data={s.sparkline_posts || []} color="#228be6" />
-                                        </Box>
                                     </Stack>
                                 </Table.Td>
                             </Table.Tr>

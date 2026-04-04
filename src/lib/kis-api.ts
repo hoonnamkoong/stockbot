@@ -35,16 +35,39 @@ let tokenExpiry: number = 0;
 const TOKEN_CACHE_PATH = path.join(process.cwd(), 'data', 'kis_token_cache.json');
 
 async function readTokenCache() {
+    // 1. Try Remote GitHub Cache (for Vercel persistence)
+    if (process.env.VERCEL) {
+        try {
+            const owner = "hoonnamkoong";
+            const repo = "stockbot";
+            const path = "data/kis_token_cache.json";
+            const branch = "db-data";
+            const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+            
+            console.log(`[KIS-API] Fetching remote token cache from GitHub...`);
+            const res = await axios.get(url, { headers: { 'Cache-Control': 'no-cache' } });
+            const cache = res.data;
+            const config = getKISConfig();
+            
+            if (cache.appkey === config.APP_KEY && cache.expires_at > Date.now() + 3600000) {
+                console.log(`[KIS-API] Successfully retrieved valid GITHUB token cache.`);
+                return cache;
+            }
+        } catch (e: any) {
+            console.log(`[KIS-API] Remote cache check skipped or failed: ${e.message}`);
+        }
+    }
+
+    // 2. Try Local File Cache
     try {
         const data = await fs.readFile(TOKEN_CACHE_PATH, 'utf-8');
         const cache = JSON.parse(data);
-        // Check if config matches (to avoid using tokens from different accounts if keys changed)
         const config = getKISConfig();
         if (cache.appkey === config.APP_KEY && cache.expires_at > Date.now() + 3600000) {
             return cache;
         }
     } catch (e: any) {
-        // Cache miss or read error is fine
+        // Cache miss is fine
     }
     return null;
 }
@@ -58,12 +81,46 @@ async function writeTokenCache(token: string, expiresIn: number) {
             appkey: config.APP_KEY,
             issued_at: new Date().toISOString()
         };
-        // Ensure data directory exists for local
-        if (!process.env.VERCEL) {
-            await fs.mkdir(path.dirname(TOKEN_CACHE_PATH), { recursive: true });
+        
+        // 1. Local Fallback (Always try)
+        try {
+            if (!process.env.VERCEL) {
+                await fs.mkdir(path.dirname(TOKEN_CACHE_PATH), { recursive: true });
+                await fs.writeFile(TOKEN_CACHE_PATH, JSON.stringify(cache, null, 2));
+                console.log(`[KIS-API] Token saved to local disk: ${TOKEN_CACHE_PATH}`);
+            }
+        } catch (e) {}
+
+        // 2. GitHub Persistence (On Vercel)
+        const ghToken = process.env.GITHUB_TOKEN;
+        if (process.env.VERCEL && ghToken) {
+            try {
+                const owner = "hoonnamkoong";
+                const repo = "stockbot";
+                const path = "data/kis_token_cache.json";
+                const branch = "db-data";
+                
+                // First get the SHA of the existing file (required for PUT)
+                const getRes = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                    params: { ref: branch },
+                    headers: { Authorization: `token ${ghToken}` }
+                });
+                const sha = getRes.data.sha;
+
+                // Update the file
+                await axios.put(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                    message: "auth: Update KIS token cache [skip ci]",
+                    content: Buffer.from(JSON.stringify(cache, null, 2)).toString('base64'),
+                    sha: sha,
+                    branch: branch
+                }, {
+                    headers: { Authorization: `token ${ghToken}` }
+                });
+                console.log(`[KIS-API] Token successfully synchronized to GitHub branch: ${branch}`);
+            } catch (e: any) {
+                console.warn(`[KIS-API] GitHub Token sync failed: ${e.message}`);
+            }
         }
-        await fs.writeFile(TOKEN_CACHE_PATH, JSON.stringify(cache, null, 2));
-        console.log(`[KIS-API] Token saved to disk cache: ${TOKEN_CACHE_PATH}`);
     } catch (e: any) {
         console.warn(`[KIS-API] Failed to write token cache: ${e.message}`);
     }

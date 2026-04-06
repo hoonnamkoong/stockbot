@@ -9,22 +9,22 @@ import json
 import concurrent.futures
 import re
 
-# [V8.4.3 Gold Master] 아키텍처 안정화 버전 (Threshold 상향 및 Thread 최적화)
-SCRAPER_VERSION = "8.4.3 Gold Master"
+# [V8.4.4 Gold Master] 수집 하드닝 (Selector Hardening & Diagnostic Logging)
+SCRAPER_VERSION = "8.4.4 Gold Master"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src', 'strategy')))
 from src.strategy import analyzer
 from src.strategy.advisor import StrategyAdvisor
 
-# --- [V8.4.3] Helper Functions ---
+# --- [V8.4.4] Helper Functions ---
 def get_current_kst_time():
     return datetime.utcnow() + timedelta(hours=9)
 
 def get_threshold_by_time(hour):
     if 9 <= hour < 12: return 40
     elif 12 <= hour < 14: return 60
-    elif 14 <= hour < 24: return 120 # [V8.4.3] 사용자 지시에 따라 120개로 상향
+    elif 14 <= hour < 24: return 120 # [V8.4.3] 120개 유지
     return 10
 
 def load_env_manual():
@@ -60,7 +60,7 @@ def fetch_post_body(link_suffix):
 
 def get_discussion_stats(code, threshold_time):
     """
-    [V8.4.3] 날짜 직결 로직 및 Thread 최적화 대응
+    [V8.4.4] 수집 하드닝: 셀렉터 확장 및 실시간 데이터 진단 로깅 적용
     """
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     collected_posts = []
@@ -70,24 +70,37 @@ def get_discussion_stats(code, threshold_time):
         url = f"https://finance.naver.com/item/board.naver?code={code}&page={page}"
         try:
             res = requests.get(url, headers=headers, timeout=10)
+            if res.status_code != 200:
+                print(f"   [Warning] {code} 접속 실패: {res.status_code}")
+                return {'recent_posts_count': 0, 'latest_posts': []}
+
             soup = BeautifulSoup(res.content, 'html.parser')
-            # [V8.4.3] 공지사항 제외, 순수 게시글 행만 추출
-            rows = soup.select('table.type2 tr[onmouseover]')
+            
+            # [V8.4.4 하드닝] 속성 필터링을 제거하고 모든 tr에서 데이터 추출 시도
+            rows = soup.select('table.type2 tr')
             
             for row in rows:
                 cols = row.select('td')
+                # 데이터가 실린 행은 최소 5개 이상의 컬럼을 가짐
                 if len(cols) < 5: continue
-                date_text = cols[0].get_text(strip=True)
                 
-                # [V8.4.3 날짜 직결] HH:MM 형식인 경우 오늘 날짜 강제 결합
+                date_text = cols[0].get_text(strip=True)
+                if not date_text: continue # 비어있는 날짜 칸 제외
+
+                # [V8.4.4 날짜 판정 견고화] 마침표와 콜론 유무로 당일글 판별
                 try:
-                    if len(date_text) <= 5: 
+                    if ":" in date_text and "." not in date_text:
                         full_date = f"{today_prefix} {date_text}"
-                    else: 
+                    else:
                         full_date = date_text
                     post_date = datetime.strptime(full_date, "%Y.%m.%d %H:%M")
-                except: continue
+                except:
+                    continue
                 
+                # 디버깅: 삼성전자 등에서 0개 발생 시 이 로그를 추적
+                if page == 1 and len(collected_posts) == 0:
+                     print(f"   [Debug] {code} Sample Date: '{date_text}' -> Parsed: {post_date}")
+
                 if post_date < threshold_time: 
                     return {'recent_posts_count': len(collected_posts), 'latest_posts': collected_posts}
                 
@@ -98,7 +111,10 @@ def get_discussion_stats(code, threshold_time):
                         'likes': cols[4].get_text(strip=True) if len(cols) > 4 else '0',
                         'link': title_tag['href']
                     })
-        except: break
+        except Exception as e:
+            print(f"   [Error] {code} Scraping Page {page}: {e}")
+            break
+            
     return {'recent_posts_count': len(collected_posts), 'latest_posts': collected_posts}
 
 def get_stock_details(code):
@@ -158,7 +174,7 @@ if __name__ == "__main__":
     threshold = 1 if force_run else get_threshold_by_time(now_kst.hour)
     threshold_time = now_kst.replace(hour=8, minute=0, second=0, microsecond=0)
     
-    print(f"[System] V8.4.3 Gold Master 가동 (임계값: {threshold})")
+    print(f"[System] V8.4.4 Gold Master 가동 (임계값: {threshold})")
 
     candidates = []
     for m in ['KOSPI', 'KOSDAQ']:
@@ -196,7 +212,7 @@ if __name__ == "__main__":
         from src.notification.notification_service import NotificationService
         ns = NotificationService()
         if ns.is_available:
-            summary_msg = f"🚀 **V8.4.3 Gold Master 전략 리포트**\n\n"
+            summary_msg = f"🚀 **V8.4.4 Gold Master 전략 리포트**\n\n"
             summary_msg += f"일시: {now_kst.strftime('%Y-%m-%d %H:%M')}\n"
             summary_msg += f"분석 대상: {len(results)}개 종목\n\n"
             summary_msg += f"--- **Strategic Insights** ---\n\n"

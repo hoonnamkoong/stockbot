@@ -27,36 +27,51 @@ class GeminiAgent:
     [Why] 기술적 지표만으로는 파악하기 힘든 뉴스의 무게감과 시장 분위기를 AI가 최종 검증하기 위함입니다.
     """
     def __init__(self):
-        load_env()
-        # [Rule 4.1] 하드코딩 금지: 환경 변수에서 키 로드
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        
         self.api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY')
         self.model = None
+        self.model_name = "Unknown"
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            # [Update] 사용자 지시사항: 2.0/2.5급 최고 사양 모델로 교체
-            # Python SDK에서 2.5는 gemini-2.0-pro-exp 또는 gemini-2.0-flash로 대응
-            models_to_try = [
-                'gemini-2.0-pro-exp-0205',  # 최상위 실험적 모델
-                'gemini-2.0-flash',         # 최고 성능/속도
-                'gemini-1.5-pro'            # 안정적인 상위 모델
-            ]
-            
-            for m in models_to_try:
-                try:
-                    # [Step] 모델 초기화 시도
-                    model_obj = genai.GenerativeModel(m)
-                    self.model = model_obj
-                    self.model_name = m
-                    print(f"[GeminiAgent] 모델 로드 성공: {m}")
-                    break
-                except Exception as e:
-                    print(f"[GeminiAgent] {m} 로드 실패, 다음 모델 시도: {e}")
-            
-            if not self.model:
-                print("[GeminiAgent] 경고: 유효한 모델을 로드하지 못했습니다.")
+            try:
+                # 1. API 키로 접근 가능한 모든 텍스트 생성 모델 리스트 동적 조회
+                available_models = [
+                    m.name for m in genai.list_models() 
+                    if 'generateContent' in m.supported_generation_methods
+                ]
+                
+                # 2. 선호하는 고성능 모델 순서대로 매칭 (가장 똑똑한 Pro 모델 우선)
+                preferred_keywords = ['gemini-2.0-pro-exp', 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash']
+                selected_model_name = None
+                
+                for keyword in preferred_keywords:
+                    for am in available_models:
+                        if keyword in am:
+                            selected_model_name = am
+                            break
+                    if selected_model_name:
+                        break
+                        
+                # 3. 선호 모델이 없으면 구글이 내려준 리스트의 첫 번째 모델 사용 (404 완벽 차단)
+                if not selected_model_name and available_models:
+                    selected_model_name = available_models[0]
+                    
+                if selected_model_name:
+                    # 'models/' 접두사가 이미 포함되어 있으므로 안전하게 바로 객체 생성
+                    self.model = genai.GenerativeModel(selected_model_name)
+                    self.model_name = selected_model_name
+                    print(f"[GeminiAgent] ✅ 동적 모델 로드 성공: {selected_model_name}")
+                else:
+                    print("[GeminiAgent] 🚨 사용 가능한 텍스트 생성 모델이 없습니다.")
+                    
+            except Exception as e:
+                print(f"[GeminiAgent] 🚨 API 모델 조회 실패: {e}")
         else:
-            print("[GeminiAgent] 경고: API 키가 설정되지 않았습니다.")
+            print("[GeminiAgent] 🚨 API 키가 누락되었습니다.")
 
     def evaluate_momentum(self, stock_info, news_list, dart_info):
         """

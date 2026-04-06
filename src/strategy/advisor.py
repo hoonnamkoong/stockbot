@@ -46,7 +46,7 @@ class GeminiAgent:
                 
                 # 2. 선호하는 고성능 모델 순서대로 매칭 (무료 티어 한도 및 성능 고려)
                 # [V8.2] gemini-2.5-flash 최우선 모델 전격 배치
-                preferred_keywords = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
+                preferred_keywords = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro-002']
                 selected_model_name = None
                 
                 for keyword in preferred_keywords:
@@ -198,7 +198,34 @@ class StrategyAdvisor:
         self.vpm = VirtualPortfolioManager() # 가상 계좌 관리자
         self.engine = StrategyEngine() # 기술적 분석 엔진
         self.gemini = GeminiAgent() # AI 분석 에이전트
-        
+
+    def analyze_bulk_sentiment(self, bulk_data: list) -> dict:
+        """
+        [V8.2] 2단계 (Bulk Body Sentiment) 분석을 실행합니다.
+        advisor.py 내의 GeminiAgent를 통해 대량의 종목 감성 점수를 한 번에 산출합니다.
+        데이터 누락 시 모든 종목에 대해 0점을 반환합니다.
+        """
+        try:
+            if not bulk_data:
+                return {}
+            
+            # GeminiAgent의 실제 분석 함수 호출
+            result = self.gemini.analyze_bulk_sentiment(bulk_data)
+            
+            # 입력된 모든 티커에 대해 결과 보장 (누락 시 0점)
+            final_map = {}
+            for item in bulk_data:
+                ticker = item.get('code')
+                if ticker:
+                    final_map[ticker] = result.get(ticker, 0)
+            
+            return final_map
+            
+        except Exception as e:
+            print(f"[StrategyAdvisor] Error in bulk sentiment: {e}")
+            # 전체 실패 시 안전하게 0점 반환 로직
+            return {item.get('code'): 0 for item in bulk_data if item.get('code')}
+
     def fetch_portfolio(self):
         """
         [What] 실전(KIS) 또는 가상 계좌의 보유 종목 정보를 가져옵니다.

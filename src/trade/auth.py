@@ -2,15 +2,20 @@ import os
 import requests
 import json
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    HAS_DOTENV = True
+except ImportError:
+    HAS_DOTENV = False
 
 # [Rule 4.3] KIS API 인증 및 토큰 관리를 위한 모듈입니다.
 # 토큰의 수명을 관리하고 깃허브 원격 저장소와 동기화하여 다중 환경(Actions, Vercel 등)에서 동일한 세션을 유지합니다.
 
 def load_env():
     """시스템 환경 변수를 로드합니다."""
-    # .env 파일이 존재할 경우 로드 (로컬 개발 환경 대응)
-    if os.path.exists('.env'):
+    # [Why] 서버 환경(GitHub Actions 등)에는 이미 환경 변수가 주입되어 있으므로, 
+    # 로컬 개발 환경에서만 .env 파일을 선택적으로 로드합니다.
+    if HAS_DOTENV and os.path.exists('.env'):
         load_dotenv('.env', override=True)
 
 def get_access_token(force_refresh=False):

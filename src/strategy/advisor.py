@@ -225,7 +225,7 @@ class StrategyAdvisor:
         1. Evaluate 1st Gate (4 Factors via Engine) for NEW candidates.
         """
         print("[Advisor] Running Hybrid Engine Candidate Analysis...")
-        portfolio = self.get_portfolio()
+        portfolio = self.fetch_portfolio()
         
         existing_codes = {c.get('code') for c in candidates}
         for code, info in portfolio.items():

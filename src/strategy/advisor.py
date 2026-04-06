@@ -45,7 +45,7 @@ class GeminiAgent:
                 ]
                 
                 # 2. 선호하는 고성능 모델 순서대로 매칭 (무료 티어 한도 및 성능 고려)
-                # [FIX] gemini-2.5-flash를 최우선 모델로 고정
+                # [V8.2] gemini-2.5-flash 최우선 모델 전격 배치
                 preferred_keywords = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
                 selected_model_name = None
                 
@@ -122,7 +122,7 @@ class GeminiAgent:
         if not self.model: return "⚠️ Gemini API 초기화 실패: 리포트를 생성할 수 없습니다."
         
         prompt = f"""
-        당신은 실전 주식 투자 전문가이며, '4월 V2 어텐션 모멘텀' 전략의 수석 분석가입니다. 
+        당신은 실전 주식 투자 전문가이며, 'V8.2 Attention Deep-Dive' 전략의 수석 분석가입니다. 
         제공된 15개 정예 종목 리스트를 바탕으로 통합 'Strategic Guide'를 작성하세요.
         
         데이터:
@@ -141,6 +141,44 @@ class GeminiAgent:
             if response and response.text:
                 return response.text
             return "⚠️ AI 모델 응답이 비어있습니다. (데이터 부족)"
+        except Exception as e:
+            return f"⚠️ 전략 리포트 생성 실패: {str(e)}"
+
+    def analyze_bulk_sentiment(self, bulk_data: list) -> dict:
+        """
+        [V8.2] 2단계 (Bulk Body Sentiment) 분석을 수행합니다.
+        여러 종목의 베스트 게시글 본문을 한 번에 분석하여 감성 점수(-10 ~ 10)를 산출합니다.
+        """
+        if not self.model: return {}
+        
+        prompt = f"""
+        당신은 주식 시장의 대중 심리를 분석하는 고도의 인공지능 분석가입니다. 
+        다음 종목 리스트와 각 종목별 추천 상위 5개 게시글 본문을 읽고, 
+        대중의 열광도와 호재의 논리성을 바탕으로 'AI 감성 점수(-10에서 10 사이)'를 부여하세요.
+        
+        - 10: 폭발적인 호재와 압도적인 대중 열광
+        - 0: 중립 또는 단순 정보 공유
+        - -10: 극심한 공포와 악재의 구체화
+        
+        분석 데이터:
+        {json.dumps(bulk_data, ensure_ascii=False)}
+        
+        출력 형식 (JSON만 답변):
+        {{
+            "종목코드": 점수(숫자),
+            ...
+        }}
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            # JSON만 추출 시도
+            match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            return {}
+        except Exception as e:
+            print(f"[StrategyAdvisor] Bulk Sentiment Analysis Error: {e}")
+            return {}
         except Exception as e:
             import traceback
             # [FIX] 지시사항: 에러 원인 명확히 로깅

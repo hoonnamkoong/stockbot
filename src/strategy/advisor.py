@@ -32,22 +32,71 @@ class GeminiAgent:
             return
 
         genai.configure(api_key=self.api_key)
-        
+        self._update_available_models()
+
+    def _update_available_models(self):
+        """[V8.4.8] 사용 가능한 모델 리스트를 동적으로 갱신하고 우선순위에 따라 선택합니다."""
         try:
-            # 사용 가능한 모델 리스트 동적 확보
             available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             
-            # 우선순위에 따른 모델 매칭 (2.0 -> 1.5 -> 1.0)
+            # [V8.4.8] 모델 우선순위 정의 (2.0 -> 1.5 -> 1.0)
             priority_list = ['models/gemini-2.0-flash', 'models/gemini-1.5-flash', 'models/gemini-1.5-pro']
-            selected = next((m for m in priority_list if m in available_models), available_models[0] if available_models else 'gemini-1.5-flash')
+            self.all_available_models = []
             
-            self.model = genai.GenerativeModel(selected)
-            self.model_name = selected
-            print(f"[GeminiAgent] ✅ 최신 동적 모델 로드 성공: {selected}")
+            for p in priority_list:
+                if p in available_models:
+                    self.all_available_models.append(p)
+            
+            # 리스트에 없는 나머지 모델들도 추가
+            for am in available_models:
+                if am not in self.all_available_models:
+                    self.all_available_models.append(am)
+
+            if self.all_available_models:
+                self.model_name = self.all_available_models[0]
+                self.model = genai.GenerativeModel(self.model_name)
+                print(f"[GeminiAgent] ✅ 모델 초기화: {self.model_name}")
+            else:
+                self.model = None
+                print("[GeminiAgent] 🚨 사용 가능한 텍스트 생성 모델이 없습니다.")
+                
         except Exception as e:
-            print(f"[GeminiAgent] 🚨 모델 탐색 실패, 기본값 사용: {e}")
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
-            self.model_name = 'gemini-1.5-flash'
+            print(f"[GeminiAgent] 🚨 API 모델 조회 실패: {e}")
+            self.model = None
+
+    def _call_gemini_safe(self, prompt, generation_config=None, max_retries=2):
+        """
+        [V8.4.8] Quota Exceeded (429) 발생 시 모델을 교체하며 재시도하는 안전 호출 함수
+        """
+        current_retry = 0
+        tried_models = []
+        
+        while current_retry <= max_retries:
+            if not self.model: return None
+                
+            try:
+                response = self.model.generate_content(prompt, generation_config=generation_config)
+                return response
+            except Exception as e:
+                err_msg = str(e)
+                if ("429" in err_msg or "Quota" in err_msg or "ResourceExhausted" in err_msg):
+                    print(f"[GeminiAgent] ⚠️ Quota Exceeded for {self.model_name}. Switching model...")
+                    tried_models.append(self.model_name)
+                    
+                    next_model = next((m for m in self.all_available_models if m not in tried_models), None)
+                    if next_model:
+                        self.model_name = next_model
+                        self.model = genai.GenerativeModel(self.model_name)
+                        print(f"[GeminiAgent] 🔄 Switched to Backup: {self.model_name}")
+                        time.sleep(2)
+                        current_retry += 1
+                        continue
+                    else:
+                        break
+                else:
+                    print(f"[GeminiAgent] 🚨 API Error: {err_msg}")
+                    break
+        return None
 
     def generate_trading_guide(self, market_context, signals):
         """[V8.4.6] 31개 종목 누락 방지 및 딥다이브 리포트 생성"""
@@ -77,7 +126,7 @@ class GeminiAgent:
         4. HTML 태그(<br>, <b> 등)를 절대 사용하지 말 것.
         """
         try:
-            response = self.model.generate_content(prompt)
+            response = self._call_gemini_safe(prompt)
             if response and response.text:
                 res_text = response.text
                 # HTML 태그 강제 제거 (보안 레이어)
@@ -101,8 +150,8 @@ class GeminiAgent:
         반드시 'BUY', 'WATCH', 'REJECT' 중 하나의 단어로 시작하고, 그 뒤에 한 줄 이유를 덧붙이세요.
         """
         try:
-            response = self.model.generate_content(prompt)
-            return response.text.strip() if response.text else "WATCH"
+            response = self._call_gemini_safe(prompt)
+            return response.text.strip() if response and response.text else "WATCH"
         except:
             return "WATCH"
 
@@ -120,7 +169,7 @@ class GeminiAgent:
 
             prompt = f"다음 주식 종목들의 토론방 분위기를 분석하여 감성 점수(-10 ~ 10)를 JSON 형식으로만 답변하세요:\n{json.dumps(processed_bulk, ensure_ascii=False)}"
             
-            response = self.model.generate_content(
+            response = self._call_gemini_safe(
                 prompt,
                 generation_config={"response_mime_type": "application/json"}
             )

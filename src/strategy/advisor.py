@@ -151,6 +151,15 @@ class GeminiAgent:
         """
         if not self.model: return {}
         
+        # [V9.3 강화] 토큰 제한 방지를 위한 본문 슬라이싱 (종목당 최대 300자)
+        processed_bulk = []
+        for s in bulk_data:
+            processed_bulk.append({
+                "code": s.get('code'),
+                "name": s.get('name'),
+                "bodies": [str(b)[:300] for b in s.get('bodies', [])]
+            })
+
         prompt = f"""
         당신은 주식 시장의 대중 심리를 분석하는 고도의 인공지능 분석가입니다. 
         다음 종목 리스트와 각 종목별 추천 상위 5개 게시글 본문을 읽고, 
@@ -161,23 +170,39 @@ class GeminiAgent:
         - -10: 극심한 공포와 악재의 구체화
         
         분석 데이터:
-        {json.dumps(bulk_data, ensure_ascii=False)}
+        {json.dumps(processed_bulk, ensure_ascii=False)}
         
-        출력 형식 (JSON만 답변):
+        출력 형식 (반드시 아래 JSON 형식만 답변하세요. 다른 설명은 금지합니다):
         {{
             "종목코드": 점수(숫자),
-            ...
+            "종목코드": 점수(숫자)
         }}
         """
         try:
-            response = self.model.generate_content(prompt)
-            # JSON만 추출 시도
-            match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            # generation_config 적용하여 JSON 응답 유도
+            response = self.model.generate_content(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            
+            # [Debugging] AI 원본 응답 로그 출력
+            raw_text = response.text.strip()
+            # print(f"[Gemini] Raw Sentiment Response: {raw_text[:500]}...")
+
+            # 마크다운 백틱 제거 정규식 강화
+            clean_json = re.sub(r'```(?:json)?\n?|```', '', raw_text).strip()
+            
+            # JSON 추출 (중괄호 사이 내용만)
+            match = re.search(r'\{.*\}', clean_json, re.DOTALL)
             if match:
                 return json.loads(match.group(0))
-            return {}
+                
+            return json.loads(clean_json) # 정규식 실패 시 전체 파싱 시도
+            
         except Exception as e:
-            print(f"[StrategyAdvisor] Bulk Sentiment Analysis Error: {e}")
+            print(f"[StrategyAdvisor] Bulk Sentiment AI 호출/파싱 실패: {e}")
+            if 'response' in locals():
+                print(f"[Raw Output]: {response.text[:200]}")
             return {}
         except Exception as e:
             import traceback

@@ -187,26 +187,27 @@ class NotificationService:
         records: result_df_kr.to_dict('records') 결과 리스트
         """
         icon = "📉" if market == "KOSPI" else "📈"
-        top5 = records[:5]
-        msg = f"{icon} <b>[{market}] Top {min(len(top5), 5)} (토론 급등)</b>\n\n"
+        if records:
+            top5 = records[:5]
+            for item in top5:
+                name = item.get('종목명', item.get('name', '?'))
+                try:
+                    price = f"{int(item.get('현재가', item.get('price', 0))):,}"
+                except (ValueError, TypeError):
+                    price = str(item.get('현재가', item.get('price', '?')))
 
-        for item in top5:
-            name = item.get('종목명', item.get('name', '?'))
-            try:
-                price = f"{int(item.get('현재가', item.get('price', 0))):,}"
-            except (ValueError, TypeError):
-                price = str(item.get('현재가', item.get('price', '?')))
+                change = item.get('등락률', item.get('change_rate', '?'))
+                posts = item.get('당일_게시글수', item.get('recent_posts_count', '?'))
+                summary = item.get('게시물_요약', item.get('posts_summary', '요약 없음'))
 
-            change = item.get('등락률', item.get('change_rate', '?'))
-            posts = item.get('당일_게시글수', item.get('recent_posts_count', '?'))
-            summary = item.get('게시물_요약', item.get('posts_summary', '요약 없음'))
+                if isinstance(summary, str) and len(summary) > 100:
+                    summary = summary[:100] + "..."
 
-            if isinstance(summary, str) and len(summary) > 100:
-                summary = summary[:100] + "..."
-
-            msg += f"🔥 <b>{name}</b> ({price}원 | {change})\n"
-            msg += f"💬 {posts}개 의견\n"
-            msg += f"📝 {summary}\n\n"
+                msg += f"🔥 <b>{name}</b> ({price}원 | {change})\n"
+                msg += f"💬 {posts}개 의견\n"
+                msg += f"📝 {summary}\n\n"
+        else:
+            msg += "⚠️ 현재 기준을 충족하는 종목이 없습니다.\n\n"
 
         if len(records) > 5:
             msg += f"<i>... 외 {len(records) - 5}개 종목 — Dashboard 확인</i>\n"

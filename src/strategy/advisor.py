@@ -272,141 +272,39 @@ class StrategyAdvisor:
 
     def analyze_candidates(self, candidates, allow_buy=True):
         """
-        [What] 후보 종목들을 분석하여 매수/매도 신호를 생성합니다.
-        [Flow] 기술적 분석(Engine) -> 공시/뉴스 분석(Gate) -> AI 모멘텀 분석(Gemini) 순으로 진행됩니다.
+        [V2] 통합 분석 실행 및 결과 반환
+        낡은 is_v2_target_passed 호출을 제거하고 엔진에 처리를 위임함.
         """
-        print("[Advisor] 하이브리드 엔진 분석 시작...")
-        # [Rule 4.4] AttributeError 해결: fetch_portfolio() 호출
-        portfolio = self.fetch_portfolio()
-        
-        # 기존 후보군에 현재 보유 종목도 포함하여 매도 신호 추적
-        existing_codes = {c.get('code') for c in candidates}
-        for code, info in portfolio.items():
-            if code not in existing_codes:
-                candidates.append({
-                    'code': code,
-                    'name': info['name'],
-                    'price': info['current_price'],
-                    'change_rate': 0.0,
-                    'source': 'portfolio'
-                })
-
-        results = []
-        for stock in candidates:
-            code = stock.get('code')
-            name = stock.get('name')
-            in_portfolio = code in portfolio
-            
-            # [지시사항 1] 기술적/어텐션 1차 필터 통과 여부 확인
-            passed, p_change = self.engine.is_v2_target_passed(stock)
-            
-            p_info = portfolio.get(code)
-            profit_rate = p_info.get('profit_rate', 0) if in_portfolio else 0.0
-            
-            # [지시사항 4] 4월 V2 매도 룰 적용
-            prev_post_count = 0 # (실제 구현 시 이전 날짜 데이터 로드 로직 필요)
-            signal, reason = self.engine.get_signal(
-                stock_data=stock, 
-                in_portfolio=in_portfolio, 
-                profit_rate=profit_rate,
-                prev_post_count=prev_post_count
-            )
-            
-            action = "WATCH"
-            target_price = 0
-            custom_reason = ""
-            
-            if in_portfolio:
-                if signal == "SELL_ALL":
-                    action = "SELL_EXECUTE"
-                    custom_reason = f"🚨 {reason} (수익률: {profit_rate:.2f}%)"
-                    self.vpm.sell_stock(code) # 가상 시뮬레이터 매도
-                elif signal == "SELL_HALF":
-                    action = "PARTIAL_SELL"
-                    qty = p_info.get('qty', 0)
-                    half_qty = max(1, int(qty / 2))
-                    custom_reason = f"⚠️ {reason} (+10% 익절, 50% 매도)"
-                    self.vpm.sell_stock(code, sell_qty=half_qty)
-                elif signal == "HOLD":
-                    action = "HOLD"
-                    custom_reason = f"보유 지속 (수익률: {profit_rate:.2f}%)"
-            
-            # [지시사항 2, 3] 신규 후보 종목의 2차 검증 및 AI 승인
-            elif passed and allow_buy:
-                # 2-1. 뉴스 0건 체크
-                news_list = self.fetch_specific_news(code, name)
-                if len(news_list) == 0:
-                    action = "REJECTED (뉴스 0건)"
-                    continue
-                    
-                # 2-2. DART 오늘 자 악재 공시 체크
-                dart_info = self.check_dart_filings(name, code)
-                if dart_info.get("reject"):
-                    action = f"REJECTED ({dart_info['reason']})"
-                    continue
-                    
-                # 3. Gemini V2 AI 최종 승인 (JSON 강제)
-                gemini_eval = self.gemini.evaluate_momentum(stock, news_list, dart_info)
-                if gemini_eval.get("decision") == "APPROVED":
-                    # [지시사항 5] 자금 운용 및 포지션 사이징은 vpm.buy_stock 내부에서 처리
-                    action = "BUY_RECOMMENDED" 
-                    target_price = float(stock.get('price', 0))
-                    custom_reason = gemini_eval.get("telegram_narrative", "AI 승인됨")
-                    
-                    # [V2] 가상 자산 규칙에 따른 매수 집행
-                    self.vpm.buy_stock(code, name, target_price) 
-                else:
-                    action = "REJECTED (AI 분석 미승인)"
-                    custom_reason = gemini_eval.get("telegram_narrative", "모멘텀 부족")
-
-            results.append({
-                'code': code,
-                'name': name,
-                'price': stock.get('price', 0),
-                'signal': signal,
-                'action': action,
-                'target_price': target_price,
-                'in_portfolio': in_portfolio,
-                'profit_rate': profit_rate,
-                'custom_reason': custom_reason
-            })            
-        
-        return results[:10]
+        print(f"[Advisor] 4월 V2 알고리즘 가동 - {len(candidates)} 종목 정밀 검정 시작")
+        return self.engine.execute_simulation(candidates, allow_buy)
 
     def generate_report(self, candidates, allow_buy=True):
         """[What] 텔레그램으로 보낼 최종 가독성 있는 리포트 문자열을 생성합니다."""
         all_results = self.analyze_candidates(candidates, allow_buy=allow_buy)
         
-        # 상위 6개 종목 + 강제 매도 종목 포함
-        top_6 = all_results[:6]
-        forced_sells = [item for item in all_results[6:] if item['action'] == "SELL_EXECUTE"]
-        final_report_items = top_6 + forced_sells
+        # 성적이 좋은 상위 종목 + 대응 종목 위주로 리포트 구성
+        report = f"📊 **4월 V2 어텐션 모멘텀 리포트**\n"
+        report += f"📅 일시: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
         
-        # Gemini를 통한 시장 서사 생성
-        market_context = f"{len(candidates)}개 종목 분석 완료. 상위 {len(final_report_items)}개 집중 분석."
-        gemini_guide = self.gemini.generate_trading_guide(market_context, final_report_items)
+        buy_targets = [r for r in all_results if r['signal'] == 'BUY']
+        sell_targets = [r for r in all_results if 'SELL' in r['signal']]
         
-        try:
-            report = f"{gemini_guide}\n\n"
-            report += "📋 **오늘의 매매 액션 리포트**\n"
+        if buy_targets:
+            report += "🔥 **[매수 승인 종목]**\n"
+            for t in buy_targets:
+                report += f"✅ **{t['name']}** ({t['code']})\n"
+                report += f"💬 AI 분석: {t['reason']}\n\n"
+        
+        if sell_targets:
+            report += "🚨 **[매도/대응 종목]**\n"
+            for t in sell_targets:
+                report += f"📉 **{t['name']}**: {t['signal']} ({t['reason']})\n"
+            report += "\n"
             
-            for item in final_report_items:
-                # 상태 및 아이콘 설정
-                icon = "🔴" if "BUY" in item['action'] else "🔵"
-                if item['action'] == "WATCH": icon = "👀"
-                if item['action'] == "SELL_EXECUTE": icon = "🚨"
-                
-                p_tag = " [보유중]" if item['in_portfolio'] else ""
-                report += f"{icon} **{item['name']}** ({item['action']}){p_tag}\n"
-                report += f"   - 신호: {item['signal']} (점수: {item['score']})\n"
-                if item['target_price'] > 0:
-                    report += f"   - 진입가: {item['price']} -> 목표: {int(item['target_price'])}\n"
-                elif item['in_portfolio']:
-                    report += f"   - 현재익률: {item['profit_rate']:.2f}%\n"
-                
-            return report, final_report_items
-        except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"[Advisor] Critical Report Generation Error: {e}")
-            return f"⚠️ **가이드 생성 중 오류가 발생했습니다.**\n\n**원인:** {str(e)}\n\n**상세:**\n```\n{error_details[:500]}\n```", []
+        if not buy_targets and not sell_targets:
+            report += "💤 특이 신호 종목 없음 (관망 유지)\n"
+            
+        market_context = f"{len(candidates)}개 종목 분석 완료. 포지션 사이징 규칙 적용됨."
+        gemini_guide = self.gemini.generate_trading_guide(market_context, all_results)
+        
+        return f"{gemini_guide}\n\n{report}", all_results

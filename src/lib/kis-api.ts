@@ -242,7 +242,7 @@ export async function getRealPortfolio(): Promise<any> {
         const tr_id = config.IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
         console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
 
-        const fetchBalance = async () => {
+        const fetchBalance = async (fk = '', nk = '') => {
             return await axios.get(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -263,11 +263,11 @@ export async function getRealPortfolio(): Promise<any> {
                     UNPR_DVSN: '01',
                     FUND_STTL_ICLD_YN: 'N',
                     FNCG_AMT_AUTO_RDPT_YN: 'N',
-                    PRCS_DVSN: '01', // 전일결제기준(01)으로 고정하여 정합성 에러 방지
-                    CTX_AREA_FK100: '',
-                    CTX_AREA_NK100: '',
+                    PRCS_DVSN: '01', 
+                    CTX_AREA_FK100: fk,
+                    CTX_AREA_NK100: nk,
                 },
-                timeout: 8000 // Increased timeout to 8s
+                timeout: 10000 // Timeout 10s
             });
         };
 
@@ -276,12 +276,18 @@ export async function getRealPortfolio(): Promise<any> {
         const maxRetries = 5; 
         const delays = [1500, 2500, 3500, 4500, 6000]; // 재시도 지연 시간 대폭 강화
 
+        let currentFK = '';
+        let currentNK = '';
+
         for (let i = 0; i <= maxRetries; i++) {
-            res = await fetchBalance();
+            res = await fetchBalance(currentFK, currentNK);
             if (res.data.rt_cd === '0') break; // SUCCESS
 
             if ((res.data.rt_cd === '7' || res.data.rt_cd === '9') && i < maxRetries) {
-                console.warn(`[KIS-API] [${tr_id}] Error ${res.data.rt_cd} (Data changed/updating). Retry ${i+1}/${maxRetries} in ${delays[i]}ms...`);
+                console.warn(`[KIS-API] [${tr_id}] Error ${res.data.rt_cd} (Data changed). Resetting CTX and Retry ${i+1}/${maxRetries} in ${delays[i]}ms...`);
+                // [Standard] 에러 7 발생 시 연속조회 키를 명시적으로 비우고 처음부터 재시작
+                currentFK = '';
+                currentNK = '';
                 await new Promise(resolve => setTimeout(resolve, delays[i]));
                 continue;
             }

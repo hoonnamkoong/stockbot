@@ -157,13 +157,7 @@ class GeminiAgent:
         try:
             response = self.model.generate_content(prompt)
             if response and response.text:
-                res_text = response.text
-                # [V8.4.1] 텔레그램 마크다운 파싱 에러 방지 (HTML 태그 제거)
-                res_text = re.sub(r'<(?:br|p|div|span|b|i|strong|em)(?: [^>]*)?>', '', res_text, flags=re.I)
-                res_text = re.sub(r'</(?:br|p|div|span|b|i|strong|em)>', '', res_text, flags=re.I)
-                # HTML 엔티티 치환
-                res_text = res_text.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&').replace('&quot;', '"')
-                return res_text
+                return response.text
             return "⚠️ AI 모델 응답이 비어있습니다. (데이터 부족)"
         except Exception as e:
             return f"⚠️ 전략 리포트 생성 실패: {str(e)}"
@@ -418,7 +412,7 @@ class StrategyAdvisor:
         gemini_guide = self.gemini.generate_trading_guide(market_context, all_results)
         
         # 하단 요약 섹션 (간결하게)
-        summary = f"\n---\n📊 **시스템 요약 리포트 (V8.4)**\n"
+        summary = f"\n---\n📊 **시스템 요약 리포트 (V9.4)**\n"
         summary += f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
         
         buy_targets = [r for r in all_results if r['signal'] == 'BUY']

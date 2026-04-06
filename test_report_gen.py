@@ -3,7 +3,9 @@ import os
 import json
 
 # 프로젝트 루트 경로 추가
-sys.path.append(os.getcwd())
+root_dir = os.getcwd()
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 
 # 모듈 임포트
 from src.strategy.advisor import StrategyAdvisor

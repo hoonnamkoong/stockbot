@@ -4,7 +4,7 @@ import os
 import sys
 import time
 import traceback
-from auth import get_access_token, load_env
+from src.trade.auth import get_access_token, load_env
 
 # [Rule 4.3] KIS API를 통한 계좌 잔고 및 보유 종목 조회를 담당하는 모듈입니다.
 # 실전 및 모의 투자 계좌를 지원하며, 에러 7(조회이후 자료변경) 발생 시의 자동 재시도 로직을 포함합니다.

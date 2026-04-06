@@ -1132,7 +1132,6 @@ if __name__ == "__main__":
                     else:
                         stock['positive_rate'] = 50.0
                 except Exception as e:
-                    # [FIX] 지시사항: AI 분석 실패 시 원인을 로깅합니다.
                     print(f"   [Error] Sentiment analysis failed for {stock['name']}: {str(e)}")
                     stock['positive_rate'] = 50.0
                 
@@ -1326,31 +1325,40 @@ if __name__ == "__main__":
         if trigger_reason:
             print(f"[System] Notification Triggered by: {trigger_reason}")
 
-        # ── 전략 리포트 생성 (지능형 AI 호출 제어: 수동 실행 또는 정시 윈도우 0-10분 시에만 제미나이 작동) ───────
-        advisor_report_text = ""
-        is_market_close = (now_kst.hour == 15 and 0 <= now_kst.minute <= 30)
+        # ── 전략 리포트 생성 (지능형 AI 호출 제어: 선(先) 기술적 필터링, 후(後) AI 분석 로직) ───────
+        is_market_close = (now_kst.hour == 15 and 0 <= now_kst.minute <= 40) # 장마감 윈도우 확장
         is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
-        
-        # [지시사항] 깃허브 스케줄러가 아닌 모든 실행(Push, Manual, Dispatch)은 사용자의 의도가 담긴 수동형 실행으로 간주
         is_manual_run = os.environ.get('GITHUB_EVENT_NAME') != 'schedule' or is_forced
         is_time_window = 0 <= now_kst.minute <= 10
-        
-        # [지시사항] 수동 실행이거나 정시 윈도우인 경우에만 AI 호출
         should_run_ai = is_manual_run or is_time_window
         allow_buy = is_market_close or is_forced
 
+        advisor_report_text = ""
         if all_data and should_run_ai:
             try:
+                # 1. 기술적 지표(ml_prob) 상위 15개 "정예 후보군" 선별 (API 부하 1/100 감소)
+                elite_candidates = sorted(all_data, key=lambda x: x.get('ml_prob', 0), reverse=True)[:15]
+                print(f"[System] 📊 정예 후보군 15개 추출 완료 (Base: {len(all_data)}개 종목)")
+                
+                # 2. 단일 AI 호출로 통합 'Strategic Guide' 생성 (단 1회 호출 보장)
                 advisor = StrategyAdvisor()
-                print(f"[System] 🧠 Gemini V2 Advisor 가동 (Reason: {'Manual' if is_manual_run else 'TimeWindow'}) - allow_buy={allow_buy}")
-                advisor_report_text, _ = advisor.generate_report(all_data, allow_buy=allow_buy)
+                print(f"[System] 🧠 Gemini Advisor 단일 호출 가동 (Reason: {'Manual' if is_manual_run else 'TimeWindow'})")
+                
+                # AI 분석 실패 시에도 리포트 본문은 유지되도록 내부 try-except
+                try:
+                    advisor_report_text, _ = advisor.generate_report(elite_candidates, allow_buy=allow_buy)
+                except Exception as ai_inner_e:
+                    print(f"[ERROR] Gemini API Content Generation Failed: {ai_inner_e}")
+                    advisor_report_text = "⚠️ AI 전략 분석 일시적 지연 (정예 종목 리스트로 대체합니다)"
+                
             except Exception as e:
                 import traceback
-                print(f"[ERROR] Strategy Advisor Failed: {type(e).__name__}: {e}")
+                print(f"[ERROR] Strategy Advisor Logic Failed: {e}")
                 traceback.print_exc()
-                advisor_report_text = f"[전략 리포트 분석 실패: {type(e).__name__}]"
+                advisor_report_text = "⚠️ 전략 리포트 생성 오류 (시스템 로그 확인 필요)"
         elif all_data and not should_run_ai:
             print(f"[System] 💤 AI 호출 건너뜀 (현재 {now_kst.minute}분: 정시 윈도우 아님)")
+            advisor_report_text = "상위 종목 모니터링 중 (전략 리포트는 정시/수동 실행 시 생성됩니다)"
 
         if all_data and should_send_telegram:
             print("[System] Generating Consolidated Telegram Report via NotificationService...")

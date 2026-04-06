@@ -254,7 +254,7 @@ export async function getRealPortfolio(): Promise<any> {
                     'appkey': config.APP_KEY,
                     'appsecret': config.APP_SECRET,
                     'tr_id': tr_id,
-                    'tr_cont': fk ? 'N' : 'N', // [REVISIT] KIS standard: first request is 'N', continuation is also usually 'N' but with keys.
+                    'tr_cont': fk ? 'N' : ' ', // 최초 호출 시 공백(' ') 또는 빈 문자열 명시 (KIS 규격)
                     'custtype': 'P'
                 },
                 params: {
@@ -280,24 +280,25 @@ export async function getRealPortfolio(): Promise<any> {
         const maxRetries = 5; 
         const delays = [1500, 2500, 3500, 4500, 6000]; // 재시도 지연 시간 대폭 강화
 
-        let currentFK = '';
-        let currentNK = '';
+        let currentFK = "";
+        let currentNK = "";
 
         for (let i = 0; i <= maxRetries; i++) {
             res = await fetchBalance(currentFK, currentNK);
-            if (res.data.rt_cd === '0') break; // SUCCESS
+            
+            // 1. 성공 시 즉시 중단
+            if (res.data.rt_cd === '0') break; 
 
+            // 2. 추가 데이터(페이지네이션)가 있는 경우 (7: 실시간, 9: 과거 등)
             if ((res.data.rt_cd === '7' || res.data.rt_cd === '9') && i < maxRetries) {
                 console.warn(`[KIS-API] [${tr_id}] Paginated Response ${res.data.rt_cd}. Fetching next page ${i+1}/${maxRetries}...`);
                 
-                // [FIX] 사용자 지시사항: 절대 초기화하지 않고 다음 조회를 위한 연속키를 응답에서 추출합니다.
+                // 연속 키 추출 보강
                 currentFK = res.data.ctx_area_fk100 || res.headers['ctx_area_fk100'] || '';
                 currentNK = res.data.ctx_area_nk100 || res.headers['ctx_area_nk100'] || '';
                 
-                console.log(`[KIS-API] Next Keys Found: FK=${currentFK.substring(0,5)}..., NK=${currentNK.substring(0,5)}...`);
-                
                 if (!currentFK && !currentNK) {
-                    console.error(`[KIS-API] Continuity error: rt_cd was 7 but no keys found in response.`);
+                    console.warn(`[KIS-API] Continuity keys missing in rt_cd ${res.data.rt_cd}. Breaking loop.`);
                     break; 
                 }
                 
@@ -305,7 +306,9 @@ export async function getRealPortfolio(): Promise<any> {
                 continue;
             }
             
+            // 3. 그 외 에러 코드(RT_CD != 0, 7, 9) 발생 시 즉시 루프 탈출 (무한 루프 및 SYDB0050 방어)
             lastError = res.data.msg1 || 'Unknown KIS Error';
+            console.error(`[KIS-API] Breaking loop due to RT_CD ${res.data.rt_cd}: ${lastError}`);
             break;
         }
 

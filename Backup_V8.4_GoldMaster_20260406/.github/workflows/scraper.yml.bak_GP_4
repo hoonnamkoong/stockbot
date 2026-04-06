@@ -1,0 +1,166 @@
+name: Stock Scraper Schedule
+
+on:
+  schedule:
+    - cron: '0 0-7 * * 1-5' # 9 AM to 4 PM KST (Mon-Fri) [Grand Protocol Verified]
+  repository_dispatch:
+    types: [tasker_trigger]
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Bypass market holiday check'
+        required: false
+        default: 'false'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'data/**'
+      - 'trending_*.csv'
+      - 'trending_*.xlsx'
+      - 'reports.json'
+      - '*.md'
+
+jobs:
+  scrape-and-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout content
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+          cache-dependency-path: 'requirements-scraper.txt'
+
+      - name: Check if market is closed (Weekend or Holiday)
+        id: market_check
+        run: |
+          pip install holidays
+          python3 << 'EOF'
+          import holidays
+          from datetime import datetime
+          import os
+          
+          force_run = "${{ github.event.inputs.force_run }}"
+          if force_run == 'true':
+              print("Force run requested. Bypassing market check.")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=false\n')
+              exit(0)
+
+          kr_holidays = holidays.KR()
+          today = datetime.now()
+          day_of_week = today.weekday()  # 0=Mon, 6=Sun
+          
+          is_weekend = day_of_week >= 5  # 5=Sat, 6=Sun
+          is_holiday = today.strftime('%Y-%m-%d') in kr_holidays
+          
+          if is_weekend:
+              print(f"Weekend detected (day={day_of_week}). Market closed.")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=true\n')
+          elif is_holiday:
+              holiday_name = kr_holidays.get(today.strftime('%Y-%m-%d'))
+              print(f"Korean holiday detected: {holiday_name}. Market closed.")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=true\n')
+          else:
+              print(f"Weekday detected (day={day_of_week}). Market open.")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('is_market_closed=false\n')
+          EOF
+
+      - name: Install dependencies
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        run: |
+          pip install -r requirements-scraper.txt
+          pip install openpyxl
+
+      - name: Download Existing Monthly Report
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        run: |
+          MONTH=$(date -u +"%Y-%m")
+          MONTHLY_FILE="monthly_report_${MONTH}.xlsx"
+          mkdir -p data
+          
+          # Try to download existing monthly report from db-data branch
+          curl -sfL "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/${MONTHLY_FILE}" \
+            -o "data/${MONTHLY_FILE}" \
+            || echo "[Info] No existing monthly report found for ${MONTH}, will create new one"
+            
+      - name: Restore Previous Data (db-data)
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        run: |
+          mkdir -p data
+          if git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_temp 2>/dev/null; then
+            # Restore normal data folder
+            cp -r db_temp/data/* data/ 2>/dev/null || true
+            
+            # [Fix] Restore legacy data saved in root (Move to data/)
+            cp db_temp/trending_*.csv data/ 2>/dev/null || true
+            cp db_temp/trending_*.xlsx data/ 2>/dev/null || true
+            
+            rm -rf db_temp
+          else
+            echo "[Info] db-data branch not found or empty, starting fresh"
+          fi
+
+      - name: Run Scraper
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DASHBOARD_URL: "https://stockbot-phi.vercel.app"
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
+          FORCE_RUN: ${{ github.event.inputs.force_run }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python scraper.py
+
+      - name: Run Trade Executor (Reservations)
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python src/trade_executor.py
+
+      - name: Commit and Push Data (db-data)
+        if: steps.market_check.outputs.is_market_closed == 'false'
+        run: |
+          git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_repo
+          
+          # Copy data folder (contains reports.json, monthly reports, etc.)
+          cp -r data/ db_repo/
+          
+          # Copy daily Excel/CSV files from data/ folder to db-data root for backward compatibility
+          cp data/trending_*.csv db_repo/ 2>/dev/null || true
+          cp data/trending_*.xlsx db_repo/ 2>/dev/null || true
+          
+          cd db_repo
+          git config user.name "StockBot"
+          git config user.email "bot@stockbot.com"
+          git add .
+          git status
+          git commit -m "data: Update stock data (Isolated Branch - Force: ${{ github.event.inputs.force_run }})" || echo "No changes to commit"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data
+
+      - name: Notify on Failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d text="⚠️ Stock Scraper Workflow Failed! Check GitHub Actions logs."

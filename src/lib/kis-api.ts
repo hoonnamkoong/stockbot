@@ -240,12 +240,16 @@ export async function getRealPortfolio(): Promise<any> {
         const ACNT_PRDT_CD = fullAccount.slice(8, 10) || '01';
 
         const tr_id = config.IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
-        console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
+        // [Cache Busting] Vercel 캐시 및 세션 꼬임 방지를 위한 고유 ID 생성
+        const burstId = Date.now();
+        console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD} [Buster: ${burstId}]...`);
 
         const fetchBalance = async (fk = '', nk = '') => {
-            return await axios.get(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance`, {
+            return await axios.get(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-balance?t=${burstId}`, {
                 headers: {
                     'Content-Type': 'application/json',
+                    'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    'Pragma': 'no-cache',
                     'authorization': `Bearer ${token}`,
                     'appkey': config.APP_KEY,
                     'appsecret': config.APP_SECRET,

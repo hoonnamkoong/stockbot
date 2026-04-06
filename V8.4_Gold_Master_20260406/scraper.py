@@ -1209,6 +1209,12 @@ if __name__ == "__main__":
                 tg_manager.send_market_report('KOSPI', kospi_items)
                 tg_manager.send_market_report('KOSDAQ', kosdaq_items)
                 if advisor_report_text: tg_manager.send_message(f"🧠 Strategic Guide\n{advisor_report_text[:3500]}")
+    else:
+        # [NEW] 1단계 Buzz Filter 통과 종목이 없을 때 알림 (Silent Skip 방지)
+        print("[System] 📉 조건에 맞는 종목이 없습니다. 알림을 전송합니다.")
+        should_send_telegram, _ = TelegramNotificationGuard.should_send(now_kst)
+        if (should_send_telegram or is_manual_run) and notif_service:
+            notif_service.send_no_data_alert(threshold=threshold)
 
     # --- 4. Gemini Portfolio Simulator ---
     print("\n[System] Entering Gemini Portfolio Simulator...")
@@ -1251,6 +1257,8 @@ if __name__ == "__main__":
         print(f"\n[CRITICAL ERROR] Failed in consolidated section: {grand_e}")
         import traceback
         traceback.print_exc()
+        if 'notif_service' in locals() and notif_service:
+            notif_service.send_error_alert(str(grand_e))
         sys.exit(1)
 
     finally:

@@ -9,8 +9,8 @@ import json
 import concurrent.futures
 import re
 
-# [V8.4.4 Gold Master] 수집 하드닝 (Selector Hardening & Diagnostic Logging)
-SCRAPER_VERSION = "8.4.4 Gold Master"
+# [V8.4.6 Gold Master] 아키텍처 안정화 버전 (최신 버전 동기화)
+SCRAPER_VERSION = "8.4.6 Gold Master"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src', 'strategy')))
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         from src.notification.notification_service import NotificationService
         ns = NotificationService()
         if ns.is_available:
-            summary_msg = f"🚀 **V8.4.4 Gold Master 전략 리포트**\n\n"
+            summary_msg = f"🚀 **V8.4.6 Gold Master 전략 리포트**\n\n"
             summary_msg += f"일시: {now_kst.strftime('%Y-%m-%d %H:%M')}\n"
             summary_msg += f"분석 대상: {len(results)}개 종목\n\n"
             summary_msg += f"--- **Strategic Insights** ---\n\n"

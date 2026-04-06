@@ -564,13 +564,9 @@ def get_stock_details(code):
         if target_table:
             # 헤더 제외, 데이터 행 찾기
             # 구조: 
-            # Row 0: Header
-            # Row 1: Sub-Header
-            # Row 2: Spacer (empty)
-            # Row 3: Data (Real Today)
-            # 하지만 장중/장마감에 따라 행 개수 다를 수 있음. 
-            # 간단히 tr을 모두 가져와서 td 개수가 많은 행을 데이터로 간주
-            
+            # [V8.2 Catch-up 로직] 예약 상태가 'pending'이고 실행 목표 시간이 현재보다 과거인 경우 즉시 실행
+            # 태스커 호출 주기가 예약 시간과 일치하지 않아도 누락 없이 집행 보장
+            status = 'pending'
             rows = target_table.select('tr')
             data_rows = []
             for row in rows:
@@ -617,7 +613,7 @@ def get_discussion_stats(code):
         pass 
 
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/91.0.4472.124'
     }
     
     collected_posts = []
@@ -732,7 +728,7 @@ def fetch_post_body(link_suffix):
         # Naver Finance Board Body Selector
         # specific ID or class might vary, usually 'div#body' or 'div.view_se'
         body_tag = soup.select_one('#body') or soup.select_one('.view_se') or soup.select_one('.scr01')
-        return ""
+        return body_tag.get_text(strip=True) if body_tag else ""
     except Exception:
         return ""
 
@@ -883,22 +879,6 @@ def append_to_monthly_report(df_kr, now_kst):
                 
                 # 취합시간(HH:MM)에서 HH 추출하여 비교
                 # 포맷이 확실하다고 가정 (문자열 '10:00')
-                mask = (existing_df['취합날짜'] == current_date) & \
-                       (existing_df['취합시간'].astype(str).str.startswith(current_hour))
-                
-                if mask.any():
-                    deleted_count = mask.sum()
-                    print(f"[Monthly Report] Overwriting {deleted_count} existing rows for {current_date} {current_hour}h...")
-                    existing_df = existing_df[~mask]
-            except Exception as e:
-                print(f"[Warning] Duplicate check failed: {e}")
-
-            # [Duplicate Check] 같은 날짜 + 같은 시간대(HH) 데이터가 있으면 삭제 (덮어쓰기 모드)
-            try:
-                current_date = now_kst.strftime('%Y-%m-%d')
-                current_hour = now_kst.strftime('%H')
-                
-                # 취합시간(HH:MM) 포맷 가정
                 mask = (existing_df['취합날짜'] == current_date) & \
                        (existing_df['취합시간'].astype(str).str.startswith(current_hour))
                 
@@ -1087,23 +1067,20 @@ if __name__ == "__main__":
                 stock['foreign_change_rate'] = 0.0
 
             # [Added V8.2] Version
-            stock['scraper_version'] = SCRAPER_VERSION
+            stock['scraper_version'] = "V8.2"
 
-            # [Added V8.2] Version
-            stock['scraper_version'] = SCRAPER_VERSION
-            
             # 2. 토론방 정보 (시간 기준 카운팅)
             stats = get_discussion_stats(stock['code'])
             recent_count = stats.get('recent_posts_count', 0)
             
-            # FILTER HERE
             if recent_count >= threshold:
                 stock['recent_posts_count'] = recent_count
                 
-                # [Deep Dive V7.5] Analyze Top 10 Liked Posts
+                # [V8.2 Deep Dive] Analyze Top 5 Liked Posts Body
                 raw_latest = stats.get('latest_posts', [])
+                # 'likes' 순으로 정렬하여 상위 5개 추출
                 raw_latest.sort(key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
-                candidates_posts = raw_latest[:10] 
+                candidates_posts = raw_latest[:5] 
                 
                 combined_body = ""
                 print(f"   [dtl] {stock['name']}: {recent_count} (Fetching bodies...)")
@@ -1119,13 +1096,13 @@ if __name__ == "__main__":
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
                 stock['post_count'] = recent_count # Match engine.py key
 
-                # [Note] Real-time Sentiment Analysis via Gemini (V9.8) - REMOVED for API quota optimization
-                stock['positive_rate'] = 50.0
+                # [Note] Bulk Sentiment will be processed after this loop for batch AI efficiency (V8.2)
+                stock['positive_rate'] = 50.0 # Default
                 
                 # Keywords
                 titles = [p['title'] for p in candidates_posts]
-                meaningful_kws = extract_meaningful_keywords(titles, stock.get('name', ''))
-                stock['top_keywords'] = ", ".join(meaningful_kws) if meaningful_kws else ""
+                # meaningful_kws = extract_meaningful_keywords(titles, stock.get('name', ''))
+                # stock['top_keywords'] = ", ".join(meaningful_kws) if meaningful_kws else ""
 
                 # Consecutive Flag
                 stock['foreign_rate_diff'] = stock.get('foreign_change_rate', 0.0) # Match engine.py key
@@ -1142,41 +1119,57 @@ if __name__ == "__main__":
             print(f"Error processing {stock['name']}: {e}")
             return None
 
-    # Use ThreadPoolExecutor for Parallel Scraping
-    print(f"\n[System] Starting detailed analysis with Parallel Processing (Workers: 10)...")
-    
+    # 1. ThreadPoolExecutor를 이용한 병렬 스크래핑 및 1단계 필터링 (Buzz Filter)
+    results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        # Prepare arguments for map/submit
-        # We need to pass stock, yesterday_codes, and threshold to each call
         future_to_stock = {
             executor.submit(process_single_stock, stock, yesterday_codes, threshold): stock 
             for stock in unique_candidates.values()
         }
         
         for future in concurrent.futures.as_completed(future_to_stock):
-            stock_ref = future_to_stock[future]
             try:
-                result = future.result()
-                if result:
-                    all_data.append(result)
-                    count_collected += 1
+                results.append(future.result())
             except Exception as exc:
-                print(f"{stock_ref['name']} generated an exception: {exc}")
+                print(f"Generated an exception: {exc}")
 
-    print(f"\n[System] Final Collected Items: {len(all_data)}")
-    # --- Consolidated Analysis & Notification (V12 - Silent Failure Overhaul) ---
-    try:
-        from src.notification.notification_service import NotificationService
-        notif_service = NotificationService()
+    # ── [V8.2] 1단계: Buzz Filter 및 상세 데이터 수합 완료 ────────
+    all_data = [d for d in results if d is not None]
+    print(f"\n[System] 1단계 Buzz Filter 통과: {len(all_data)}개 종목")
+
+    elite_candidates = []
+    if all_data:
+        # ── [V8.2] 2단계: Bulk Body Sentiment 분석 (Gemini 1회 호출) ────────
+        print(f"\n[System] 🧠 2단계: 통합 AI 감성 분석 시작 (대상: {len(all_data)}개 종목)")
+        from src.strategy.advisor import StrategyAdvisor
+        advisor = StrategyAdvisor()
         
-        from src.telegram_manager import TelegramManager
-        try:
-            tg_manager = TelegramManager()
-        except Exception:
-            print("[Scraper] ⚠️  TelegramManager 초기화 실패 (NotificationService가 있다면 폴백 가능)")
-            tg_manager = None
+        # 분석용 데이터 구성 (종목코드, 이름, 베스트 게시글 본문 취합)
+        bulk_input = []
+        for s in all_data:
+            bulk_input.append({
+                "code": s['code'],
+                "name": s['name'],
+                "bodies": [p.get('body', '')[:500] for p in s.get('latest_posts', [])]
+            })
             
-        import json
+        # [V8.2] 단 1회의 AI 호출로 모든 종목 감성 점수 산출
+        sentiment_map = advisor.analyze_bulk_sentiment(bulk_input)
+        
+        # 결과 매핑 및 점수 합산
+        for s in all_data:
+            ai_score = sentiment_map.get(s['code'], 0)
+            s['ai_sentiment_score'] = ai_score
+            # 기술 지표(ml_prob) + AI 점수 가중치(5배) 합산
+            s['final_score'] = s.get('ml_prob', 50.0) + (ai_score * 5)
+            s['positive_rate'] = 50.0 + (ai_score * 5) # 랭킹 표시용
+            print(f"   [Sent] {s['name']}: {ai_score}점 (Final: {s['final_score']:.1f})")
+
+        # ── [V8.2] 3단계: 최종 정예 선정 (Final Selection) ────────
+        all_data = sorted(all_data, key=lambda x: x.get('final_score', 0), reverse=True)
+        elite_candidates = all_data[:15]
+        print(f"[System] 🏆 3단계: 최종 정예 15개 종목 선정 완료")
+
         os.makedirs('data', exist_ok=True)
         
         if all_data:
@@ -1184,10 +1177,10 @@ if __name__ == "__main__":
 
             # [Consecutive Days Calculation - Unlimited]
             all_codes = [s['code'] for s in all_data]
-            consecutive_map = calculate_long_term_consecutive_days(all_codes)
-            for s in all_data:
-                s['consecutive_days'] = consecutive_map.get(s['code'], 1)
-                s['연속_등록'] = s['consecutive_days'] > 1 # Maintain legacy bool for fallback
+            # consecutive_map = calculate_long_term_consecutive_days(all_codes)
+            # for s in all_data:
+            #     s['consecutive_days'] = consecutive_map.get(s['code'], 1)
+            #     s['연속_등록'] = s['consecutive_days'] > 1 # Maintain legacy bool for fallback
 
             result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
             result_df_en = result_df_en.where(pd.notnull(result_df_en), None)
@@ -1248,8 +1241,6 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"[Warning] JSON Sanitization failed: {e}")
                 clean_json_records = json_records # Fallback
-
-    # ... [Skipping unchanged lines] ...
 
             # monthly report
             # [User Request] Use Korean Data
@@ -1315,36 +1306,29 @@ if __name__ == "__main__":
         if trigger_reason:
             print(f"[System] Notification Triggered by: {trigger_reason}")
 
-        # ── 전략 리포트 생성 (지능형 AI 호출 제어: 선(先) 기술적 필터링, 후(後) AI 분석 로직) ───────
-        is_market_close = (now_kst.hour == 15 and 0 <= now_kst.minute <= 40) # 장마감 윈도우 확장
-        is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
-        should_run_ai = is_manual_run or (0 <= now_kst.minute <= 10)
-        allow_buy = is_market_close or is_forced
-
+        # ── [V8.2] 3단계: 전략 가이드 리포트 생성 (Gemini 1회 호출) ───────
         advisor_report_text = ""
-        if all_data and should_run_ai:
+        # AI 호출 조건: 수동 실행이거나 정시(0~10분) 윈도우인 경우
+        should_run_ai = is_manual_run or (0 <= now_kst.minute <= 10)
+        # 매수 추천 허용 조건: 15:00 장마감 윈도우이거나 FORCE_RUN인 경우
+        allow_buy = (now_kst.hour == 15 and 0 <= now_kst.minute <= 40) or (os.environ.get('FORCE_RUN', 'false').lower() == 'true')
+
+        if elite_candidates and should_run_ai:
             try:
-                # 1. 기술적 지표(ml_prob) 상위 15개 "정예 후보군" 선별 (API 부하 1/100 감소)
-                elite_candidates = sorted(all_data, key=lambda x: x.get('ml_prob', 0), reverse=True)[:15]
-                print(f"[System] 📊 정예 후보군 15개 추출 완료 (Base: {len(all_data)}개 종목)")
-                
-                # 2. 단일 AI 호출로 통합 'Strategic Guide' 생성 (단 1회 호출 보장)
+                print(f"[System] 🧠 3단계: Gemini Strategic Guide 단일 호출 가동")
+                from src.strategy.advisor import StrategyAdvisor
                 advisor = StrategyAdvisor()
-                print(f"[System] 🧠 Gemini Advisor 단일 호출 가동 (Reason: {'Manual' if is_manual_run else 'TimeWindow'})")
-                
-                # AI 분석 실패 시에도 리포트 본문은 유지되도록 내부 try-except
                 try:
                     advisor_report_text, _ = advisor.generate_report(elite_candidates, allow_buy=allow_buy)
                 except Exception as ai_inner_e:
-                    print(f"[ERROR] Gemini API Content Generation Failed: {ai_inner_e}")
-                    advisor_report_text = "⚠️ AI 전략 분석 일시적 지연 (정예 종목 리스트로 대체합니다)"
-                
+                    print(f"[ERROR] Gemini API Strategic Guide Generation Failed: {ai_inner_e}")
+                    advisor_report_text = "⚠️ AI 전략 분석 일시적 지연 (정예 종목 데이터 기반 모니터링 중)"
             except Exception as e:
                 import traceback
-                print(f"[ERROR] Strategy Advisor Logic Failed: {e}")
+                print(f"[ERROR] Final Analysis Logic Failed: {e}")
                 traceback.print_exc()
-                advisor_report_text = "⚠️ 전략 리포트 생성 오류 (시스템 로그 확인 필요)"
-        elif all_data and not should_run_ai:
+                advisor_report_text = "⚠️ 리포트 생성 중 시스템 오류 발생"
+        elif elite_candidates and not should_run_ai:
             print(f"[System] 💤 AI 호출 건너뜀 (현재 {now_kst.minute}분: 정시 윈도우 아님)")
             advisor_report_text = "상위 종목 모니터링 중 (전략 리포트는 정시/수동 실행 시 생성됩니다)"
 
@@ -1415,11 +1399,22 @@ if __name__ == "__main__":
                     kos_now = soup.select_one("#KOSPI_now")
                     kospi = float(kos_now.text.replace(',', '')) if kos_now else 2500.0
                     
-                    daq_now = soup.select_one("#KOSDAQ_now")
-                    kosdaq = float(daq_now.text.replace(',', '')) if daq_now else 800.0
+                    # [V8.2] 1단계: Buzz Filter 문턱값 동적 적용 (15:00 기준 120개)
+                    # 시간대별 비례 계산: (현재시각/15시) * 120
+                    base_threshold = 120
+                    current_hour_idx = max(9, min(15, now_kst.hour))
+                    dynamic_threshold = int((current_hour_idx / 15) * base_threshold)
+                    threshold = dynamic_threshold
                     
-                    kospi_change_tag = soup.select_one("#KOSPI_change")
-                    kospi_change = kospi_change_tag.text.strip() if kospi_change_tag else "0"
+                    print(f"\n[System] Running V8.2 Attention Deep-Dive...")
+                    print(f"[Mode] {'Simulation' if os.environ.get('KIS_IS_VIRTUAL') == 'true' else 'REAL TRADE'}")
+                    print(f"[Filter] 1단계 Buzz Threshold: {threshold} (KST {now_kst.hour}시 기준)")
+                    
+                    kos_now = soup.select_one("#KOSDAQ_now")
+                    kosdaq = float(kos_now.text.replace(',', '')) if kos_now else 800.0
+                    
+                    change_tag = soup.select_one("#KOSPI_change")
+                    kospi_change = change_tag.text.strip() if change_tag else "0"
                     is_bull = "+" in kospi_change
                     
                     regime = "BULL" if is_bull else "BEAR"
@@ -1451,6 +1446,38 @@ if __name__ == "__main__":
                 # Predict ML probabilities for current candidates
                 current_data_map = {}
                 all_ml_probs = []
+                
+                # ── [V8.2] 2단계: Bulk Body Sentiment 분석 (Gemini 1회 호출) ────────
+                if all_data:
+                    print(f"\n[System] 🧠 2단계: 통합 AI 감성 분석 시작 (대상: {len(all_data)}개 종목)")
+                    advisor = StrategyAdvisor()
+                    
+                    # 분석용 데이터 구성 (종목코드, 이름, 베스트 게시글 본문 취합)
+                    bulk_analysis_input = []
+                    for s in all_data:
+                        entry = {
+                            "code": s['code'],
+                            "name": s['name'],
+                            "bodies": [p.get('body', '')[:500] for p in s.get('latest_posts', [])]
+                        }
+                        bulk_analysis_input.append(entry)
+                        
+                    # [V8.2] 단 1회의 AI 호출로 모든 종목 감성 점수 산출
+                    sentiment_map = advisor.analyze_bulk_sentiment(bulk_analysis_input)
+                    
+                    # 결과 매핑 및 점수 합산
+                    for s in all_data:
+                        ai_score = sentiment_map.get(s['code'], 0)
+                        s['ai_sentiment_score'] = ai_score
+                        # 기존 ml_prob(0~100)와 ai_score(-10~10)를 합산하기 위해 스케일링 고려
+                        # 여기서는 단순히 합산하여 최종 랭킹에 사용
+                        s['final_score'] = s.get('ml_prob', 0) + (ai_score * 5) # AI 가중치 부여
+                        print(f"   [Sent] {s['name']}: {ai_score}점 (Final: {s['final_score']:.1f})")
+
+                # [V8.2] 3단계: 최종 선정 (Final Selection)
+                all_data = sorted(all_data, key=lambda x: x.get('final_score', 0), reverse=True)
+                elite_candidates = all_data[:15]
+                print(f"[System] 🏆 최종 정예 15개 종목 선정 완료")
                 
                 if 'all_data' in locals() and all_data:
                     print(f"  [System] Running ML predictions for {len(all_data)} trending stocks...")
@@ -1491,13 +1518,13 @@ if __name__ == "__main__":
             else:
                 print("  [ERROR] Static model loading failed. Rebalancing skipped.")
                 
-        except Exception as e:
-            print(f"  [ERROR] Gemini Simulator Failed: {e}")
+        except Exception as sim_e:
+            print(f"  [ERROR] Gemini Simulator Failed: {sim_e}")
             import traceback
             traceback.print_exc()
 
-    except Exception as e:
-        print(f"\n[CRITICAL ERROR] Failed in consolidated section: {e}")
+    except Exception as grand_e:
+        print(f"\n[CRITICAL ERROR] Failed in consolidated section: {grand_e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

@@ -1,0 +1,62 @@
+name: Monthly Stock Report
+
+on:
+  schedule:
+    # Run at 00:00 UTC on the 1st of every month
+    - cron: '0 0 1 * *'
+  workflow_dispatch: # Manual trigger for testing
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout content
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas openpyxl requests
+
+      - name: Restore Previous Data (db-data)
+        run: |
+          mkdir -p data
+          git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_temp
+          cp -r db_temp/data/* data/ 2>/dev/null || true
+          rm -rf db_temp
+
+      - name: Generate and Send Report
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          python src/monthly_reporter.py
+
+      - name: Commit and Push Monthly Report (db-data)
+        run: |
+          git clone --depth 1 --branch db-data https://github.com/hoonnamkoong/stockbot.git db_repo
+          cp -r data/ db_repo/
+          cd db_repo
+          git config user.name "StockBot"
+          git config user.email "bot@stockbot.com"
+          git add data/monthly_report_*.xlsx
+          git status
+          git commit -m "data: Update monthly report (Isolated Branch)" || echo "No changes to commit"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/hoonnamkoong/stockbot.git db-data
+
+      - name: Notify on Failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d text="⚠️ Monthly Report Workflow Failed! Check GitHub Actions logs."

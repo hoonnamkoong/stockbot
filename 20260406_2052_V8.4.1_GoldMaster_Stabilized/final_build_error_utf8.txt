@@ -1,0 +1,77 @@
+﻿
+> stock-dashboard@0.1.0 build
+> next build
+
+   ??Next.js 14.0.0
+   - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+node.exe : (node:18704) [D
+EP_WEBPACK_MODULE_UPDATE_H
+ASH] DeprecationWarning: M
+odule.updateHash: Use new 
+ChunkGraph API
+위치 줄:1 문자:1
++ & "C:\Program Files\node
+js/node.exe" "C:\Program F
+iles\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: ((  
+  node:18704) [D... Chu   
+ nkGraph API:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+(Use `node --trace-depreca
+tion ...` to show where th
+e warning was created)
+ ??Compiled successfully
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/app/trade/page.tsx:2
+30:17
+Type error: Element implic
+itly has an 'any' type bec
+ause expression of type '"
+time"' can't be used to in
+dex type '{ code: string; 
+qty: string | number; pric
+e: string | number; side: 
+string | null; pin: string
+; isVirtual: boolean; }'.
+  Property 'time' does not
+ exist on type '{ code: st
+ring; qty: string | number
+; price: string | number; 
+side: string | null; pin: 
+string; isVirtual: boolean
+; }'.
+
+[0m [90m 228 |[39m[0m
+[0m [90m 229 |[39m     
+        [36mif[39m (isRe
+servation) {[0m
+[0m[31m[1m>[22m[39m[
+90m 230 |[39m            
+     payload[[32m'time'[
+39m] [33m=[39m [32m`${r
+esHour}:${resMin}`[39m[3
+3m;[39m[0m
+[0m [90m     |[39m     
+            [31m[1m^[22
+m[39m[0m
+[0m [90m 231 |[39m     
+        }[0m
+[0m [90m 232 |[39m[0m
+[0m [90m 233 |[39m     
+        [36mconst[39m re
+s [33m=[39m [36mawait[
+39m axios[33m.[39mpost(e
+ndpoint[33m,[39m payload
+)[33m;[39m[0m

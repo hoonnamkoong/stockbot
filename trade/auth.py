@@ -190,39 +190,6 @@ def get_access_token(force_refresh=False):
                     with open(token_path, 'w', encoding='utf-8') as f:
                         json.dump(token_data, f, indent=2)
                     print(f"Success! New Access Token retrieved and saved to {token_path}.")
-                    
-                    # --- NEW: Push to GitHub to sync with Vercel/Actions ---
-                    if gh_token:
-                        print("Syncing new token to GitHub Repository...")
-                        try:
-                            api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{gh_file_path}"
-                            gh_headers = {
-                                "Authorization": f"token {gh_token}",
-                                "Accept": "application/vnd.github.v3+json"
-                            }
-                            
-                            # 1. Get SHA of existing file to update
-                            r_get = requests.get(api_url, headers=gh_headers, params={"ref": branch})
-                            sha = r_get.json().get('sha') if r_get.status_code == 200 else None
-                            
-                            # 2. Put file
-                            import base64
-                            content_b64 = base64.b64encode(json.dumps(token_data, indent=2).encode('utf-8')).decode('utf-8')
-                            put_data = {
-                                "message": "chore: update kis token cache [bot]",
-                                "content": content_b64,
-                                "branch": branch
-                            }
-                            if sha: put_data["sha"] = sha
-                            
-                            r_put = requests.put(api_url, headers=gh_headers, json=put_data)
-                            if r_put.status_code in [200, 201]:
-                                print("✅ Successfully synced token to GitHub.")
-                            else:
-                                print(f"❌ GitHub sync failed: {r_put.text}")
-                        except Exception as gh_e:
-                            print(f"❌ Error during GitHub sync: {gh_e}")
-                    
                     return access_token
                 else:
                     raise ValueError("Invalid access_token received from KIS")

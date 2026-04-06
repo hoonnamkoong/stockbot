@@ -1326,15 +1326,17 @@ if __name__ == "__main__":
         if trigger_reason:
             print(f"[System] Notification Triggered by: {trigger_reason}")
 
-        # ── 전략 리포트 생성 (지능형 AI 호출 제어: 정시 윈도우 0-10분 또는 수동 실행 시에만 제미나이 작동) ─────────
+        # ── 전략 리포트 생성 (지능형 AI 호출 제어: 수동 실행 또는 정시 윈도우 0-10분 시에만 제미나이 작동) ───────
         advisor_report_text = ""
         is_market_close = (now_kst.hour == 15 and 0 <= now_kst.minute <= 30)
         is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
-        is_manual = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch' or is_forced
+        
+        # [지시사항] 깃허브 스케줄러가 아닌 모든 실행(Push, Manual, Dispatch)은 사용자의 의도가 담긴 수동형 실행으로 간주
+        is_manual_run = os.environ.get('GITHUB_EVENT_NAME') != 'schedule' or is_forced
         is_time_window = 0 <= now_kst.minute <= 10
         
-        # [지시사항] 정시 윈도우이거나 수동 실행인 경우에만 AI 호출
-        should_run_ai = is_time_window or is_manual
+        # [지시사항] 수동 실행이거나 정시 윈도우인 경우에만 AI 호출
+        should_run_ai = is_manual_run or is_time_window
         allow_buy = is_market_close or is_forced
 
         if all_data and should_run_ai:

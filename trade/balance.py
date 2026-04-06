@@ -64,7 +64,8 @@ def get_balance():
     max_retries = 3
     for i in range(max_retries):
         try:
-            res = requests.get(url, headers=headers, params=params, timeout=10)
+            # [SAFETY] Timeout reduced from 10s to 5s for faster failure in scraper context
+            res = requests.get(url, headers=headers, params=params, timeout=5)
             if res.status_code != 200:
                 if i < max_retries - 1:
                     time.sleep(1 + i)

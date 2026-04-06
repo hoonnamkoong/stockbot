@@ -121,11 +121,11 @@ class StrategyAdvisor:
         if not is_virtual:
             print("[Advisor] Fetching REAL KIS Portfolio...")
             try:
+                # [SAFETY] Import and call inside try block to prevent crash if module fails
                 from trade.balance import get_balance
                 res = get_balance()
-                if "error" in res:
-                    print(f"[Advisor] ❌ REAL Balance Fetch Error: {res['error']}")
-                else:
+                
+                if res and isinstance(res, dict) and "error" not in res:
                     for h in res.get('holdings', []):
                         holdings[h['code']] = {
                             'name': h['name'],
@@ -136,8 +136,12 @@ class StrategyAdvisor:
                         }
                     print(f"[Advisor] REAL Portfolio loaded: {len(holdings)} items")
                     return holdings
+                else:
+                    err = res.get('error') if res else 'Unknown error'
+                    print(f"[Advisor] ⚠️ REAL Balance Fetch Skip: {err}")
             except Exception as e:
-                print(f"[Advisor] ❌ REAL Portfolio Import/Fetch Error: {e}")
+                # [CRITICAL] Catch all exceptions to guarantee report generation continues
+                print(f"[Advisor] ❌ CRITICAL: REAL Portfolio Fetch Exception (Skipping): {e}")
 
         # Fallback to Virtual Portfolio
         print("[Advisor] Fetching Virtual Portfolio (Fallback/Mock)...")

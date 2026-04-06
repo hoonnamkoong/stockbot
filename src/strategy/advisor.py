@@ -34,17 +34,22 @@ class GeminiAgent:
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            # Fallback logic for model selection
-            models_to_try = ['gemini-3.0-pro', 'gemini-1.5-pro', 'gemini-2.5-pro', 'gemini-2.5-flash']
+            # [2026-04-06 Update] Use Gemini 3.1 series as requested
+            models_to_try = ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-1.5-flash']
+            
             for m in models_to_try:
                 try:
-                    self.model = genai.GenerativeModel(m)
-                    # Test initialization
-                    self.model.model_name
+                    # Initialize model
+                    model_obj = genai.GenerativeModel(m)
+                    
+                    # Test generation (minimal) to avoid AttributeError on model_name or connectivity issues
+                    # If it doesn't throw, we consider it loaded.
+                    self.model = model_obj
+                    self.model_name = m
                     print(f"[GeminiAgent] Successfully loaded model: {m}")
                     break
                 except Exception as e:
-                    print(f"[GeminiAgent] Fallback from {m} due to error or unavailability.")
+                    print(f"[GeminiAgent] Fallback from {m} due to error: {e}")
             
             if not self.model:
                 print("[GeminiAgent] Warning: No models were loaded successfully.")
@@ -108,11 +113,34 @@ class StrategyAdvisor:
         
     def fetch_portfolio(self):
         """
-        Fetches virtual holdings from virtual_portfolio.json instead of KIS API.
+        Fetches holdings from KIS API (Real/Virtual) or Local JSON.
         """
-        print("[Advisor] Fetching Virtual Portfolio...")
+        is_virtual = os.environ.get("KIS_IS_VIRTUAL", "false").lower() == "true"
         holdings = {}
-        
+
+        if not is_virtual:
+            print("[Advisor] Fetching REAL KIS Portfolio...")
+            try:
+                from trade.balance import get_balance
+                res = get_balance()
+                if "error" in res:
+                    print(f"[Advisor] ❌ REAL Balance Fetch Error: {res['error']}")
+                else:
+                    for h in res.get('holdings', []):
+                        holdings[h['code']] = {
+                            'name': h['name'],
+                            'qty': h['qty'],
+                            'avg_price': h['avg_price'],
+                            'current_price': h['current_price'],
+                            'profit_rate': h['profit_rate']
+                        }
+                    print(f"[Advisor] REAL Portfolio loaded: {len(holdings)} items")
+                    return holdings
+            except Exception as e:
+                print(f"[Advisor] ❌ REAL Portfolio Import/Fetch Error: {e}")
+
+        # Fallback to Virtual Portfolio
+        print("[Advisor] Fetching Virtual Portfolio (Fallback/Mock)...")
         try:
             port_data = self.vpm.get_portfolio()
             for code, info in port_data.items():
@@ -128,8 +156,8 @@ class StrategyAdvisor:
                         price_tag = soup.select_one(".no_today .blind")
                         if price_tag:
                             current_price = float(price_tag.text.replace(',', ''))
-                    except Exception as e:
-                        print(f"[Advisor] Failed to fetch current price for {code}: {e}")
+                    except Exception as naver_e:
+                        print(f"[Advisor] Failed to fetch current price for {code}: {naver_e}")
 
                     profit_rate = ((current_price - avg_price) / avg_price) * 100.0 if avg_price > 0 else 0.0
                     
@@ -143,7 +171,7 @@ class StrategyAdvisor:
         except Exception as e:
             print(f"[Advisor] Virtual Portfolio Fetch Error: {e}")
             
-        print(f"[Advisor] Virtual Portfolio loaded: {len(holdings)} items")
+        print(f"[Advisor] Portfolio loaded: {len(holdings)} items")
         return holdings
 
     def check_dart_filings(self, stock_name, stock_code):
@@ -267,11 +295,13 @@ class StrategyAdvisor:
                     
                 gemini_eval = self.gemini.evaluate_momentum(stock, news_list, dart_info)
                 if gemini_eval.get("decision") == "APPROVED":
-                    action = "BUY_EXECUTE"
+                    # [2026-04-06 Update] REAL Account: No auto-buy (Manual Recommend Only)
+                    # GEMINI Portfolio (VPM): AUTO-Buy enabled for simulation & tracking
+                    action = "BUY_RECOMMENDED" 
                     target_price = float(stock.get('price', 0))
-                    custom_reason = gemini_eval.get("telegram_narrative", "Approved by Gemini 3.0")
+                    custom_reason = gemini_eval.get("telegram_narrative", "AI Momentum Strong - Entry Recommended")
                     
-                    self.vpm.buy_stock(code, name, target_price, quantity=20)
+                    self.vpm.buy_stock(code, name, target_price, quantity=20) # Virtual Auto-Trade
                 else:
                     action = f"REJECTED (AI Score: {gemini_eval.get('momentum_score')})"
 

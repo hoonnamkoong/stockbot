@@ -14,9 +14,10 @@ class GeminiAgent:
 
         try:
             genai.configure(api_key=GEMINI_KEY)
-            self.model_name = 'gemini-2.5-flash'
+            # [2026-04-06 Update] Use Gemini 3.1 series as requested
+            self.model_name = 'gemini-3.1-flash'
             self.model = genai.GenerativeModel(self.model_name)
-            self.fallback_models = ['gemini-2.0-flash', 'gemini-2.5-flash-lite']
+            self.fallback_models = ['gemini-3.1-pro', 'gemini-1.5-flash']
             print(f"[GeminiAgent] Initialized with {self.model_name}")
         except Exception as e:
             print(f"[GeminiAgent] Initialization Error: {e}")

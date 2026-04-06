@@ -27,7 +27,10 @@ def get_access_token(force_refresh=False):
     
     app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
     app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
-    base_url = os.environ.get("KIS_BASE_URL", "https://openapivts.koreainvestment.com:29443")
+    is_virtual = os.environ.get("KIS_IS_VIRTUAL", "false").lower() == "true"
+    
+    default_url = "https://openapi.koreainvestment.com:9443" if not is_virtual else "https://openapivts.koreainvestment.com:29443"
+    base_url = os.environ.get("KIS_BASE_URL", default_url)
     
     # Path to shared token file (sync with src/lib/kis-api.ts)
     possible_paths = [

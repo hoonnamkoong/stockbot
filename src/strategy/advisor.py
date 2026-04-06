@@ -129,6 +129,17 @@ class GeminiAgent:
         top_5 = sentinel_signals[:5]
         others = sentinel_signals[5:15]
 
+        # [V9.6] 상위 5개 데이터 경량화 (본문 200자 슬라이싱)
+        lightweight_top_5 = []
+        for s in top_5:
+            mini_s = s.copy()
+            if 'latest_posts' in mini_s:
+                mini_s['latest_posts'] = [
+                    {**p, 'body': str(p.get('body', ''))[:200]} 
+                    for p in mini_s['latest_posts']
+                ]
+            lightweight_top_5.append(mini_s)
+
         # [V9.5 핵심 수정] 데이터 인젝션 강화
         prompt = f"""
         당신은 공격적인 퀀트 분석가이며 '인사이트 중심 딥다이브' 리포트의 수석 에디터입니다. 
@@ -137,21 +148,23 @@ class GeminiAgent:
 
         [실제 데이터 (Raw Data)]
         - 시장 상황: {market_context}
-        - 상위 5개 타겟 상세: {json.dumps(top_5, ensure_ascii=False)}
+        - 상위 5개 타겟 상세: {json.dumps(lightweight_top_5, ensure_ascii=False)}
         - 나머지 10개 요약: {json.dumps(others, ensure_ascii=False)}
         
         요구사항 (PM 보고용 요약 리포트 스타일):
         1. 시황 브리핑 (Market Brief): 상위 5개 종목 기반 주도 섹터/테마 위주 3줄 이내 요약.
         2. Top 5 Deep-Dive: 상위 5개 종목 각각에 대해 아래 4개 요소를 구체적 데이터 기반으로 서술.
            - 버즈 발생 원인 (Trigger): 뉴스/공시 텍스트를 인용하여 한 문장 정의.
-           - 커뮤니티 심층 분석 (Community Insight): 본문(bodies)의 핵심 논점 요약.
+           - 커뮤니티 심층 분석 (Community Insight): 본문(bodies 또는 latest_posts)의 핵심 논점 요약.
            - 공시/뉴스 팩트 체크: 버즈와 일치하는 실재하는 텍스트 인용.
            - AI 최종 판단: [ML 확률 + 감성 점수]를 수치로 표기하고 '진짜 호재' 여부 판정.
         3. 나머지 10개 종목: [종목명 | AI 점수 | 핵심 키워드] 위주로 리스트화.
         
         🚨 절대 금기 사항:
+        - 결과 출력 시 <b>, <i> 등의 HTML 태그를 절대 사용하지 마라.
+        - 강조가 필요할 경우 반드시 마크다운 기술(**텍스트**)만 사용하라.
         - "[상위 종목 1]" 또는 "[뉴스/공시]" 같은 템플릿 대괄호([]) 형식을 그대로 출력하지 말 것.
-        - "제공된 데이터가 부족합니다" 같은 안내 문구를 출력하지 말 것. 데이터가 부족하면 현재 있는 수치(AI 점수 등)로만 판단할 것.
+        - "제공된 데이터가 부족합니다" 같은 안내 문구를 출력하지 말 것.
         - 오직 전문가용 불렛포인트(*)와 핵심 키워드 중심의 실전 리포트만 출력할 것.
         """
         try:

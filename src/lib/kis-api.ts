@@ -317,7 +317,7 @@ export async function getRealPortfolio(): Promise<any> {
             console.error(`[KIS-API ERROR] Balance Inquiry Failed! rt_cd: ${rt_cd}, msg_cd: ${msg_cd}, msg1: ${msg1}`);
             return { 
                 deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
-                error: `KIS API Error: ${msg1 || lastError} (${rt_cd})`,
+                error: `${msg1 || lastError} (${rt_cd})`,
                 sync_status: 'error'
             };
         }
@@ -395,6 +395,49 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
      * 실거래 주문 API 호출은 4월 V2 알고리즘 하에서 절대 금지됩니다.
      */
     export async function placeRealOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {
-        console.error(`[KIS-API] 🚨 CRITICAL: Real-world order attempt blocked by V2 Simulation Rules.`);
-        throw new Error('실거래 주문은 현재 4월 V2 시뮬레이션 모드 운영 정책에 따라 금지되어 있습니다. 가상 포트폴리오를 이용하세요.');
+        // [지시사항] 실거래 차단 정책 전면 삭제 및 수동 주문 허용
+        console.log(`[KIS-API] 🚀 Executing REAL order: ${side.toUpperCase()} ${code} ${qty} shares at ${price}`);
+        
+        try {
+            const config = getKISConfig();
+            const token = await getAccessToken();
+            
+            // KIS 국내주식 주문/매도 API 호출 (TTTC0802U: 매수, TTTC0801U: 매도)
+            const tr_id = side === 'buy' ? 
+                (config.IS_VIRTUAL ? 'VTTC0802U' : 'TTTC0802U') : 
+                (config.IS_VIRTUAL ? 'VTTC0801U' : 'TTTC0801U');
+
+            const body = {
+                "CANO": config.ACCOUNT_NO.slice(0, 8),
+                "ACNT_PRDT_CD": config.ACCOUNT_NO.slice(8, 10) || "01",
+                "PDNO": code,
+                "ORD_DVSN": "01", // 시장가(01) 또는 지정가(00) - 여기서는 시장가 기본
+                "ORD_QTY": qty.toString(),
+                "ORD_UNPR": side === 'buy' ? "0" : price.toString() // 시장가 매수 시 0
+            };
+
+            const hashKey = await getHashKey(body);
+
+            const res = await axios.post(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, body, {
+                headers: {
+                    'content-type': 'application/json',
+                    'authorization': `Bearer ${token}`,
+                    'appkey': config.APP_KEY,
+                    'appsecret': config.APP_SECRET,
+                    'tr_id': tr_id,
+                    'hashkey': hashKey
+                }
+            });
+
+            if (res.data.rt_cd !== '0') {
+                // KIS 서버의 한글 에러 사유(msg1)를 포함하여 반환
+                throw new Error(res.data.msg1 || `KIS 주문 실패 (${res.data.rt_cd})`);
+            }
+
+            return res.data;
+        } catch (e: any) {
+            const msg = e.response?.data?.msg1 || e.message;
+            console.error(`[KIS-API] Order Failed: ${msg}`);
+            throw new Error(msg);
+        }
     }

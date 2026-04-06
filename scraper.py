@@ -1119,21 +1119,8 @@ if __name__ == "__main__":
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
                 stock['post_count'] = recent_count # Match engine.py key
 
-                # [NEW] Real-time Sentiment Analysis via Gemini (V9.8)
-                try:
-                    from src.strategy.advisor import GeminiAgent
-                    sentiment_agent = GeminiAgent()
-                    # Calculate positive rate from combined bodies
-                    if combined_body.strip():
-                        prompt = f"다음 주식 게시글들을 분석하여 긍정적인 의견의 비율(0~100)을 숫자로만 답변하세요: {combined_body[:2000]}"
-                        res_text = sentiment_agent.model.generate_content(prompt).text
-                        pos_rate = float(re.search(r'\d+', res_text).group())
-                        stock['positive_rate'] = pos_rate
-                    else:
-                        stock['positive_rate'] = 50.0
-                except Exception as e:
-                    print(f"   [Error] Sentiment analysis failed for {stock['name']}: {str(e)}")
-                    stock['positive_rate'] = 50.0
+                # [Note] Real-time Sentiment Analysis via Gemini (V9.8) - REMOVED for API quota optimization
+                stock['positive_rate'] = 50.0
                 
                 # Keywords
                 titles = [p['title'] for p in candidates_posts]
@@ -1319,8 +1306,11 @@ if __name__ == "__main__":
             with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
                 json.dump(json_records, f, ensure_ascii=False, indent=2)
 
-        # [TELEGRAM V12 — Grand Protocol] Unified Notification Guard
+        # [TELEGRAM V12.1 — Grand Protocol] Unified Notification Guard
         should_send_telegram, trigger_reason = TelegramNotificationGuard.should_send(now_kst)
+        
+        # [FIX] 수동 실행(Manual Run)일 경우 조건 없이 알림 발송 보장
+        is_manual_run = os.environ.get('GITHUB_EVENT_NAME') != 'schedule' or (os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true')
 
         if trigger_reason:
             print(f"[System] Notification Triggered by: {trigger_reason}")
@@ -1328,9 +1318,7 @@ if __name__ == "__main__":
         # ── 전략 리포트 생성 (지능형 AI 호출 제어: 선(先) 기술적 필터링, 후(後) AI 분석 로직) ───────
         is_market_close = (now_kst.hour == 15 and 0 <= now_kst.minute <= 40) # 장마감 윈도우 확장
         is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
-        is_manual_run = os.environ.get('GITHUB_EVENT_NAME') != 'schedule' or is_forced
-        is_time_window = 0 <= now_kst.minute <= 10
-        should_run_ai = is_manual_run or is_time_window
+        should_run_ai = is_manual_run or (0 <= now_kst.minute <= 10)
         allow_buy = is_market_close or is_forced
 
         advisor_report_text = ""
@@ -1360,8 +1348,12 @@ if __name__ == "__main__":
             print(f"[System] 💤 AI 호출 건너뜀 (현재 {now_kst.minute}분: 정시 윈도우 아님)")
             advisor_report_text = "상위 종목 모니터링 중 (전략 리포트는 정시/수동 실행 시 생성됩니다)"
 
-        if all_data and should_send_telegram:
+        # [FIX] 수동 알림(Manual Run) 보완 로직 적용
+        should_actually_send = should_send_telegram or is_manual_run
+
+        if all_data and should_actually_send:
             print("[System] Generating Consolidated Telegram Report via NotificationService...")
+            if is_manual_run: print("[System] Manual Run Detected: Forcing notification regardless of time.")
 
             records = result_df_kr.to_dict('records') if not result_df_kr.empty else []
             kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
@@ -1395,7 +1387,7 @@ if __name__ == "__main__":
             else:
                 print("[Scraper] ✅ 텔레그램 리포트 전송 완료.")
 
-        elif not all_data and should_send_telegram:
+        elif not all_data and should_actually_send:
             if notif_service and notif_service.is_available:
                 notif_service.send_no_data_alert(threshold)
             elif tg_manager:

@@ -69,12 +69,14 @@ class NotificationService:
             print("[NotificationService] ⚠️  TelegramManager 임포트 실패. 알림 비활성화.")
             return
 
+        # [Standard] Gemini API 키 유연성 확보 (GOOGLE_API_KEY 또는 GEMINI_KEY 지원)
+        gemini_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY', '').strip()
         token = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
         chat_id = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
 
         # [DEBUG] 초기화 시점의 환경 변수 상태 확인 (마스킹)
         from src.config_validator import mask_sensitive
-        print(f"[NotificationService] 초기화 시도: Token={mask_sensitive(token)}, ChatID={chat_id[:4]}***")
+        print(f"[NotificationService] 초기화 시도: Token={mask_sensitive(token)}, ChatID={chat_id[:4]}***, GeminiKey={mask_sensitive(gemini_key)}")
 
         if not token or not chat_id:
             print("[NotificationService] ⚠️  필수 환경 변수(TOKEN/CHAT_ID) 누락.")

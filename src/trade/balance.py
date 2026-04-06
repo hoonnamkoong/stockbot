@@ -88,7 +88,10 @@ def get_balance():
             # [What] KIS 서버 데이터 갱신 중 호출 시 발생하는 '에러 7' 대응
             if rt_cd == '7' and i < max_retries - 1:
                 delay = 1.5 + (i * 1.5)
-                print(f"[Balance] ⚠️ '자료변경' 에러 발생. {i+1}차 재시도 중 ({delay}초 대기)...")
+                print(f"[Balance] ⚠️ '자료변경(7)' 에러 발생. 파라미터 초기화 후 {i+1}차 재시도 중 ({delay}초 대기)...")
+                # [Standard] 에러 7 발생 시 연속조회 키를 초기화하고 처음부터 다시 요청해야 함
+                params["CTX_AREA_FK100"] = ""
+                params["CTX_AREA_NK100"] = ""
                 time.sleep(delay)
                 continue
 

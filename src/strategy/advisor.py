@@ -94,12 +94,32 @@ class GeminiAgent:
 
     def generate_trading_guide(self, market_context, sentinel_signals):
         """[What] 전체 시장Context와 신호를 바탕으로 하는 서술형 가이드를 생성합니다."""
-        if not self.model: return "Gemini API 키가 없습니다."
-        prompt = f"다음 신호들을 바탕으로 오늘의 매매 요약을 작성하세요: {json.dumps(sentinel_signals, ensure_ascii=False)}. 왜 매도하거나 보유했는지 전문가처럼 설명하세요."
+        if not self.model: return "⚠️ Gemini API 초기화 실패: 리포트를 생성할 수 없습니다."
+        
+        prompt = f"""
+        당신은 실전 주식 투자 전문가입니다. 
+        다음 데이터와 신호를 바탕으로 오늘의 시장 상황을 요약하고, 투자자들에게 주는 핵심 권고 사항을 작성하세요.
+        
+        데이터:
+        - 시장 상황: {market_context}
+        - 주요 신호: {json.dumps(sentinel_signals, ensure_ascii=False)}
+        
+        요구사항:
+        1. 첫 문장은 시장의 '분의기(Regime)'를 한 문장으로 정의하며 시작하세요.
+        2. 왜 특정 종목을 보유(HOLD)하거나 매도(SELL)해야 하는지 논리적으로 설명하세요.
+        3. '입니다/합니다'체를 사용하며 신뢰감 있는 톤으로 작성하세요.
+        4. 수치 데이터를 근거로 제시하세요.
+        """
         try:
-            return self.model.generate_content(prompt).text
-        except:
-            return "가이드 생성 중 오류가 발생했습니다."
+            response = self.model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+            return "⚠️ AI 모델 응답이 비어있습니다. (데이터 부족)"
+        except Exception as e:
+            import traceback
+            print(f"[GeminiAgent] AI 가이드 생성 실패: {e}")
+            traceback.print_exc()
+            return f"⚠️ **AI 가이드 생성 중 오류 발생**: {str(e)[:100]}"
 
 # --- 2. Strategy Advisor (전략 실행 코디네이터) ---
 class StrategyAdvisor:

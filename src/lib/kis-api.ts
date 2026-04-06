@@ -254,7 +254,7 @@ export async function getRealPortfolio(): Promise<any> {
                     'appkey': config.APP_KEY,
                     'appsecret': config.APP_SECRET,
                     'tr_id': tr_id,
-                    'tr_cont': 'N',
+                    'tr_cont': fk ? 'N' : 'N', // [REVISIT] KIS standard: first request is 'N', continuation is also usually 'N' but with keys.
                     'custtype': 'P'
                 },
                 params: {
@@ -288,14 +288,19 @@ export async function getRealPortfolio(): Promise<any> {
             if (res.data.rt_cd === '0') break; // SUCCESS
 
             if ((res.data.rt_cd === '7' || res.data.rt_cd === '9') && i < maxRetries) {
-                console.warn(`[KIS-API] [${tr_id}] Error ${res.data.rt_cd} (Data changed/Session stale). Forcing TOKEN RESET and Retry ${i+1}/${maxRetries}...`);
+                console.warn(`[KIS-API] [${tr_id}] Paginated Response ${res.data.rt_cd}. Fetching next page ${i+1}/${maxRetries}...`);
                 
-                // [Standard] 에러 7 고착 시 세션 초기화를 위해 토큰 캐시를 강제 비움
-                cachedToken = null;
-                tokenExpiry = 0;
+                // [FIX] 사용자 지시사항: 절대 초기화하지 않고 다음 조회를 위한 연속키를 응답에서 추출합니다.
+                currentFK = res.data.ctx_area_fk100 || res.headers['ctx_area_fk100'] || '';
+                currentNK = res.data.ctx_area_nk100 || res.headers['ctx_area_nk100'] || '';
                 
-                currentFK = '';
-                currentNK = '';
+                console.log(`[KIS-API] Next Keys Found: FK=${currentFK.substring(0,5)}..., NK=${currentNK.substring(0,5)}...`);
+                
+                if (!currentFK && !currentNK) {
+                    console.error(`[KIS-API] Continuity error: rt_cd was 7 but no keys found in response.`);
+                    break; 
+                }
+                
                 await new Promise(resolve => setTimeout(resolve, delays[i]));
                 continue;
             }
@@ -381,53 +386,11 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
 /**
  * KIS 실거래 주문 집행 (REAL/VIRTUAL)
  */
-export async function placeRealOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {
-    try {
-        const config = getKISConfig();
-        const token = await getAccessToken();
-        const [cano, prdt_cd] = config.ACCOUNT_NO.split('-');
-        
-        let tr_id = '';
-        if (side === 'buy') {
-            tr_id = config.IS_VIRTUAL ? 'VTTC0802U' : 'TTTC0802U';
-        } else {
-            tr_id = config.IS_VIRTUAL ? 'VTTC0801U' : 'TTTC0801U';
-        }
-
-        console.log(`[KIS-API] [${tr_id}] Placing ${side} order for ${code}...`);
-
-        const orderBody = {
-            CANO: cano,
-            ACNT_PRDT_CD: prdt_cd || '01',
-            PDNO: code,
-            ORD_DVSN: price === 0 ? '01' : '00',
-            ORD_QTY: qty.toString(),
-            ORD_UNPR: price.toString()
-        };
-
-        const hashkey = await getHashKey(orderBody);
-
-        const res = await axios.post(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, orderBody, {
-            headers: {
-                'content-type': 'application/json; charset=utf-8',
-                'authorization': `Bearer ${token}`,
-                'appkey': config.APP_KEY,
-                'appsecret': config.APP_SECRET,
-                'hashkey': hashkey,
-                'tr_id': tr_id,
-                'tr_cont': 'N',
-                'custtype': 'P'
-            }
-        });
-
-        if (res.data.rt_cd !== '0') {
-             console.error(`[KIS-API] Order Error [${res.data.rt_cd}]:`, res.data.msg1);
-             throw new Error(res.data.msg1);
-        }
-
-        return { ODNO: res.data.output.ODNO, status: "SUCCESS", msg: res.data.msg1 };
-    } catch (error: any) {
-        console.error('[KIS-API] Real Order Critical Error:', error.message);
-        throw error;
+    /**
+     * [지시사항 6] 실거래와 가상 매매의 엄격한 물리적 분리
+     * 실거래 주문 API 호출은 4월 V2 알고리즘 하에서 절대 금지됩니다.
+     */
+    export async function placeRealOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {
+        console.error(`[KIS-API] 🚨 CRITICAL: Real-world order attempt blocked by V2 Simulation Rules.`);
+        throw new Error('실거래 주문은 현재 4월 V2 시뮬레이션 모드 운영 정책에 따라 금지되어 있습니다. 가상 포트폴리오를 이용하세요.');
     }
-}

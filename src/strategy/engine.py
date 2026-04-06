@@ -1,89 +1,114 @@
 import json
 import datetime
+from src.strategy.monthly.algo_04_v2 import Algo04V2
+from src.strategy.virtual_portfolio import VirtualPortfolioManager
+from src.strategy.advisor import GeminiAgent
+import requests
+from bs4 import BeautifulSoup
 
 class StrategyEngine:
     """
-    Pure Logic Engine for Stock Scoring and Signal Generation.
-    Hybrid Engine (March + April V2 Adaptive Attention Momentum)
-    NO external API calls (KIS, Google, etc.) allowed here.
+    [V2 Architecture] 4월 전략 전담 실행 엔진.
+    데이터 수집(사이드 이펙트) 및 전략 객체 호출을 담당합니다.
     """
-    def __init__(self, config=None):
-        self.config = config or {}
-
-    def calculate_score(self, stock_data):
-        """
-        1차 관문 필터링 모듈
-        기존 점수 방식 대신 4대 팩터(AND 조건)를 만족하는지 검사합니다.
+    def __init__(self):
+        # 4월 어텐션 모멘텀 전략 주입 (Strategy Pattern)
+        self.strategy = Algo04V2()
+        self.vpm = VirtualPortfolioManager()
+        self.gemini = GeminiAgent()
         
-        stock_data: dict containing:
-        - post_count (int): 당일 게시글 수
-        - positive_rate (float): 감정분석 Positive 비율 (0.0 ~ 100.0)
-        - foreign_rate_diff (float): 전일 대비 외국인 비중 변화
-        - change_rate (str 또는 float): 당일 주가 등락률
+    def execute_simulation(self, candidates, allow_buy=True):
         """
+        메인 시뮬레이션 루프. 
+        전략 모듈에서 받은 판단으로 실제 I/O(매수/매도/로그)를 수행합니다.
+        """
+        results = []
+        portfolio = self.vpm.get_portfolio()
+        balance = self.vpm.get_balance()
+        
+        for stock in candidates:
+            code = stock.get('code')
+            name = stock.get('name')
+            in_portfolio = code in portfolio
+            
+            # [Step 1] 보유 종목 대응 (Adaptive Exit)
+            if in_portfolio:
+                prev_post_cnt = 0 # (실제 구현 시 히스토리 데이터 로드 필요)
+                signal_data = self.strategy.check_exit_signal(
+                    holding_data=portfolio[code],
+                    stock_data=stock,
+                    prev_post_count=prev_post_cnt
+                )
+                
+                action = signal_data['action']
+                if action == "SELL_ALL":
+                    self.vpm.sell_stock(code, current_price=float(stock.get('price', 0)))
+                elif action == "SELL_HALF":
+                    qty = portfolio[code].get('quantity', 0)
+                    self.vpm.sell_stock(
+                        code, 
+                        current_price=float(stock.get('price', 0)), 
+                        sell_qty=max(1, int(qty / 2))
+                    )
+                
+                results.append({
+                    'code': code, 'name': name, 'signal': action,
+                    'reason': signal_data['reason'], 'in_portfolio': True
+                })
+                continue
+                
+            # [Step 2] 신규 후보 분석 (2차 검증 + AI)
+            if allow_buy:
+                # 2-1. [I/O] 2차 검증 오버레이 (DART/News) 데이터 수집
+                dart_data = self.fetch_dart_data(code)
+                news_list = self.fetch_news_data(code, name)
+                
+                # 2-2. [I/O] Gemini V2 AI 최종 승인 대기
+                llm_decision = self.gemini.evaluate_momentum(stock, news_list, dart_data)
+                
+                # 2-3. [Pure Logic] 전략 모듈 호출 (No I/O inside)
+                decision = self.strategy.analyze_target(
+                    stock_data=stock,
+                    dart_data=dart_data,
+                    llm_decision=llm_decision,
+                    current_cash=balance['cash']
+                )
+                
+                if decision['action'] == "BUY":
+                    # [I/O] 시뮬레이션 매수 집행
+                    self.vpm.buy_stock(
+                        code=code, name=name, 
+                        price=float(stock.get('price', 0)),
+                        quantity=decision['quantity'] # 전략이 계산한 수량 사용
+                    )
+                
+                results.append({
+                    'code': code, 'name': name, 'signal': decision['action'],
+                    'reason': decision.get('reason', '관망'), 'in_portfolio': False
+                })
+
+        return results
+
+    def fetch_dart_data(self, code):
+        # [I/O 전담] DART 데이터 수집 로직
+        # (기존 advisor.py에서 이관된 공시 파싱 로직)
         try:
-            p_change = stock_data.get('change_rate', 0.0)
-            if isinstance(p_change, str):
-                p_change = float(p_change.replace('%', ''))
-        except:
-            p_change = 0.0
+            url = f"https://finance.naver.com/item/news_notice.naver?code={code}"
+            res = requests.get(url, timeout=5)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            today_str = datetime.datetime.now().strftime('%Y.%m.%d')
+            reject_kws = ["전환사채", "신주인수권부사채", "유상증자"]
             
-        post_count = int(stock_data.get('post_count', 0))
-        positive_rate = float(stock_data.get('positive_rate', 0.0))
-        foreign_rate_diff = float(stock_data.get('foreign_rate_diff', 0.0))
+            for row in soup.select('tr'):
+                date_td = row.select_one('.date')
+                title_a = row.select_one('.title a')
+                if date_td and title_a and today_str in date_td.get_text():
+                    text = title_a.get_text()
+                    if any(k in text for k in reject_kws):
+                        return {"reject": True, "reason": f"DART 악재({text})"}
+            return {"reject": False}
+        except: return {"reject": False}
 
-        # 4대 팩터 검사
-        is_attention_high = post_count >= 100
-        is_sentiment_good = positive_rate >= 60.0
-        is_smart_money_in = foreign_rate_diff > 0.0
-        has_upside_room = 5.0 < p_change < 20.0
-
-        score = 0 # 의미상 더 이상 점수를 쓰진 않지만 하위 호환성을 위해 유지
-        if is_attention_high and is_sentiment_good and is_smart_money_in and has_upside_room:
-            score = 100 # 통과
-            
-        return score, p_change
-
-    def get_signal(self, score, p_change, in_portfolio=False, profit_rate=0.0, post_count_diff_pct=0.0, positive_rate=50.0):
-        """
-        Determines the signal based on 4월 V2 매수 및 인공지능 매도 룰.
-        
-        post_count_diff_pct: 어제 대비 당일 게시글 수 증감률 (%)
-        """
-        signal = "WATCH"
-        confidence = "LOW"
-        
-        # 1. 미보유 종목 처리 (신규 매수 진입 룰)
-        if not in_portfolio:
-            if score == 100:
-                signal = "BUY_CANDIDATE"
-                confidence = "HIGH"
-            return signal, confidence
-            
-        # 2. 보유 종목 처리 (Adaptive Exit Rules - 인공지능형 출구 전략)
-        
-        # [2-1. 칼날 손절 (Hard Stop)]
-        if profit_rate <= -5.0:
-            signal = "SELL_ALL"
-            confidence = "HIGH"
-            reason = "Hard Stop (-5.0% Risk Cut)"
-            return signal, confidence
-            
-        # [2-2. 50/50 익절 (Scale-out)]
-        if profit_rate >= 10.0:
-            # V2 룰에서는 한번 +10% 쳤을 때 절반 매도 처리.
-            # 이 로직을 위해서는 이미 50%를 덜어냈는지 확인해야 하지만, 상태 저장은 외부에서 하므로 일단 SELL_HALF 반환
-            signal = "SELL_HALF"
-            confidence = "HIGH"
-            return signal, confidence
-
-        # [2-3. 어텐션 소멸 탈출 (Attention Decay)]
-        if post_count_diff_pct <= -50.0 or positive_rate < 50.0:
-            signal = "SELL_ALL"
-            confidence = "MEDIUM"
-            return signal, confidence
-
-        # [2-4. 어텐션 가속도 홀딩 (Velocity Hold)]
-        signal = "HOLD"
-        confidence = "HIGH"
-        return signal, confidence
+    def fetch_news_data(self, code, name):
+        # [I/O 전담] 뉴스 데이터 수집 로직
+        return [] # TODO: Implement real news fetcher

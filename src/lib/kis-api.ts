@@ -235,9 +235,9 @@ export async function getRealPortfolio(): Promise<any> {
         const token = await getAccessToken();
         if (!token) throw new Error('KIS API Access Token 발급 실패');
 
-        const [cano, prdt_cd] = config.ACCOUNT_NO.split('-').map(s => s.trim());
-        const CANO = cano;
-        const ACNT_PRDT_CD = prdt_cd || '01';
+        const fullAccount = (config.ACCOUNT_NO || '').replace(/[-\s]/g, '').trim();
+        const CANO = fullAccount.slice(0, 8);
+        const ACNT_PRDT_CD = fullAccount.slice(8, 10) || '01';
 
         const tr_id = config.IS_VIRTUAL ? 'VTTC8434R' : 'TTTC8434R';
         console.log(`[KIS-API] [${tr_id}] Fetching balance for ${CANO}-${ACNT_PRDT_CD}...`);
@@ -273,20 +273,19 @@ export async function getRealPortfolio(): Promise<any> {
 
         let res: any = null;
         let lastError = '';
-        const maxRetries = 5; // Increased to 5
-        const delays = [1000, 2000, 3000, 4000, 5500]; // Increased delays
+        const maxRetries = 5; 
+        const delays = [1500, 2500, 3500, 4500, 6000]; // 재시도 지연 시간 대폭 강화
 
         for (let i = 0; i <= maxRetries; i++) {
             res = await fetchBalance();
             if (res.data.rt_cd === '0') break; // SUCCESS
 
-            if (res.data.rt_cd === '7' && i < maxRetries) {
-                console.warn(`[KIS-API] [${tr_id}] Error 7 (Data changed). Retry ${i+1}/${maxRetries} in ${delays[i]}ms...`);
+            if ((res.data.rt_cd === '7' || res.data.rt_cd === '9') && i < maxRetries) {
+                console.warn(`[KIS-API] [${tr_id}] Error ${res.data.rt_cd} (Data changed/updating). Retry ${i+1}/${maxRetries} in ${delays[i]}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delays[i]));
                 continue;
             }
             
-            // If it's another error or we ran out of retries
             lastError = res.data.msg1 || 'Unknown KIS Error';
             break;
         }

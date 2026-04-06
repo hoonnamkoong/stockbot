@@ -288,8 +288,12 @@ export async function getRealPortfolio(): Promise<any> {
             if (res.data.rt_cd === '0') break; // SUCCESS
 
             if ((res.data.rt_cd === '7' || res.data.rt_cd === '9') && i < maxRetries) {
-                console.warn(`[KIS-API] [${tr_id}] Error ${res.data.rt_cd} (Data changed). Resetting CTX and Retry ${i+1}/${maxRetries} in ${delays[i]}ms...`);
-                // [Standard] 에러 7 발생 시 연속조회 키를 명시적으로 비우고 처음부터 재시작
+                console.warn(`[KIS-API] [${tr_id}] Error ${res.data.rt_cd} (Data changed/Session stale). Forcing TOKEN RESET and Retry ${i+1}/${maxRetries}...`);
+                
+                // [Standard] 에러 7 고착 시 세션 초기화를 위해 토큰 캐시를 강제 비움
+                cachedToken = null;
+                tokenExpiry = 0;
+                
                 currentFK = '';
                 currentNK = '';
                 await new Promise(resolve => setTimeout(resolve, delays[i]));

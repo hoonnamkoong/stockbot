@@ -34,14 +34,13 @@ class GeminiAgent:
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            # [What] 최신 3.1 시리즈 모델부터 순차적으로 시도 (성능 및 비용 최적화)
-            models_to_try = ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-1.5-flash']
+            # [What] 안정적인 1.5 시리즈 모델부터 순차적으로 시도
+            models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro']
             
             for m in models_to_try:
                 try:
                     # [Step] 모델 초기화 시도
                     model_obj = genai.GenerativeModel(m)
-                    # 실제 연결 확인을 위한 간단한 할당 (AttributeError 방지 로직 포함)
                     self.model = model_obj
                     self.model_name = m
                     print(f"[GeminiAgent] 모델 로드 성공: {m}")

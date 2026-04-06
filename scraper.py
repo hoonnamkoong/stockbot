@@ -982,7 +982,7 @@ if __name__ == "__main__":
     except Exception as _cv_err:
         print(f"[System] ConfigValidator 로드 실패: {_cv_err}")
 
-    # --- [Grand Protocol] NotificationService 초기화 (단일 진입점) ---
+        # --- [Grand Protocol] NotificationService 초기화 (단일 진입점) ---
     try:
         from src.notification.notification_service import NotificationService
         notif_service = NotificationService()
@@ -1008,7 +1008,7 @@ if __name__ == "__main__":
     # [Consolidated Scraping V8.0]
     # Fetch Volume Top 30 + Rising Top 20
     candidates = []
-    markets = ['KOSPI', 'KOSDAQ']  # [FIX] Define markets
+    markets = ['KOSPI', 'KOSDAQ']
     
     for market in markets:
         # 1. Volume Top 30
@@ -1025,23 +1025,15 @@ if __name__ == "__main__":
     for stock in candidates:
         if stock['code'] not in unique_candidates:
             unique_candidates[stock['code']] = stock
-        else:
-            # If already exists, maybe update source info to 'both'?
-            pass
-            
+
     print(f"\n[System] Total Unique Candidates: {len(unique_candidates)}")
 
     # Process Candidates
-    today_consecutive_check_done = False
     yesterday_codes = set()
-    
-    # [Consecutive Check V7.4]
     try:
         yesterday_codes = get_yesterday_last_stocks()
     except:
         pass
-
-    count_collected = 0
     
     print("\n[System] Starting detailed analysis & filtering...")
     
@@ -1049,16 +1041,11 @@ if __name__ == "__main__":
     import concurrent.futures
 
     def process_single_stock(stock, yesterday_codes, threshold):
-        """
-        Process a single stock: fetch details, stats, discussion bodies, and apply logic.
-        Returns the updated stock dict if it meets criteria, else None.
-        """
         try:
-            # 1. 상세 정보 (전일종가, 외국인)
             details = get_stock_details(stock['code'])
             stock.update(details)
             
-            # [Added V8.X] Foreign Change Rate
+            # Foreign Change Rate
             try:
                 fr = float(str(stock.get('foreign_rate', '0')).replace('%', '').strip())
                 pfr = float(str(stock.get('prev_foreign_rate', '0')).replace('%', '').strip())
@@ -1066,7 +1053,6 @@ if __name__ == "__main__":
             except:
                 stock['foreign_change_rate'] = 0.0
 
-            # [Added V8.2] Version
             stock['scraper_version'] = "V8.2"
 
             # 2. 토론방 정보 (시간 기준 카운팅)
@@ -1075,10 +1061,7 @@ if __name__ == "__main__":
             
             if recent_count >= threshold:
                 stock['recent_posts_count'] = recent_count
-                
-                # [V8.2 Deep Dive] Analyze Top 5 Liked Posts Body
                 raw_latest = stats.get('latest_posts', [])
-                # 'likes' 순으로 정렬하여 상위 5개 추출
                 raw_latest.sort(key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
                 candidates_posts = raw_latest[:5] 
                 
@@ -1094,27 +1077,12 @@ if __name__ == "__main__":
                 
                 stock['latest_posts'] = candidates_posts
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
-                stock['post_count'] = recent_count # Match engine.py key
-
-                # [Note] Bulk Sentiment will be processed after this loop for batch AI efficiency (V8.2)
-                stock['positive_rate'] = 50.0 # Default
-                
-                # Keywords
-                titles = [p['title'] for p in candidates_posts]
-                # meaningful_kws = extract_meaningful_keywords(titles, stock.get('name', ''))
-                # stock['top_keywords'] = ", ".join(meaningful_kws) if meaningful_kws else ""
-
-                # Consecutive Flag
-                stock['foreign_rate_diff'] = stock.get('foreign_change_rate', 0.0) # Match engine.py key
-                if stock['code'] in yesterday_codes:
-                    stock['is_consecutive'] = True
-                else:
-                    stock['is_consecutive'] = False
-
+                stock['post_count'] = recent_count
+                stock['positive_rate'] = 50.0 
+                stock['foreign_rate_diff'] = stock.get('foreign_change_rate', 0.0)
+                stock['is_consecutive'] = stock['code'] in yesterday_codes
                 return stock
-            else:
-                return None
-
+            return None
         except Exception as e:
             print(f"Error processing {stock['name']}: {e}")
             return None
@@ -1126,7 +1094,6 @@ if __name__ == "__main__":
             executor.submit(process_single_stock, stock, yesterday_codes, threshold): stock 
             for stock in unique_candidates.values()
         }
-        
         for future in concurrent.futures.as_completed(future_to_stock):
             try:
                 results.append(future.result())
@@ -1172,363 +1139,118 @@ if __name__ == "__main__":
 
         os.makedirs('data', exist_ok=True)
         
-        if all_data:
-            print(f"\nAnalyzing total {len(all_data)} items...")
+        print(f"\nAnalyzing total {len(all_data)} items...")
+        result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
+        result_df_en = result_df_en.where(pd.notnull(result_df_en), None)
+        json_records = result_df_en.to_dict('records')
 
-            # [Consecutive Days Calculation - Unlimited]
-            all_codes = [s['code'] for s in all_data]
-            # consecutive_map = calculate_long_term_consecutive_days(all_codes)
-            # for s in all_data:
-            #     s['consecutive_days'] = consecutive_map.get(s['code'], 1)
-            #     s['연속_등록'] = s['consecutive_days'] > 1 # Maintain legacy bool for fallback
-
-            result_df_kr, result_df_en = analyzer.analyze_discussion_trend(all_data)
-            result_df_en = result_df_en.where(pd.notnull(result_df_en), None)
-            json_records = result_df_en.to_dict('records')
-
-            # [Feature: 5-Day Cumulative Analysis]
-            extra_sheets = {}
-            try:
-                from src import analyzer_5days
-                df_5days = analyzer_5days.analyze_5days()
-                if not df_5days.empty:
-                    df_5days = df_5days.where(pd.notnull(df_5days), None)
-                    with open('data/analysis_5days.json', 'w', encoding='utf-8') as f:
-                        f.write(df_5days.to_json(orient='records', force_ascii=False))
-                    extra_sheets['5Day_Analysis'] = df_5days
-            except Exception as e:
-                print(f"[Warning] 5-Day Analysis Failed: {e}")
-
-            # [Feature: 3-Day Cumulative Analysis]
-            try:
-                df_3days = analyzer_5days.analyze_3days()
-                if not df_3days.empty:
-                    df_3days = df_3days.where(pd.notnull(df_3days), None)
-                    with open('data/analysis_3days.json', 'w', encoding='utf-8') as f:
-                        f.write(df_3days.to_json(orient='records', force_ascii=False))
-                    extra_sheets['3Day_Analysis'] = df_3days
-            except Exception as e:
-                print(f"[Warning] 3-Day Analysis Failed: {e}")
-            
-            # Save CSV & Excel
-            filename_prefix = f"trending_integrated"
-            # [User Request] Revert to Korean Format (Original) - Dashboard expects Korean keys!
-            saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
-            
-            # --- Fix: Save JSON for Frontend (Dashboard) ---
-            try:
-                # Helper function to sanitize NaN values for JSON
-                import math
-                def sanitize_for_json(obj):
-                    """Recursively replace NaN and Infinity with None/0 for valid JSON"""
-                    if isinstance(obj, dict):
-                        return {k: sanitize_for_json(v) for k, v in obj.items()}
-                    elif isinstance(obj, list):
-                        return [sanitize_for_json(item) for item in obj]
-                    
-                    # Handle Numeric NaNs
-                    if isinstance(obj, float):
-                        if math.isnan(obj) or math.isinf(obj):
-                            return 0 # Default to 0 instead of None for easier frontend math
-                    if pd.isna(obj): 
-                        return 0
-                        
-                    return obj
-                
-                # Sanitize json_records before saving
-                clean_json_records = sanitize_for_json(json_records)
-
-            except Exception as e:
-                print(f"[Warning] JSON Sanitization failed: {e}")
-                clean_json_records = json_records # Fallback
-
-            # monthly report
-            # [User Request] Use Korean Data
-            monthly_file, monthly_count = append_to_monthly_report(result_df_kr, now_kst)
-            
-            # reports.json update
-            if 'excel' in saved_files:
-                reports_file = 'data/reports.json'
-                current_reports = []
-                if os.path.exists(reports_file):
-                    try:
-                        with open(reports_file, 'r', encoding='utf-8') as f:
-                            current_reports = json.load(f)
-                    except: pass
-                
-                if monthly_file:
-                    month_str = now_kst.strftime('%Y-%m')
-                    month_label = f"{now_kst.month}월 누적 리포트 ({month_str})"
-                    monthly_entry = { "type": "monthly", "date": month_str, "filename": os.path.basename(monthly_file), "count": monthly_count, "label": month_label, "timestamp": datetime.now().timestamp() }
-                    
-                    monthly_exists = False
-                    for i, report in enumerate(current_reports):
-                        if report.get('type') == 'monthly' and report.get('date') == month_str:
-                            current_reports[i] = monthly_entry
-                            monthly_exists = True
-                            break
-                    if not monthly_exists:
-                        daily_start = next((i for i, r in enumerate(current_reports) if r.get('type') == 'daily'), len(current_reports))
-                        current_reports.insert(daily_start, monthly_entry)
-                
-                daily_entry = { "type": "daily", "date": now_kst.strftime('%Y-%m-%d %H:%M'), "filename": os.path.basename(saved_files['excel']), "count": len(all_data), "timestamp": datetime.now().timestamp() }
-                daily_start = next((i for i, r in enumerate(current_reports) if r.get('type') == 'daily'), len(current_reports))
-                current_reports.insert(daily_start, daily_entry)
-                
-                daily_reports = [r for r in current_reports if r.get('type') == 'daily'][:50]
-                monthly_reports = [r for r in current_reports if r.get('type') == 'monthly']
-                monthly_reports.sort(key=lambda x: x.get('date', ''), reverse=True)
-                current_reports = monthly_reports + daily_reports
-                
-                with open(reports_file, 'w', encoding='utf-8') as f:
-                    json.dump(current_reports, f, ensure_ascii=False, indent=2)
-
-        # Save latest_stocks.json
+        # [Feature: 5-Day/3-Day Cumulative Analysis]
+        extra_sheets = {}
+        try:
+            from src import analyzer_5days
+            for day in [5, 3]:
+                df_day = analyzer_5days.analyze_5days() if day == 5 else analyzer_5days.analyze_3days()
+                if not df_day.empty:
+                    df_day = df_day.where(pd.notnull(df_day), None)
+                    with open(f'data/analysis_{day}days.json', 'w', encoding='utf-8') as f:
+                        f.write(df_day.to_json(orient='records', force_ascii=False))
+                    extra_sheets[f'{day}Day_Analysis'] = df_day
+        except Exception as e:
+            print(f"[Warning] Multi-day Analysis Failed: {e}")
+        
+        # Save CSV & Excel
+        filename_prefix = f"trending_integrated"
+        saved_files = analyzer.save_data(result_df_kr, filename_prefix=filename_prefix, extra_sheets=extra_sheets)
+        
+        # Save JSON for Frontend
         with open('data/latest_stocks.json', 'w', encoding='utf-8') as f:
             json.dump(json_records, f, ensure_ascii=False, indent=2)
 
-        # Save Time Snapshot
-        snapshot_name = None
-        if 9 <= current_hour <= 10: snapshot_name = "stocks_1000.json"
-        elif 12 <= current_hour <= 13: snapshot_name = "stocks_1300.json"
-        elif 14 <= current_hour <= 23: snapshot_name = "stocks_1500.json"
-        
-        if snapshot_name:
-            with open(f'data/{snapshot_name}', 'w', encoding='utf-8') as f:
-                json.dump(json_records, f, ensure_ascii=False, indent=2)
+        # Reports.json update
+        monthly_file, monthly_count = append_to_monthly_report(result_df_kr, now_kst)
+        if 'excel' in saved_files:
+            reports_file = 'data/reports.json'
+            current_reports = []
+            if os.path.exists(reports_file):
+                try:
+                    with open(reports_file, 'r', encoding='utf-8') as f:
+                        current_reports = json.load(f)
+                except: pass
+            
+            daily_entry = { "type": "daily", "date": now_kst.strftime('%Y-%m-%d %H:%M'), "filename": os.path.basename(saved_files['excel']), "count": len(all_data), "timestamp": datetime.now().timestamp() }
+            current_reports.insert(0, daily_entry)
+            with open(reports_file, 'w', encoding='utf-8') as f:
+                json.dump(current_reports[:50], f, ensure_ascii=False, indent=2)
 
-        # [TELEGRAM V12.1 — Grand Protocol] Unified Notification Guard
+        # [TELEGRAM V12.1]
         should_send_telegram, trigger_reason = TelegramNotificationGuard.should_send(now_kst)
-        
-        # [FIX] 수동 실행(Manual Run)일 경우 조건 없이 알림 발송 보장
         is_manual_run = os.environ.get('GITHUB_EVENT_NAME') != 'schedule' or (os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true')
 
-        if trigger_reason:
-            print(f"[System] Notification Triggered by: {trigger_reason}")
-
-        # ── [V8.2] 3단계: 전략 가이드 리포트 생성 (Gemini 1회 호출) ───────
         advisor_report_text = ""
-        # AI 호출 조건: 수동 실행이거나 정시(0~10분) 윈도우인 경우
         should_run_ai = is_manual_run or (0 <= now_kst.minute <= 10)
-        # 매수 추천 허용 조건: 15:00 장마감 윈도우이거나 FORCE_RUN인 경우
         allow_buy = (now_kst.hour == 15 and 0 <= now_kst.minute <= 40) or (os.environ.get('FORCE_RUN', 'false').lower() == 'true')
 
         if elite_candidates and should_run_ai:
             try:
                 print(f"[System] 🧠 3단계: Gemini Strategic Guide 단일 호출 가동")
-                from src.strategy.advisor import StrategyAdvisor
-                advisor = StrategyAdvisor()
-                try:
-                    advisor_report_text, _ = advisor.generate_report(elite_candidates, allow_buy=allow_buy)
-                except Exception as ai_inner_e:
-                    print(f"[ERROR] Gemini API Strategic Guide Generation Failed: {ai_inner_e}")
-                    advisor_report_text = "⚠️ AI 전략 분석 일시적 지연 (정예 종목 데이터 기반 모니터링 중)"
+                advisor_report_text, _ = advisor.generate_report(elite_candidates, allow_buy=allow_buy)
             except Exception as e:
-                import traceback
-                print(f"[ERROR] Final Analysis Logic Failed: {e}")
-                traceback.print_exc()
-                advisor_report_text = "⚠️ 리포트 생성 중 시스템 오류 발생"
-        elif elite_candidates and not should_run_ai:
-            print(f"[System] 💤 AI 호출 건너뜀 (현재 {now_kst.minute}분: 정시 윈도우 아님)")
-            advisor_report_text = "상위 종목 모니터링 중 (전략 리포트는 정시/수동 실행 시 생성됩니다)"
+                print(f"[ERROR] Gemini Strategic Guide Failed: {e}")
+                advisor_report_text = "⚠️ AI 전략 분석 일시적 지연"
 
-        # [FIX] 수동 알림(Manual Run) 보완 로직 적용
-        should_actually_send = should_send_telegram or is_manual_run
-
-        if all_data and should_actually_send:
-            print("[System] Generating Consolidated Telegram Report via NotificationService...")
-            if is_manual_run: print("[System] Manual Run Detected: Forcing notification regardless of time.")
-
-            records = result_df_kr.to_dict('records') if not result_df_kr.empty else []
-            kospi_items = [r for r in records if r.get('시장구분') == 'KOSPI']
-            kosdaq_items = [r for r in records if r.get('시장구분') == 'KOSDAQ']
-
-            # ── NotificationService 를 통한 전송 (Traceback 가시화 적용) ────────
-            report_success = False
+        if should_send_telegram or is_manual_run:
+            kospi_items = [r for r in result_df_kr.to_dict('records') if r.get('시장구분') == 'KOSPI']
+            kosdaq_items = [r for r in result_df_kr.to_dict('records') if r.get('시장구분') == 'KOSDAQ']
+            
             if notif_service and notif_service.is_available:
-                report_success = notif_service.send_hourly_report(
-                    kospi_records=kospi_items,
-                    kosdaq_records=kosdaq_items,
-                    advisor_report_text=advisor_report_text,
-                    dashboard_url=os.environ.get('DASHBOARD_URL', 'https://stockbot-phi.vercel.app'),
-                )
+                notif_service.send_hourly_report(kospi_records=kospi_items, kosdaq_records=kosdaq_items, advisor_report_text=advisor_report_text)
             elif tg_manager:
-                print("[System] Fallback: Using tg_manager directly.")
-                try:
-                    tg_manager.send_market_report('KOSPI', kospi_items)
-                    tg_manager.send_market_report('KOSDAQ', kosdaq_items)
-                    if advisor_report_text:
-                        tg_manager.send_message(f"🧠 <b>[Strategic Guide]</b>\n{advisor_report_text[:3500]}")
-                    report_success = True
-                except Exception:
-                    print("[Fallback] 전송 실패!")
-                    traceback.print_exc()
+                tg_manager.send_market_report('KOSPI', kospi_items)
+                tg_manager.send_market_report('KOSDAQ', kosdaq_items)
+                if advisor_report_text: tg_manager.send_message(f"🧠 Strategic Guide\n{advisor_report_text[:3500]}")
 
-            if not report_success:
-                print("\n[Scraper] ❌ [CRITICAL] 알림 전송 실패가 감지되었습니다. 로그를 확인하세요.")
-                # 알림이 치명적 기능이므로 실패 시 명시적으로 종료 코드 1 반환
-                sys.exit(1)
-            else:
-                print("[Scraper] ✅ 텔레그램 리포트 전송 완료.")
-
-        elif not all_data and should_actually_send:
-            if notif_service and notif_service.is_available:
-                notif_service.send_no_data_alert(threshold)
-            elif tg_manager:
-                try:
-                    tg_manager.send_no_data_alert(threshold)
-                except Exception as e:
-                    import traceback
-                    traceback.print_exc()
-                    print(f"[System] No-data alert 전송 실패: {e}")
-        elif not should_send_telegram:
-            print(f"[System] Skipped notification (not top of hour): {now_kst.strftime('%H:%M')}")
-
-        # --- 4. Gemini Portfolio Simulator (Regime-Aware & Static Model) ---
-        print("\n[System] Entering Gemini Portfolio Simulator...")
+    # --- 4. Gemini Portfolio Simulator ---
+    print("\n[System] Entering Gemini Portfolio Simulator...")
+    try:
+        from src.strategy.hybrid_advisor_sandbox import HybridAnalyzerSandbox
+        from src.trade.gemini_trade import GeminiTrader
+        
+        regime = "NEUTRAL"
         try:
-            from src.strategy.hybrid_advisor_sandbox import HybridAnalyzerSandbox
-            from src.trade.gemini_trade import GeminiTrader
+            res_regime = requests.get("https://finance.naver.com/sise/", timeout=5)
+            regime = "BULL" if "+" in BeautifulSoup(res_regime.text, 'html.parser').select_one("#KOSPI_change").text else "BEAR"
+        except: pass
+
+        model_ver = "v2026-01-02--2026-02-28"
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "src", "strategy", "models", f"{model_ver}.joblib")
+        archive_file = os.path.join(base_dir, "scraping data", "combined_scraping_data.csv")
+        
+        sandbox = HybridAnalyzerSandbox(data_path=archive_file, model_path=model_path, version=model_ver)
+        
+        if sandbox.ml_model:
+            trader = GeminiTrader()
+            trader.state['algo_version'] = model_ver
+            trader.state['market_regime'] = regime
             
-            # 1. Market Regime Detection (KOSPI/KOSDAQ)
-            def get_market_regime():
-                try:
-                    url = "https://finance.naver.com/sise/"
-                    res = requests.get(url, timeout=5)
-                    soup = BeautifulSoup(res.text, 'html.parser')
-                    kos_now = soup.select_one("#KOSPI_now")
-                    kospi = float(kos_now.text.replace(',', '')) if kos_now else 2500.0
-                    
-                    # [V8.2] 1단계: Buzz Filter 문턱값 동적 적용 (15:00 기준 120개)
-                    # 시간대별 비례 계산: (현재시각/15시) * 120
-                    base_threshold = 120
-                    current_hour_idx = max(9, min(15, now_kst.hour))
-                    dynamic_threshold = int((current_hour_idx / 15) * base_threshold)
-                    threshold = dynamic_threshold
-                    
-                    print(f"\n[System] Running V8.2 Attention Deep-Dive...")
-                    print(f"[Mode] {'Simulation' if os.environ.get('KIS_IS_VIRTUAL') == 'true' else 'REAL TRADE'}")
-                    print(f"[Filter] 1단계 Buzz Threshold: {threshold} (KST {now_kst.hour}시 기준)")
-                    
-                    kos_now = soup.select_one("#KOSDAQ_now")
-                    kosdaq = float(kos_now.text.replace(',', '')) if kos_now else 800.0
-                    
-                    change_tag = soup.select_one("#KOSPI_change")
-                    kospi_change = change_tag.text.strip() if change_tag else "0"
-                    is_bull = "+" in kospi_change
-                    
-                    regime = "BULL" if is_bull else "BEAR"
-                    return regime, {"KOSPI": kospi, "KOSDAQ": kosdaq}
-                except Exception as re_e:
-                    print(f"  [Warning] Regime detection failed: {re_e}")
-                    return "NEUTRAL", {"KOSPI": 2500, "KOSDAQ": 800}
-
-            regime, indices = get_market_regime()
-            print(f"  [System] Market Regime: {regime} ({indices})")
-
-            # 2. Load Static Model (Dynamic Path for CI/CD)
-            model_ver = "v2026-01-02--2026-02-28"
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            model_path = os.path.join(base_dir, "src", "strategy", "models", f"{model_ver}.joblib")
-            archive_file = os.path.join(base_dir, "scraping data", "combined_scraping_data.csv")
-            
-            # Fallback for CI if archive file doesn't exist (can use latest stock data as proxy if needed, but for now just check existence)
-            if not os.path.exists(archive_file):
-                print(f"  [Warning] Archive file not found at {archive_file}. AI Simulator might have limited context.")
-            
-            sandbox = HybridAnalyzerSandbox(data_path=archive_file, model_path=model_path, version=model_ver)
-            
-            if sandbox.ml_model:
-                trader = GeminiTrader()
-                trader.state['algo_version'] = model_ver
-                trader.state['market_regime'] = regime
-                
-                # Predict ML probabilities for current candidates
-                current_data_map = {}
-                all_ml_probs = []
-                
-                # ── [V8.2] 2단계: Bulk Body Sentiment 분석 (Gemini 1회 호출) ────────
-                if all_data:
-                    print(f"\n[System] 🧠 2단계: 통합 AI 감성 분석 시작 (대상: {len(all_data)}개 종목)")
-                    advisor = StrategyAdvisor()
-                    
-                    # 분석용 데이터 구성 (종목코드, 이름, 베스트 게시글 본문 취합)
-                    bulk_analysis_input = []
-                    for s in all_data:
-                        entry = {
-                            "code": s['code'],
-                            "name": s['name'],
-                            "bodies": [p.get('body', '')[:500] for p in s.get('latest_posts', [])]
-                        }
-                        bulk_analysis_input.append(entry)
-                        
-                    # [V8.2] 단 1회의 AI 호출로 모든 종목 감성 점수 산출
-                    sentiment_map = advisor.analyze_bulk_sentiment(bulk_analysis_input)
-                    
-                    # 결과 매핑 및 점수 합산
-                    for s in all_data:
-                        ai_score = sentiment_map.get(s['code'], 0)
-                        s['ai_sentiment_score'] = ai_score
-                        # 기존 ml_prob(0~100)와 ai_score(-10~10)를 합산하기 위해 스케일링 고려
-                        # 여기서는 단순히 합산하여 최종 랭킹에 사용
-                        s['final_score'] = s.get('ml_prob', 0) + (ai_score * 5) # AI 가중치 부여
-                        print(f"   [Sent] {s['name']}: {ai_score}점 (Final: {s['final_score']:.1f})")
-
-                # [V8.2] 3단계: 최종 선정 (Final Selection)
-                all_data = sorted(all_data, key=lambda x: x.get('final_score', 0), reverse=True)
-                elite_candidates = all_data[:15]
-                print(f"[System] 🏆 최종 정예 15개 종목 선정 완료")
-                
-                if 'all_data' in locals() and all_data:
-                    print(f"  [System] Running ML predictions for {len(all_data)} trending stocks...")
-                    all_ml_probs = sandbox.predict_all(all_data)
-                    for pick in all_ml_probs:
-                        current_data_map[pick['code']] = {
-                            'price': pick.get('price', 0),
-                            'ml_prob': pick.get('ml_prob', 50.0)
-                        }
-                else:
-                    print("  [System] No trending stocks in this run. Checking existing portfolio.")
-
-                # IMPORTANT: Fetch current prices for stocks already in portfolio
-                for code in list(trader.state['holdings'].keys()):
-                    if code not in current_data_map:
-                        try:
-                            h_name = trader.state['holdings'][code].get('name', '')
-                            # print(f"  [System] Fetching price for portfolio stock: {h_name} ({code})")
-                            res_h = requests.get(f"https://finance.naver.com/item/main.naver?code={code}", timeout=5)
-                            soup_h = BeautifulSoup(res_h.text, 'html.parser')
-                            price_tag = soup_h.select_one(".no_today .blind")
-                            if price_tag:
-                                h_price = int(price_tag.text.replace(',', ''))
-                                current_data_map[code] = {
-                                    'price': h_price,
-                                    'ml_prob': 50.0 # Neutral prob if not in trending list
-                                }
-                        except Exception as e:
-                            print(f"  [Warning] Failed to fetch price for {code}: {e}")
-
-                # Execute Portfolio Logic
+            current_data_map = {}
+            if all_data:
+                all_ml_probs = sandbox.predict_all(all_data)
+                for pick in all_ml_probs:
+                    current_data_map[pick['code']] = {
+                        'price': pick.get('price', 0),
+                        'ml_prob': pick.get('ml_prob', 50.0)
+                    }
                 trader.check_exits(current_data_map)
-                
-                top_ml_picks = sorted(all_ml_probs, key=lambda x: x['ml_prob'], reverse=True)[:5]
-                trader.execute_buys(top_ml_picks)
-                
-                print("[System] Gemini Portfolio Simulator run complete.")
-            else:
-                print("  [ERROR] Static model loading failed. Rebalancing skipped.")
-                
-        except Exception as sim_e:
-            print(f"  [ERROR] Gemini Simulator Failed: {sim_e}")
-            import traceback
-            traceback.print_exc()
+                trader.execute_buys(sorted(all_ml_probs, key=lambda x: x['ml_prob'], reverse=True)[:5])
+    except Exception as sim_e:
+        print(f"  [ERROR] Gemini Simulator Failed: {sim_e}")
 
     except Exception as grand_e:
         print(f"\n[CRITICAL ERROR] Failed in consolidated section: {grand_e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
 
     finally:
         # Save Status JSON for Frontend (ALWAYS RUN)
@@ -1542,28 +1264,17 @@ if __name__ == "__main__":
             
             status_data = {
                 "last_updated": current_kst.strftime('%Y-%m-%d %H:%M:%S'),
-                "message": "Data updated successfully" if all_data else "No data collected",
-                "count": len(all_data) if 'all_data' in locals() else 0
+                "message": "Data updated successfully" if 'all_data' in locals() and all_data else "No data collected",
+                "count": len(all_data) if 'all_data' in locals() else 0,
+                "version": SCRAPER_VERSION
             }
+            os.makedirs('data', exist_ok=True)
             with open('data/status.json', 'w', encoding='utf-8') as f:
                 json.dump(status_data, f, ensure_ascii=False, indent=2)
             print(f"[System] status.json updated at {status_data['last_updated']}")
         except Exception as status_e:
             print(f"[ERROR] Failed to save status.json: {status_e}")
 
-        # Auto-push is now handled by scraper.yml workflow for better security and stability.
-        pass
-
         end_time_perf = time.perf_counter()
         elapsed_time = end_time_perf - start_time_perf
         print(f"\n[System] 스크래핑 프로세스 완전 종료 (Execution Time: {elapsed_time:.2f} seconds)")
-
-
-
-
-
-
-
-
-
-

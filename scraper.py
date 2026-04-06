@@ -907,7 +907,7 @@ if __name__ == "__main__":
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_to_stock = {
             executor.submit(process_single_stock, stock, yesterday_codes, threshold): stock 
-            for stock in unique_candidates.values()
+            for stock in unique_candidates
         }
         for future in concurrent.futures.as_completed(future_to_stock):
             try:

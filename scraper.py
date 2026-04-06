@@ -241,7 +241,7 @@ if __name__ == "__main__":
         from src.notification.notification_service import NotificationService
         ns = NotificationService()
         if ns.is_available:
-            summary_msg = f"🚀 **V8.4.6 Gold Master 전략 리포트**\n\n"
+            summary_msg = f"🚀 **{SCRAPER_VERSION} 전략 리포트**\n\n"
             summary_msg += f"일시: {now_kst.strftime('%Y-%m-%d %H:%M')}\n"
             summary_msg += f"분석 대상: {len(results)}개 종목\n\n"
             summary_msg += f"--- **Strategic Insights** ---\n\n"
@@ -249,6 +249,13 @@ if __name__ == "__main__":
             
             ns._tg.send_message(summary_msg)
             print("[System] 텔레그램 리포트 전송 완료")
+    else:
+        # [NEW] 조건 만족 종목이 없을 때 알림 (Silent Skip 방지)
+        print("[System] 📉 조건에 맞는 종목이 없습니다. 알림을 전송합니다.")
+        from src.notification.notification_service import NotificationService
+        ns = NotificationService()
+        if ns.is_available:
+            ns.send_no_data_alert(threshold=threshold)
 
     print("[System] Simulator 가동 중...")
     from src.strategy.engine import StrategyEngine

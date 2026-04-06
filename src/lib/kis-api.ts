@@ -92,7 +92,7 @@ async function writeTokenCache(token: string, expiresIn: number) {
         } catch (e) {}
 
         // 2. GitHub Persistence (On Vercel)
-        const ghToken = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+        const ghToken = process.env.GH_PAT || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
         if (process.env.VERCEL && ghToken) {
             try {
                 const owner = "hoonnamkoong";
@@ -267,14 +267,14 @@ export async function getRealPortfolio(): Promise<any> {
                     CTX_AREA_FK100: '',
                     CTX_AREA_NK100: '',
                 },
-                timeout: 5000 // 5s timeout
+                timeout: 8000 // Increased timeout to 8s
             });
         };
 
         let res: any = null;
         let lastError = '';
-        const maxRetries = 3;
-        const delays = [500, 1000, 2000];
+        const maxRetries = 5; // Increased to 5
+        const delays = [1000, 2000, 3000, 4000, 5500]; // Increased delays
 
         for (let i = 0; i <= maxRetries; i++) {
             res = await fetchBalance();

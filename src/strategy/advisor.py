@@ -118,23 +118,31 @@ class GeminiAgent:
             return {"decision": "REJECTED", "telegram_narrative": f"분석 오류 발생: {str(e)[:100]}"}
 
     def generate_trading_guide(self, market_context, sentinel_signals):
-        """[What] 전체 시장Context와 신호를 바탕으로 하는 서술형 가이드를 생성합니다."""
+        """[What] 텔레그램 리포트를 인사이트 중심의 딥다이브 체제로 개편합니다."""
         if not self.model: return "⚠️ Gemini API 초기화 실패: 리포트를 생성할 수 없습니다."
         
+        # 상위 5개와 나머지 10개 분리
+        top_5 = sentinel_signals[:5]
+        others = sentinel_signals[5:15]
+
         prompt = f"""
-        당신은 실전 주식 투자 전문가이며, 'V8.2 Attention Deep-Dive' 전략의 수석 분석가입니다. 
-        제공된 15개 정예 종목 리스트를 바탕으로 통합 'Strategic Guide'를 작성하세요.
+        당신은 공격적인 퀀트 분석가이며 '인사이트 중심 딥다이브' 리포트의 수석 에디터입니다. 
+        불필요한 인사말, 종목 나열, 일반적 조언은 모두 삭제하고 아래 데이터에만 화력을 집중하세요.
         
         데이터:
         - 시장 상황: {market_context}
-        - 정예 종목 리스트 (상위 15개): {json.dumps(sentinel_signals, ensure_ascii=False)}
+        - 상위 5개 타겟 (심층 분석 대상): {json.dumps(top_5, ensure_ascii=False)}
+        - 나머지 10개 리스트: {json.dumps(others, ensure_ascii=False)}
         
-        요구사항:
-        1. 첫 문장은 시장의 '분위기(Regime)'를 한 문장으로 정의하며 시작하세요.
-        2. 15개 종목 전체의 흐름을 관통하는 핵심 테마와 특징을 분석하세요.
-        3. 왜 특정 종목들을 주목해야 하는지, 그리고 리스크 요인은 무엇인지 논리적으로 설명하세요.
-        4. '입니다/합니다'체를 사용하며 투자자에게 실질적인 도움이 되는 조언을 포함하세요.
-        5. 수치 데이터를 근거로 제시하며, 전반적인 매매 전략(분할 매수 등)을 제안하세요.
+        요구사항 (PM 보고용 요약 리포트 스타일):
+        1. 시황 브리핑 (Market Brief): 상위 5개 종목을 관통하는 주도 섹터/테마 위주로 3줄 이내 요약.
+        2. Top 5 Deep-Dive: 상위 5개 종목에 대해 반드시 다음 4개 하위 요소를 포함할 것.
+           - 버즈 발생 원인 (Trigger): 뉴스/공시와 대조하여 핵심 원인을 한 문장으로 정의.
+           - 커뮤니티 심층 분석 (Community Insight): 본문에서 발견된 기대감/논점 요약.
+           - 공시/뉴스 팩트 체크: 버즈와 가장 밀접한 텍스트 인용.
+           - AI 최종 판단: [ML 확률 + 감성 점수] 기반 '진짜 호재' 여부 판단.
+        3. 나머지 10개 종목: [종목명 | AI 점수 | 핵심 키워드] 위주로 아주 간결하게 리스트화.
+        4. 말투: 전문가용 불렛포인트(*)와 핵심 키워드 중심. 장황한 설명 절대 금지.
         """
         try:
             response = self.model.generate_content(prompt)
@@ -389,29 +397,16 @@ class StrategyAdvisor:
         """[What] 텔레그램으로 보낼 최종 가독성 있는 리포트 문자열을 생성합니다."""
         all_results = self.analyze_candidates(candidates, allow_buy=allow_buy)
         
-        # 성적이 좋은 상위 종목 + 대응 종목 위주로 리포트 구성
-        report = f"📊 **4월 V2 어텐션 모멘텀 리포트**\n"
-        report += f"📅 일시: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-        
-        buy_targets = [r for r in all_results if r['signal'] == 'BUY']
-        sell_targets = [r for r in all_results if 'SELL' in r['signal']]
-        
-        if buy_targets:
-            report += "🔥 **[매수 승인 종목]**\n"
-            for t in buy_targets:
-                report += f"✅ **{t['name']}** ({t['code']})\n"
-                report += f"💬 AI 분석: {t['reason']}\n\n"
-        
-        if sell_targets:
-            report += "🚨 **[매도/대응 종목]**\n"
-            for t in sell_targets:
-                report += f"📉 **{t['name']}**: {t['signal']} ({t['reason']})\n"
-            report += "\n"
-            
-        if not buy_targets and not sell_targets:
-            report += "💤 특이 신호 종목 없음 (관망 유지)\n"
-            
-        market_context = f"{len(candidates)}개 종목 분석 완료. 포지션 사이징 규칙 적용됨."
+        # 인사이트 중심 딥다이브 리포트 생성 (가장 상단에 배치)
+        market_context = f"{len(candidates)}개 종목 분석 완료. 주도 섹터 및 모멘텀 분석 중심."
         gemini_guide = self.gemini.generate_trading_guide(market_context, all_results)
         
-        return f"{gemini_guide}\n\n{report}", all_results
+        # 하단 요약 섹션 (간결하게)
+        summary = f"\n---\n📊 **시스템 요약 리포트 (V9.4)**\n"
+        summary += f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        
+        buy_targets = [r for r in all_results if r['signal'] == 'BUY']
+        if buy_targets:
+            summary += f"🔥 매수 승인: {', '.join([t['name'] for t in buy_targets])}\n"
+        
+        return f"{gemini_guide}\n{summary}", all_results

@@ -6,6 +6,18 @@ from auth import get_access_token, load_env
 
 import time
 
+def get_hashkey(body, app_key, app_secret, base_url):
+    url = f"{base_url}/uapi/hashkey"
+    headers = {
+        'content-type': 'application/json',
+        'appkey': app_key,
+        'appsecret': app_secret,
+    }
+    res = requests.post(url, headers=headers, data=json.dumps(body))
+    if res.status_code == 200:
+        return res.json().get('HASH')
+    return None
+
 def place_order(side="buy", code="005930", qty=1, price=0):
     """
     side: 'buy' or 'sell'
@@ -16,25 +28,41 @@ def place_order(side="buy", code="005930", qty=1, price=0):
         raise Exception("Failed to get Access Token")
 
     load_env()
-    app_key = os.environ.get("KIS_APP_KEY")
-    app_secret = os.environ.get("KIS_APP_SECRET")
-    account_no_full = os.environ.get("KIS_ACCOUNT_NO")
-    base_url = os.environ.get("KIS_BASE_URL")
+    app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
+    app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
+    account_no_full = os.environ.get("KIS_ACCOUNT_NO", "").strip().replace("\n", "")
+    is_virtual = os.environ.get("KIS_IS_VIRTUAL", "false").lower() == "true"
+    
+    default_url = "https://openapi.koreainvestment.com:9443" if not is_virtual else "https://openapivts.koreainvestment.com:29443"
+    base_url = os.environ.get("KIS_BASE_URL", default_url)
     
     clean_acc = account_no_full.replace('-', '')
     cano = clean_acc[:8]
-    acnt_prdt_cd = clean_acc[8:]
+    acnt_prdt_cd = clean_acc[8:10]
     
     url = f"{base_url}/uapi/domestic-stock/v1/trading/order-cash"
     
     # Determine TR ID (Real vs Virtual)
-    # Buy: REAL: TTTC0802U, VIRTUAL: VTTC0802U
-    # Sell: REAL: TTTC0801U, VIRTUAL: VTTC0801U
-    is_virtual = "vts" in base_url.lower()
     if side == "buy":
         tr_id = "VTTC0802U" if is_virtual else "TTTC0802U"
     else:
         tr_id = "VTTC0801U" if is_virtual else "TTTC0801U"
+
+    ord_dvsn = "00" 
+    if price == 0:
+        ord_dvsn = "01" # Market
+        
+    order_body = {
+        "CANO": cano,
+        "ACNT_PRDT_CD": acnt_prdt_cd,
+        "PDNO": code,
+        "ORD_DVSN": ord_dvsn, 
+        "ORD_QTY": str(qty),
+        "ORD_UNPR": str(price),
+    }
+
+    # --- Generate HashKey for POST request ---
+    hashkey = get_hashkey(order_body, app_key, app_secret, base_url)
 
     headers = {
         "content-type": "application/json; charset=utf-8",
@@ -43,7 +71,7 @@ def place_order(side="buy", code="005930", qty=1, price=0):
         "appsecret": app_secret,
         "tr_id": tr_id,
         "custtype": "P",
-        "hashkey": ""
+        "hashkey": hashkey or ""
     }
     
     ord_dvsn = "00" 

@@ -1131,7 +1131,9 @@ if __name__ == "__main__":
                         stock['positive_rate'] = pos_rate
                     else:
                         stock['positive_rate'] = 50.0
-                except:
+                except Exception as e:
+                    # [FIX] 지시사항: AI 분석 실패 시 원인을 로깅합니다.
+                    print(f"   [Error] Sentiment analysis failed for {stock['name']}: {str(e)}")
                     stock['positive_rate'] = 50.0
                 
                 # Keywords

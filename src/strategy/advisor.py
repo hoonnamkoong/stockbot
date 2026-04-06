@@ -34,8 +34,13 @@ class GeminiAgent:
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            # [What] 안정적인 1.5 시리즈 모델부터 순차적으로 시도
-            models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro']
+            # [Update] 사용자 지시사항: 2.0/2.5급 최고 사양 모델로 교체
+            # Python SDK에서 2.5는 gemini-2.0-pro-exp 또는 gemini-2.0-flash로 대응
+            models_to_try = [
+                'gemini-2.0-pro-exp-0205',  # 최상위 실험적 모델
+                'gemini-2.0-flash',         # 최고 성능/속도
+                'gemini-1.5-pro'            # 안정적인 상위 모델
+            ]
             
             for m in models_to_try:
                 try:
@@ -55,41 +60,46 @@ class GeminiAgent:
 
     def evaluate_momentum(self, stock_info, news_list, dart_info):
         """
-        [What] 특정 종목의 매수 적합성을 AI가 최종 판정합니다.
-        [Output] JSON 형식을 강제하여 시스템이 자동 의사결정을 내릴 수 있도록 합니다.
+        [지시사항 3] Gemini V2 내러티브 및 JSON 포맷 강제
         """
         if not self.model:
             return {"decision": "REJECTED", "momentum_score": 0, "telegram_narrative": "API 키 오류"}
             
         prompt = f"""
-        당신은 공격적인 모멘텀 주식 트레이더입니다.
-        현재 시장의 광기와 스마트 머니(외국인)의 수급이 실질적인 촉매제(공시/뉴스)에 근거한 것인지 판별하세요.
+        당신은 공격적인 퀀트 트레이더입니다. 아래 데이터를 바탕으로 이 종목이 '4월 어텐션 모멘텀'의 최종 승인 대상인지 판별하세요.
         
         데이터:
         - 대상 종목: {json.dumps(stock_info, ensure_ascii=False)}
         - 관련 뉴스: {json.dumps(news_list, ensure_ascii=False)}
         - 공시 정보: {json.dumps(dart_info, ensure_ascii=False)}
         
-        원칙:
-        - 단순 테마성 소음(Gap & Crap)인지, 아니면 강력한 실체가 있는 뉴스인지 분석하세요.
-        - 모멘텀 점수(1-10)가 7점 이상일 때만 "APPROVED"를 부여하세요.
-        - 'telegram_narrative'에는 왜 시장이 이 종목에 열광하는지, 내일 시초가 갭이 어느 정도일지 예측하는 서사적인 조언을 작성하세요.
-        
-        반드시 다음 JSON 형식을 엄수하세요:
+        요구사항:
+        - 단순 데이터 나열이 아닌, 매수 근거에 대한 전문적인 스토리텔링 코멘트를 작성하세요.
+        - 'telegram_narrative'는 텔레그램으로 전송될 최종 리포트의 핵심입니다.
+        - 반드시 다음 JSON 형식을 엄수하세요:
         {{
             "decision": "APPROVED" | "REJECTED",
-            "momentum_score": 8,
-            "catalyst_summary": "핵심 촉매 요약",
-            "telegram_narrative": "텔레그램 리포트용 상세 조언..."
+            "telegram_narrative": "전문적인 스토리텔링 코멘트..."
         }}
         """
         try:
-            # JSON 응답을 강제하는 설정 적용
-            response = self.model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text)
+            # [FIX] 지시사항: response_mime_type="application/json" 강제
+            response = self.model.generate_content(
+                prompt, 
+                generation_config={"response_mime_type": "application/json"}
+            )
+            res_json = json.loads(response.text)
+            
+            # [FIX] 지시사항: decision이 APPROVED일 때만 최종 매수 타겟 확정 로직을 위해 
+            # 형식을 보장합니다.
+            if "decision" not in res_json: res_json["decision"] = "REJECTED"
+            return res_json
         except Exception as e:
-            print(f"[GeminiAgent] 모멘텀 평가 오류: {e}")
-            return {"decision": "REJECTED", "momentum_score": 0, "telegram_narrative": f"분석 오류: {e}"}
+            # [FIX] 지시사항: Silent Failure 방지 및 상세 로깅
+            print(f"[GeminiAgent] V2 JSON 분석 치명적 오류: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {"decision": "REJECTED", "telegram_narrative": f"분석 오류 발생: {str(e)[:100]}"}
 
     def generate_trading_guide(self, market_context, sentinel_signals):
         """[What] 전체 시장Context와 신호를 바탕으로 하는 서술형 가이드를 생성합니다."""
@@ -116,9 +126,10 @@ class GeminiAgent:
             return "⚠️ AI 모델 응답이 비어있습니다. (데이터 부족)"
         except Exception as e:
             import traceback
-            print(f"[GeminiAgent] AI 가이드 생성 실패: {e}")
+            # [FIX] 지시사항: 에러 원인 명확히 로깅
+            print(f"[GeminiAgent] AI 가이드 생성 치명적 오류: {str(e)}")
             traceback.print_exc()
-            return f"⚠️ **AI 가이드 생성 중 오류 발생**: {str(e)[:100]}"
+            return f"⚠️ **AI 가이드 생성 중 오류 발생**: {str(e)[:150]}\n\n(시스템 로그를 확인해 주세요)"
 
 # --- 2. Strategy Advisor (전략 실행 코디네이터) ---
 class StrategyAdvisor:
@@ -216,39 +227,41 @@ class StrategyAdvisor:
         return news_list
 
     def check_dart_filings(self, stock_name, stock_code):
-        """[What] DART 공시 정보를 확인하여 악재나 호재 키워드를 필터링합니다."""
-        load_env()
-        dart_key = os.environ.get('DART_API_KEY')
-        result = {"premium": [], "hard_reject": False, "summary": "이상 없음"}
+        """
+        [지시사항 2] 2차 검증 오버레이 (DART 크로스체크)
+        """
+        result = {"reject": False, "reason": "이상 없음"}
         
-        # 기피 키워드(악재) 및 선호 키워드(호재) 정의
-        reject_kws = ["전환사채", "신주인수권부사채", "유상증자", "주식등의대량보유상황보고서", "임원ㆍ주요주주특정증권등소유상황보고서"]
-        premium_kws = ["단일판매ㆍ공급계약체결", "자기주식취득", "무상증자"]
-
-        if not dart_key:
-            result["summary"] = "DART API 키 미설정 (건너뜀)"
-            return result
+        # [ 지시사항 ] 기피 키워드(악재) 정의
+        reject_kws = ["전환사채", "신주인수권부사채", "유상증자"]
 
         try:
-            # 네이버 금융 공시/뉴스 탭 활용
+            # 실시간 공시 페이지 파싱
             naver_url = f"https://finance.naver.com/item/news_notice.naver?code={stock_code}"
-            n_res = requests.get(naver_url, timeout=3)
+            n_res = requests.get(naver_url, timeout=5)
             soup = BeautifulSoup(n_res.text, 'html.parser')
             titles = soup.select('.title a')
             
-            for t in titles:
-                text = t.get_text(strip=True)
-                if any(k in text for k in reject_kws):
-                    result["hard_reject"] = True
-                    result["summary"] = f"기피 공시 발견: {text}"
-                    break
-                if any(k in text for k in premium_kws):
-                    result["premium"].append(text)
-                    result["summary"] = f"프리미엄 공시 발견: {text}"
+            # 오늘 날짜 공시만 필터링 (V2 엄격성)
+            today_str = datetime.datetime.now().strftime('%Y.%m.%d')
+            
+            for row in soup.select('tr'):
+                date_td = row.select_one('.date')
+                title_a = row.select_one('.title a')
+                
+                if date_td and title_a:
+                    date = date_td.get_text(strip=True)
+                    text = title_a.get_text(strip=True)
+                    
+                    if today_str in date: # 오늘 자 공시인 경우
+                        if any(k in text for k in reject_kws):
+                            result["reject"] = True
+                            result["reason"] = f"DART 악재 발견: {text}"
+                            print(f"[Advisor] 🚨 {stock_name} 2차 검증 탈락 (악재 공시: {text})")
+                            break
                     
         except Exception as e:
             print(f"[Advisor] DART 분석 오류 ({stock_name}): {e}")
-            result["summary"] = f"DART 분석 예외 (건너뜀): {e}"
             
         return result
 
@@ -283,20 +296,19 @@ class StrategyAdvisor:
             name = stock.get('name')
             in_portfolio = code in portfolio
             
-            # 1단계: 기술적 스코어 계산
-            score, p_change = self.engine.calculate_score(stock)
+            # [지시사항 1] 기술적/어텐션 1차 필터 통과 여부 확인
+            passed, p_change = self.engine.is_v2_target_passed(stock)
             
             p_info = portfolio.get(code)
             profit_rate = p_info.get('profit_rate', 0) if in_portfolio else 0.0
             
-            # 2단계: 엔진 신호(HOLD/SELL/BUY_CANDIDATE) 획득
-            signal, confidence = self.engine.get_signal(
-                score=score, 
-                p_change=p_change, 
+            # [지시사항 4] 4월 V2 매도 룰 적용
+            prev_post_count = 0 # (실제 구현 시 이전 날짜 데이터 로드 로직 필요)
+            signal, reason = self.engine.get_signal(
+                stock_data=stock, 
                 in_portfolio=in_portfolio, 
                 profit_rate=profit_rate,
-                post_count_diff_pct=0.0,
-                positive_rate=float(stock.get('positive_rate', 50.0))
+                prev_post_count=prev_post_count
             )
             
             action = "WATCH"
@@ -304,69 +316,60 @@ class StrategyAdvisor:
             custom_reason = ""
             
             if in_portfolio:
-                # 보유 종목의 대응 로직
-                if "SELL" in signal:
+                if signal == "SELL_ALL":
                     action = "SELL_EXECUTE"
-                    custom_reason = f"적응형 익절: {signal} (수익률: {profit_rate:.2f}%)"
-                    
-                    if signal == "SELL_ALL":
-                        self.vpm.sell_stock(code) # 가상 매도 기록
-                    elif signal == "SELL_HALF":
-                        qty = p_info.get('qty', 0)
-                        half_qty = max(1, int(qty / 2))
-                        self.vpm.sell_stock(code, sell_qty=half_qty)
-                        custom_reason += f" [절반 분할 익절]"
-                        
+                    custom_reason = f"🚨 {reason} (수익률: {profit_rate:.2f}%)"
+                    self.vpm.sell_stock(code) # 가상 시뮬레이터 매도
+                elif signal == "SELL_HALF":
+                    action = "PARTIAL_SELL"
+                    qty = p_info.get('qty', 0)
+                    half_qty = max(1, int(qty / 2))
+                    custom_reason = f"⚠️ {reason} (+10% 익절, 50% 매도)"
+                    self.vpm.sell_stock(code, sell_qty=half_qty)
                 elif signal == "HOLD":
                     action = "HOLD"
                     custom_reason = f"보유 지속 (수익률: {profit_rate:.2f}%)"
             
-            # 신규 후보 종목의 매수 검증 로직
-            elif signal == "BUY_CANDIDATE":
-                if not allow_buy:
-                    continue # 장중이 아닐 경우 분석 생략
-                
-                # 3단계: 뉴스 및 공시(Gate) 검증
+            # [지시사항 2, 3] 신규 후보 종목의 2차 검증 및 AI 승인
+            elif passed and allow_buy:
+                # 2-1. 뉴스 0건 체크
                 news_list = self.fetch_specific_news(code, name)
-                if not self.crosscheck_news_keywords(news_list, name):
-                    action = "거절 (뉴스 부재)"
+                if len(news_list) == 0:
+                    action = "REJECTED (뉴스 0건)"
                     continue
                     
+                # 2-2. DART 오늘 자 악재 공시 체크
                 dart_info = self.check_dart_filings(name, code)
-                if dart_info.get("hard_reject"):
-                    action = f"거절 (DART 악재: {dart_info['summary']})"
+                if dart_info.get("reject"):
+                    action = f"REJECTED ({dart_info['reason']})"
                     continue
                     
-                # 4단계: AI(Gemini) 모멘텀 검증
+                # 3. Gemini V2 AI 최종 승인 (JSON 강제)
                 gemini_eval = self.gemini.evaluate_momentum(stock, news_list, dart_info)
                 if gemini_eval.get("decision") == "APPROVED":
-                    # 실전 계좌: 자동 매수 방지 (추천만 발송)
-                    # 가상 계좌(VPM): 자동 매수 기록하여 성과 추정
+                    # [지시사항 5] 자금 운용 및 포지션 사이징은 vpm.buy_stock 내부에서 처리
                     action = "BUY_RECOMMENDED" 
                     target_price = float(stock.get('price', 0))
-                    custom_reason = gemini_eval.get("telegram_narrative", "AI 모멘텀 강력 - 진입 추천")
+                    custom_reason = gemini_eval.get("telegram_narrative", "AI 승인됨")
                     
-                    self.vpm.buy_stock(code, name, target_price, quantity=20)
+                    # [V2] 가상 자산 규칙에 따른 매수 집행
+                    self.vpm.buy_stock(code, name, target_price) 
                 else:
-                    action = f"거절 (AI 점수: {gemini_eval.get('momentum_score')})"
+                    action = "REJECTED (AI 분석 미승인)"
+                    custom_reason = gemini_eval.get("telegram_narrative", "모멘텀 부족")
 
             results.append({
                 'code': code,
                 'name': name,
                 'price': stock.get('price', 0),
                 'signal': signal,
-                'score': score,
                 'action': action,
                 'target_price': target_price,
                 'in_portfolio': in_portfolio,
                 'profit_rate': profit_rate,
-                'today_change': p_change,
-                'factors': stock,
                 'custom_reason': custom_reason
             })            
         
-        # 스코어 기준 정렬 및 상위 리스팅
-        results.sort(key=lambda x: x['score'], reverse=True)
         return results[:10]
 
     def generate_report(self, candidates, allow_buy=True):

@@ -9,8 +9,8 @@ import json
 import concurrent.futures
 import re
 
-# [V8.4.6 Gold Master] 아키텍처 안정화 버전 (최신 버전 동기화)
-SCRAPER_VERSION = "8.4.6 Gold Master"
+# [V8.4.7 Gold Master] 아키텍처 안정화 버전 (휴장일 판별 및 리포트 중단 방지)
+SCRAPER_VERSION = "8.4.7 Gold Master"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src', 'strategy')))
@@ -26,6 +26,32 @@ def get_threshold_by_time(hour):
     elif 12 <= hour < 14: return 60
     elif 14 <= hour < 24: return 120 # [V8.4.3] 120개 유지
     return 10
+
+def is_trading_day(dt):
+    """
+    [V8.4.7] 2026년 한국거래소(KRX) 휴장일 판별 함수
+    """
+    # 1. 주말(토, 일)은 기본 휴장
+    if dt.weekday() >= 5: return False
+    
+    # 2. 2026년 법정 공휴일 및 KRX 지정 휴장일
+    holidays_2026 = [
+        "01-01", # 신정
+        "02-16", "02-17", "02-18", # 설날 연휴
+        "03-01", "03-02", # 삼일절 및 대체공휴일
+        "05-05", # 어린이날
+        "05-22", # 부처님오신날
+        "06-06", # 현충일
+        "08-15", # 광복절
+        "09-24", "09-25", "09-26", # 추석 연휴
+        "10-03", # 개천절
+        "10-09", # 한글날
+        "12-25", # 성탄절
+        "12-31"  # 연말 휴장일
+    ]
+    if dt.strftime('%m-%d') in holidays_2026: return False
+    
+    return True
 
 def load_env_manual():
     """
@@ -171,10 +197,12 @@ if __name__ == "__main__":
     now_kst = get_current_kst_time()
     
     force_run = os.environ.get('FORCE_RUN', 'false').lower() == 'true'
+    # [V8.4.7] 단순히 15시 여부를 따지지 않고 '개장일'인지 여부로 판단
+    is_open_day = is_trading_day(now_kst)
     threshold = 1 if force_run else get_threshold_by_time(now_kst.hour)
     threshold_time = now_kst.replace(hour=8, minute=0, second=0, microsecond=0)
     
-    print(f"[System] V8.4.4 Gold Master 가동 (임계값: {threshold})")
+    print(f"[System] {SCRAPER_VERSION} 가동 (개장일: {is_open_day}, 임계값: {threshold})")
 
     candidates = []
     for m in ['KOSPI', 'KOSDAQ']:
@@ -201,7 +229,8 @@ if __name__ == "__main__":
     if elite_candidates:
         print(f"[System] Gemini Strategic Guide 생성 중...")
         advisor = StrategyAdvisor()
-        advisor_report, _ = advisor.generate_report(elite_candidates, allow_buy=force_run or (now_kst.hour == 15))
+        # [V8.4.7] allow_buy를 개장일 여부로 설정 (밤에도 분석 결과 생성 가능)
+        advisor_report, _ = advisor.generate_report(elite_candidates, allow_buy=force_run or is_open_day)
     else:
         advisor_report = "⚠️ 금일 분석 기준(Buzz Threshold)을 충족하는 종목이 없습니다."
 
@@ -224,7 +253,8 @@ if __name__ == "__main__":
     print("[System] Simulator 가동 중...")
     from src.strategy.engine import StrategyEngine
     engine = StrategyEngine()
-    engine.execute_simulation(results, allow_buy=force_run or (now_kst.hour == 15))
+    # [V8.4.7] 시뮬레이션 및 데이터 보존을 위해 allow_buy=is_open_day 적용
+    engine.execute_simulation(results, allow_buy=force_run or is_open_day)
 
     elapsed = time.perf_counter() - start_time
     print(f"[System] 프로세스 종료 ({elapsed:.2f}s)")

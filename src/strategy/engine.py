@@ -91,6 +91,12 @@ class StrategyEngine:
                     'code': code, 'name': name, 'signal': decision['action'],
                     'reason': decision.get('reason', '관망'), 'in_portfolio': False
                 })
+            else:
+                # [V8.4.7] 비거래 시간대에도 분석 결과 목록에 포함하여 데이터 연속성 유지
+                results.append({
+                    'code': code, 'name': name, 'signal': 'WATCH',
+                    'reason': '비거래 시간대 분석', 'in_portfolio': False
+                })
 
         return results
 

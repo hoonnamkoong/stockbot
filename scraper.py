@@ -25,13 +25,25 @@ def get_threshold_by_time(hour):
     elif 14 <= hour < 24: return 100
     return 10
 
-def load_env_manual(filepath=".env.local"):
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip() and not line.startswith('#'):
-                    key, val = line.strip().split('=', 1)
-                    os.environ[key.strip()] = val.strip().strip('"').strip("'")
+def load_env_manual():
+    """
+    [V8.4.2] .env 및 .env.local 호환 로드 및 API Key 상호 보완
+    """
+    for filepath in [".env", ".env.local"]:
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip() and not line.startswith('#'):
+                        try:
+                            key, val = line.strip().split('=', 1)
+                            os.environ[key.strip()] = val.strip().strip('"').strip("'")
+                        except: continue
+
+    # API Key 상호 호환 처리
+    gemini_key = os.environ.get('GEMINI_KEY')
+    google_key = os.environ.get('GOOGLE_API_KEY')
+    if gemini_key and not google_key: os.environ['GOOGLE_API_KEY'] = gemini_key
+    elif google_key and not gemini_key: os.environ['GEMINI_KEY'] = google_key
 
 def fetch_post_body(link_suffix):
     try:
@@ -45,36 +57,33 @@ def fetch_post_body(link_suffix):
     except: return ""
 
 def get_discussion_stats(code, threshold_time):
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     collected_posts = []
     page = 1
-    stop_collecting = False
     
-    while page <= 25 and not stop_collecting:
+    while page <= 15:
         url = f"https://finance.naver.com/item/board.naver?code={code}&page={page}"
         try:
             res = requests.get(url, headers=headers, timeout=10)
             soup = BeautifulSoup(res.content, 'html.parser')
             rows = soup.select('table.type2 tr')
-            if not rows: break
             
             for row in rows:
                 cols = row.select('td')
                 if len(cols) < 5: continue
                 date_text = cols[0].get_text(strip=True)
                 
-                # [버그 수정]: 네이버 금융 당일 게시글 형식(HH:MM) 대응
+                # [V8.4.2 핵심 수정] 당일 게시글(HH:MM)과 과거글(YYYY.MM.DD) 모두 대응
                 try:
-                    if len(date_text) <= 5:
+                    if ":" in date_text and "." not in date_text: # 당일글 (예: 21:15)
                         today_str = get_current_kst_time().strftime('%Y.%m.%d')
                         post_date = datetime.strptime(f"{today_str} {date_text}", "%Y.%m.%d %H:%M")
-                    else:
+                    else: # 과거글 (예: 2026.04.05 15:30)
                         post_date = datetime.strptime(date_text, "%Y.%m.%d %H:%M")
                 except: continue
                 
-                if post_date < threshold_time:
-                    stop_collecting = True
-                    break
+                if post_date < threshold_time: 
+                    return {'recent_posts_count': len(collected_posts), 'latest_posts': collected_posts}
                 
                 title_tag = row.select_one('a.title')
                 if title_tag:
@@ -83,17 +92,9 @@ def get_discussion_stats(code, threshold_time):
                         'likes': cols[4].get_text(strip=True) if len(cols) > 4 else '0',
                         'link': title_tag['href']
                     })
-                if len(collected_posts) >= 500: 
-                    stop_collecting = True
-                    break
             page += 1
         except: break
-    
-    return {
-        'recent_posts_count': len(collected_posts),
-        'latest_posts': collected_posts,
-        'all_posts_titles': [p['title'] for p in collected_posts]
-    }
+    return {'recent_posts_count': len(collected_posts), 'latest_posts': collected_posts}
 
 def get_stock_details(code):
     details = {}

@@ -44,8 +44,8 @@ class GeminiAgent:
                     if 'generateContent' in m.supported_generation_methods
                 ]
                 
-                # 2. 선호하는 고성능 모델 순서대로 매칭 (가장 똑똑한 Pro 모델 우선)
-                preferred_keywords = ['gemini-2.0-pro-exp', 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash']
+                # 2. 선호하는 고성능 모델 순서대로 매칭 (무료 티어 한도 및 성능 고려)
+                preferred_keywords = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']
                 selected_model_name = None
                 
                 for keyword in preferred_keywords:
@@ -121,18 +121,19 @@ class GeminiAgent:
         if not self.model: return "⚠️ Gemini API 초기화 실패: 리포트를 생성할 수 없습니다."
         
         prompt = f"""
-        당신은 실전 주식 투자 전문가입니다. 
-        다음 데이터와 신호를 바탕으로 오늘의 시장 상황을 요약하고, 투자자들에게 주는 핵심 권고 사항을 작성하세요.
+        당신은 실전 주식 투자 전문가이며, '4월 V2 어텐션 모멘텀' 전략의 수석 분석가입니다. 
+        제공된 15개 정예 종목 리스트를 바탕으로 통합 'Strategic Guide'를 작성하세요.
         
         데이터:
         - 시장 상황: {market_context}
-        - 주요 신호: {json.dumps(sentinel_signals, ensure_ascii=False)}
+        - 정예 종목 리스트 (상위 15개): {json.dumps(sentinel_signals, ensure_ascii=False)}
         
         요구사항:
-        1. 첫 문장은 시장의 '분의기(Regime)'를 한 문장으로 정의하며 시작하세요.
-        2. 왜 특정 종목을 보유(HOLD)하거나 매도(SELL)해야 하는지 논리적으로 설명하세요.
-        3. '입니다/합니다'체를 사용하며 신뢰감 있는 톤으로 작성하세요.
-        4. 수치 데이터를 근거로 제시하세요.
+        1. 첫 문장은 시장의 '분위기(Regime)'를 한 문장으로 정의하며 시작하세요.
+        2. 15개 종목 전체의 흐름을 관통하는 핵심 테마와 특징을 분석하세요.
+        3. 왜 특정 종목들을 주목해야 하는지, 그리고 리스크 요인은 무엇인지 논리적으로 설명하세요.
+        4. '입니다/합니다'체를 사용하며 투자자에게 실질적인 도움이 되는 조언을 포함하세요.
+        5. 수치 데이터를 근거로 제시하며, 전반적인 매매 전략(분할 매수 등)을 제안하세요.
         """
         try:
             response = self.model.generate_content(prompt)

@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/stocks/refresh",
+      "schedule": "0 0 1 * *"
+    }
+  ]
+}

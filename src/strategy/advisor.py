@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 from src.trade.auth import get_access_token, load_env
 from src.trade.balance import get_balance
 
-from .engine import StrategyEngine
+# from .engine import StrategyEngine (순환 참조 방지를 위해 지연 로딩으로 이동)
 
 # --- 1. Gemini Agent Logic (AI 분석 엔진) ---
 class GeminiAgent:
@@ -139,6 +139,7 @@ class StrategyAdvisor:
     """
     def __init__(self):
         from .virtual_portfolio import VirtualPortfolioManager
+        from .engine import StrategyEngine
         self.vpm = VirtualPortfolioManager() # 가상 계좌 관리자
         self.engine = StrategyEngine() # 기술적 분석 엔진
         self.gemini = GeminiAgent() # AI 분석 에이전트

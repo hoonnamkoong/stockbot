@@ -23,13 +23,13 @@ def get_current_kst_time():
 
 def get_threshold_by_time(hour):
     """
-    [V8.4.8] 사용자 지정 시간대별 Buzz 문턱값 적용
+    [V8.4.8] 사용자 지정 누적 Buzz 문턱값 최종 적용
     """
-    if 0 <= hour < 9: return 20   # 00:00 ~ 08:59
-    elif 9 <= hour < 11: return 40 # 09:00 ~ 10:59 (10시까지 포함)
-    elif 11 <= hour < 14: return 80 # 11:00 ~ 13:59 (13시까지 포함)
-    elif 14 <= hour < 16: return 120 # 14:00 ~ 15:59 (15시까지 포함)
-    return 20 # 16:00 ~ 23:59 (야간 기준)
+    if 0 <= hour < 9: return 20       # 00:00 ~ 08:59: 20개
+    elif 9 <= hour < 10: return 40    # 09:00 ~ 10:00: 40개
+    elif 10 <= hour < 13: return 80   # 10:01 ~ 13:00: 80개
+    elif 13 <= hour < 15: return 120  # 13:01 ~ 15:00: 120개
+    return 130 # 15:01 ~ 23:59: 130개 (사용자 요청 반영)
 
 def is_trading_day(dt):
     """

@@ -104,7 +104,7 @@ def get_discussion_stats(code, threshold_time):
                 if post_date < threshold_time: 
                     return {'recent_posts_count': len(collected_posts), 'latest_posts': collected_posts}
                 
-                title_tag = row.select_one('a.title')
+                title_tag = row.select_one('td.title a')
                 if title_tag:
                     collected_posts.append({
                         'title': title_tag.get_text(strip=True),

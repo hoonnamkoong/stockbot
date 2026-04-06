@@ -118,11 +118,16 @@ class StrategyAdvisor:
         self.gemini = GeminiAgent()
 
     def generate_report(self, candidates, allow_buy=True):
+        """[V8.4.7] 개장일 중심 리포트 생성 로직"""
+        # 기술적 분석 및 시뮬레이션 실행 (종목 대응은 그대로 수행)
         all_results = self.engine.execute_simulation(candidates, allow_buy=allow_buy)
-        market_context = f"{len(candidates)}개 종목 Buzz 필터 통과. 시장 주도 섹터 분석 필요."
-        gemini_guide = self.gemini.generate_trading_guide(market_context, all_results)
         
-        summary = f"\n---\n📊 **V8.4.6 Gold Master 시스템 리포트**\n"
+        # [V8.4.7 Fix] AI 분석에는 Buzz 필터를 통과한 정예 종목(candidates)을 직접 전달
+        # 이를 통해 allow_buy=False인 밤 시간대에도 데이터 단절 없이 리포트가 생성됨
+        market_context = f"{len(candidates)}개 종목 Buzz 필터 통과. 시장 주도 섹터 및 모멘텀 분석."
+        gemini_guide = self.gemini.generate_trading_guide(market_context, candidates)
+        
+        summary = f"\n---\n📊 **V8.4.7 Gold Master 시스템 리포트**\n"
         summary += f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
         
         buy_targets = [r for r in all_results if r.get('signal') == 'BUY']

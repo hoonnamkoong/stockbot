@@ -2,7 +2,7 @@ import json
 import datetime
 from src.strategy.monthly.algo_04_v2 import Algo04V2
 from src.strategy.virtual_portfolio import VirtualPortfolioManager
-from src.strategy.advisor import GeminiAgent
+# from src.strategy.advisor import GeminiAgent (순환 참조 방지 Lazy Loading)
 import requests
 from bs4 import BeautifulSoup
 
@@ -13,6 +13,7 @@ class StrategyEngine:
     """
     def __init__(self):
         # 4월 어텐션 모멘텀 전략 주입 (Strategy Pattern)
+        from src.strategy.advisor import GeminiAgent
         self.strategy = Algo04V2()
         self.vpm = VirtualPortfolioManager()
         self.gemini = GeminiAgent()

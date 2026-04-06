@@ -2,13 +2,14 @@ import requests
 import json
 import os
 import sys
+import time
 import traceback
 from auth import get_access_token, load_env
 
 def get_balance():
     """
     KIS API를 사용하여 현재 잔고 및 보유 종목을 가져옵니다.
-    임포트하여 사용할 수 있도록 함수화되었습니다.
+    에러 7(조회이후 자료변경) 발생 시 자체 재시도 로직이 포함되어 있습니다.
     """
     access_token = get_access_token()
     if not access_token:
@@ -60,40 +61,56 @@ def get_balance():
         "CTX_AREA_NK100": "",
     }
 
-    try:
-        res = requests.get(url, headers=headers, params=params, timeout=10)
-        if res.status_code != 200:
-            return {"error": f"HTTP {res.status_code}: {res.text}", "holdings": []}
+    max_retries = 3
+    for i in range(max_retries):
+        try:
+            res = requests.get(url, headers=headers, params=params, timeout=10)
+            if res.status_code != 200:
+                if i < max_retries - 1:
+                    time.sleep(1 + i)
+                    continue
+                return {"error": f"HTTP {res.status_code}: {res.text}", "holdings": []}
+                
+            data = res.json()
+            rt_cd = data.get('rt_cd')
             
-        data = res.json()
-        if data.get('rt_cd') != '0':
-            return {"error": f"KIS API Error: {data.get('msg1')} ({data.get('msg_cd')})", "holdings": []}
+            # 에러 7 (조회이후 자료변경) 대응 재시도
+            if rt_cd == '7' and i < max_retries - 1:
+                delay = 1.5 + (i * 1.5)
+                print(f"[Balance] ⚠️ Error 7 (Data changed). Retrying {i+1}/{max_retries} in {delay}s...")
+                time.sleep(delay)
+                continue
 
-        output1 = data.get('output1', [])
-        output2 = data.get('output2', [{}])[0]
-        
-        holdings = []
-        for item in output1:
-            if int(item.get('hldg_qty', 0)) > 0:
-                holdings.append({
-                    "code": item.get('pdno'),
-                    "name": item.get('prdt_name'),
-                    "qty": int(item.get('hldg_qty', 0)),
-                    "avg_price": float(item.get('pchs_avg_pric', 0)),
-                    "current_price": float(item.get('prpr', 0)),
-                    "profit_rate": float(item.get('evlu_pfls_rt', 0))
-                })
-        
-        return {
-            "deposit": int(output2.get('dnca_tot_amt', 0)),
-            "total_asset": int(output2.get('tot_evlu_amt', 0)),
-            "total_profit": int(output2.get('evlu_pfls_smtl_amt', 0)),
-            "holdings": holdings,
-            "raw": data
-        }
+            if rt_cd != '0':
+                return {"error": f"KIS API Error: {data.get('msg1')} ({data.get('msg_cd')})", "holdings": []}
+
+            output1 = data.get('output1', [])
+            output2 = data.get('output2', [{}])[0]
             
-    except Exception as e:
-        return {"error": f"Exception: {str(e)}", "holdings": []}
+            holdings = []
+            for item in output1:
+                if int(item.get('hldg_qty', 0)) > 0:
+                    holdings.append({
+                        "code": item.get('pdno'),
+                        "name": item.get('prdt_name'),
+                        "qty": int(item.get('hldg_qty', 0)),
+                        "avg_price": float(item.get('pchs_avg_pric', 0)),
+                        "current_price": float(item.get('prpr', 0)),
+                        "profit_rate": float(item.get('evlu_pfls_rt', 0))
+                    })
+            
+            return {
+                "deposit": int(output2.get('dnca_tot_amt', 0)),
+                "total_asset": int(output2.get('tot_evlu_amt', 0)),
+                "total_profit": int(output2.get('evlu_pfls_smtl_amt', 0)),
+                "holdings": holdings,
+                "raw": data
+            }
+        except Exception as e:
+            if i < max_retries - 1:
+                time.sleep(1)
+                continue
+            return {"error": f"Exception: {str(e)}", "holdings": []}
 
 if __name__ == "__main__":
     result = get_balance()

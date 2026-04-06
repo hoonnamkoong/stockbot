@@ -1342,7 +1342,7 @@ if __name__ == "__main__":
         if all_data and should_run_ai:
             try:
                 advisor = StrategyAdvisor()
-                print(f"[System] 🧠 Gemini V2 Advisor 가동 (Reason: {'Manual' if is_manual else 'TimeWindow'}) - allow_buy={allow_buy}")
+                print(f"[System] 🧠 Gemini V2 Advisor 가동 (Reason: {'Manual' if is_manual_run else 'TimeWindow'}) - allow_buy={allow_buy}")
                 advisor_report_text, _ = advisor.generate_report(all_data, allow_buy=allow_buy)
             except Exception as e:
                 import traceback

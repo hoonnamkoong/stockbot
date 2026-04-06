@@ -310,10 +310,11 @@ export async function getRealPortfolio(): Promise<any> {
         }
 
         if (res.data.rt_cd !== '0') {
-            console.error(`[KIS-API] Balance Inquiry Final Error [${res.data.rt_cd}]:`, lastError);
+            const { rt_cd, msg_cd, msg1 } = res.data;
+            console.error(`[KIS-API ERROR] Balance Inquiry Failed! rt_cd: ${rt_cd}, msg_cd: ${msg_cd}, msg1: ${msg1}`);
             return { 
                 deposit: 0, stocks: [], total_value: 0, total_profit: 0, profit_rate: 0,
-                error: `KIS API Error: ${lastError} (${res.data.rt_cd})`,
+                error: `KIS API Error: ${msg1 || lastError} (${rt_cd})`,
                 sync_status: 'error'
             };
         }

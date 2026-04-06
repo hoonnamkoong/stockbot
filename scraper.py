@@ -22,10 +22,14 @@ def get_current_kst_time():
     return datetime.utcnow() + timedelta(hours=9)
 
 def get_threshold_by_time(hour):
-    if 9 <= hour < 12: return 40
-    elif 12 <= hour < 14: return 60
-    elif 14 <= hour < 24: return 120 # [V8.4.3] 120개 유지
-    return 10
+    """
+    [V8.4.8] 사용자 지정 시간대별 Buzz 문턱값 적용
+    """
+    if 0 <= hour < 9: return 20   # 00:00 ~ 08:59
+    elif 9 <= hour < 11: return 40 # 09:00 ~ 10:59 (10시까지 포함)
+    elif 11 <= hour < 14: return 80 # 11:00 ~ 13:59 (13시까지 포함)
+    elif 14 <= hour < 16: return 120 # 14:00 ~ 15:59 (15시까지 포함)
+    return 20 # 16:00 ~ 23:59 (야간 기준)
 
 def is_trading_day(dt):
     """
@@ -234,28 +238,28 @@ if __name__ == "__main__":
     else:
         advisor_report = "⚠️ 금일 분석 기준(Buzz Threshold)을 충족하는 종목이 없습니다."
 
-    if results:
-        result_df_kr, _ = analyzer.analyze_discussion_trend(results)
-        analyzer.save_data(result_df_kr, filename_prefix="trending_integrated")
+    # --- 4. 알림 전송 (항상 4개 메시지 체제 유지) ---
+    from src.notification.notification_service import NotificationService
+    ns = NotificationService()
+    
+    if ns.is_available:
+        # [V8.4.8] 종목 유무와 상관없이 시장 상황 보고
+        kospi_items = [r for r in results if r.get('시장구분') == 'KOSPI'] or []
+        kosdaq_items = [r for r in results if r.get('시장구분') == 'KOSDAQ'] or []
         
-        from src.notification.notification_service import NotificationService
-        ns = NotificationService()
-        if ns.is_available:
-            summary_msg = f"🚀 **{SCRAPER_VERSION} 전략 리포트**\n\n"
-            summary_msg += f"일시: {now_kst.strftime('%Y-%m-%d %H:%M')}\n"
-            summary_msg += f"분석 대상: {len(results)}개 종목\n\n"
-            summary_msg += f"--- **Strategic Insights** ---\n\n"
-            summary_msg += advisor_report[:3500] 
-            
-            ns._tg.send_message(summary_msg)
-            print("[System] 텔레그램 리포트 전송 완료")
+        # 실제 적용된 문턱값을 포함하여 리포트 전송
+        # advisor_report가 비어있을 경우 (종목 없음) 안내 문구 삽입
+        final_report_text = advisor_report if results else f"ℹ️ 현재 기준(Buzz {threshold}개)을 충족하는 종목이 없어 상세 분석이 생략되었습니다."
+        
+        print(f"[System] 리포트 전송 시도 (Threshold: {threshold})")
+        ns.send_hourly_report(
+            kospi_records=kospi_items, 
+            kosdaq_records=kosdaq_items, 
+            advisor_report_text=final_report_text
+        )
+        print("[System] 텔레그램 4세대 리포트 전송 완료")
     else:
-        # [NEW] 조건 만족 종목이 없을 때 알림 (Silent Skip 방지)
-        print("[System] 📉 조건에 맞는 종목이 없습니다. 알림을 전송합니다.")
-        from src.notification.notification_service import NotificationService
-        ns = NotificationService()
-        if ns.is_available:
-            ns.send_no_data_alert(threshold=threshold)
+        print("[System] 🚨 알림 서비스 비활성화 상태 (리포트 전송 스킵)")
 
     print("[System] Simulator 가동 중...")
     from src.strategy.engine import StrategyEngine

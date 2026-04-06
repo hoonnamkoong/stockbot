@@ -159,11 +159,18 @@ def main():
             if target_time.tzinfo is None:
                 target_time = target_time.replace(tzinfo=timezone.utc)
 
-            if res.get('status') == 'executed': continue
-
-            if now_utc < target_time:
+            # [Catch-up 로직] 예약 상태가 'pending'이고 실행 목표 시간이 현재보다 과거인 경우 즉시 실행
+            status = res.get('status', 'pending')
+            if status == 'executed': continue
+            
+            is_overdue = now_utc >= target_time
+            if not is_overdue:
+                # 미래 예약이므로 건너뜀
                 pending_reservations.append(res)
                 continue
+
+            # 이 시점에서는 target_time <= now_utc 이고 status != 'executed'임
+            print(f"  [Catch-up] 예약 {res_id}: 목표시간({target_time_str}) 경과됨. 즉시 실행 시도.")
 
             # ── 실행 ──
             code  = res.get('code', '')

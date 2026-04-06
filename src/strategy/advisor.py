@@ -45,7 +45,8 @@ class GeminiAgent:
                 ]
                 
                 # 2. 선호하는 고성능 모델 순서대로 매칭 (무료 티어 한도 및 성능 고려)
-                preferred_keywords = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']
+                # [FIX] gemini-2.5-flash를 최우선 모델로 고정
+                preferred_keywords = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
                 selected_model_name = None
                 
                 for keyword in preferred_keywords:

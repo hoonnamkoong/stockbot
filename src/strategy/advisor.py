@@ -14,20 +14,9 @@ from bs4 import BeautifulSoup
 # 실전/가상 포트폴리오 데이터를 통합하고, Gemini AI를 사용하여 매매 가이드를 생성합니다.
 
 # --- Trade Module Imports ---
-# 로컬 및 깃허브 액션 환경 모두에서 인증/잔고 모듈을 찾을 수 있도록 경로를 보강합니다.
-try:
-    from trade.auth import get_access_token, load_env
-    from trade.balance import get_balance
-except ImportError:
-    try:
-        from src.trade.auth import get_access_token, load_env
-        from src.trade.balance import get_balance
-    except ImportError:
-        # 최후의 수단: 모듈을 찾지 못할 경우 상위 경로 강제 주입
-        sys.path.append(os.path.join(os.getcwd(), 'trade'))
-        sys.path.append(os.path.join(os.getcwd(), 'src', 'trade'))
-        from auth import get_access_token, load_env
-        from balance import get_balance
+# [Rule 4.3] 통합된 src/trade 패키지로부터 인증 및 잔고 모듈을 표준 경로로 가져옵니다.
+from src.trade.auth import get_access_token, load_env
+from src.trade.balance import get_balance
 
 from .engine import StrategyEngine
 

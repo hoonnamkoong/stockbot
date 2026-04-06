@@ -37,42 +37,87 @@ class GeminiAgent:
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            try:
-                # 1. API 키로 접근 가능한 모든 텍스트 생성 모델 리스트 동적 조회
-                available_models = [
-                    m.name for m in genai.list_models() 
-                    if 'generateContent' in m.supported_generation_methods
-                ]
-                
-                # 2. 선호하는 고성능 모델 순서대로 매칭 (무료 티어 한도 및 성능 고려)
-                # [V8.2] gemini-2.5-flash 최우선 모델 전격 배치
-                preferred_keywords = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro-002']
-                selected_model_name = None
-                
-                for keyword in preferred_keywords:
-                    for am in available_models:
-                        if keyword in am:
-                            selected_model_name = am
-                            break
-                    if selected_model_name:
-                        break
-                        
-                # 3. 선호 모델이 없으면 구글이 내려준 리스트의 첫 번째 모델 사용 (404 완벽 차단)
-                if not selected_model_name and available_models:
-                    selected_model_name = available_models[0]
-                    
-                if selected_model_name:
-                    # 'models/' 접두사가 이미 포함되어 있으므로 안전하게 바로 객체 생성
-                    self.model = genai.GenerativeModel(selected_model_name)
-                    self.model_name = selected_model_name
-                    print(f"[GeminiAgent] ✅ 동적 모델 로드 성공: {selected_model_name}")
-                else:
-                    print("[GeminiAgent] 🚨 사용 가능한 텍스트 생성 모델이 없습니다.")
-                    
-            except Exception as e:
-                print(f"[GeminiAgent] 🚨 API 모델 조회 실패: {e}")
+            self._update_available_models()
         else:
             print("[GeminiAgent] 🚨 API 키가 누락되었습니다.")
+
+    def _update_available_models(self):
+        """[V8.6] 사용 가능한 모델 리스트를 동적으로 갱신하고 우선순위에 따라 선택합니다."""
+        try:
+            available_models = [
+                m.name for m in genai.list_models() 
+                if 'generateContent' in m.supported_generation_methods
+            ]
+            
+            # [V8.6] 모델 우선순위 정의 (이름에 포함된 키워드 기준)
+            preferred_keywords = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.0-pro']
+            self.all_available_models = []
+            
+            for keyword in preferred_keywords:
+                for am in available_models:
+                    if keyword in am and am not in self.all_available_models:
+                        self.all_available_models.append(am)
+            
+            # 리스트에 없는 나머지 모델들도 추가
+            for am in available_models:
+                if am not in self.all_available_models:
+                    self.all_available_models.append(am)
+
+            if self.all_available_models:
+                self.model_name = self.all_available_models[0]
+                self.model = genai.GenerativeModel(self.model_name)
+                print(f"[GeminiAgent] ✅ 모델 초기화 로드: {self.model_name}")
+            else:
+                self.model = None
+                print("[GeminiAgent] 🚨 사용 가능한 텍스트 생성 모델이 없습니다.")
+                
+        except Exception as e:
+            print(f"[GeminiAgent] 🚨 API 모델 조회 실패: {e}")
+            self.model = None
+
+    def _call_gemini_safe(self, prompt, generation_config=None, max_retries=2):
+        """
+        [V8.6] Quota Exceeded (429) 발생 시 모델을 교체하며 재시도하는 안전 호출 함수
+        """
+        current_retry = 0
+        tried_models = []
+        
+        while current_retry <= max_retries:
+            if not self.model:
+                return None
+                
+            try:
+                # print(f"[GeminiAgent] 호출 시도 (Model: {self.model_name}, Retry: {current_retry})")
+                response = self.model.generate_content(prompt, generation_config=generation_config)
+                return response
+            except Exception as e:
+                err_msg = str(e)
+                if ("429" in err_msg or "Quota" in err_msg or "ResourceExhausted" in err_msg):
+                    print(f"[GeminiAgent] ⚠️ Quota Exceeded for {self.model_name}. Switching model...")
+                    tried_models.append(self.model_name)
+                    
+                    # 다음 가용한 모델로 교체
+                    next_model = None
+                    for m in self.all_available_models:
+                        if m not in tried_models:
+                            next_model = m
+                            break
+                    
+                    if next_model:
+                        self.model_name = next_model
+                        self.model = genai.GenerativeModel(self.model_name)
+                        print(f"[GeminiAgent] 🔄 Switched to Backup Model: {self.model_name}")
+                        time.sleep(2) # 짧은 대기 후 재시도
+                        current_retry += 1
+                        continue
+                    else:
+                        print("[GeminiAgent] 🚨 No more backup models available.")
+                        break
+                else:
+                    # 일반 에러는 전파
+                    print(f"[GeminiAgent] 🚨 API Error: {err_msg}")
+                    break
+        return None
 
     def evaluate_momentum(self, stock_info, news_list, dart_info):
         """
@@ -100,10 +145,14 @@ class GeminiAgent:
         """
         try:
             # [FIX] 지시사항: response_mime_type="application/json" 강제
-            response = self.model.generate_content(
+            response = self._call_gemini_safe(
                 prompt, 
                 generation_config={"response_mime_type": "application/json"}
             )
+            
+            if not response or not response.text:
+                return {"decision": "REJECTED", "telegram_narrative": "AI 응답 실패 (잠시 후 다시 시도)"}
+                
             res_json = json.loads(response.text)
             
             # [FIX] 지시사항: decision이 APPROVED일 때만 최종 매수 타겟 확정 로직을 위해 
@@ -155,7 +204,7 @@ class GeminiAgent:
         - 오직 전문가용 불렛포인트(*)와 핵심 키워드 중심의 실전 리포트만 출력할 것.
         """
         try:
-            response = self.model.generate_content(prompt)
+            response = self._call_gemini_safe(prompt)
             if response and response.text:
                 return response.text
             return "⚠️ AI 모델 응답이 비어있습니다. (데이터 부족)"
@@ -198,7 +247,7 @@ class GeminiAgent:
         """
         try:
             # generation_config 적용하여 JSON 응답 유도
-            response = self.model.generate_content(
+            response = self._call_gemini_safe(
                 prompt,
                 generation_config={"response_mime_type": "application/json"}
             )

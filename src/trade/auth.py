@@ -152,6 +152,35 @@ def get_access_token(force_refresh=False):
         
     return None
 
+def get_account_info():
+    """
+    [지시사항] KIS 계좌번호(KIS_ACCOUNT_NO)를 읽어 CANO(8자리)와 ACNT_PRDT_CD(2자리)로 분리합니다.
+    [Why] 한국투자증권 API는 계좌번호를 두 부분으로 나누어 수신하기 때문입니다.
+    """
+    load_env()
+    account_full = os.environ.get('KIS_ACCOUNT_NO', '').strip().replace("-", "") # 하이픈 제거 후 처리
+    cano = ""
+    acnt_prdt_cd = ""
+
+    if account_full:
+        if len(account_full) >= 10:
+            # 표준 규격: 앞 8자리 계좌번호 + 뒤 2자리 상품코드
+            cano = account_full[:8]
+            acnt_prdt_cd = account_full[8:10]
+        else:
+            # 예외 상황 처리 (로그 기록)
+            print(f"[Auth] 경고: 계좌번호 형식이 올바르지 않습니다 (길이: {len(account_full)})")
+            
+    return cano, acnt_prdt_cd
+
+def get_base_url():
+    """실전/모의 서버 주소를 반환합니다."""
+    load_env()
+    is_virtual = os.environ.get("KIS_IS_VIRTUAL", "false").lower() == "true"
+    if is_virtual:
+        return "https://openapivts.koreainvestment.com:29443"
+    return "https://openapi.koreainvestment.com:9443"
+
 if __name__ == "__main__":
     t = get_access_token()
     if t: print(f"[Auth] 최종 토큰 획득 성공 (길이={len(t)})")

@@ -363,21 +363,27 @@ class StrategyAdvisor:
         market_context = f"{len(candidates)}개 종목 분석 완료. 상위 {len(final_report_items)}개 집중 분석."
         gemini_guide = self.gemini.generate_trading_guide(market_context, final_report_items)
         
-        report = f"{gemini_guide}\n\n"
-        report += "📋 **오늘의 매매 액션 리포트**\n"
-        
-        for item in final_report_items:
-            # 상태 및 아이콘 설정
-            icon = "🔴" if "BUY" in item['action'] else "🔵"
-            if item['action'] == "WATCH": icon = "👀"
-            if item['action'] == "SELL_EXECUTE": icon = "🚨"
+        try:
+            report = f"{gemini_guide}\n\n"
+            report += "📋 **오늘의 매매 액션 리포트**\n"
             
-            p_tag = " [보유중]" if item['in_portfolio'] else ""
-            report += f"{icon} **{item['name']}** ({item['action']}){p_tag}\n"
-            report += f"   - 신호: {item['signal']} (점수: {item['score']})\n"
-            if item['target_price'] > 0:
-                report += f"   - 진입가: {item['price']} -> 목표: {int(item['target_price'])}\n"
-            elif item['in_portfolio']:
-                report += f"   - 현재익률: {item['profit_rate']:.2f}%\n"
-            
-        return report, final_report_items
+            for item in final_report_items:
+                # 상태 및 아이콘 설정
+                icon = "🔴" if "BUY" in item['action'] else "🔵"
+                if item['action'] == "WATCH": icon = "👀"
+                if item['action'] == "SELL_EXECUTE": icon = "🚨"
+                
+                p_tag = " [보유중]" if item['in_portfolio'] else ""
+                report += f"{icon} **{item['name']}** ({item['action']}){p_tag}\n"
+                report += f"   - 신호: {item['signal']} (점수: {item['score']})\n"
+                if item['target_price'] > 0:
+                    report += f"   - 진입가: {item['price']} -> 목표: {int(item['target_price'])}\n"
+                elif item['in_portfolio']:
+                    report += f"   - 현재익률: {item['profit_rate']:.2f}%\n"
+                
+            return report, final_report_items
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"[Advisor] Critical Report Generation Error: {e}")
+            return f"⚠️ **가이드 생성 중 오류가 발생했습니다.**\n\n**원인:** {str(e)}\n\n**상세:**\n```\n{error_details[:500]}\n```", []

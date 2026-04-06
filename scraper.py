@@ -1103,24 +1103,44 @@ if __name__ == "__main__":
                 # [Deep Dive V7.5] Analyze Top 10 Liked Posts
                 raw_latest = stats.get('latest_posts', [])
                 raw_latest.sort(key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
-                candidates_posts = raw_latest[:10] # Renamed from 'candidates' to avoid confusion
+                candidates_posts = raw_latest[:10] 
                 
+                combined_body = ""
                 print(f"   [dtl] {stock['name']}: {recent_count} (Fetching bodies...)")
                 for post in candidates_posts:
                     if post.get('link'):
-                        post['body'] = fetch_post_body(post['link'])
+                        b = fetch_post_body(post['link'])
+                        post['body'] = b
+                        combined_body += f"\n{b}"
                     else:
                         post['body'] = ""
                 
                 stock['latest_posts'] = candidates_posts
                 stock['all_posts_titles'] = stats.get('all_posts_titles', []) 
+                stock['post_count'] = recent_count # Match engine.py key
+
+                # [NEW] Real-time Sentiment Analysis via Gemini (V9.8)
+                try:
+                    from src.strategy.advisor import GeminiAgent
+                    sentiment_agent = GeminiAgent()
+                    # Calculate positive rate from combined bodies
+                    if combined_body.strip():
+                        prompt = f"다음 주식 게시글들을 분석하여 긍정적인 의견의 비율(0~100)을 숫자로만 답변하세요: {combined_body[:2000]}"
+                        res_text = sentiment_agent.model.generate_content(prompt).text
+                        pos_rate = float(re.search(r'\d+', res_text).group())
+                        stock['positive_rate'] = pos_rate
+                    else:
+                        stock['positive_rate'] = 50.0
+                except:
+                    stock['positive_rate'] = 50.0
                 
-                # Keywords (for Sentinel-V) - Extract meaningful keywords, not raw titles
+                # Keywords
                 titles = [p['title'] for p in candidates_posts]
                 meaningful_kws = extract_meaningful_keywords(titles, stock.get('name', ''))
                 stock['top_keywords'] = ", ".join(meaningful_kws) if meaningful_kws else ""
 
                 # Consecutive Flag
+                stock['foreign_rate_diff'] = stock.get('foreign_change_rate', 0.0) # Match engine.py key
                 if stock['code'] in yesterday_codes:
                     stock['is_consecutive'] = True
                 else:

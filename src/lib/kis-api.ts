@@ -259,11 +259,11 @@ export async function getRealPortfolio(): Promise<any> {
                     AFHR_FLG: 'N',
                     OCCN_TX_FOR_YN: 'N',
                     PRDT_TYPE_CD: '01',
-                    INQR_DVSN: '02',
+                    INQR_DVSN: '01', // Changed from '02' to '01' (Account-based)
                     UNPR_DVSN: '01',
                     FUND_STTL_ICLD_YN: 'N',
                     FNCG_AMT_AUTO_RDPT_YN: 'N',
-                    PRCS_DVSN: '00',
+                    PRCS_DVSN: '01', // Changed from '00' to '01' (Standard for '01' INQR_DVSN)
                     CTX_AREA_FK100: '',
                     CTX_AREA_NK100: '',
                 },

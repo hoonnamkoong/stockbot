@@ -61,11 +61,11 @@ def get_balance():
         "AFHR_FLG": "N", # 시간외 단일가 구분
         "OCCN_TX_FOR_YN": "N", # 외국인 거래 여부
         "PRDT_TYPE_CD": "01", # 종목 구분 (01: 주식)
-        "INQR_DVSN": "02", # 조회 구분 (02: 종목별)
+        "INQR_DVSN": "01", # Changed from '02' to '01' (Account-based)
         "UNPR_DVSN": "01", # 단가 구분 (01: 평균단가)
         "FUND_STTL_ICLD_YN": "N", # 펀드 결제 포함 여부
         "FNCG_AMT_AUTO_RDPT_YN": "N", # 융자 금액 자동 상환 여부
-        "PRCS_DVSN": "00", # 처리 구분 (00: 전일결제기준)
+        "PRCS_DVSN": "01", # Changed from '00' to '01' (Standard for '01' INQR_DVSN)
         "CTX_AREA_FK100": "",
         "CTX_AREA_NK100": "",
     }

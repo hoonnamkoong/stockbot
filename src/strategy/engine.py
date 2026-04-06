@@ -67,6 +67,10 @@ class StrategyEngine:
                 # 2-2. [I/O] Gemini V2 AI 최종 승인 대기
                 llm_decision = self.gemini.evaluate_momentum(stock, news_list, dart_data)
                 
+                # [지시사항] 무료 티어 15 RPM 제한 준수를 위한 4초 강제 지연
+                import time
+                time.sleep(4)
+                
                 # 2-3. [Pure Logic] 전략 모듈 호출 (No I/O inside)
                 decision = self.strategy.analyze_target(
                     stock_data=stock,

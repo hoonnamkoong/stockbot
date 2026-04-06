@@ -1326,22 +1326,29 @@ if __name__ == "__main__":
         if trigger_reason:
             print(f"[System] Notification Triggered by: {trigger_reason}")
 
-        # ── 전략 리포트 생성 (알림 여부 상관없이 백그라운드로 매번 실행하여 방어 로직 상시 가동) ─────────────────────────────
+        # ── 전략 리포트 생성 (지능형 AI 호출 제어: 정시 윈도우 0-10분 또는 수동 실행 시에만 제미나이 작동) ─────────
         advisor_report_text = ""
         is_market_close = (now_kst.hour == 15 and 0 <= now_kst.minute <= 30)
         is_forced = os.environ.get('FORCE_RUN', 'false').strip().lower() == 'true'
+        is_manual = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch' or is_forced
+        is_time_window = 0 <= now_kst.minute <= 10
+        
+        # [지시사항] 정시 윈도우이거나 수동 실행인 경우에만 AI 호출
+        should_run_ai = is_time_window or is_manual
         allow_buy = is_market_close or is_forced
 
-        if all_data:
+        if all_data and should_run_ai:
             try:
                 advisor = StrategyAdvisor()
-                print(f"[System] Generating Strategy Report and running defensive logics (allow_buy={allow_buy})...")
+                print(f"[System] 🧠 Gemini V2 Advisor 가동 (Reason: {'Manual' if is_manual else 'TimeWindow'}) - allow_buy={allow_buy}")
                 advisor_report_text, _ = advisor.generate_report(all_data, allow_buy=allow_buy)
             except Exception as e:
                 import traceback
-                traceback.print_exc()
                 print(f"[ERROR] Strategy Advisor Failed: {type(e).__name__}: {e}")
-                advisor_report_text = f"[전략 리포트 생성 실패: {type(e).__name__}]"
+                traceback.print_exc()
+                advisor_report_text = f"[전략 리포트 분석 실패: {type(e).__name__}]"
+        elif all_data and not should_run_ai:
+            print(f"[System] 💤 AI 호출 건너뜀 (현재 {now_kst.minute}분: 정시 윈도우 아님)")
 
         if all_data and should_send_telegram:
             print("[System] Generating Consolidated Telegram Report via NotificationService...")

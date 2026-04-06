@@ -87,6 +87,25 @@ class GeminiAgent:
         except Exception as e:
             return f"⚠️ 리포트 생성 중 오류 발생: {e}"
 
+    def evaluate_momentum(self, stock, news, dart):
+        """[V8.4.7] 개별 종목의 모멘텀을 AI가 최종 검증 (Engine 호출용)"""
+        if not self.model: return "WATCH"
+        
+        prompt = f"""
+        종목명: {stock.get('name')} ({stock.get('code')})
+        현재 Buzz: {stock.get('post_count')} posts
+        최근 뉴스: {news}
+        공시 분석: {dart}
+        
+        위 데이터를 바탕으로 이 종목의 단기 모멘텀을 평가하세요.
+        반드시 'BUY', 'WATCH', 'REJECT' 중 하나의 단어로 시작하고, 그 뒤에 한 줄 이유를 덧붙이세요.
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip() if response.text else "WATCH"
+        except:
+            return "WATCH"
+
     def analyze_bulk_sentiment(self, bulk_data):
         """기존 벌크 감성 분석 로직 유지 (모델 동적 적용)"""
         if not self.model: return {}

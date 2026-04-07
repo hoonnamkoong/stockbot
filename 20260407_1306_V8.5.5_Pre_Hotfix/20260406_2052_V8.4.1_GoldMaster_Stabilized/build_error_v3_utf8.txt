@@ -1,0 +1,71 @@
+﻿
+> stock-dashboard@0.1.0 build
+> next build
+
+   ??Next.js 14.0.0
+   - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+node.exe : (node:26772) [D
+EP_WEBPACK_MODULE_UPDATE_H
+ASH] DeprecationWarning: M
+odule.updateHash: Use new 
+ChunkGraph API
+위치 줄:1 문자:1
++ & "C:\Program Files\node
+js/node.exe" "C:\Program F
+iles\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: ((  
+  node:26772) [D... Chu   
+ nkGraph API:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+(Use `node --trace-depreca
+tion ...` to show where th
+e warning was created)
+ ??Compiled successfully
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/lib/kis-api-v14.ts:2
+5:37
+Type error: Cannot find mo
+dule './github-db' or its 
+corresponding type declara
+tions.
+
+[0m [90m 23 |[39m [36m
+import[39m os [36mfrom[
+39m [32m'os'[39m[33m;[
+39m[0m
+[0m [90m 24 |[39m[0m
+[0m[31m[1m>[22m[39m[
+90m 25 |[39m [36mimport
+[39m { fetchFile[33m,[39
+m saveFile } [36mfrom[39
+m [32m'./github-db'[39m
+[33m;[39m[0m
+[0m [90m    |[39m      
+                          
+     [31m[1m^[22m[39m
+[0m
+[0m [90m 26 |[39m[0m
+[0m [90m 27 |[39m [90m
+// File-based Token Manage
+ment to prevent EGW00133 (
+Rate Limit) & SMS Spam[39
+m[0m
+[0m [90m 28 |[39m [36m
+const[39m [33mTOKEN_FILE
+_LOCAL[39m [33m=[39m pa
+th[33m.[39mjoin(os[33m.
+[39mtmpdir()[33m,[39m 
+[32m'token.json'[39m)[33
+m;[39m[0m

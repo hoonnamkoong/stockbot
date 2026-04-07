@@ -1,0 +1,98 @@
+{
+  "cash": 33950.159250000026,
+  "holdings": {
+    "336370": {
+      "qty": 67,
+      "avg_price": 8900.0,
+      "buy_date": "2026-03-03",
+      "days_held": 0,
+      "name": "솔루스첨단소재",
+      "target_prob": 83.0184320608825
+    },
+    "234340": {
+      "qty": 21,
+      "avg_price": 28200.0,
+      "buy_date": "2026-03-03",
+      "days_held": 0,
+      "name": "헥토파이낸셜",
+      "target_prob": 81.79506906188193
+    },
+    "064260": {
+      "qty": 66,
+      "avg_price": 9000.0,
+      "buy_date": "2026-03-03",
+      "days_held": 0,
+      "name": "다날",
+      "target_prob": 79.74009574739621
+    },
+    "047770": {
+      "qty": 151,
+      "avg_price": 3955.0,
+      "buy_date": "2026-03-03",
+      "days_held": 0,
+      "name": "코데즈컴바인",
+      "target_prob": 77.04880007919739
+    },
+    "086390": {
+      "qty": 27,
+      "avg_price": 21700.0,
+      "buy_date": "2026-03-03",
+      "days_held": 0,
+      "name": "유니테스트",
+      "target_prob": 76.7577182968092
+    }
+  },
+  "trade_log": [
+    {
+      "date": "2026-03-03 04:19:36",
+      "type": "BUY",
+      "code": "336370",
+      "name": "솔루스첨단소재",
+      "qty": 67,
+      "price": 8900.0,
+      "prob": 83.0184320608825,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-03 04:19:36",
+      "type": "BUY",
+      "code": "234340",
+      "name": "헥토파이낸셜",
+      "qty": 21,
+      "price": 28200.0,
+      "prob": 81.79506906188193,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-03 04:19:36",
+      "type": "BUY",
+      "code": "064260",
+      "name": "다날",
+      "qty": 66,
+      "price": 9000.0,
+      "prob": 79.74009574739621,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-03 04:19:36",
+      "type": "BUY",
+      "code": "047770",
+      "name": "코데즈컴바인",
+      "qty": 151,
+      "price": 3955.0,
+      "prob": 77.04880007919739,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-03 04:19:36",
+      "type": "BUY",
+      "code": "086390",
+      "name": "유니테스트",
+      "qty": 27,
+      "price": 21700.0,
+      "prob": 76.7577182968092,
+      "reason": "ML Strong Buy Signal"
+    }
+  ],
+  "last_update": "2026-03-03"
+}

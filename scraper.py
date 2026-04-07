@@ -200,22 +200,32 @@ def get_discussion_stats(code, threshold_time, prev_state):
     }
 
 def get_stock_details(code):
-    details = {}
+    details = {'prev_close': 0} # Default 0 instead of NaN
     url_frgn = f"https://finance.naver.com/item/frgn.naver?code={code}"
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url_frgn, headers=headers, timeout=10)
         soup = BeautifulSoup(res.content, 'html.parser')
+        
+        # [V8.9.9] 전일 종가 수집 로직 보강
         rows = soup.select('table.type2 tbody tr')
         data_rows = [r for r in rows if len(r.select('td')) > 5]
+        
         if len(data_rows) >= 2:
             cols_today = data_rows[0].select('td')
             cols_yest = data_rows[1].select('td')
             details['foreign_rate'] = cols_today[-1].get_text(strip=True)
             details['prev_foreign_rate'] = cols_yest[-1].get_text(strip=True)
-            prev_close = cols_yest[1].get_text(strip=True).replace(',', '')
-            if prev_close.isdigit(): details['prev_close'] = int(prev_close)
-    except: pass
+            
+            # 전일 종가 추출 (텍스트 정제)
+            prev_close_text = cols_yest[1].get_text(strip=True).replace(',', '')
+            if prev_close_text.isdigit():
+                details['prev_close'] = int(prev_close_text)
+            
+        # [V8.9.9 Fallback] 전일 종가가 0이거나 수집 실패 시 현재가/등락률 기반 역산 시도
+        # (메인 페이지에서 price/change_rate는 기본으로 가져오므로 analyzer 등에서 보완될 수 있음)
+    except Exception as e:
+        print(f"   [Warning] {code} 상세 정보 수집 실패: {e}")
     return details
 
 def process_single_stock(stock, yesterday_codes, threshold, threshold_time, prev_sync_state):

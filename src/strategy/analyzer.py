@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
 import os
@@ -90,49 +90,50 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         print("No data to save.")
         return {}
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_name = f"data/{filename_prefix}_{timestamp}"
-    csv_filename = f"{base_name}.csv"
-    xlsx_filename = f"{base_name}.xlsx"
+    # [V8.9.9] 타임스탬프 중복 파일 생성 중단 (저장소 최적화)
+    # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # base_name = f"data/{filename_prefix}_{timestamp}"
+    # csv_filename = f"{base_name}.csv"
+    # xlsx_filename = f"{base_name}.xlsx"
     
     saved_files = {}
 
-    # 1. Save CSV (Main Data Only)
+    # 1. Save Fixed CSV (Force Sync)
     try:
-        df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
-        print(f"\nData saved to CSV: {os.path.abspath(csv_filename)}")
-        saved_files['csv'] = csv_filename
+        fixed_csv = "data/trending_integrated.csv"
+        df.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
+        print(f"\n[Fixed] Data saved to CSV: {os.path.abspath(fixed_csv)}")
+        saved_files['csv'] = fixed_csv
     except Exception as e:
         print(f"Error saving to CSV: {e}")
 
-    # 2. Save Excel (Multi-sheet support)
+    # 2. Save Fixed Excel
     try:
-        with pd.ExcelWriter(xlsx_filename, engine='openpyxl') as writer:
-            # Main Sheet
+        fixed_xlsx = "data/trending_integrated.xlsx"
+        with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
-            
-            # Extra Sheets
             if extra_sheets:
                 for sheet_name, sheet_df in extra_sheets.items():
                     if not sheet_df.empty:
                         sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                        
+        print(f"[Fixed] Data saved to Excel: {os.path.abspath(fixed_xlsx)}")
+        saved_files['excel'] = fixed_xlsx
+    except Exception as e:
+        print(f"Error saving to Excel: {e}")
                         
         print(f"Data saved to Excel: {os.path.abspath(xlsx_filename)}")
         saved_files['excel'] = xlsx_filename
     except Exception as e:
         print(f"Error saving to Excel: {e}")
         
-    # 3. [V8.6.0] Save Fixed Filename for Vercel Dashboard (Overwrite Guarantee)
-    try:
+        # 3. [V8.6.0] Save Fixed Filename for Vercel Dashboard
         # data 디렉토리가 없을 경우 생성 (보안 레이어)
         os.makedirs('data', exist_ok=True)
         
-        fixed_csv = "data/trending_integrated.csv"
-        fixed_xlsx = "data/trending_integrated.xlsx"
         fixed_json = "data/latest_stocks.json"
         
-        # Overwrite CSV (Force Sync)
-        df.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
+        # [V8.6.2 Hotfix] Save JSON for Vercel/GitHub Dashboard (Typed Clean)
         
         # [V8.6.2 Hotfix] Save JSON for Vercel/GitHub Dashboard (Typed Clean)
         # 1. 문자열(Text) 데이터 결측치 처리 (프론트엔드 Crash 방지)

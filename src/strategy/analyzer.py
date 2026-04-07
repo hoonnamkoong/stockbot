@@ -177,7 +177,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         now_kst = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         status_json = "data/status.json"
         with open(status_json, 'w', encoding='utf-8') as f:
-            json.dump({"last_updated": now_kst, "status": "ok", "message": "V8.9.9.5 Final Proof"}, f, ensure_ascii=False, indent=4)
+            json.dump({"last_updated": now_kst, "status": "ok", "message": "V8.9.9.5 LIVE"}, f, ensure_ascii=False, indent=4)
             
         print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.5)")
     except Exception as e:

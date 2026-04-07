@@ -23,13 +23,16 @@ export async function GET() {
             fs.readFile(reportsPath, 'utf-8').catch(() => '[]')
         ]);
 
+        // [V8.6.2 Hotfix] JSON 파싱 에러(NaN, Infinity) 방지를 위한 정규식 치환
+        const sanitize = (raw: string) => raw.replace(/\bNaN\b/g, 'null').replace(/\bInfinity\b/g, 'null');
+
         return NextResponse.json({
             success: true,
-            stocks: JSON.parse(stocksRaw),
-            status: JSON.parse(statusRaw),
-            analysis_5days: JSON.parse(a5Raw),
-            analysis_3days: JSON.parse(a3Raw),
-            reports: JSON.parse(reportsRaw)
+            stocks: JSON.parse(sanitize(stocksRaw)),
+            status: JSON.parse(sanitize(statusRaw)),
+            analysis_5days: JSON.parse(sanitize(a5Raw)),
+            analysis_3days: JSON.parse(sanitize(a3Raw)),
+            reports: JSON.parse(sanitize(reportsRaw))
         });
 
     } catch (error: any) {

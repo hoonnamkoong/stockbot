@@ -109,15 +109,15 @@ class BaseSimulator:
         self.state['invested'] += cost
         
         if code in self.state['portfolio']:
-            old_q = self.state['portfolio'][code]['quantity']
-            old_p = self.state['portfolio'][code]['price']
+            old_q = self.state['portfolio'][code].get('quantity', 0)
+            old_p = self.state['portfolio'][code].get('avg_price', self.state['portfolio'][code].get('price', 0))
             new_q = old_q + quantity
             new_p = ((old_q * old_p) + cost) / new_q
             self.state['portfolio'][code]['quantity'] = new_q
-            self.state['portfolio'][code]['price'] = new_p
+            self.state['portfolio'][code]['avg_price'] = new_p
         else:
             self.state['portfolio'][code] = {
-                "name": name, "quantity": quantity, "price": price, 
+                "name": name, "quantity": quantity, "avg_price": price, 
                 "buy_date": datetime.datetime.now().strftime('%Y-%m-%d')
             }
             

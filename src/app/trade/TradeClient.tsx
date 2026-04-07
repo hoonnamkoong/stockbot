@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack,
     Table, Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea, Box
+    Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea, Box, Divider
 } from '@mantine/core';
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
@@ -75,24 +75,19 @@ function TradeContent() {
     const pinContainerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
 
-    // Data Fetchers with SSR Safety
     const showNotify = useCallback((title: string, msg: string, color: string) => {
         setNotification({ title, msg, color });
         setTimeout(() => setNotification(null), 5000);
     }, []);
 
-    // Data Fetchers with SSR Safety
     const fetchBalance = useCallback(async (retryCount = 0, silent = false) => {
         if (typeof window === 'undefined') return;
         if (!silent) setLoading(true);
         try {
             const res = await fetch(`/api/portfolio/real?v=57&cb=${Date.now()}`);
-            const data = await res.json().catch(() => ({ error: '서버 응답이 JSON이 아닙니다. (HTML 에러 발생)' }));
-            console.log("[DEBUG] Real Portfolio Response:", data);
+            const data = await res.json().catch(() => ({ error: '서버 응답이 JSON이 아닙니다.' }));
             setBalance(data);
-            if (data.error && !silent) {
-                showNotify('API Error (KIS)', data.error, 'red');
-            }
+            if (data.error && !silent) showNotify('API Error', data.error, 'red');
         } catch (error: any) {
             if (retryCount < 1) setTimeout(() => fetchBalance(retryCount + 1, silent), 2000);
             else if (!silent) showNotify('Fetch Error', '실시간 계좌 정보를 가져오지 못했습니다.', 'red');
@@ -105,11 +100,11 @@ function TradeContent() {
         if (typeof window === 'undefined') return;
         setGeminiLoading(true);
         try {
-            const res = await fetch(`/api/simulation/stats?v=85&cb=${Date.now()}`);
+            const res = await fetch(`/api/simulation/stats?v=86&cb=${Date.now()}`);
             const data = await res.json();
             setGeminiBalance(data);
         } catch (e) {
-            console.error("Simulation Stats Fetch Error", e);
+            console.error(e);
         } finally {
             setGeminiLoading(false);
         }
@@ -121,11 +116,9 @@ function TradeContent() {
         try {
             const res = await fetch(`/api/trade/history?cb=${Date.now()}`);
             const data = await res.json();
-            if (data.success) {
-                setHistory(data.data);
-            }
+            if (data.success) setHistory(data.data);
         } catch (e) {
-            console.error("History Fetch Error", e);
+            console.error(e);
         } finally {
             setHistoryLoading(false);
         }
@@ -154,12 +147,10 @@ function TradeContent() {
         fetchReservations();
         fetchSimulationStats();
         fetchHistory();
-        
         const codeParam = searchParams.get('code');
         if (codeParam) setCode(codeParam);
     }, [searchParams, fetchBalance, fetchStocks, fetchReservations, fetchSimulationStats, fetchHistory]);
 
-    // Polling Intervals
     const balancePoller = useInterval(() => fetchBalance(0, true), 30000);
     useEffect(() => {
         balancePoller.start();
@@ -181,21 +172,18 @@ function TradeContent() {
         const { isReservation } = pendingAction;
         setPinModalOpen(false);
         setOrderLoading(true);
-
         try {
             const endpoint = isReservation ? '/api/trade/reservation' : '/api/trade/order';
-            const payload: any = {
-                code, qty, price, side: orderType, pin
-            };
+            const payload: any = { code, qty, price, side: orderType, pin };
             if (isReservation) payload.time = `${resHour}:${resMin}`;
-
             const res = await axios.post(endpoint, payload);
             if (res.data.success) {
-                showNotify('주문 성공', isReservation ? '예약이 등록되었습니다.' : '주문이 처결되었습니다.', 'green');
+                showNotify('성공', isReservation ? '예약 완료' : '주문 완료', 'green');
                 fetchBalance();
                 fetchReservations();
+                fetchHistory();
             } else {
-                showNotify('주문 실패', res.data.error, 'red');
+                showNotify('실패', res.data.error, 'red');
             }
         } catch (error: any) {
             showNotify('Error', error.response?.data?.error || error.message, 'red');
@@ -214,134 +202,108 @@ function TradeContent() {
         } catch (error) {}
     };
 
-    function renderPortfolio() {
-        const deposit = balance?.deposit ?? 0;
-        const totalEval = balance?.holdings?.reduce((sum, h) => sum + ((h.price || 0) * (h.qty || 0)), 0) ?? 0;
-        const totalPL = balance?.holdings?.reduce((sum, h) => sum + (h.pl_amount || 0), 0) ?? 0;
+    // --- Helper UI Renderers ---
 
-        return (
-            <Paper p="md" withBorder radius="md">
-                <Title order={4} mb="sm">My Portfolio (Real)</Title>
-                {balance?.error && (
-                    <Box mb="md" p="xs" style={{ backgroundColor: '#fff5f5', border: '1px solid #ffa8a8', borderRadius: '4px' }}>
-                        <Text size="xs" color="red" fw={700}>⚠️ {balance.error}</Text>
-                    </Box>
-                )}
-                <div style={{ position: 'relative' }}>
-                    <LoadingOverlay visible={loading} zIndex={10} overlayProps={{ radius: 'sm', blur: 2 }} />
-                    <Group justify="space-between" mb="md" align="flex-end">
-                        <Stack gap={0}>
-                            <Text size="sm" c="dimmed">예수금</Text>
-                            <Title order={3}>{(Number(deposit) || 0).toLocaleString()} 원</Title>
-                        </Stack>
-                        <Button variant="light" size="xs" onClick={() => fetchBalance()}>Refresh</Button>
-                    </Group>
-
-                    <Group grow mb="md">
-                        <Stack gap={0}>
-                            <Text size="sm" c="dimmed">평가금액</Text>
-                            <Text fw={700}>{(Number(totalEval) || 0).toLocaleString()} 원</Text>
-                        </Stack>
-                        <Stack gap={0}>
-                            <Text size="sm" c="dimmed">평가손익</Text>
-                            <Text fw={700} c={totalPL >= 0 ? 'red' : 'blue'}>
-                                {(Number(totalPL) || 0).toLocaleString()} 원
-                            </Text>
-                        </Stack>
-                    </Group>
-
-                    <ScrollArea>
-                        <Table striped highlightOnHover verticalSpacing="xs">
-                            <Table.Thead>
-                                <Table.Tr>
-                                    <Table.Th>종목</Table.Th>
-                                    <Table.Th>수량</Table.Th>
-                                    <Table.Th>수익률</Table.Th>
-                                </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                                {balance?.holdings && Array.isArray(balance.holdings) && balance.holdings.map((h) => (
-                                    <Table.Tr key={h.code} style={{ cursor: 'pointer' }} onClick={() => setCode(h.code)}>
-                                        <Table.Td>
-                                            <Text size="sm" fw={500}>{h.name}</Text>
-                                            <Text size="xs" c="dimmed">{h.code}</Text>
-                                        </Table.Td>
-                                        <Table.Td>{h.qty}</Table.Td>
-                                        <Table.Td>
-                                            <Badge color={(h.pl_rate ?? 0) > 0 ? 'red' : 'blue'} variant="light">
-                                                {h.pl_rate ?? 0}%
-                                            </Badge>
-                                        </Table.Td>
-                                    </Table.Tr>
-                                ))}
-                            </Table.Tbody>
-                        </Table>
-                    </ScrollArea>
-                </div>
-            </Paper>
-        );
-    }
-
-    function renderHistoryTable(type: 'real' | 'sim') {
-        const filtered = history.filter(h => type === 'real' ? h.type === 'real' : h.type.startsWith('sim_'));
-        
-        if (filtered.length === 0) {
+    function renderPortfolioTable(holdings: any[], isReal: boolean = false) {
+        if (!holdings || holdings.length === 0) {
             return (
                 <Box py="xl" style={{ textAlign: 'center', border: '1px dashed #ced4da', borderRadius: '8px' }}>
-                    <Text c="dimmed">거래 내역이 없습니다.</Text>
+                    <Text c="dimmed">보유 종목이 없습니다.</Text>
                 </Box>
             );
         }
-
         return (
-            <ScrollArea h={300} offsetScrollbars>
-                <Table striped highlightOnHover stickyHeader verticalSpacing="xs">
+            <ScrollArea offsetScrollbars>
+                <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 550 : 500 }}>
                     <Table.Thead>
                         <Table.Tr>
-                            <Table.Th>일시</Table.Th>
-                            <Table.Th>종목</Table.Th>
-                            <Table.Th>구분</Table.Th>
-                            <Table.Th>체결가</Table.Th>
-                            <Table.Th>수량</Table.Th>
-                            <Table.Th>체결금액</Table.Th>
-                            {type === 'sim' && <Table.Th>판단 사유</Table.Th>}
+                            <Table.Th style={{ width: 120 }}>종목명</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>보유수량</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>평균 체결가</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>체결 금액</Table.Th>
+                            <Table.Th style={{ textAlign: 'center' }}>수익률(%)</Table.Th>
+                        </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                        {holdings.map((h) => {
+                            const avgPrice = h.avg_price || h.price || 0;
+                            const plRate = h.pl_rate ?? 0;
+                            const amount = (h.qty || h.quantity || 0) * avgPrice;
+                            return (
+                                <Table.Tr key={h.code} style={{ cursor: isReal ? 'pointer' : 'default' }} onClick={() => isReal && setCode(h.code)}>
+                                    <Table.Td>
+                                        <Text size="sm" fw={700}>{h.name}</Text>
+                                        <Text size="xs" c="dimmed">{h.code}</Text>
+                                    </Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>
+                                        <Text size="sm">{(h.qty || h.quantity || 0).toLocaleString()}주</Text>
+                                    </Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>
+                                        <Text size="sm">{Math.round(avgPrice).toLocaleString()}원</Text>
+                                    </Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>
+                                        <Text size="sm" fw={700}>{Math.round(amount).toLocaleString()}원</Text>
+                                    </Table.Td>
+                                    <Table.Td style={{ textAlign: 'center' }}>
+                                        <Badge color={plRate >= 0 ? 'red' : 'blue'} variant="filled" size="sm" style={{ width: 65 }}>
+                                            {plRate >= 0 ? '+' : ''}{plRate.toFixed(2)}%
+                                        </Badge>
+                                    </Table.Td>
+                                </Table.Tr>
+                            );
+                        })}
+                    </Table.Tbody>
+                </Table>
+            </ScrollArea>
+        );
+    }
+
+    function renderHistoryTable(targetType: string) {
+        const filtered = history.filter(h => h.type === targetType).slice(0, 20);
+        if (filtered.length === 0) {
+            return (
+                <Box py="md" style={{ textAlign: 'center' }}>
+                    <Text size="xs" c="dimmed">최근 거래 내역이 없습니다.</Text>
+                </Box>
+            );
+        }
+        return (
+            <ScrollArea h={180} offsetScrollbars>
+                <Table striped highlightOnHover stickyHeader verticalSpacing="xs" style={{ minWidth: 500 }}>
+                    <Table.Thead>
+                        <Table.Tr>
+                            <Table.Th style={{ fontSize: '11px' }}>일시</Table.Th>
+                            <Table.Th style={{ fontSize: '11px' }}>종목</Table.Th>
+                            <Table.Th style={{ fontSize: '11px' }}>구분</Table.Th>
+                            <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>체결가</Table.Th>
+                            <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>수량</Table.Th>
+                            {targetType !== 'real' && <Table.Th style={{ fontSize: '11px' }}>판단 사유</Table.Th>}
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                         {filtered.map((h, i) => (
                             <Table.Tr key={i}>
                                 <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                                    <Text size="xs" c="dimmed">{h.time.split(' ')[0]}</Text>
-                                    <Text size="xs" fw={500}>{h.time.split(' ')[1]}</Text>
+                                    <Text size="xs" c="dimmed" style={{ fontSize: '10px' }}>{h.time.split(' ')[0].slice(5)}</Text>
+                                    <Text size="xs" fw={500} style={{ fontSize: '10px' }}>{h.time.split(' ')[1]}</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Group gap={5}>
-                                        {h.type.startsWith('sim_') && (
-                                            <Badge size="xs" variant="outline" color={h.type === 'sim_conviction' ? 'grape' : h.type === 'sim_aggressive' ? 'red' : 'blue'}>
-                                                {h.type.split('_')[1][0].toUpperCase()}
-                                            </Badge>
-                                        )}
-                                        <Text size="sm" fw={700}>{h.symbol}</Text>
-                                    </Group>
+                                    <Text size="xs" fw={700}>{h.symbol.split('(')[0]}</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                    <Badge color={h.action === 'BUY' ? 'red' : 'blue'} variant="filled" size="sm">
+                                    <Badge color={h.action === 'BUY' ? 'red' : 'blue'} variant="light" size="xs">
                                         {h.action === 'BUY' ? '매수' : '매도'}
                                     </Badge>
                                 </Table.Td>
-                                <Table.Td><Text size="sm">{h.price}원</Text></Table.Td>
-                                <Table.Td><Text size="sm">{h.qty}주</Text></Table.Td>
-                                <Table.Td><Text size="sm" fw={700}>{h.amount}원</Text></Table.Td>
-                                {type === 'sim' && (
+                                <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.price}</Text></Table.Td>
+                                <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.qty}</Text></Table.Td>
+                                {targetType !== 'real' && (
                                     <Table.Td>
-                                        <Button 
-                                            variant="subtle" size="compact-xs" 
-                                            onClick={() => {
-                                                setSelectedReason({ title: `${h.symbol} ${h.action} 판단 근거`, content: h.reason });
-                                                setReasonModalOpen(true);
-                                            }}
-                                        >
-                                            <Text size="xs" truncate maw={100}>{h.reason || '사유 없음'}</Text>
+                                        <Button variant="subtle" size="compact-xs" onClick={() => {
+                                            setSelectedReason({ title: `${h.symbol} 판단 근거`, content: h.reason });
+                                            setReasonModalOpen(true);
+                                        }}>
+                                            <Text size="xs" truncate maw={80}>{h.reason || '사유 없음'}</Text>
                                         </Button>
                                     </Table.Td>
                                 )}
@@ -353,74 +315,107 @@ function TradeContent() {
         );
     }
 
-    function renderSimulationTripod() {
-        if (!geminiBalance) return null;
-        
-        const simData = [
-            { key: 'sim1', label: '오리지널', color: 'blue' },
-            { key: 'sim2', label: '공격형', color: 'red' },
-            { key: 'sim3', label: '컨빅션', color: 'grape' }
-        ];
+    function renderRealPortfolioSection() {
+        const deposit = balance?.deposit ?? 0;
+        const holdings = balance?.holdings || [];
+        const totalEval = holdings.reduce((sum, h) => sum + ((h.price || 0) * (h.qty || 0)), 0);
+        const totalPL = holdings.reduce((sum, h) => sum + (h.pl_amount || 0), 0);
 
         return (
             <Stack gap="md">
-                <Group justify="space-between">
-                    <Title order={4} c="dimmed">3-Track 시뮬레이션 현황</Title>
-                    <Button variant="subtle" size="xs" leftSection={<IconRefresh size={14}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>새로고침</Button>
-                </Group>
-                <Group grow align="stretch">
-                    {simData.map((sim) => {
-                        const stats = geminiBalance[sim.key]?.raw || {};
-                        return (
-                            <Paper key={sim.key} p="md" withBorder radius="md">
-                                <Stack gap="xs">
-                                    <Group justify="space-between">
-                                        <Text fw={700} c={sim.color}>{sim.label}</Text>
-                                        <Badge color={sim.color} variant="light">Sim {(sim.key as string).slice(-1)}</Badge>
-                                    </Group>
-                                    
-                                    <Stack gap={2}>
-                                        <Text size="xs" c="dimmed">현재 자산</Text>
-                                        <Text fw={700} size="lg">{(Math.round(stats.total_asset || 0)).toLocaleString()} 원</Text>
-                                    </Stack>
+                <Paper p="md" withBorder radius="md" style={{ position: 'relative' }}>
+                    <LoadingOverlay visible={loading} zIndex={10} overlayProps={{ radius: 'sm', blur: 2 }} />
+                    <Group justify="space-between" mb="sm">
+                        <Title order={4}><IconCoin size={20} style={{ marginBottom: -4, marginRight: 8 }}/>실전 계좌 (Main KIS)</Title>
+                        <Group gap="xs">
+                            <Badge color="blue" variant="light">Real-Time</Badge>
+                            <Button variant="subtle" size="xs" leftSection={<IconRefresh size={14}/>} onClick={() => fetchBalance()}>새로고침</Button>
+                        </Group>
+                    </Group>
+                    <Group grow mb="md" align="flex-end">
+                        <Stack gap={2}>
+                            <Text size="xs" c="dimmed">추정 예수금</Text>
+                            <Text fw={700} size="lg">{(Number(deposit) || 0).toLocaleString()} 원</Text>
+                        </Stack>
+                        <Stack gap={2}>
+                            <Text size="xs" c="dimmed">총 평가손익</Text>
+                            <Text fw={700} size="lg" c={totalPL >= 0 ? 'red' : 'blue'}>
+                                {totalPL >= 0 ? '+' : ''}{(Number(totalPL) || 0).toLocaleString()} 원
+                            </Text>
+                        </Stack>
+                    </Group>
+                    <Divider mb="xs" label="보유 포트폴리오" labelPosition="center" />
+                    {renderPortfolioTable(holdings, true)}
+                </Paper>
+                <Paper p="md" withBorder radius="md">
+                    <Title order={5} mb="sm"><IconHistory size={18} style={{ marginBottom: -4, marginRight: 8 }}/>실거래 매매 히스토리</Title>
+                    {renderHistoryTable('real')}
+                </Paper>
+            </Stack>
+        );
+    }
 
-                                    <Group grow>
+    function renderSimulationTripod() {
+        if (!geminiBalance) return null;
+        const simConfigs = [
+            { id: 'sim1', key: 'sim1', label: '안정 지향형', color: 'blue', type: 'sim_original' },
+            { id: 'sim2', key: 'sim2', label: '공격 투자형', color: 'red', type: 'sim_aggressive' },
+            { id: 'sim3', key: 'sim3', label: '신념 집중형', color: 'violet', type: 'sim_conviction' }
+        ];
+        return (
+            <Stack gap="xl">
+                <Group justify="space-between">
+                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>3-Track 지능형 시뮬레이션</Title>
+                    <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
+                </Group>
+                <Group grow align="flex-start" gap="lg" style={{ flexWrap: 'wrap' }}>
+                    {simConfigs.map((sim) => {
+                        const stats = geminiBalance[sim.key]?.raw || {};
+                        const portfolio = geminiBalance[sim.key]?.portfolio || {};
+                        const holdings = Object.keys(portfolio).map(code => {
+                            const p = portfolio[code];
+                            const avgVal = p.avg_price || p.price || 0;
+                            const curVal = stats.current_prices?.[code] || avgVal; 
+                            const pl = avgVal > 0 ? ((curVal - avgVal) / avgVal) * 100 : 0;
+                            
+                            return {
+                                code,
+                                name: p.name,
+                                qty: p.quantity,
+                                avg_price: avgVal,
+                                pl_rate: pl || (stats.profit_rate || 0)
+                            };
+                        });
+                        return (
+                            <Stack key={sim.id} gap="md" style={{ minWidth: '320px', flex: 1 }}>
+                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)` }}>
+                                    <Group justify="space-between" mb="xs">
+                                        <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
+                                        <Badge color={sim.color}>{sim.id.toUpperCase()}</Badge>
+                                    </Group>
+                                    <Group grow mb="md">
                                         <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">누적 수익률</Text>
-                                            <Text size="sm" fw={700} c={(stats.profit_rate || 0) >= 0 ? 'red' : 'blue'}>
+                                            <Text size="xs" c="dimmed">운용 자산</Text>
+                                            <Text fw={700} size="md">{(Math.round(stats.total_asset || 0)).toLocaleString()}원</Text>
+                                        </Stack>
+                                        <Stack gap={2}>
+                                            <Text size="xs" c="dimmed">수익률</Text>
+                                            <Text size="md" fw={800} c={(stats.profit_rate || 0) >= 0 ? 'red' : 'blue'}>
                                                 {(stats.profit_rate || 0).toFixed(2)}%
                                             </Text>
                                         </Stack>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">당일 승률</Text>
-                                            <Text size="sm" fw={700} c="orange">
-                                                {(stats.daily_win_rate || 0).toFixed(1)}%
-                                            </Text>
-                                        </Stack>
                                     </Group>
-
-                                    <Group grow>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">보류 종목</Text>
-                                            <Text size="sm" fw={700}>{stats.holdings_count || 0} 개</Text>
-                                        </Stack>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">MDD</Text>
-                                            <Text size="sm" fw={700} c="teal">{(stats.mdd || 0).toFixed(2)}%</Text>
-                                        </Stack>
-                                    </Group>
-                                </Stack>
-                            </Paper>
+                                    <Divider mb="xs" label="포트폴리오" labelPosition="center" />
+                                    {renderPortfolioTable(holdings)}
+                                </Paper>
+                                <Paper p="md" withBorder radius="md" bg="gray.0">
+                                    <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{sim.label} 기록</Text>
+                                    {renderHistoryTable(sim.type)}
+                                </Paper>
+                            </Stack>
                         );
                     })}
                 </Group>
-                
-                <Paper p="md" withBorder radius="md" mt="sm">
-                    <Group mb="sm" justify="space-between">
-                        <Title order={5}><IconHistory size={18} style={{ marginBottom: -4, marginRight: 8 }}/>시뮬레이션 거래 히스토리</Title>
-                    </Group>
-                    {renderHistoryTable('sim')}
-                </Paper>
             </Stack>
         );
     }
@@ -434,47 +429,31 @@ function TradeContent() {
                         <Tabs.Tab value="immediate">Immediate</Tabs.Tab>
                         <Tabs.Tab value="reservation">Reservation</Tabs.Tab>
                     </Tabs.List>
-
                     <div style={{ position: 'relative' }}>
                         <LoadingOverlay visible={orderLoading} zIndex={10} overlayProps={{ radius: 'sm', blur: 2 }} />
                         <Group mb="sm" grow>
                             <Button variant={orderType === 'buy' ? 'filled' : 'outline'} color="red" onClick={() => setOrderType('buy')}>BUY</Button>
                             <Button variant={orderType === 'sell' ? 'filled' : 'outline'} color="blue" onClick={() => setOrderType('sell')}>SELL</Button>
                         </Group>
-
                         <Stack gap="xs">
-                            <Select
-                                label="Stock"
-                                placeholder="Search Stock"
-                                searchable
+                            <Select label="Stock" placeholder="종목 선택" searchable
                                 data={stocks.map(s => ({ value: s.code, label: `${s.name} (${s.code})` }))}
-                                value={code}
-                                onChange={(val) => setCode(val || '')}
-                            />
+                                value={code} onChange={(val) => setCode(val || '')} />
                             <NumberInput label="Quantity" min={1} value={qty} onChange={(val) => setQty(Number(val) || 1)} />
                             <NumberInput label="Price (0=Market)" min={0} value={price} onChange={(val) => setPrice(Number(val) || 0)} />
                         </Stack>
-
                         <Tabs.Panel value="immediate" pt="md">
-                            <Stack gap="xs">
-                                <Button fullWidth size="lg" onClick={() => handleOrder(false)} color={orderType === 'buy' ? 'red' : 'blue'}>
-                                    Submit Real Order
-                                </Button>
-                            </Stack>
+                            <Button fullWidth size="lg" onClick={() => handleOrder(false)} color={orderType === 'buy' ? 'red' : 'blue'}>주문 전송</Button>
                         </Tabs.Panel>
-
                         <Tabs.Panel value="reservation" pt="md">
                             <Group grow mb="sm">
                                 <NumberInput label="Hour" min={0} max={23} value={resHour} onChange={(val) => setResHour(Number(val) || 15)} />
-                                <NumberInput label="Minute" min={0} max={59} value={resMin} onChange={(val) => setResMin(Number(val) || 15)} />
+                                <NumberInput label="Min" min={0} max={59} value={resMin} onChange={(val) => setResMin(Number(val) || 15)} />
                             </Group>
-                            <Button fullWidth size="lg" color="violet" onClick={() => handleOrder(true)}>
-                                Schedule Order
-                            </Button>
+                            <Button fullWidth size="lg" color="violet" onClick={() => handleOrder(true)}>예약 등록</Button>
                         </Tabs.Panel>
                     </div>
                 </Tabs>
-
                 {reservations.length > 0 && (
                     <Stack mt="xl">
                         <Text size="sm" fw={700}>Active Reservations</Text>
@@ -482,7 +461,7 @@ function TradeContent() {
                             <Paper key={r.id} p="xs" withBorder>
                                 <Group justify="space-between">
                                     <Text size="xs">{r.time} | {r.code} | {r.side}</Text>
-                                    <Button size="xs" variant="subtle" color="red" onClick={() => cancelReservation(r.id)}>Cancel</Button>
+                                    <Button size="xs" variant="subtle" color="red" onClick={() => cancelReservation(r.id)}>취소</Button>
                                 </Group>
                             </Paper>
                         ))}
@@ -495,58 +474,47 @@ function TradeContent() {
     return (
         <Container size="lg" py="xl">
             {notification && (
-                <Notification
-                    title={notification.title} color={notification.color}
-                    onClose={() => setNotification(null)}
-                    style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}
-                >
+                <Notification title={notification.title} color={notification.color} onClose={() => setNotification(null)}
+                    style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}>
                     {notification.msg}
                 </Notification>
             )}
-
-            <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security Verification" centered zIndex={2000}>
+            <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security PIN" centered zIndex={2000}>
                 <Stack align="center" py="md" ref={pinContainerRef}>
-                    <Text>거래 승인을 위해 보안 PIN 번호를 입력하세요.</Text>
+                    <Text size="sm">보안 PIN 4자리를 입력하세요.</Text>
                     <PinInput length={4} type="number" mask value={pin} onChange={setPin} onComplete={confirmOrder} />
                     <Group mt="md">
-                        <Button variant="default" onClick={() => setPinModalOpen(false)}>Cancel</Button>
-                        <Button color="blue" onClick={confirmOrder} disabled={pin.length !== 4}>Confirm</Button>
+                        <Button variant="default" onClick={() => setPinModalOpen(false)}>취소</Button>
+                        <Button color="blue" onClick={confirmOrder} disabled={pin.length !== 4}>확인</Button>
                     </Group>
                 </Stack>
             </Modal>
-
             <Group justify="space-between" mb="lg">
-                <Title order={2}>Stock Trading Dashboard</Title>
+                <Title order={2}>Stock Dashboard</Title>
                 <Group gap="xs">
-                    <Badge color="pink" variant="filled">V57-HOTFIX</Badge>
+                    <Badge color="pink" variant="filled">V8.6.2-UI</Badge>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>Out</Button>
                 </Group>
             </Group>
-
-            <Stack gap="lg" mb="lg">
-                <Group grow align="flex-start" gap="lg">
-                    <Stack gap="md">
-                        {renderPortfolio()}
-                        <Paper p="md" withBorder radius="md">
-                            <Title order={5} mb="sm"><IconHistory size={18} style={{ marginBottom: -4, marginRight: 8 }}/>실거래 매매 히스토리</Title>
-                            {renderHistoryTable('real')}
-                        </Paper>
+            <Stack gap="lg" mb="xl">
+                <Group grow align="flex-start" gap="lg" style={{ flexWrap: 'wrap' }}>
+                    <Stack gap="md" style={{ flex: 1, minWidth: '320px' }}>
+                        {renderRealPortfolioSection()}
                     </Stack>
-                    {renderTrading()}
+                    <Stack gap="md" style={{ flex: 1, minWidth: '320px' }}>
+                        {renderTrading()}
+                    </Stack>
                 </Group>
+                <Divider my="md" label="Simulation Analysis" labelPosition="center" />
                 {renderSimulationTripod()}
             </Stack>
-
             <Modal opened={reasonModalOpen} onClose={() => setReasonModalOpen(false)} title={selectedReason.title} size="lg">
                 <Paper p="md" withBorder bg="gray.0">
-                    <Text style={{ whiteSpace: 'pre-wrap' }}>{selectedReason.content}</Text>
+                    <Text style={{ whiteSpace: 'pre-wrap' }} size="sm">{selectedReason.content}</Text>
                 </Paper>
-                <Group justify="flex-end" mt="md">
-                    <Button onClick={() => setReasonModalOpen(false)}>닫기</Button>
-                </Group>
+                <Group justify="flex-end" mt="md"><Button onClick={() => setReasonModalOpen(false)}>닫기</Button></Group>
             </Modal>
-
             <Box mt="xl">
                 <StrategyRadarChart />
             </Box>

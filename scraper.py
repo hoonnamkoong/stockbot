@@ -207,23 +207,35 @@ def get_stock_details(code):
         res = requests.get(url_frgn, headers=headers, timeout=10)
         soup = BeautifulSoup(res.content, 'html.parser')
         
-        # [V8.9.9] 전일 종가 수집 로직 보강
-        rows = soup.select('table.type2 tbody tr')
-        data_rows = [r for r in rows if len(r.select('td')) > 5]
+        # [V8.9.9] 전일 종가 수집 로직 보강 (날짜 가변성 대응)
+        rows = soup.select('table.type2 tr')
+        data_rows = [r for r in rows if len(r.select('td')) >= 7] # 데이터 행은 보통 7개 이상의 td를 가짐
         
-        if len(data_rows) >= 2:
-            cols_today = data_rows[0].select('td')
-            cols_yest = data_rows[1].select('td')
-            details['foreign_rate'] = cols_today[-1].get_text(strip=True)
-            details['prev_foreign_rate'] = cols_yest[-1].get_text(strip=True)
+        if data_rows:
+            today_str = get_current_kst_time().strftime('%Y.%m.%d')
+            target_row = None
             
-            # 전일 종가 추출 (텍스트 정제)
-            prev_close_text = cols_yest[1].get_text(strip=True).replace(',', '')
-            if prev_close_text.isdigit():
-                details['prev_close'] = int(prev_close_text)
+            # 첫 번째 행이 오늘 날짜면 두 번째 행이 전일, 아니면 첫 번째 행이 전일(최신 장마감 데이터)
+            first_row_date = data_rows[0].select_one('td').get_text(strip=True)
             
-        # [V8.9.9 Fallback] 전일 종가가 0이거나 수집 실패 시 현재가/등락률 기반 역산 시도
-        # (메인 페이지에서 price/change_rate는 기본으로 가져오므로 analyzer 등에서 보완될 수 있음)
+            if first_row_date == today_str and len(data_rows) >= 2:
+                target_row = data_rows[1]
+                print(f"   [Debug] {code}: 오늘({today_str}) 데이터 감지. 전일 데이터(index 1) 채택.")
+            else:
+                target_row = data_rows[0]
+                print(f"   [Debug] {code}: 최신 데이터({first_row_date})가 오늘이 아니거나 단일 행임. index 0 채택.")
+
+            if target_row:
+                cols = target_row.select('td')
+                details['foreign_rate'] = cols[-1].get_text(strip=True)
+                
+                # 전일 종가 추출 (2번째 td)
+                prev_close_text = cols[1].get_text(strip=True).replace(',', '')
+                if prev_close_text.isdigit():
+                    details['prev_close'] = int(prev_close_text)
+                    print(f"   [Success] {code} 전일 종가: {details['prev_close']}")
+                else:
+                    print(f"   [Warning] {code} 종가 파싱 실패: {prev_close_text}")
     except Exception as e:
         print(f"   [Warning] {code} 상세 정보 수집 실패: {e}")
     return details

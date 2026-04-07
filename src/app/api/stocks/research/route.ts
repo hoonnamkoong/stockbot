@@ -1,26 +1,29 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
-        const dataDir = path.join(process.cwd(), 'data');
+        const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
         
-        // [V8.6.2 Hotfix] 필수 데이터 파일 로드
-        const latestStocksPath = path.join(dataDir, 'latest_stocks.json');
-        const statusPath = path.join(dataDir, 'status.json');
-        const analysis5DaysPath = path.join(dataDir, 'analysis_5days.json');
-        const analysis3DaysPath = path.join(dataDir, 'analysis_3days.json');
-        const reportsPath = path.join(dataDir, 'reports.json');
+        // [V8.9.9] GitHub Raw DB에서 원격 데이터 로드 (Vercel 배포 대응)
+        const fetchRemote = async (filename: string, fallback: string) => {
+            try {
+                const res = await fetch(`${GITHUB_BASE}/${filename}`, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
+                return await res.text();
+            } catch (err) {
+                console.error(`[ResearchAPI] Failed to fetch ${filename}:`, err);
+                return fallback;
+            }
+        };
 
         const [stocksRaw, statusRaw, a5Raw, a3Raw, reportsRaw] = await Promise.all([
-            fs.readFile(latestStocksPath, 'utf-8').catch(() => '[]'),
-            fs.readFile(statusPath, 'utf-8').catch(() => '{"last_updated": "unknown"}'),
-            fs.readFile(analysis5DaysPath, 'utf-8').catch(() => '[]'),
-            fs.readFile(analysis3DaysPath, 'utf-8').catch(() => '[]'),
-            fs.readFile(reportsPath, 'utf-8').catch(() => '[]')
+            fetchRemote('latest_stocks.json', '[]'),
+            fetchRemote('status.json', '{"last_updated": "unknown"}'),
+            fetchRemote('analysis_5days.json', '[]'),
+            fetchRemote('analysis_3days.json', '[]'),
+            fetchRemote('reports.json', '[]')
         ]);
 
         return NextResponse.json({

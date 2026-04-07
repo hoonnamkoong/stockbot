@@ -63,19 +63,19 @@ export const useResearchSource = () => {
                 name: item.name || item['종목명'],
                 price: parseNum(item.price || item['현재가']),
                 current_price: parseNum(item.price || item['현재가']),
-                prev_close: parseNum(item.prev_close || item['어제_종가'] || item['전일종가']),
+                prev_close: parseNum(item.prev_close || item['전일종가'] || item['어제_종가']),
                 change_rate: parseNum(item.change_rate || item['등락률']),
-                recent_posts_count: item.recent_posts_count || item['게시글수'] || item['당일_게시글수'] || item['당일 게시글수'],
-                foreign_rate: parseNum(item.foreign_rate || item['외인소진율'] || item['현재_외국인비중']),
-                prev_foreign_rate: parseNum(item.prev_foreign_rate || item['전일_외국인비중'] || item['어제_외국인비중']),
+                recent_posts_count: item.recent_posts_count || item['게시물'] || item['당일_게시글수'] || item['게시글수'] || item['당일 게시글수'],
+                foreign_rate: parseNum(item.foreign_rate || item['외인비중'] || item['외인소진율'] || item['현재_외국인비중']),
+                prev_foreign_rate: parseNum(item.prev_foreign_rate || item['전일외인'] || item['전일_외국인비중'] || item['어제_외국인비중']),
                 posts_summary: item.posts_summary || item['게시물_요약'],
-                sentiment: item.sentiment || item['감정분석'],
+                sentiment: item.sentiment || item['감정'] || item['감정분석'],
                 top_keywords: Array.isArray(item.top_keywords) ? item.top_keywords : 
                              (typeof item.top_keywords === 'string' ? item.top_keywords.split(',').map((k: string) => k.trim()) : 
-                             (item['Top_Keyword'] || item['Top_Keywords'] || [])),
-                is_last_captured: item.is_last_captured || item['연속_등록'],
-                consecutive_days: Number(item.consecutive_days) || (item['연속_등록'] === true ? 2 : 1),
-                foreign_change_rate: parseNum(item.foreign_change_rate || item['외국인_변화'] || 0),
+                             (item['키워드'] || item['Top_Keyword'] || item['Top_Keywords'] || [])),
+                is_last_captured: item.is_last_captured || (item['연속'] > 1),
+                consecutive_days: Number(item.consecutive_days || item['연속']) || (item['연속_등록'] === true ? 2 : 1),
+                foreign_change_rate: parseNum(item.foreign_change_rate || item['외인변화'] || item['외국인_변화'] || 0),
                 latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
             }));
             setStocks(mappedData);

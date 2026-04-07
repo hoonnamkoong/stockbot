@@ -86,20 +86,22 @@ def load_sync_state():
     """[V8.5.1] 종목별 당일 누적 데이터 및 마지막 게시글 ID를 로드합니다."""
     state_path = 'data/sync_state.json'
     today_str = get_current_kst_time().strftime('%Y%m%d')
+    yesterday_codes = set()
     
     if os.path.exists(state_path):
         try:
             with open(state_path, 'r', encoding='utf-8') as f:
                 state = json.load(f)
-                # [V8.5.1] 날짜가 바뀌었으면 리셋 (00:00 KST 기준)
+                # [V8.5.5] 날짜 변경 시 이전 데이터에서 어제 날짜 종목 코드 셋 추출
                 if state.get('last_update_date') != today_str:
-                    print(f"[Sync] 🆕 날짜 변경 감지 ({state.get('last_update_date')} -> {today_str}) - 당일 데이터 초기화")
-                    return {'last_update_date': today_str, 'stocks': {}}
-                return state
+                    print(f"[Sync] 🆕 날짜 변경 감지 ({state.get('last_update_date')} -> {today_str})")
+                    yesterday_codes = set(state.get('stocks', {}).keys())
+                    return {'last_update_date': today_str, 'stocks': {}}, yesterday_codes
+                return state, yesterday_codes
         except Exception as e:
             print(f"[Sync] ⚠️ 상태 로드 실패 (초기화 진행): {e}")
             
-    return {'last_update_date': today_str, 'stocks': {}}
+    return {'last_update_date': today_str, 'stocks': {}}, yesterday_codes
 
 def save_sync_state(state):
     """[V8.5.1] 갱신된 누적 데이터를 저장합니다."""
@@ -123,6 +125,7 @@ def get_discussion_stats(code, threshold_time, prev_state):
     new_posts = []
     today_prefix = get_current_kst_time().strftime('%Y.%m.%d')
     found_prev_marker = False
+    found_by_nid = False # [V8.5.5] 마커(NID) 탐색 여부 추적
     
     # [꼼꼼한 수집] 최대 50페이지까지 훑으며 새 글 탐색
     for page in range(1, 51):
@@ -158,6 +161,7 @@ def get_discussion_stats(code, threshold_time, prev_state):
                 current_nid = extract_nid(title_tag['href'])
                 if current_nid == stock_state['last_nid']:
                     found_prev_marker = True
+                    found_by_nid = True # 마커 실존 확인
                     break
                 
                 # 당일 글인지 최종 확인 (장 시작 08시 이후)
@@ -174,9 +178,13 @@ def get_discussion_stats(code, threshold_time, prev_state):
                 })
         except: break
             
-    # [V8.5.1] 증분 수집 결과 계산
+    # [V8.5.5] 증분 수집 결과 계산 (Smart Reset 적용)
     new_count = len(new_posts)
-    total_cumulative = stock_state['cumulative_count'] + new_count
+    # 마커 유실(글 삭제) 시 누적 합산이 아닌 오늘자 수집 데이터로 전체 덮어쓰기
+    if stock_state['last_nid'] is not None and not found_by_nid:
+        total_cumulative = new_count
+    else:
+        total_cumulative = stock_state['cumulative_count'] + new_count
     
     # 마지막 NID 업데이트 (수집된 글 중 가장 첫 번째 글이 최신글)
     latest_nid = new_posts[0]['nid'] if new_posts else stock_state['last_nid']
@@ -198,7 +206,7 @@ def get_stock_details(code):
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url_frgn, headers=headers, timeout=10)
         soup = BeautifulSoup(res.content, 'html.parser')
-        rows = soup.select('table.type_2 tr')
+        rows = soup.select('table.type2 tbody tr')
         data_rows = [r for r in rows if len(r.select('td')) > 5]
         if len(data_rows) >= 2:
             cols_today = data_rows[0].select('td')
@@ -211,6 +219,9 @@ def get_stock_details(code):
     return details
 
 def process_single_stock(stock, yesterday_codes, threshold, threshold_time, prev_sync_state):
+    """
+    [V8.5.5] 스레드 최적화: AI 분석을 제외하고 Buzz 수집만 수행
+    """
     try:
         details = get_stock_details(stock['code'])
         stock.update(details)
@@ -219,28 +230,18 @@ def process_single_stock(stock, yesterday_codes, threshold, threshold_time, prev
         stats = get_discussion_stats(stock['code'], threshold_time, prev_sync_state)
         count = stats.get('recent_posts_count', 0)
         
-        # [V8.4.3 로깅 강화] 통과 여부와 상관없이 수집된 원본 수 출력
-        print(f"   [Buzz] {stock['name']}: {count} posts accum (Threshold: {threshold})")
-        
+        # [V8.5.5] 1차 통과 여부 로깅 (AI 분석은 나중에 일괄 수행)
         if count >= threshold:
+            print(f"   [Buzz] {stock['name']}: {count} posts accum (PASS)")
             stock['recent_posts_count'] = count
-            rep_posts = stats.get('representative_posts', [])
+            stock['representative_posts'] = stats.get('representative_posts', [])
+            stock['is_consecutive'] = stock['code'] in yesterday_codes
             
-            # [V8.5.2] 1차 통과 종목 대상: Gemini 감정/요약/키워드 추출 (리소스 최적화)
-            print(f"   [Gemini] {stock['name']} 초기 분석 중... (대표글 {len(rep_posts)}개)")
-            advisor = StrategyAdvisor()
-            discovery_res = advisor.analyze_initial_discovery(stock['name'], rep_posts)
-            
-            stock.update({
-                'posts_summary': discovery_res.get('summary', '요약 실패'),
-                'keywords': discovery_res.get('keywords', []),
-                'sentiment_score': discovery_res.get('sentiment_score', 0),
-                'is_consecutive': stock['code'] in yesterday_codes
-            })
-            
-            # [V8.5.1] 갱신된 상태 정보를 함께 반환하도록 수정 (코드 포함)
+            # [V8.5.5] Recovery를 위해 시장 정보 보존
             updated_info = stats.get('updated_state', {})
+            updated_info.update({'name': stock['name'], 'market': stock.get('market', 'KOSPI')})
             return stock, {stock['code']: updated_info}
+            
         return None, {stock['code']: stats.get('updated_state', {})}
     except Exception as e:
         print(f"[Error] {stock.get('name', 'Unknown')} 처리 중 오류: {e}")
@@ -268,9 +269,8 @@ if __name__ == "__main__":
     unique_candidates = list({s['code']: s for s in candidates}.values())
     print(f"[System] 유니크 후보 {len(unique_candidates)}개 수집 완료")
 
-    yesterday_codes = set() 
     # --- 2. 1단계 Buzz Filter ---
-    prev_sync_state = load_sync_state()
+    prev_sync_state, yesterday_codes = load_sync_state()
     current_stocks_state = prev_sync_state.get('stocks', {})
     
     results = []
@@ -293,10 +293,67 @@ if __name__ == "__main__":
     prev_sync_state['stocks'] = updated_full_state
     save_sync_state(prev_sync_state)
 
-    print(f"[System] 1단계 Buzz Filter 통과: {len(results)}개")
+    # --- [V8.5.5] Global Threshold Recovery (전수 조사) ---
+    print(f"[System] Global Recovery 가동 (순위권 밖 종목 검사)...")
+    recovered_count = 0
+    for code, s_state in updated_full_state.items():
+        if s_state.get('cumulative_count', 0) >= threshold:
+            if not any(r['code'] == code for r in results):
+                # 기존 results에 없는 종목 발견 시 추가
+                recovered_stock = {
+                    'code': code,
+                    'name': s_state.get('name', 'Unknown'),
+                    'market': s_state.get('market', 'KOSPI'),
+                    'recent_posts_count': s_state['cumulative_count'],
+                    'representative_posts': [], # Recovery 종목은 대표글 수집 생략 가능 (혹은 추가 수집)
+                    'is_consecutive': False
+                }
+                results.append(recovered_stock)
+                recovered_count += 1
+    
+    if recovered_count > 0:
+        print(f"[System] Global Recovery 완료: {recovered_count}개 종목 복구됨")
+
+    print(f"[System] 최종 분석 대상: {len(results)}개 종목")
+
+    # --- [V8.5.5] Batch AI Discovery 분석 ---
+    if results:
+        print(f"[System] Gemini Batch AI 분석 시작 ({len(results)}개 종목, 10개씩 분할)...")
+        advisor = StrategyAdvisor()
+        batch_results = {}
+        chunk_size = 10
+        for i in range(0, len(results), chunk_size):
+            chunk = results[i:i + chunk_size]
+            batch_input = [{"code": r['code'], "name": r['name'], "posts": r.get('representative_posts', [])} for r in chunk]
+            
+            print(f"   [Batch] Chunk {i//chunk_size + 1} 분석 중 ({len(chunk)}개 종목)...")
+            chunk_res = advisor.analyze_batch_discovery(batch_input)
+            if chunk_res:
+                batch_results.update(chunk_res)
+            
+            if i + chunk_size < len(results):
+                time.sleep(3) # API Rate Limit 방어용 지연
+                
+        for r in results:
+            insight = batch_results.get(r['code'], {"sentiment_score": 0, "summary": "분석 오류", "keywords": []})
+            r.update({
+                'posts_summary': insight.get('summary', '요약 실패'),
+                'keywords': insight.get('keywords', []),
+                'sentiment_score': insight.get('sentiment_score', 0)
+            })
+        print(f"[System] Batch AI 분석 완료")
+
+    # --- [V8.5.5] 리서치 데이터 저장 (대시보드 갱신용) ---
+    import pandas as pd
+    if results:
+        # 한글 키 매핑 및 저장
+        final_df, _ = analyzer.analyze_discussion_trend(results) # 내부에서 필터링 및 한글 변환 수행
+        analyzer.save_data(final_df, "trending_integrated")
+        print(f"[System] 리서치 데이터 저장 완료 (Research 탭 갱신)")
 
     # --- 3. 3차 필터링 & 심층 리뷰 (DART/뉴스) ---
     advisor_report = ""
+    # 통합된 results에서 다시 정렬
     elite_candidates = sorted(results, key=lambda x: x.get('recent_posts_count', 0), reverse=True)[:15]
     
     if elite_candidates:
@@ -315,9 +372,14 @@ if __name__ == "__main__":
     ns = NotificationService()
     
     if ns.is_available:
-        # [V8.4.8] 종목 유무와 상관없이 시장 상황 보고
-        kospi_items = [r for r in results if r.get('시장구분') == 'KOSPI'] or []
-        kosdaq_items = [r for r in results if r.get('시장구분') == 'KOSDAQ'] or []
+        # [V8.5.5] analyzer를 통해 변환된 데이터(final_df)가 있으면 그것을 사용
+        # 없으면 results에서 직접 필터링 (키 매핑 주의)
+        try:
+            kospi_items = final_df[final_df['시장구분'] == 'KOSPI'].to_dict('records')
+            kosdaq_items = final_df[final_df['시장구분'] == 'KOSDAQ'].to_dict('records')
+        except:
+            kospi_items = [r for r in results if r.get('market') == 'KOSPI' or r.get('시장구분') == 'KOSPI']
+            kosdaq_items = [r for r in results if r.get('market') == 'KOSDAQ' or r.get('시장구분') == 'KOSDAQ']
         
         # 실제 적용된 문턱값을 포함하여 리포트 전송
         # advisor_report가 비어있을 경우 (종목 없음) 안내 문구 삽입
@@ -333,12 +395,34 @@ if __name__ == "__main__":
     else:
         print("[System] 🚨 알림 서비스 비활성화 상태 (리포트 전송 스킵)")
 
-    # --- 5. 시뮬레이션 (Virtual Only - KIS와 완전 분리) ---
-    print("[System] Sandbox Simulator 가동 중...")
-    from src.strategy.engine import StrategyEngine
-    engine = StrategyEngine()
-    # [V8.5.4] KIS 실계좌와 완전히 단절된 가상 포트폴리오 매매만 수행
-    engine.execute_sandbox_simulation(results, allow_buy=force_run or is_open_day)
+    # --- 5. 3-Track 시뮬레이션 통합 실행 (Virtual Only) ---
+    print(f"[System] 3-Track Tripod Simulator 가동 ({'Open Market' if force_run or is_open_day else 'Analytic Mode'})")
+    
+    from src.strategy.simulators.sim1_original import OriginalSimulator
+    from src.strategy.simulators.sim2_aggressive import AggressiveSimulator
+    from src.strategy.simulators.sim3_conviction import ConvictionSimulator
+    
+    results_codes = [r['code'] for r in results]
+    
+    # Sim 1: 오리지널 (1/N 분산)
+    sim1 = OriginalSimulator()
+    sim1.check_liquidation(results_codes)
+    if force_run or is_open_day:
+        sim1.execute_strategy(results)
+    
+    # Sim 2: 공격형 (변동성 돌파)
+    sim2 = AggressiveSimulator()
+    sim2.check_maintenance()
+    if force_run or is_open_day:
+        sim2.execute_strategy(results)
+        
+    # Sim 3: 컨빅션 (AI 확신도)
+    sim3 = ConvictionSimulator()
+    sim3.check_liquidation(results_codes)
+    if force_run or is_open_day:
+        sim3.execute_strategy(results)
+    
+    print("[System] 3-Track 시뮬레이션 및 로깅 완료")
 
     elapsed = time.perf_counter() - start_time
     print(f"[System] 프로세스 종료 ({elapsed:.2f}s)")

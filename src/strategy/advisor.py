@@ -147,13 +147,68 @@ class GeminiAgent:
         공시 분석: {dart}
         
         위 데이터를 바탕으로 이 종목의 단기 모멘텀을 평가하세요.
-        반드시 'BUY', 'WATCH', 'REJECT' 중 하나의 단어로 시작하고, 그 뒤에 한 줄 이유를 덧붙이세요.
         """
         try:
             response = self._call_gemini_safe(prompt)
             return response.text.strip() if response and response.text else "WATCH"
         except:
             return "WATCH"
+
+    def analyze_batch_discovery(self, batch_data):
+        """
+        [V8.5.5] 1차 필터 통과 종목군 일괄 분석 (Batch Discovery)
+        - 한 번의 API 호출로 모든 종목의 감정/요약/키워드 추출
+        - Quota 절감 및 분석 속도 개선
+        """
+        if not self.model or not batch_data: 
+            return {s.get('code', s.get('name')): {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []} for s in batch_data}
+        
+        # [V8.5.5] 데이터 경량화 및 정합성 보전 (body 대신 title + likes 활용)
+        cleaned_batch = []
+        for stock in batch_data:
+            posts_text = "\n".join([f"[{p.get('title')}] (추천:{p.get('likes')})" for p in stock.get('posts', [])])
+            cleaned_batch.append({
+                "code": stock.get('code'),
+                "name": stock.get('name'),
+                "content": posts_text
+            })
+            
+        prompt = f"""
+        당신은 실시간 주식 수급 분석 전문가입니다. 아래 리스트에 포함된 각 종목의 토론방 데이터를 분석하세요.
+        
+        [데이터 정제 및 평가 필수 규칙 - 절대 준수]
+        1. 노이즈 배제: '가자', '가즈아', '존버', '상한가', '떡상', '구조대', '세력', '개미털기', '설거지', 'ㅋㅋ', 'ㅎㅎ' 등 단순 감정적 선동, 음모론 단어는 분석 대상에서 철저히 무시한다.
+        2. 팩트 기반 키워드: keywords는 기업 펀더멘털, 수급 변화, 공시, 테마 모멘텀을 나타내는 '명사형 팩트 단어'만 추출한다.
+        3. 감정 점수 기준: 근거 없는 맹신은 0점 처리. 객관적 호재(실적, 수주 등)가 동반된 여론만 긍정(+), 객관적 악재가 동반된 여론만 부정(-)으로 평가한다.
+
+        [분석 대상 데이터]
+        {json.dumps(cleaned_batch, ensure_ascii=False)}
+        
+        각 종목별로 종목코드(code)를 Key로 사용하여 다음 JSON 형식으로만 응답하세요 (반드시 유효한 JSON 객체 하나만 반환하세요):
+        {{
+            "005930": {{
+                "sentiment_score": 점수(-10 ~ 10),
+                "summary": "게시글 한 줄 요약 (50자 이내)",
+                "keywords": ["키워드1", "키워드2", "키워드3"]
+            }},
+            "066570": {{ ... }}
+        }}
+        """
+        try:
+            response = self._call_gemini_safe(
+                prompt, 
+                generation_config={"response_mime_type": "application/json"}
+            )
+            if response and response.text:
+                # [V8.5.5] 마크다운 코드 블록(```json 등) 제거 안전장치
+                raw_text = response.text.strip()
+                if raw_text.startswith("```"):
+                    raw_text = re.sub(r"^(?:```[a-z]*\n)|(?:```$)", "", raw_text, flags=re.MULTILINE).strip()
+                return json.loads(raw_text)
+        except Exception as e:
+            print(f"[GeminiAgent] Batch 분석 오류: {e}")
+            
+        return {s.get('code', s.get('name')): {"sentiment_score": 0, "summary": "분석 오류", "keywords": []} for s in batch_data}
 
     def analyze_bulk_sentiment(self, bulk_data):
         """기존 벌크 감성 분석 로직 유지 (모델 동적 적용)"""
@@ -197,10 +252,16 @@ class StrategyAdvisor:
             summary += f"🔥 매수 대상: {', '.join([t['name'] for t in buy_targets])}\n"
         return f"{gemini_guide}\n{summary}", all_results
 
+    def analyze_batch_discovery(self, batch_data):
+        """
+        [V8.5.5] StrategyAdvisor용 일괄 분석 인터페이스
+        batch_data: [{\"name\": \"삼성전자\", \"posts\": [...]}, ...]
+        """
+        return self.gemini.analyze_batch_discovery(batch_data)
+
     def analyze_initial_discovery(self, stock_name, posts):
         """
-        [V8.5.2] 1차 통과 종목 전용 최적화 분석
-        분석 항목: 감정 점수(-10~10), 1줄 요약, 핵심 키워드 3개
+        [Legacy / Fallback] 1차 통과 종목 전용 최적화 분석 (개별 호출)
         """
         if not self.gemini.model: return {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []}
         

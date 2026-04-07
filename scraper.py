@@ -342,9 +342,10 @@ if __name__ == "__main__":
                 time.sleep(3) # API Rate Limit 방어용 지연
                 
         for r in results:
-            insight = batch_results.get(r['code'], {"sentiment_score": 0, "summary": "분석 스킵(Quota)", "keywords": []})
+            # [V8.6.2 Hotfix] AI 분석 실패 또는 Quota 소진 시에도 "분석 대기중"으로 유지하여 렌더링 에러 방지
+            insight = batch_results.get(r['code'], {"sentiment_score": 0, "summary": "분석 대기중", "keywords": []})
             r.update({
-                'posts_summary': insight.get('summary', '요약 실패'),
+                'posts_summary': insight.get('summary', '분석 대기중'),
                 'keywords': insight.get('keywords', []),
                 'sentiment_score': insight.get('sentiment_score', 0)
             })

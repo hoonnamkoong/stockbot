@@ -125,39 +125,60 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         os.makedirs('data', exist_ok=True)
         fixed_json = "data/latest_stocks.json"
         
-        # 1. 컬럼명 정제 (대시보드 호환용)
-        # 만약 'recent_posts_count'가 아직 남아있다면 '게시물'로 변환
-        rename_map = {
-            'recent_posts_count': '게시물',
-            'prev_close': '전일종가',
-            'foreign_change': '외인변화',
-            'foreign_rate': '외인비중',
-            'prev_foreign_rate': '전일외인'
-        }
-        df = df.rename(columns=rename_map)
-
-        # 2. 문자열(Text) 데이터 결측치 처리 (프론트엔드 Crash 방지)
-        if '게시물_요약' in df.columns:
-            df['게시물_요약'] = df['게시물_요약'].fillna("분석 대기중")
-        if '감정' in df.columns:
-            df['감정'] = df['감정'].fillna("중립 (0)")
-        if '키워드' in df.columns:
-            df['키워드'] = df['키워드'].fillna("")
-            
-        # 3. 나머지 숫자형 데이터 결측치 처리 (NaN 방지)
-        df = df.fillna(0)
+        # 1. 컬럼명 정제 및 필드 확장 (대시보드 호환용 전용)
+        # V8.9.9.5: UI에서 기대하는 영어 필드명과 한글 필드명을 모두 포함하여 안전성 극대화
         
-        df_json = df.to_json(orient='records', force_ascii=False)
+        # 기본 데이터 복사
+        df_for_json = df.copy()
+        
+        mapping_pairs = [
+            ('recent_posts_count', '게시물'),
+            ('prev_close', '전일종가'),
+            ('foreign_change', '외인변화'),
+            ('foreign_change_rate', '외인변화'),
+            ('foreign_rate', '외인비중'),
+            ('prev_foreign_rate', '전일외인'),
+            ('consecutive_days', '연속'),
+            ('posts_summary', '게시물_요약'),
+            ('sentiment', '감정')
+        ]
+        
+        for eng, kor in mapping_pairs:
+            if eng in df_for_json.columns and kor not in df_for_json.columns:
+                df_for_json[kor] = df_for_json[eng]
+            elif kor in df_for_json.columns and eng not in df_for_json.columns:
+                df_for_json[eng] = df_for_json[kor]
+
+        # 2. 필수 필드 결측치 처리 (프론트엔드 Crash 방지)
+        text_fields = ['게시물_요약', 'posts_summary', '감정', 'sentiment', '키워드', 'keywords']
+        for field in text_fields:
+            if field in df_for_json.columns:
+                if '요약' in field or 'summary' in field:
+                    df_for_json[field] = df_for_json[field].fillna("분석 대기중")
+                elif '감정' in field or 'sentiment' in field:
+                    df_for_json[field] = df_for_json[field].fillna("중립 (0)")
+                else:
+                    df_for_json[field] = df_for_json[field].fillna("")
+            else:
+                # 필드가 아예 없는 경우 기본값으로 생성
+                if '요약' in field or 'summary' in field: df_for_json[field] = "분석 대기중"
+                elif '감정' in field or 'sentiment' in field: df_for_json[field] = "중립 (0)"
+                else: df_for_json[field] = ""
+
+        # 3. 나머지 숫자형 데이터 결측치 처리 (NaN 방지)
+        df_for_json = df_for_json.fillna(0)
+        
+        json_data = df_for_json.to_json(orient='records', force_ascii=False)
         with open(fixed_json, 'w', encoding='utf-8') as f:
-            f.write(df_json)
+            f.write(json_data)
         
         # [V8.6.2 Hotfix] Update status.json with current KST
         now_kst = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         status_json = "data/status.json"
         with open(status_json, 'w', encoding='utf-8') as f:
-            json.dump({"last_updated": now_kst, "status": "ok", "message": "Synced V8.9.9.4"}, f, ensure_ascii=False, indent=4)
+            json.dump({"last_updated": now_kst, "status": "ok", "message": "Synced V8.9.9.5"}, f, ensure_ascii=False, indent=4)
             
-        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json")
+        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.5)")
     except Exception as e:
         print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
         

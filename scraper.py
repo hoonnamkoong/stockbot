@@ -159,6 +159,7 @@ def get_stock_details(code):
         'foreign_rate': 0.0,
         'prev_foreign_rate': 0.0,
         'foreign_change': 0.0,     # 비중 변화량 (%p)
+        'foreign_change_rate': 0.0, # (UI 호환용) 비중 변화량
         'foreign_net_buy': 0       # 외인 순매수량 (주식 수)
     }
     url_frgn = f"https://finance.naver.com/item/frgn.naver?code={code}"
@@ -199,6 +200,7 @@ def get_stock_details(code):
 
             # 3. 비중 변화량 연산 (%p)
             details['foreign_change'] = round(details['foreign_rate'] - details['prev_foreign_rate'], 3)
+            details['foreign_change_rate'] = details['foreign_change'] # UI에서 foreign_change_rate를 기대함
             
             print(f"   [Scrape] {code}: 비중 {details['foreign_rate']}%, 변화 {details['foreign_change']}%p, 순매수 {details['foreign_net_buy']}, 전일종가 {details['prev_close']}")
     except Exception as e:

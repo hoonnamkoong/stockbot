@@ -183,7 +183,7 @@ class GeminiAgent:
         각 종목별로 종목코드(code)를 Key로 사용하여 다음 JSON 형식으로만 응답하세요:
         {{
             "005930": {{
-                "sentiment_score": 점수(-10 ~ 10),
+                "sentiment": 점수(-10 ~ 10),
                 "summary": "**핵심키워드** 중심 요약",
                 "keywords": ["키워드1", "키워드2"]
             }}
@@ -204,7 +204,7 @@ class GeminiAgent:
         except Exception as e:
             print(f"[GeminiAgent] Batch 분석 오류: {e}")
             
-        return {s.get('code', s.get('name')): {"sentiment_score": 0, "summary": "분석 오류", "keywords": []} for s in batch_data}
+        return {s.get('code', s.get('name')): {"sentiment": 0, "summary": "분석 오류", "keywords": []} for s in batch_data}
 
     def analyze_bulk_sentiment(self, bulk_data):
         """기존 벌크 감성 분석 로직 유지 (모델 동적 적용)"""

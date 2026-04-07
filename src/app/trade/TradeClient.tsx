@@ -373,7 +373,7 @@ function TradeContent() {
                     <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>3-Track 지능형 시뮬레이션</Title>
                     <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
                 </Group>
-                <Group grow align="flex-start" gap="lg" style={{ flexWrap: 'wrap' }}>
+                <Group align="flex-start" gap="lg" style={{ flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: '10px' }}>
                     {simConfigs.map((sim) => {
                         const stats = geminiBalance[sim.key]?.raw || {};
                         const portfolio = geminiBalance[sim.key]?.portfolio || {};
@@ -392,15 +392,15 @@ function TradeContent() {
                             };
                         });
                         return (
-                            <Stack key={sim.id} gap="md" style={{ minWidth: '320px', flex: 1 }}>
-                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)` }}>
+                            <Group key={sim.id} gap="md" style={{ minWidth: '850px', flex: '0 0 auto' }} align="stretch">
+                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)`, flex: 1 }}>
                                     <Group justify="space-between" mb="xs">
                                         <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
                                         <Badge color={sim.color}>{sim.id.toUpperCase()}</Badge>
                                     </Group>
                                     <Group grow mb="md">
                                         <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">운용 자산</Text>
+                                            <Text size="xs" c="dimmed">예수금</Text>
                                             <Text fw={700} size="md">{(Math.round(stats.total_asset || 0)).toLocaleString()}원</Text>
                                         </Stack>
                                         <Stack gap={2}>
@@ -413,11 +413,11 @@ function TradeContent() {
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
                                     {renderPortfolioTable(holdings)}
                                 </Paper>
-                                <Paper p="md" withBorder radius="md" bg="gray.0">
+                                <Paper p="md" withBorder radius="md" bg="gray.0" style={{ flex: 1 }}>
                                     <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{sim.label} 기록</Text>
                                     {renderHistoryTable(sim.type)}
                                 </Paper>
-                            </Stack>
+                            </Group>
                         );
                     })}
                 </Group>

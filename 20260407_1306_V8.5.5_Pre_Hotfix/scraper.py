@@ -398,9 +398,9 @@ if __name__ == "__main__":
     # --- 5. 3-Track 시뮬레이션 통합 실행 (Virtual Only) ---
     print(f"[System] 3-Track Tripod Simulator 가동 ({'Open Market' if force_run or is_open_day else 'Analytic Mode'})")
     
-    from src.strategy.simulators.sim1_original import OriginalSimulator
-    from src.strategy.simulators.sim2_aggressive import AggressiveSimulator
-    from src.strategy.simulators.sim3_conviction import ConvictionSimulator
+    from src.strategy.simulators.original_simulator import OriginalSimulator
+    from src.strategy.simulators.aggressive_simulator import AggressiveSimulator
+    from src.strategy.simulators.conviction_simulator import ConvictionSimulator
     
     results_codes = [r['code'] for r in results]
     

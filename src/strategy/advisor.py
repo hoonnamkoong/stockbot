@@ -19,13 +19,15 @@ from src.trade.balance import get_balance
 
 class GeminiAgent:
     """
-    [V8.4.6] 최신 모델 동적 탐색 엔진 적용
+    [V8.5.8] 최신 모델 동적 탐색 및 Fail-Fast 재시도 엔진
     """
     def __init__(self):
         # 환경변수 통합 로드 (Double Defense)
         self.api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY')
         self.model = None
         self.model_name = "Unknown"
+        self.all_available_models = []
+        self.model_index = 0
         
         if not self.api_key:
             print("[GeminiAgent] 🚨 에러: API 키(GOOGLE_API_KEY)가 감지되지 않습니다.")
@@ -35,14 +37,20 @@ class GeminiAgent:
         self._update_available_models()
 
     def _update_available_models(self):
-        """[V8.4.8] 사용 가능한 모델 리스트를 동적으로 갱신하고 우선순위에 따라 선택합니다."""
+        """[V8.5.8] 사용 가능한 모델 리스트를 동적으로 갱신하고 최신 2.5 시리즈 순으로 선택합니다."""
         try:
             available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             
-            # [V8.4.8] 모델 우선순위 정의 (2.0 -> 1.5 -> 1.0)
-            priority_list = ['models/gemini-2.0-flash', 'models/gemini-1.5-flash', 'models/gemini-1.5-pro']
+            # [V8.5.8] 진짜 동적 모델 우선순위 (2.5 -> 2.0)
+            priority_list = [
+                'models/gemini-2.5-flash', 
+                'models/gemini-2.5-flash-lite', 
+                'models/gemini-2.5-pro', 
+                'models/gemini-2.0-flash'
+            ]
             self.all_available_models = []
             
+            # 우선순위 항목 먼저 배치
             for p in priority_list:
                 if p in available_models:
                     self.all_available_models.append(p)
@@ -51,42 +59,53 @@ class GeminiAgent:
             for am in available_models:
                 if am not in self.all_available_models:
                     self.all_available_models.append(am)
-
+            
             if self.all_available_models:
-                self.model_name = self.all_available_models[0]
+                self.model_index = 0
+                self.model_name = self.all_available_models[self.model_index]
                 self.model = genai.GenerativeModel(self.model_name)
-                print(f"[GeminiAgent] ✅ 모델 초기화: {self.model_name}")
+                print(f"[GeminiAgent] ✅ 최신 모델 초기화: {self.model_name}")
             else:
                 self.model = None
                 print("[GeminiAgent] 🚨 사용 가능한 텍스트 생성 모델이 없습니다.")
                 
         except Exception as e:
             print(f"[GeminiAgent] 🚨 API 모델 조회 실패: {e}")
+            self.all_available_models = []
             self.model = None
 
-    def _call_gemini_safe(self, prompt, generation_config=None, max_retries=3):
+    def _call_gemini_safe(self, prompt, generation_config=None):
         """
-        [V8.5.6 Hotfix] Quota Exceeded (429) 발생 시 15초 대기 후 동일 모델로 재시도
+        [V8.5.8 Fail-Fast] 429 발생 시 5초 대기 후 백업 모델로 단 1회만 재시도
         """
-        current_retry = 0
-        while current_retry < max_retries:
-            if not self.model: return None
-                
-            try:
-                response = self.model.generate_content(prompt, generation_config=generation_config)
-                return response
-            except Exception as e:
-                err_msg = str(e)
-                if ("429" in err_msg or "Quota" in err_msg or "ResourceExhausted" in err_msg):
-                    print(f"[GeminiAgent] ⚠️ Quota Exceeded ({self.model_name}). {current_retry+1}/{max_retries} 재시도 전 15초 대입(Sleep)...")
-                    time.sleep(15)
-                    current_retry += 1
-                    continue
-                else:
-                    print(f"[GeminiAgent] 🚨 API 에러: {err_msg}")
-                    break
+        if not self.model: return None
         
-        print(f"[GeminiAgent] ❌ {self.model_name} {max_retries}회 재시도 모두 실패.")
+        # 1차 시도
+        try:
+            return self.model.generate_content(prompt, generation_config=generation_config)
+        except Exception as e:
+            err_msg = str(e)
+            if ("429" in err_msg or "Quota" in err_msg or "ResourceExhausted" in err_msg):
+                print(f"[GeminiAgent] ⚠️ Quota Exceeded ({self.model_name}). 5초 대기 후 백업 모델 전환...")
+                time.sleep(5)
+                
+                # 백업 모델 전환 (다음 순위 모델)
+                self.model_index += 1
+                if self.model_index < len(self.all_available_models):
+                    self.model_name = self.all_available_models[self.model_index]
+                    self.model = genai.GenerativeModel(self.model_name)
+                    print(f"[GeminiAgent] 🔄 백업 모델로 2차 시도 (Fail-Fast): {self.model_name}")
+                    
+                    # 2차 시도 (단 1회)
+                    try:
+                        return self.model.generate_content(prompt, generation_config=generation_config)
+                    except Exception as e2:
+                        print(f"[GeminiAgent] ❌ 백업 모델({self.model_name}) 2차 시도마저 실패: {str(e2)}")
+                else:
+                    print(f"[GeminiAgent] 🚨 가용 백업 모델이 없습니다. 분석 스킵.")
+            else:
+                print(f"[GeminiAgent] 🚨 API 에러: {err_msg}")
+        
         return None
 
     def generate_trading_guide(self, market_context, signals):

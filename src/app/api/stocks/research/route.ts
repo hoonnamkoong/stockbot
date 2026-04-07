@@ -9,7 +9,11 @@ export async function GET() {
         // [V8.9.9] GitHub Raw DB에서 원격 데이터 로드 (Vercel 배포 대응)
         const fetchRemote = async (filename: string, fallback: string) => {
             try {
-                const res = await fetch(`${GITHUB_BASE}/${filename}`, { cache: 'no-store' });
+                // [V8.9.9.5] GitHub Raw 캐시 무력화를 위한 타임스탬프 쿼리 추가
+                const res = await fetch(`${GITHUB_BASE}/${filename}?t=${Date.now()}`, { 
+                    cache: 'no-store',
+                    next: { revalidate: 0 }
+                });
                 if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
                 return await res.text();
             } catch (err) {

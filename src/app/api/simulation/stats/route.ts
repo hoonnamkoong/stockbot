@@ -1,31 +1,66 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import path from 'path';
-import { promisify } from 'util';
 
-const execAsync = promisify(exec);
-
+/**
+ * [V8.9.9] 시뮬레이터 통합 통계 API (Remote DB Version)
+ * GitHub Raw URL에서 시뮬레이터 상태를 가져와 통합 통계를 산출합니다.
+ */
 export async function GET() {
-  try {
-    // 1. 파이썬 스크립트 경로 설정
-    const scriptPath = path.join(process.cwd(), 'src', 'strategy', 'simulators', 'get_all_stats.py');
-    
-    // 2. 파이썬 실행 및 결과 수신
-    const { stdout, stderr } = await execAsync(`python "${scriptPath}"`);
-    
-    if (stderr) {
-      console.error('[Simulation API] Python Stderr:', stderr);
+    try {
+        const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
+        const types = [
+            { id: 'sim1', file: 'sim_original_state.json' },
+            { id: 'sim2', file: 'sim_aggressive_state.json' },
+            { id: 'sim3', file: 'sim_conviction_state.json' }
+        ];
+
+        const results: any = {};
+        
+        await Promise.all(types.map(async (type) => {
+            try {
+                const res = await fetch(`${GITHUB_BASE}/${type.file}`, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`Fetch failed for ${type.file}`);
+                
+                const state = await res.json();
+                
+                // 간단한 통계 산출 (평가 금액 합산)
+                // 상태 데이터에 이미 total_asset 등이 포함되어 있다고 가정하거나, 
+                // 포트폴리오 정보를 기반으로 계산
+                let portfolioValue = 0;
+                if (state.portfolio) {
+                    Object.values(state.portfolio).forEach((item: any) => {
+                        // Python 시뮬레이터가 저장한 마지막 가격 혹은 평균 단가 사용
+                        const price = item.current_price || item.avg_price || 0;
+                        portfolioValue += price * item.qty;
+                    });
+                }
+
+                const totalAsset = (state.cash || 0) + portfolioValue;
+                const initialCash = state.initial_cash || 3000000;
+                const profit = totalAsset - initialCash;
+                const returnRate = (profit / initialCash) * 100;
+
+                results[type.id] = {
+                    cash: state.cash,
+                    portfolio_value: portfolioValue,
+                    total_asset: totalAsset,
+                    profit: profit,
+                    return_rate: returnRate.toFixed(2),
+                    history_count: state.history ? state.history.length : 0
+                };
+            } catch (err) {
+                console.error(`[StatsAPI] Error processing ${type.id}:`, err);
+                results[type.id] = { error: 'Data not available' };
+            }
+        }));
+
+        results["last_updated"] = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+        return NextResponse.json(results);
+        
+    } catch (error: any) {
+        console.error('[Simulation API] Error fetching stats:', error);
+        return NextResponse.json(
+            { error: 'Failed to fetch simulation stats', details: error.message },
+            { status: 500 }
+        );
     }
-    
-    // 3. JSON 파싱 및 반환
-    const stats = JSON.parse(stdout);
-    return NextResponse.json(stats);
-    
-  } catch (error) {
-    console.error('[Simulation API] Error fetching stats:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch simulation stats' },
-      { status: 500 }
-    );
-  }
 }

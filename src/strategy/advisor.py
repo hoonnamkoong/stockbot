@@ -41,11 +41,10 @@ class GeminiAgent:
         try:
             available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             
-            # [V8.5.8] 진짜 동적 모델 우선순위 (2.5 -> 2.0)
+            # [V8.5.8] 진짜 동적 모델 우선순위 (Lite 우선)
             priority_list = [
-                'models/gemini-2.5-flash', 
                 'models/gemini-2.5-flash-lite', 
-                'models/gemini-2.5-pro', 
+                'models/gemini-2.5-flash', 
                 'models/gemini-2.0-flash'
             ]
             self.all_available_models = []

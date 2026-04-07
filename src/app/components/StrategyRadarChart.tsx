@@ -109,31 +109,24 @@ export default function StrategyRadarChart() {
             <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
             
             <Radar
-              name="실전 계좌"
-              dataKey="real"
+              name="안정 지향형 (Sim 1)"
+              dataKey="sim1"
               stroke="#228be6" // Blue
               fill="#228be6"
-              fillOpacity={0.6}
+              fillOpacity={0.5}
             />
             <Radar
-              name="Sim 1 (균등)"
-              dataKey="sim1"
-              stroke="#fab005" // Yellow/Amber
-              fill="#fab005"
-              fillOpacity={0.4}
-            />
-            <Radar
-              name="Sim 2 (AI)"
+              name="공격 투자형 (Sim 2)"
               dataKey="sim2"
-              stroke="#7950f2" // Violet/Indigo
-              fill="#7950f2"
+              stroke="#fa5252" // Red
+              fill="#fa5252"
               fillOpacity={0.3}
             />
             <Radar
-              name="Sim 3 (Frame)"
+              name="신념 집중형 (Sim 3)"
               dataKey="sim3"
-              stroke="#fa5252" // Red/Rose
-              fill="#fa5252"
+              stroke="#7950f2" // Violet
+              fill="#7950f2"
               fillOpacity={0.2}
             />
             

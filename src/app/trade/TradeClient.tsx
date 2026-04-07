@@ -373,7 +373,7 @@ function TradeContent() {
                     <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>3-Track 지능형 시뮬레이션</Title>
                     <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
                 </Group>
-                <Group align="flex-start" gap="lg" style={{ flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: '10px' }}>
+                <Stack gap="xl">
                     {simConfigs.map((sim) => {
                         const stats = geminiBalance[sim.key]?.raw || {};
                         const portfolio = geminiBalance[sim.key]?.portfolio || {};
@@ -392,7 +392,7 @@ function TradeContent() {
                             };
                         });
                         return (
-                            <Group key={sim.id} gap="md" style={{ minWidth: '850px', flex: '0 0 auto' }} align="stretch">
+                            <Group key={sim.id} gap="md" align="stretch" style={{ flexWrap: 'nowrap' }}>
                                 <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)`, flex: 1 }}>
                                     <Group justify="space-between" mb="xs">
                                         <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
@@ -400,8 +400,8 @@ function TradeContent() {
                                     </Group>
                                     <Group grow mb="md">
                                         <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">예수금</Text>
-                                            <Text fw={700} size="md">{(Math.round(stats.total_asset || 0)).toLocaleString()}원</Text>
+                                            <Text size="xs" c="dimmed">예수금 (잔고)</Text>
+                                            <Text fw={700} size="md">{(Math.round(stats.deposit || 0)).toLocaleString()}원</Text>
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">수익률</Text>
@@ -420,7 +420,7 @@ function TradeContent() {
                             </Group>
                         );
                     })}
-                </Group>
+                </Stack>
             </Stack>
         );
     }

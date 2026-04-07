@@ -65,6 +65,12 @@ function TradeContent() {
     const [pinModalOpen, setPinModalOpen] = useState(false);
     const [pin, setPin] = useState('');
     const [pendingAction, setPendingAction] = useState<{ isReservation: boolean } | null>(null);
+    const [history, setHistory] = useState<any[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    
+    // AI Reason Modal
+    const [reasonModalOpen, setReasonModalOpen] = useState(false);
+    const [selectedReason, setSelectedReason] = useState({ title: '', content: '' });
 
     const pinContainerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
@@ -109,6 +115,22 @@ function TradeContent() {
         }
     }, []);
 
+    const fetchHistory = useCallback(async () => {
+        if (typeof window === 'undefined') return;
+        setHistoryLoading(true);
+        try {
+            const res = await fetch(`/api/trade/history?cb=${Date.now()}`);
+            const data = await res.json();
+            if (data.success) {
+                setHistory(data.data);
+            }
+        } catch (e) {
+            console.error("History Fetch Error", e);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, []);
+
     const fetchStocks = useCallback(async () => {
         if (typeof window === 'undefined') return;
         try {
@@ -131,10 +153,11 @@ function TradeContent() {
         fetchStocks();
         fetchReservations();
         fetchSimulationStats();
+        fetchHistory();
         
         const codeParam = searchParams.get('code');
         if (codeParam) setCode(codeParam);
-    }, [searchParams, fetchBalance, fetchStocks, fetchReservations, fetchSimulationStats]);
+    }, [searchParams, fetchBalance, fetchStocks, fetchReservations, fetchSimulationStats, fetchHistory]);
 
     // Polling Intervals
     const balancePoller = useInterval(() => fetchBalance(0, true), 30000);
@@ -259,6 +282,77 @@ function TradeContent() {
         );
     }
 
+    function renderHistoryTable(type: 'real' | 'sim') {
+        const filtered = history.filter(h => type === 'real' ? h.type === 'real' : h.type.startsWith('sim_'));
+        
+        if (filtered.length === 0) {
+            return (
+                <Box py="xl" style={{ textAlign: 'center', border: '1px dashed #ced4da', borderRadius: '8px' }}>
+                    <Text c="dimmed">거래 내역이 없습니다.</Text>
+                </Box>
+            );
+        }
+
+        return (
+            <ScrollArea h={300} offsetScrollbars>
+                <Table striped highlightOnHover stickyHeader verticalSpacing="xs">
+                    <Table.Thead>
+                        <Table.Tr>
+                            <Table.Th>일시</Table.Th>
+                            <Table.Th>종목</Table.Th>
+                            <Table.Th>구분</Table.Th>
+                            <Table.Th>체결가</Table.Th>
+                            <Table.Th>수량</Table.Th>
+                            <Table.Th>체결금액</Table.Th>
+                            {type === 'sim' && <Table.Th>판단 사유</Table.Th>}
+                        </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                        {filtered.map((h, i) => (
+                            <Table.Tr key={i}>
+                                <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                                    <Text size="xs" c="dimmed">{h.time.split(' ')[0]}</Text>
+                                    <Text size="xs" fw={500}>{h.time.split(' ')[1]}</Text>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Group gap={5}>
+                                        {h.type.startsWith('sim_') && (
+                                            <Badge size="xs" variant="outline" color={h.type === 'sim_conviction' ? 'grape' : h.type === 'sim_aggressive' ? 'red' : 'blue'}>
+                                                {h.type.split('_')[1][0].toUpperCase()}
+                                            </Badge>
+                                        )}
+                                        <Text size="sm" fw={700}>{h.symbol}</Text>
+                                    </Group>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Badge color={h.action === 'BUY' ? 'red' : 'blue'} variant="filled" size="sm">
+                                        {h.action === 'BUY' ? '매수' : '매도'}
+                                    </Badge>
+                                </Table.Td>
+                                <Table.Td><Text size="sm">{h.price}원</Text></Table.Td>
+                                <Table.Td><Text size="sm">{h.qty}주</Text></Table.Td>
+                                <Table.Td><Text size="sm" fw={700}>{h.amount}원</Text></Table.Td>
+                                {type === 'sim' && (
+                                    <Table.Td>
+                                        <Button 
+                                            variant="subtle" size="compact-xs" 
+                                            onClick={() => {
+                                                setSelectedReason({ title: `${h.symbol} ${h.action} 판단 근거`, content: h.reason });
+                                                setReasonModalOpen(true);
+                                            }}
+                                        >
+                                            <Text size="xs" truncate maw={100}>{h.reason || '사유 없음'}</Text>
+                                        </Button>
+                                    </Table.Td>
+                                )}
+                            </Table.Tr>
+                        ))}
+                    </Table.Tbody>
+                </Table>
+            </ScrollArea>
+        );
+    }
+
     function renderSimulationTripod() {
         if (!geminiBalance) return null;
         
@@ -272,7 +366,7 @@ function TradeContent() {
             <Stack gap="md">
                 <Group justify="space-between">
                     <Title order={4} c="dimmed">3-Track 시뮬레이션 현황</Title>
-                    <Button variant="subtle" size="xs" leftSection={<IconRefresh size={14}/>} onClick={fetchSimulationStats}>새로고침</Button>
+                    <Button variant="subtle" size="xs" leftSection={<IconRefresh size={14}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>새로고침</Button>
                 </Group>
                 <Group grow align="stretch">
                     {simData.map((sim) => {
@@ -320,6 +414,13 @@ function TradeContent() {
                         );
                     })}
                 </Group>
+                
+                <Paper p="md" withBorder radius="md" mt="sm">
+                    <Group mb="sm" justify="space-between">
+                        <Title order={5}><IconHistory size={18} style={{ marginBottom: -4, marginRight: 8 }}/>시뮬레이션 거래 히스토리</Title>
+                    </Group>
+                    {renderHistoryTable('sim')}
+                </Paper>
             </Stack>
         );
     }
@@ -425,11 +526,26 @@ function TradeContent() {
 
             <Stack gap="lg" mb="lg">
                 <Group grow align="flex-start" gap="lg">
-                    {renderPortfolio()}
+                    <Stack gap="md">
+                        {renderPortfolio()}
+                        <Paper p="md" withBorder radius="md">
+                            <Title order={5} mb="sm"><IconHistory size={18} style={{ marginBottom: -4, marginRight: 8 }}/>실거래 매매 히스토리</Title>
+                            {renderHistoryTable('real')}
+                        </Paper>
+                    </Stack>
                     {renderTrading()}
                 </Group>
                 {renderSimulationTripod()}
             </Stack>
+
+            <Modal opened={reasonModalOpen} onClose={() => setReasonModalOpen(false)} title={selectedReason.title} size="lg">
+                <Paper p="md" withBorder bg="gray.0">
+                    <Text style={{ whiteSpace: 'pre-wrap' }}>{selectedReason.content}</Text>
+                </Paper>
+                <Group justify="flex-end" mt="md">
+                    <Button onClick={() => setReasonModalOpen(false)}>닫기</Button>
+                </Group>
+            </Modal>
 
             <Box mt="xl">
                 <StrategyRadarChart />

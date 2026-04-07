@@ -67,7 +67,8 @@ class AggressiveSimulator(BaseSimulator):
                 bet_amount = self.state['cash'] * 0.95
                 qty = int(bet_amount / current_price)
                 if qty > 0:
-                    reason = f"[공격형] 변동성 돌파({target_price:,.0f}원) 상향 도달 시점 집중 베팅"
+                    ai_summary = stock.get('posts_summary', 'AI 요약 데이터 없음').replace("•", "").strip()
+                    reason = f"[공격형] 변동성 돌파({target_price:,.0f}원) {ai_summary}"
                     if self.buy(code, stock['name'], current_price, qty, reason=reason):
                         self.state['portfolio'][code]['peak_price'] = current_price
                         print(f"[Sim 2] {stock['name']} 돌파 매수")

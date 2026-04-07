@@ -113,16 +113,18 @@ def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[�
     filepath = os.path.join(_REPO_ROOT, 'data', 'trade_history_real.csv')
     file_exists = os.path.exists(filepath)
     now_kst = datetime.now() # KST 기준 (로컬 실행 시)
+    total_amount = qty * price
     with open(filepath, 'a', encoding='utf-8-sig', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "reason"])
+            writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "reason"])
         writer.writerow([
             now_kst.strftime('%Y-%m-%d %H:%M:%S'), 
             f"{name}({code})", 
             side.upper(), 
             f"{price:,.0f}", 
             qty, 
+            f"{total_amount:,.0f}",
             reason
         ])
 

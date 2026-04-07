@@ -18,35 +18,24 @@ class ConvictionSimulator(BaseSimulator):
 
     def assess_conviction(self, stock):
         """
-        [AI Logic] 종목의 모멘텀과 Buzz를 바탕으로 확신도 점수 산출
+        [V8.6.1 Optimization] Gemini 직접 호출 제거 (Reason Reuse)
+        - 1단계 배치 분석의 sentiment_score(-10~10)를 확신도(1~5)로 변환
+        - 이미 생성된 posts_summary를 매매 사유로 재사용
         """
-        if not self.gemini.model: return 3, "AI 서비스 일시 중단 - 기본 비중 관망"
+        s_score = stock.get('sentiment_score', 0)
+        ai_summary = stock.get('posts_summary', 'AI 요약 데이터 없음')
         
-        prompt = f"""
-        종목: {stock.get('name')} ({stock.get('code')})
-        현재 수급: {stock.get('recent_posts_count')} posts (기준치 돌파)
-        AI 요약: {stock.get('posts_summary')}
-        키워드: {', '.join(stock.get('keywords', []))}
+        # sentiment_score(-10 ~ 10) -> conviction_score(1 ~ 5) 매핑
+        if s_score >= 8: conviction_score = 5
+        elif s_score >= 4: conviction_score = 4
+        elif s_score >= 0: conviction_score = 3
+        elif s_score >= -4: conviction_score = 2
+        else: conviction_score = 1
         
-        위 데이터를 바탕으로 이 종목의 단기 상승 확신도를 1~5점(5점 만점)으로 평가하고,
-        그 이유를 100자 내외의 전문적인 '컨빅션 메시지'로 작성하세요.
+        # Brevity 규칙에 따라 핵심 요약만 사유로 채택
+        clean_reason = ai_summary.replace("•", "").strip()
         
-        반드시 다음 JSON 형식으로만 답변하세요:
-        {{
-            "score": 점수,
-            "reason": "컨빅션 메시지"
-        }}
-        """
-        try:
-            response = self.gemini._call_gemini_safe(
-                prompt, 
-                generation_config={"response_mime_type": "application/json"}
-            )
-            if response and response.text:
-                res = json.loads(response.text)
-                return int(res.get('score', 3)), str(res.get('reason', '관망 추천'))
-        except: pass
-        return 3, "분석 시스템 지연 - 보수적 접근"
+        return conviction_score, clean_reason
 
     def execute_strategy(self, candidates):
         if not candidates: return

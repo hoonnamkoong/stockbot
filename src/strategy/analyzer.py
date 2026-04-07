@@ -122,15 +122,18 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
     except Exception as e:
         print(f"Error saving to Excel: {e}")
         
-    # 3. [V8.5.8] Save Fixed Filename for Vercel Dashboard (Overwrite)
+    # 3. [V8.6.0] Save Fixed Filename for Vercel Dashboard (Overwrite Guarantee)
     try:
+        # data 디렉토리가 없을 경우 생성 (보안 레이어)
+        os.makedirs('data', exist_ok=True)
+        
         fixed_csv = "data/trending_integrated.csv"
         fixed_xlsx = "data/trending_integrated.xlsx"
         
-        # Overwrite CSV
+        # Overwrite CSV (Force Sync)
         df.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
         
-        # Overwrite Excel
+        # Overwrite Excel (Force Sync)
         with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
             if extra_sheets:
@@ -138,9 +141,10 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
                     if not sheet_df.empty:
                         sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
                         
-        print(f"[Vercel] Fixed data overwriten: {fixed_csv}, {fixed_xlsx}")
+        print(f"[Vercel] ✅ Fixed data synchronized: {fixed_csv}, {fixed_xlsx}")
     except Exception as e:
-        print(f"[Vercel] Error overwriting fixed files: {e}")
+        print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
+        # 에러 발생 시 로그를 남기되 프로세스 전체를 중단시키지는 않음 (Recovery 우선성)
         
     return saved_files
 

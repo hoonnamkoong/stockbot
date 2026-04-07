@@ -41,16 +41,21 @@ export async function GET() {
                 const returnRate = (profit / initialCash) * 100;
 
                 results[type.id] = {
-                    cash: state.cash,
-                    portfolio_value: portfolioValue,
-                    total_asset: totalAsset,
-                    profit: profit,
-                    return_rate: returnRate.toFixed(2),
-                    history_count: state.history ? state.history.length : 0
+                    raw: {
+                        cash: state.cash,
+                        portfolio_value: portfolioValue,
+                        total_asset: totalAsset,
+                        profit: profit,
+                        profit_rate: returnRate,
+                        current_prices: Object.fromEntries(
+                            Object.entries(state.portfolio || {}).map(([c, p]: [string, any]) => [c, p.current_price || p.avg_price || 0])
+                        )
+                    },
+                    portfolio: state.portfolio || {}
                 };
             } catch (err) {
                 console.error(`[StatsAPI] Error processing ${type.id}:`, err);
-                results[type.id] = { error: 'Data not available' };
+                results[type.id] = { raw: {}, portfolio: {} };
             }
         }));
 

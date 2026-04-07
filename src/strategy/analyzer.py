@@ -122,6 +122,26 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
     except Exception as e:
         print(f"Error saving to Excel: {e}")
         
+    # 3. [V8.5.8] Save Fixed Filename for Vercel Dashboard (Overwrite)
+    try:
+        fixed_csv = "data/trending_integrated.csv"
+        fixed_xlsx = "data/trending_integrated.xlsx"
+        
+        # Overwrite CSV
+        df.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
+        
+        # Overwrite Excel
+        with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
+            if extra_sheets:
+                for sheet_name, sheet_df in extra_sheets.items():
+                    if not sheet_df.empty:
+                        sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                        
+        print(f"[Vercel] Fixed data overwriten: {fixed_csv}, {fixed_xlsx}")
+    except Exception as e:
+        print(f"[Vercel] Error overwriting fixed files: {e}")
+        
     return saved_files
 
 

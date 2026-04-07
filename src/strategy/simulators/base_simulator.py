@@ -35,13 +35,17 @@ class BaseSimulator:
         self.load_state()
 
     def load_state(self):
-        """상태 로드 및 3M 강제 보정 로직"""
+        """[V8.6.2 Hotfix] 상태 로드 및 마이그레이션 안전장치"""
         if os.path.exists(self.state_file):
             try:
                 with open(self.state_file, 'r', encoding='utf-8') as f:
-                    self.state = json.load(f)
-                # V8.6.2 규격 미치달 시 초기화
-                if self.state.get('initial_cash') != self.initial_cash:
+                    data = json.load(f)
+                
+                # [V8.6.2] 기존 데이터가 있고 cash 정보가 유효하면 유지 (단, initial_cash 보정)
+                if 'cash' in data and data['cash'] > 0:
+                    self.state = data
+                    self.state['initial_cash'] = self.initial_cash # 키 보정
+                else:
                     self.reset_state()
             except:
                 self.reset_state()
@@ -49,7 +53,8 @@ class BaseSimulator:
             self.reset_state()
 
     def reset_state(self):
-        """기초 자산 3,000,000원으로 초기화"""
+        """[V8.6.2 Hotfix] 3,000,000원 클린 시작"""
+        print(f"[Sim] {self.name} 상태를 3,000,000원으로 초기화합니다.")
         self.state = {
             "initial_cash": self.initial_cash,
             "cash": self.initial_cash,

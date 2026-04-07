@@ -1,0 +1,506 @@
+﻿
+> stock-dashboard@0.1.0 build
+> next build
+
+   ??Next.js 14.0.0
+   - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+node.exe : (node:31808) [D
+EP_WEBPACK_MODULE_UPDATE_H
+ASH] DeprecationWarning: M
+odule.updateHash: Use new 
+ChunkGraph API
+위치 줄:1 문자:1
++ & "C:\Program Files\node
+js/node.exe" "C:\Program F
+iles\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: ((  
+  node:31808) [D... Chu   
+ nkGraph API:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+(Use `node --trace-depreca
+tion ...` to show where th
+e warning was created)
+ ??Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/8) ...
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 22209 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\app\login\page.js:1:2
+004)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at C:\Users\Hoon_DT\ge
+mini\stock\node_modules\ne
+xt\dist\compiled\next-serv
+er\app-page.runtime.prod.j
+s:36:8464
+    at W._fromJSON (C:\Use
+rs\Hoon_DT\gemini\stock\no
+de_modules\next\dist\compi
+led\next-server\app-page.r
+untime.prod.js:36:8902)
+    at JSON.parse (<anonym
+ous>) {
+  code: 'ERR_INVALID_URL',
+  input: ''
+}
+
+Error occurred prerenderin
+g page "/login". Read more
+: https://nextjs.org/docs/
+messages/prerender-error
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 22209 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\app\login\page.js:1:2
+004)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at C:\Users\Hoon_DT\ge
+mini\stock\node_modules\ne
+xt\dist\compiled\next-serv
+er\app-page.runtime.prod.j
+s:36:8464
+    at W._fromJSON (C:\Use
+rs\Hoon_DT\gemini\stock\no
+de_modules\next\dist\compi
+led\next-server\app-page.r
+untime.prod.js:36:8902)
+    at JSON.parse (<anonym
+ous>)
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 48405 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\446.js:1:15436
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at $ (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:4600)
+    at rS (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:27173)
+    at nC (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:52685) {
+  code: 'ERR_INVALID_URL',
+  input: ''
+}
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 48405 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\446.js:1:15436
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at $ (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:4600)
+    at rS (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:27173)
+    at nC (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:52685) {
+  code: 'ERR_INVALID_URL',
+  input: ''
+}
+
+   Generating static pages (2/8) 
+
+Error occurred prerenderin
+g page "/". Read more: htt
+ps://nextjs.org/docs/messa
+ges/prerender-error
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 48405 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\446.js:1:15436
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at $ (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:4600)
+    at rS (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:27173)
+    at nC (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:52685)
+
+Error occurred prerenderin
+g page "/_not-found". Read
+ more: https://nextjs.org/
+docs/messages/prerender-er
+ror
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 48405 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\446.js:1:15436
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at $ (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:4600)
+    at rS (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:27173)
+    at nC (C:\Users\Hoon_D
+T\gemini\stock\node_module
+s\next\dist\compiled\next-
+server\app-page.runtime.pr
+od.js:28:52685)
+
+   Generating static pages (4/8) 
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 19914 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\app\trade\page.js:1:2
+843)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at C:\Users\Hoon_DT\ge
+mini\stock\node_modules\ne
+xt\dist\compiled\next-serv
+er\app-page.runtime.prod.j
+s:36:8464
+    at W._fromJSON (C:\Use
+rs\Hoon_DT\gemini\stock\no
+de_modules\next\dist\compi
+led\next-server\app-page.r
+untime.prod.js:36:8902)
+    at JSON.parse (<anonym
+ous>) {
+  code: 'ERR_INVALID_URL',
+  input: ''
+}
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 9142 (C:\Users\Hoon
+_DT\gemini\stock\.next\ser
+ver\app\research\page.js:1
+:7048)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at C:\Users\Hoon_DT\ge
+mini\stock\node_modules\ne
+xt\dist\compiled\next-serv
+er\app-page.runtime.prod.j
+s:36:8464
+    at W._fromJSON (C:\Use
+rs\Hoon_DT\gemini\stock\no
+de_modules\next\dist\compi
+led\next-server\app-page.r
+untime.prod.js:36:8902)
+    at JSON.parse (<anonym
+ous>) {
+  code: 'ERR_INVALID_URL',
+  input: ''
+}
+
+Error occurred prerenderin
+g page "/trade". Read more
+: https://nextjs.org/docs/
+messages/prerender-error
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 19914 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\app\trade\page.js:1:2
+843)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at C:\Users\Hoon_DT\ge
+mini\stock\node_modules\ne
+xt\dist\compiled\next-serv
+er\app-page.runtime.prod.j
+s:36:8464
+    at W._fromJSON (C:\Use
+rs\Hoon_DT\gemini\stock\no
+de_modules\next\dist\compi
+led\next-server\app-page.r
+untime.prod.js:36:8902)
+    at JSON.parse (<anonym
+ous>)
+
+Error occurred prerenderin
+g page "/research". Read m
+ore: https://nextjs.org/do
+cs/messages/prerender-erro
+r
+TypeError: Invalid URL
+    at new URL (node:inter
+nal/url:819:25)
+    at parseUrl (C:\Users\
+Hoon_DT\gemini\stock\.next
+\server\chunks\972.js:1:22
+481)
+    at 74284 (C:\Users\Hoo
+n_DT\gemini\stock\.next\se
+rver\chunks\972.js:1:11225
+)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at 9142 (C:\Users\Hoon
+_DT\gemini\stock\.next\ser
+ver\app\research\page.js:1
+:7048)
+    at __webpack_require__
+ (C:\Users\Hoon_DT\gemini\
+stock\.next\server\webpack
+-runtime.js:1:146)
+    at F (C:\Users\Hoon_DT
+\gemini\stock\node_modules
+\next\dist\compiled\next-s
+erver\app-page.runtime.pro
+d.js:36:6049)
+    at C:\Users\Hoon_DT\ge
+mini\stock\node_modules\ne
+xt\dist\compiled\next-serv
+er\app-page.runtime.prod.j
+s:36:8464
+    at W._fromJSON (C:\Use
+rs\Hoon_DT\gemini\stock\no
+de_modules\next\dist\compi
+led\next-server\app-page.r
+untime.prod.js:36:8902)
+    at JSON.parse (<anonym
+ous>)
+
+   Generating static pages (6/8) 
+
+ ??Generating static pages (8/8) 
+
+> Export encountered error
+s on following paths:
+	/_not-found
+	/login/page: /login
+	/page: /
+	/research/page: /research
+	/trade/page: /trade

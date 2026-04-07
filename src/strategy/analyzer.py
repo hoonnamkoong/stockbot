@@ -136,15 +136,15 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         
         # [V8.6.2 Hotfix] Save JSON for Vercel/GitHub Dashboard (Typed Clean)
         # 1. 문자열(Text) 데이터 결측치 처리 (프론트엔드 Crash 방지)
+        # scraper.py와 analyzer.py 간의 Key 매핑 정합성 수정 완료
         if '게시물_요약' in df.columns:
             df['게시물_요약'] = df['게시물_요약'].fillna("분석 대기중")
-        if '감정' in df.columns:
-            df['감정'] = df['감정'].fillna("NEUTRAL")
-        if 'Keywords' in df.columns:
-            df['Keywords'] = df['Keywords'].fillna("")
+        if '감정분석' in df.columns:
+            df['감정분석'] = df['감정분석'].fillna("NEUTRAL")
+        if 'Top_Keyword' in df.columns:
+            df['Top_Keyword'] = df['Top_Keyword'].fillna("")
             
         # 2. 나머지 숫자형 데이터 결측치 처리 (NaN 방지)
-        # numeric_only=False는 판다스 버전 경고를 피하기 위함이나, 여기서는 전체에 대해 수행 후 숫자로 남음
         df = df.fillna(0)
         
         df_json = df.to_json(orient='records', force_ascii=False)

@@ -30,7 +30,8 @@ export async function GET() {
                     Object.values(state.portfolio).forEach((item: any) => {
                         // Python 시뮬레이터가 저장한 마지막 가격 혹은 평균 단가 사용
                         const price = item.current_price || item.avg_price || 0;
-                        portfolioValue += price * item.qty;
+                        const qty = item.quantity || item.qty || 0;
+                        portfolioValue += price * qty;
                     });
                 }
 

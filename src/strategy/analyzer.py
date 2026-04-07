@@ -1,9 +1,9 @@
-import pandas as pd
 import os
-from datetime import datetime, timedelta
+import json
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import os
+from datetime import datetime, timedelta
 
 
 def analyze_discussion_trend(data_list):
@@ -33,30 +33,28 @@ def analyze_discussion_trend(data_list):
     # [사용자 요청] 컬럼 순서 및 한글 이름 변경
     # 순서: 현재가, 현재 외국인 비중, 어제 종가, 어제 외국인 비중, 어제 대비 등락률, 당일 게시글 수, 당일 게시물 주요 내용 요약 (3문장 이내), 감정 분석, top keyword, 연속 등록
     
-    # 1. 컬럼 매핑 (User Screenshot Matching)
-    # 1. 컬럼 매핑 (User Screenshot Matching)
+    # 1. 컬럼 매핑 (User Screenshot & Dashboard Matching)
     col_map = {
         'market': '시장구분',
         'name': '종목명',
         'price': '현재가',
-        'foreign_rate': '현재_외국인비중',
-        'prev_close': '어제_종가',
-        'prev_foreign_rate': '어제_외국인비중',
+        'foreign_rate': '외인비중',
+        'prev_close': '전일종가',
+        'prev_foreign_rate': '전일외인',
         'change_rate': '등락률',
-        'foreign_change_rate': '외인변화', # [Added]
-        'recent_posts_count': '당일_게시글수',
+        'foreign_change': '외인변화', 
+        'recent_posts_count': '게시물', # Vercel 대시보드와 맞춤
         'posts_summary': '게시물_요약',
-        'sentiment': '감정분석',
-        'top_keywords': 'Top_Keyword',
-        'consecutive_days': '연속_등록', # [FIXED] Use calculated count
-        'scraper_version': 'scraper_version' # [Added]
+        'sentiment_score': '감정',
+        'keywords': '키워드',
+        'consecutive_days': '연속'
     }
     
     # 2. 존재하는 컬럼만 선택하여 순서 지정
     desired_order = [
-        'name', 'price', 'change_rate', 'foreign_change_rate', 'recent_posts_count', 'foreign_rate', 'market',
+        'name', 'price', 'change_rate', 'foreign_change', 'recent_posts_count', 'foreign_rate', 'market',
         'prev_close', 'prev_foreign_rate', 'posts_summary', 
-        'sentiment', 'top_keywords', 'consecutive_days', 'latest_posts', 'scraper_version'
+        'sentiment_score', 'keywords', 'consecutive_days', 'code'
     ]
     
     final_cols = [c for c in desired_order if c in df_final.columns]
@@ -122,30 +120,31 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
     except Exception as e:
         print(f"Error saving to Excel: {e}")
                         
-        print(f"Data saved to Excel: {os.path.abspath(xlsx_filename)}")
-        saved_files['excel'] = xlsx_filename
-    except Exception as e:
-        print(f"Error saving to Excel: {e}")
-        
-        # 3. [V8.6.0] Save Fixed Filename for Vercel Dashboard
-        # data 디렉토리가 없을 경우 생성 (보안 레이어)
+    # 3. [V8.6.0] Save Fixed Filename for Vercel Dashboard
+    try:
         os.makedirs('data', exist_ok=True)
-        
         fixed_json = "data/latest_stocks.json"
         
-        # [V8.6.2 Hotfix] Save JSON for Vercel/GitHub Dashboard (Typed Clean)
-        
-        # [V8.6.2 Hotfix] Save JSON for Vercel/GitHub Dashboard (Typed Clean)
-        # 1. 문자열(Text) 데이터 결측치 처리 (프론트엔드 Crash 방지)
-        # scraper.py와 analyzer.py 간의 Key 매핑 정합성 수정 완료
+        # 1. 컬럼명 정제 (대시보드 호환용)
+        # 만약 'recent_posts_count'가 아직 남아있다면 '게시물'로 변환
+        rename_map = {
+            'recent_posts_count': '게시물',
+            'prev_close': '전일종가',
+            'foreign_change': '외인변화',
+            'foreign_rate': '외인비중',
+            'prev_foreign_rate': '전일외인'
+        }
+        df = df.rename(columns=rename_map)
+
+        # 2. 문자열(Text) 데이터 결측치 처리 (프론트엔드 Crash 방지)
         if '게시물_요약' in df.columns:
             df['게시물_요약'] = df['게시물_요약'].fillna("분석 대기중")
-        if '감정분석' in df.columns:
-            df['감정분석'] = df['감정분석'].fillna("NEUTRAL")
-        if 'Top_Keyword' in df.columns:
-            df['Top_Keyword'] = df['Top_Keyword'].fillna("")
+        if '감정' in df.columns:
+            df['감정'] = df['감정'].fillna("중립 (0)")
+        if '키워드' in df.columns:
+            df['키워드'] = df['키워드'].fillna("")
             
-        # 2. 나머지 숫자형 데이터 결측치 처리 (NaN 방지)
+        # 3. 나머지 숫자형 데이터 결측치 처리 (NaN 방지)
         df = df.fillna(0)
         
         df_json = df.to_json(orient='records', force_ascii=False)
@@ -156,28 +155,25 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         now_kst = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         status_json = "data/status.json"
         with open(status_json, 'w', encoding='utf-8') as f:
-            json.dump({"last_updated": now_kst, "status": "ok", "message": "Synced V8.6.2"}, f, ensure_ascii=False, indent=4)
-
-        # Overwrite Excel (Force Sync)
-        with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
-            if extra_sheets:
-                for sheet_name, sheet_df in extra_sheets.items():
-                    if not sheet_df.empty:
-                        sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
-                        
-        print(f"[Vercel] ✅ Fixed data synchronized: {fixed_csv}, {fixed_xlsx}")
+            json.dump({"last_updated": now_kst, "status": "ok", "message": "Synced V8.9.9.4"}, f, ensure_ascii=False, indent=4)
+            
+        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json")
     except Exception as e:
         print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
-        # 에러 발생 시 로그를 남기되 프로세스 전체를 중단시키지는 않음 (Recovery 우선성)
         
     return saved_files
 
 
 def analyze_sentiment(df):
     """
-    게시글 제목을 기반으로 긍정/부정 비율과 주요 키워드를 분석합니다.
+    [V8.9.9.4] 데이터 보호 로직: Gemini 분석 결과가 있으면 레거시 분석 스킵
     """
+    # Gemini 분석 결과 보호 필드
+    protection_fields = ['posts_summary', 'sentiment_score', 'keywords']
+    for field in protection_fields:
+        if field not in df.columns:
+            df[field] = None
+
     if 'all_posts_titles' not in df.columns:
         return df
 
@@ -188,7 +184,28 @@ def analyze_sentiment(df):
     keyword_summaries = []
     posts_summaries = [] 
 
-    for idx, row in df.iterrows():
+    for index, row in df.iterrows():
+        # Gemini 결과가 이미 있는 경우 해당 행 분석 스킵
+        if row.get('posts_summary') and row['posts_summary'] != '분석 대기중' and row['posts_summary'] != '분석 오류':
+            posts_summaries.append(row['posts_summary'])
+            
+            # 수치형 점수를 텍스트로 변환 (예: 7 -> 긍정 (7))
+            score = row.get('sentiment_score', 0)
+            try:
+                score_val = float(score)
+                if score_val >= 3: sentiment_text = f"긍정 ({score_val})"
+                elif score_val <= -3: sentiment_text = f"부정 ({score_val})"
+                else: sentiment_text = "중립"
+            except:
+                sentiment_text = str(score)
+            
+            sentiment_summaries.append(sentiment_text)
+            
+            # 키워드 필드 통합
+            kws = row.get('keywords', [])
+            keyword_summaries.append(", ".join(kws) if isinstance(kws, list) else str(kws))
+            continue
+
         titles = row.get('all_posts_titles', [])
         latest_posts = row.get('latest_posts', [])
         
@@ -285,8 +302,10 @@ def analyze_sentiment(df):
         top_keywords = ", ".join([w[0] for w in sorted_words[:3]])
         keyword_summaries.append(top_keywords)
     
-    df['sentiment'] = sentiment_summaries
-    df['top_keywords'] = keyword_summaries
+    # Skip assignment if we already have values from the protection logic above
+    # 결과를 슬라이스하지 않고 전체 반영 (루프 완료 후)
+    df['sentiment_score'] = sentiment_summaries
+    df['keywords'] = keyword_summaries
     df['posts_summary'] = posts_summaries
     
     return df

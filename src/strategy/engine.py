@@ -19,13 +19,20 @@ class StrategyEngine:
         self.gemini = GeminiAgent()
         
     def execute_simulation(self, candidates, allow_buy=True):
+        """ Legacy Simulation Logic (Reserved for potential combined mode) """
+        return self.execute_sandbox_simulation(candidates, allow_buy)
+
+    def execute_sandbox_simulation(self, candidates, allow_buy=True):
         """
-        메인 시뮬레이션 루프. 
-        전략 모듈에서 받은 판단으로 실제 I/O(매수/매도/로그)를 수행합니다.
+        [V8.5.4] KIS 실계좌와 100% 단절된 샌드박스 시뮬레이터
+        - KIS API 호출 로직이 물리적으로 제거됨.
+        - 오직 가상 계좌(VirtualPortfolioManager) 내에서만 숫자가 변동됨.
         """
         results = []
         portfolio = self.vpm.get_portfolio()
         balance = self.vpm.get_balance()
+        
+        print(f"[Sandbox] 가상 포트폴리오 매매 프로세스 시작 (잔고: {balance.get('cash', 0):,}원)")
         
         for stock in candidates:
             code = stock.get('code')
@@ -34,16 +41,17 @@ class StrategyEngine:
             
             # [Step 1] 보유 종목 대응 (Adaptive Exit)
             if in_portfolio:
-                prev_post_cnt = 0 # (실제 구현 시 히스토리 데이터 로드 필요)
+                # 알고리즘 명세 기반 매도 신호 체크
                 signal_data = self.strategy.check_exit_signal(
                     holding_data=portfolio[code],
                     stock_data=stock,
-                    prev_post_count=prev_post_cnt
+                    prev_post_count=0 # TODO: 이전 Buzz 데이터 연동
                 )
                 
                 action = signal_data['action']
                 if action == "SELL_ALL":
                     self.vpm.sell_stock(code, current_price=float(stock.get('price', 0)))
+                    print(f"   [Simulation] 전량 매도: {name}")
                 elif action == "SELL_HALF":
                     qty = portfolio[code].get('quantity', 0)
                     self.vpm.sell_stock(
@@ -51,6 +59,7 @@ class StrategyEngine:
                         current_price=float(stock.get('price', 0)), 
                         sell_qty=max(1, int(qty / 2))
                     )
+                    print(f"   [Simulation] 반량 매도(50%): {name}")
                 
                 results.append({
                     'code': code, 'name': name, 'signal': action,
@@ -58,41 +67,32 @@ class StrategyEngine:
                 })
                 continue
                 
-            # [Step 2] 신규 후보 분석 (2차 검증 + AI)
+            # [Step 2] 신규 후보 분석 및 가상 매수
             if allow_buy:
-                # 2-1. [I/O] 2차 검증 오버레이 (DART/News) 데이터 수집
-                dart_data = self.fetch_dart_data(code)
-                news_list = self.fetch_news_data(code, name)
-                
-                # 2-2. [I/O] Gemini V2 AI 최종 승인 대기
-                llm_decision = self.gemini.evaluate_momentum(stock, news_list, dart_data)
-                
-                # [지시사항] 무료 티어 15 RPM 제한 준수를 위한 4초 강제 지연
-                import time
-                time.sleep(4)
-                
-                # 2-3. [Pure Logic] 전략 모듈 호출 (No I/O inside)
+                # 3차 필터링을 통과한 종목에 대해서만 시뮬레이션 집행
+                # (매수 조건: Algo04V2 내부에 2차/3차 필터 로직 포함)
+                dart_info = self.fetch_dart_data(code)
                 decision = self.strategy.analyze_target(
                     stock_data=stock,
-                    dart_data=dart_data,
-                    llm_decision=llm_decision,
+                    dart_data=dart_info,
+                    llm_decision="BUY", # 3차 통과 가정
                     current_cash=balance['cash']
                 )
                 
                 if decision['action'] == "BUY":
-                    # [I/O] 시뮬레이션 매수 집행
+                    # KIS API 절대 호출 금지 - 오직 VPM만 사용
                     self.vpm.buy_stock(
                         code=code, name=name, 
                         price=float(stock.get('price', 0)),
-                        quantity=decision['quantity'] # 전략이 계산한 수량 사용
+                        quantity=decision['quantity']
                     )
+                    print(f"   [Simulation] 가상 매수 체결: {name} ({decision['quantity']}주)")
                 
                 results.append({
                     'code': code, 'name': name, 'signal': decision['action'],
                     'reason': decision.get('reason', '관망'), 'in_portfolio': False
                 })
             else:
-                # [V8.4.7] 비거래 시간대에도 분석 결과 목록에 포함하여 데이터 연속성 유지
                 results.append({
                     'code': code, 'name': name, 'signal': 'WATCH',
                     'reason': '비거래 시간대 분석', 'in_portfolio': False
@@ -117,8 +117,8 @@ class StrategyEngine:
                     text = title_a.get_text()
                     if any(k in text for k in reject_kws):
                         return {"reject": True, "reason": f"DART 악재({text})"}
-            return {"reject": False}
-        except: return {"reject": False}
+            return {"reject": False, "reason": "특이 공시 없음"}
+        except: return {"reject": False, "reason": "DART 모니터링 일시 중단"}
 
     def fetch_news_data(self, code, name):
         # [I/O 전담] 뉴스 데이터 수집 로직

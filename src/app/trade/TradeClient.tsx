@@ -12,10 +12,11 @@ import {
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
     IconAlertTriangle, IconSearch, IconAdjustments, IconRefresh, 
     IconTimeline, IconRobot, IconAlertCircle, IconTrash, IconPlayerPlay, 
-    IconDeviceMobile, IconHistory, IconChevronUp, IconChevronDown, IconPlus 
+    IconDeviceMobile, IconHistory, IconChevronUp, IconChevronDown, IconPlus, IconDna 
 } from '@tabler/icons-react';
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
+import StrategyRadarChart from '../components/StrategyRadarChart';
 
 interface Holding {
     name: string;
@@ -407,13 +408,17 @@ function TradeContent() {
                 </Group>
             </Group>
 
-            <Group grow align="flex-start" gap="lg">
+            <Group grow align="flex-start" gap="lg" mb="lg">
                 <Stack>
                     {renderPortfolio()}
                     {renderGeminiPortfolio()}
                 </Stack>
                 {renderTrading()}
             </Group>
+
+            <Box mt="xl">
+                <StrategyRadarChart />
+            </Box>
         </Container>
     );
 }

@@ -1,9 +1,72 @@
 {
-    "initial_cash": 3000000,
-    "cash": 3000000,
-    "invested": 0,
-    "portfolio": {},
-    "peak_nav": 3000000,
-    "history": [3000000],
-    "daily_trades": []
+  "initial_cash": 3000000,
+  "cash": 16745.578950000345,
+  "invested": 2982807.0,
+  "portfolio": {
+    "152550": {
+      "name": "한국ANKOR유전",
+      "quantity": 1071,
+      "avg_price": 280.0,
+      "buy_date": "2026-04-07"
+    },
+    "011930": {
+      "name": "신성이엔지",
+      "quantity": 87,
+      "avg_price": 3435.0,
+      "buy_date": "2026-04-07"
+    },
+    "014160": {
+      "name": "대영포장",
+      "quantity": 232,
+      "avg_price": 1288.0,
+      "buy_date": "2026-04-07"
+    },
+    "018470": {
+      "name": "조일알미늄",
+      "quantity": 196,
+      "avg_price": 1527.0,
+      "buy_date": "2026-04-07"
+    },
+    "093240": {
+      "name": "형지엘리트",
+      "quantity": 292,
+      "avg_price": 1026.0,
+      "buy_date": "2026-04-07"
+    },
+    "047040": {
+      "name": "대우건설",
+      "quantity": 17,
+      "avg_price": 17350.0,
+      "buy_date": "2026-04-07"
+    },
+    "003280": {
+      "name": "흥아해운",
+      "quantity": 79,
+      "avg_price": 3795.0,
+      "buy_date": "2026-04-07"
+    },
+    "001780": {
+      "name": "알루코",
+      "quantity": 115,
+      "avg_price": 2595.0,
+      "buy_date": "2026-04-07"
+    },
+    "017900": {
+      "name": "광전자",
+      "quantity": 39,
+      "avg_price": 7520.0,
+      "buy_date": "2026-04-07"
+    },
+    "092220": {
+      "name": "KEC",
+      "quantity": 222,
+      "avg_price": 1351.0,
+      "buy_date": "2026-04-07"
+    }
+  },
+  "peak_nav": 3000000,
+  "history": [
+    3000000
+  ],
+  "daily_trades": []
 }

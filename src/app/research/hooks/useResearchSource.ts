@@ -49,7 +49,7 @@ export const useResearchSource = () => {
         addSystemLog("🔄 리서치 데이터 새로고침 시작...");
         try {
             // [V8.6.2 Hotfix] GitHub 외부 URL이 아닌 로컬 전용 API 호출로 소스 전환
-            const res = await fetch(`/api/stocks/research?v=8.6.2&cb=${new Date().getTime()}`);
+            const res = await fetch(`/api/stocks/research?v=8.9.9.5&cb=${new Date().getTime()}`);
             if (!res.ok) throw new Error("API 응답 실패");
             
             const data = await res.json();
@@ -75,7 +75,7 @@ export const useResearchSource = () => {
                              (item['키워드'] || item['Top_Keyword'] || item['Top_Keywords'] || [])),
                 is_last_captured: item.is_last_captured || (item['연속'] > 1),
                 consecutive_days: Number(item.consecutive_days || item['연속']) || (item['연속_등록'] === true ? 2 : 1),
-                foreign_change_rate: parseNum(item.foreign_change_rate || item['외인변화'] || item['외국인_변화'] || 0),
+                foreign_change_rate: parseNum(item.foreign_change_rate || item['외인변화'] || item['외국인_변화'] || item['foreign_change'] || 0),
                 latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
             }));
             setStocks(mappedData);

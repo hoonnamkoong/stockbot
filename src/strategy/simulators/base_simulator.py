@@ -35,19 +35,24 @@ class BaseSimulator:
         self.load_state()
 
     def load_state(self):
-        """[V8.6.2 Hotfix] 상태 로드 및 마이그레이션 안전장치"""
+        """[V8.6.2 Hotfix] 상태 로드 및 마이그레이션 안전장치 (버그 수정)"""
         if os.path.exists(self.state_file):
             try:
                 with open(self.state_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 
-                # [V8.6.2] 기존 데이터가 있고 cash 정보가 유효하면 유지 (단, initial_cash 보정)
-                if 'cash' in data and data['cash'] > 0:
+                # 수정: cash가 0 이상(>=)인지 확인 (풀매수 시 현금 0원 허용)
+                # 추가로 portfolio 키가 정상적으로 존재하는지 확인
+                if 'cash' in data and data['cash'] >= 0 and 'portfolio' in data:
                     self.state = data
-                    self.state['initial_cash'] = self.initial_cash # 키 보정
+                    # 혹시 예전 데이터라 initial_cash가 없으면 추가
+                    if 'initial_cash' not in self.state:
+                        self.state['initial_cash'] = self.initial_cash
                 else:
+                    print(f"[System] {self.name} 상태 데이터 오류 감지. 초기화 진행.")
                     self.reset_state()
-            except:
+            except Exception as e:
+                print(f"[System] {self.name} 상태 로드 실패 ({e}). 초기화 진행.")
                 self.reset_state()
         else:
             self.reset_state()

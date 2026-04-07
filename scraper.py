@@ -401,34 +401,40 @@ if __name__ == "__main__":
     else:
         print("[System] 🚨 알림 서비스 비활성화 상태 (리포트 전송 스킵)")
 
-    # --- 5. 3-Track 시뮬레이션 통합 실행 (Virtual Only) ---
+    # --- 5. 3-Track 시뮬레이션 통합 실행 (Tripod Sync) ---
     print(f"[System] 3-Track Tripod Simulator 가동 ({'Open Market' if force_run or is_open_day else 'Analytic Mode'})")
     
     from src.strategy.simulators.original_simulator import OriginalSimulator
     from src.strategy.simulators.aggressive_simulator import AggressiveSimulator
     from src.strategy.simulators.conviction_simulator import ConvictionSimulator
     
+    # [V8.6.2] Reason 재활용 및 데이터 주입
+    for r in results:
+        # AI 요약이 있으면 그것을 매매 사유로 활용
+        if not r.get('reason'):
+            r['reason'] = r.get('posts_summary', '시장 관심도 증가 기반 매수')
+
     results_codes = [r['code'] for r in results]
     
-    # Sim 1: 오리지널 (1/N 분산)
+    # 1. 오리지널 (Sim 1: 안정 지향형)
     sim1 = OriginalSimulator()
     sim1.check_liquidation(results_codes)
     if force_run or is_open_day:
         sim1.execute_strategy(results)
     
-    # Sim 2: 공격형 (변동성 돌파)
+    # 2. 공격형 (Sim 2: 공격 투자형)
     sim2 = AggressiveSimulator()
     sim2.check_maintenance()
     if force_run or is_open_day:
         sim2.execute_strategy(results)
         
-    # Sim 3: 컨빅션 (AI 확신도)
+    # 3. 컨빅션 (Sim 3: 신념 집중형)
     sim3 = ConvictionSimulator()
     sim3.check_liquidation(results_codes)
     if force_run or is_open_day:
         sim3.execute_strategy(results)
     
-    print("[System] 3-Track 시뮬레이션 및 로깅 완료")
+    print("[System] 3-Track 시뮬레이션 Tripod 동기화 완")
 
     elapsed = time.perf_counter() - start_time
     print(f"[System] 프로세스 종료 ({elapsed:.2f}s)")

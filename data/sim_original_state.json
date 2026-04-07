@@ -1,68 +1,11 @@
 {
-  "cash": 20558.150749999622,
-  "invested": 2978995.0,
-  "portfolio": {
-    "011930": {
-      "name": "신성이엔지",
-      "quantity": 85,
-      "price": 3495.0,
-      "buy_date": "2026-04-07"
-    },
-    "018470": {
-      "name": "조일알미늄",
-      "quantity": 191,
-      "price": 1563.0,
-      "buy_date": "2026-04-07"
-    },
-    "152550": {
-      "name": "한국ANKOR유전",
-      "quantity": 1013,
-      "price": 296.0,
-      "buy_date": "2026-04-07"
-    },
-    "017900": {
-      "name": "광전자",
-      "quantity": 39,
-      "price": 7520.0,
-      "buy_date": "2026-04-07"
-    },
-    "093240": {
-      "name": "형지엘리트",
-      "quantity": 280,
-      "price": 1071.0,
-      "buy_date": "2026-04-07"
-    },
-    "014160": {
-      "name": "대영포장",
-      "quantity": 233,
-      "price": 1283.0,
-      "buy_date": "2026-04-07"
-    },
-    "001780": {
-      "name": "알루코",
-      "quantity": 115,
-      "price": 2600.0,
-      "buy_date": "2026-04-07"
-    },
-    "092220": {
-      "name": "KEC",
-      "quantity": 218,
-      "price": 1370.0,
-      "buy_date": "2026-04-07"
-    },
-    "047040": {
-      "name": "대우건설",
-      "quantity": 17,
-      "price": 17390.0,
-      "buy_date": "2026-04-07"
-    },
-    "008350": {
-      "name": "남선알미늄",
-      "quantity": 134,
-      "price": 2225.0,
-      "buy_date": "2026-04-07"
-    }
-  },
-  "history": [],
-  "peak_nav": 3000000
+  "initial_cash": 3000000,
+  "cash": 3000000,
+  "invested": 0,
+  "portfolio": {},
+  "peak_nav": 3000000,
+  "history": [
+    3000000
+  ],
+  "daily_trades": []
 }

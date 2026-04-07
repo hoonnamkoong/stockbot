@@ -200,8 +200,18 @@ def get_stock_details(code):
 
             # 3. 비중 변화량 연산 (%p)
             details['foreign_change'] = round(details['foreign_rate'] - details['prev_foreign_rate'], 3)
-            details['foreign_change_rate'] = details['foreign_change'] # UI에서 foreign_change_rate를 기대함
+            details['foreign_change_rate'] = details['foreign_change'] # UI 호환용
             
+            # [V8.9.9.5] 전일종가 0원 방지: 현재가와 등락률을 통한 역산 보조 (데이터 행이 부족할 경우 대비)
+            if details['prev_close'] == 0:
+                try:
+                    price_text = data_rows[0][1].get_text(strip=True).replace(',', '')
+                    change_text = data_rows[0][3].get_text(strip=True).replace('%', '')
+                    curr_price = int(price_text)
+                    change_val = float(change_text)
+                    details['prev_close'] = int(curr_price / (1 + change_val/100))
+                except: pass
+
             print(f"   [Scrape] {code}: 비중 {details['foreign_rate']}%, 변화 {details['foreign_change']}%p, 순매수 {details['foreign_net_buy']}, 전일종가 {details['prev_close']}")
     except Exception as e:
         print(f"   [Warning] {code} 상세 정보 수집 실패: {e}")

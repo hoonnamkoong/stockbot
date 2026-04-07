@@ -136,6 +136,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
             ('prev_close', '전일종가'),
             ('foreign_change', '외인변화'),
             ('foreign_change_rate', '외인변화'),
+            ('foreign_change_rate', 'foreign_change'),
             ('foreign_rate', '외인비중'),
             ('prev_foreign_rate', '전일외인'),
             ('consecutive_days', '연속'),

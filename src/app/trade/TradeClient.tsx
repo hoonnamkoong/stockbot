@@ -214,25 +214,27 @@ function TradeContent() {
         }
         return (
             <ScrollArea offsetScrollbars>
-                <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 550 : 500 }}>
+                <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 650 : 600 }}>
                     <Table.Thead>
                         <Table.Tr>
                             <Table.Th style={{ width: 120 }}>종목명</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>보유수량</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>평균 체결가</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>체결 금액</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>수량</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>평단가</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>현재가</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>체결금액</Table.Th>
                             <Table.Th style={{ textAlign: 'center' }}>수익률(%)</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                         {holdings.map((h) => {
                             const avgPrice = h.avg_price || h.price || 0;
+                            const currentPrice = h.current_price || h.price || 0; 
                             const plRate = h.pl_rate ?? 0;
                             const amount = (h.qty || h.quantity || 0) * avgPrice;
                             return (
                                 <Table.Tr key={h.code} style={{ cursor: isReal ? 'pointer' : 'default' }} onClick={() => isReal && setCode(h.code)}>
                                     <Table.Td>
-                                        <Text size="sm" fw={700}>{h.name}</Text>
+                                        <Text size="sm" fw={700} truncate maw={100}>{h.name}</Text>
                                         <Text size="xs" c="dimmed">{h.code}</Text>
                                     </Table.Td>
                                     <Table.Td style={{ textAlign: 'right' }}>
@@ -240,6 +242,9 @@ function TradeContent() {
                                     </Table.Td>
                                     <Table.Td style={{ textAlign: 'right' }}>
                                         <Text size="sm">{Math.round(avgPrice).toLocaleString()}원</Text>
+                                    </Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>
+                                        <Text size="sm" fw={500} c="teal">{Math.round(currentPrice).toLocaleString()}원</Text>
                                     </Table.Td>
                                     <Table.Td style={{ textAlign: 'right' }}>
                                         <Text size="sm" fw={700}>{Math.round(amount).toLocaleString()}원</Text>
@@ -405,7 +410,7 @@ function TradeContent() {
                                             </Text>
                                         </Stack>
                                     </Group>
-                                    <Divider mb="xs" label="포트폴리오" labelPosition="center" />
+                                    <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
                                     {renderPortfolioTable(holdings)}
                                 </Paper>
                                 <Paper p="md" withBorder radius="md" bg="gray.0">

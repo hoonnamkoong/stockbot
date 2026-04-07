@@ -46,82 +46,65 @@ export const useResearchSource = () => {
     const fetchData = useCallback(async () => {
         if (typeof window === 'undefined') return;
         setLoading(true);
-        addSystemLog("🔄 데이터 새로고침 시작...");
+        addSystemLog("🔄 리서치 데이터 새로고침 시작...");
         try {
-            const timeMap = new Date().getTime();
-            const filename = 'latest_stocks.json';
-            const stockUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/${filename}?t=${timeMap}`;
+            // [V8.6.2 Hotfix] GitHub 외부 URL이 아닌 로컬 전용 API 호출로 소스 전환
+            const res = await fetch(`/api/stocks/research?v=8.6.2&cb=${new Date().getTime()}`);
+            if (!res.ok) throw new Error("API 응답 실패");
+            
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || "데이터 로드 실패");
 
-            const resStocks = await fetch(stockUrl, { cache: 'no-store' });
-            if (resStocks.ok) {
-                const rawText = await resStocks.text();
-                const rawData = JSON.parse(rawText.replace(/\bNaN\b/g, '0').replace(/\bInfinity\b/g, '0').replace(/\b-Infinity\b/g, '0'));
-                const mappedData = rawData.map((item: any) => ({
-                    ...item,
-                    market: item.market || item['시장'] || item['시장구분'],
-                    code: item.code,
-                    name: item.name || item['종목명'],
-                    price: parseNum(item.price || item['현재가']),
-                    current_price: parseNum(item.price || item['현재가']),
-                    prev_close: parseNum(item.prev_close || item['어제_종가'] || item['전일종가']),
-                    change_rate: parseNum(item.change_rate || item['등락률']),
-                    recent_posts_count: item.recent_posts_count || item['게시글수'] || item['당일_게시글수'] || item['당일 게시글수'],
-                    foreign_rate: parseNum(item.foreign_rate || item['외인소진율'] || item['현재_외국인비중']),
-                    prev_foreign_rate: parseNum(item.prev_foreign_rate || item['전일_외국인비중'] || item['어제_외국인비중']),
-                    posts_summary: item.posts_summary || item['게시물_요약'],
-                    sentiment: item.sentiment || item['감정분석'],
-                    top_keywords: Array.isArray(item.top_keywords) ? item.top_keywords : 
-                                 (typeof item.top_keywords === 'string' ? item.top_keywords.split(',').map((k: string) => k.trim()) : 
-                                 (item['Top_Keyword'] || item['Top_Keywords'] || [])),
-                    is_last_captured: item.is_last_captured || item['연속_등록'],
-                    consecutive_days: Number(item.consecutive_days) || (item['연속_등록'] === true ? 2 : 1),
-                    foreign_change_rate: parseNum(item.foreign_change_rate || item['외국인_변화'] || 0),
-                    latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
-                }));
-                setStocks(mappedData);
-            }
+            // 1. 주요 종목 데이터 (latest_stocks.json)
+            const mappedData = (data.stocks || []).map((item: any) => ({
+                ...item,
+                market: item.market || item['시장'] || item['시장구분'],
+                code: item.code,
+                name: item.name || item['종목명'],
+                price: parseNum(item.price || item['현재가']),
+                current_price: parseNum(item.price || item['현재가']),
+                prev_close: parseNum(item.prev_close || item['어제_종가'] || item['전일종가']),
+                change_rate: parseNum(item.change_rate || item['등락률']),
+                recent_posts_count: item.recent_posts_count || item['게시글수'] || item['당일_게시글수'] || item['당일 게시글수'],
+                foreign_rate: parseNum(item.foreign_rate || item['외인소진율'] || item['현재_외국인비중']),
+                prev_foreign_rate: parseNum(item.prev_foreign_rate || item['전일_외국인비중'] || item['어제_외국인비중']),
+                posts_summary: item.posts_summary || item['게시물_요약'],
+                sentiment: item.sentiment || item['감정분석'],
+                top_keywords: Array.isArray(item.top_keywords) ? item.top_keywords : 
+                             (typeof item.top_keywords === 'string' ? item.top_keywords.split(',').map((k: string) => k.trim()) : 
+                             (item['Top_Keyword'] || item['Top_Keywords'] || [])),
+                is_last_captured: item.is_last_captured || item['연속_등록'],
+                consecutive_days: Number(item.consecutive_days) || (item['연속_등록'] === true ? 2 : 1),
+                foreign_change_rate: parseNum(item.foreign_change_rate || item['외국인_변화'] || 0),
+                latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
+            }));
+            setStocks(mappedData);
 
-            // Sync other sources
-            const resStatus = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/status.json?t=${timeMap}`, { cache: 'no-store' });
-            if (resStatus.ok) {
-                const statusData = await resStatus.json();
-                setLastUpdated(statusData.last_updated);
-            }
+            // 2. 상태 정보 (status.json)
+            setLastUpdated(data.status?.last_updated || 'Unknown');
 
-            const resReports = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/reports.json?t=${timeMap}`, { cache: 'no-store' });
-            if (resReports.ok) {
-                const data = await resReports.json();
-                setReports([...data.filter((r: any) => r.type === 'monthly'), ...data.filter((r: any) => r.type === 'daily').slice(0, 10)]);
-            }
+            // 3. 리포트 목록 (reports.json)
+            const reportsData = data.reports || [];
+            setReports([
+                ...reportsData.filter((r: any) => r.type === 'monthly'),
+                ...reportsData.filter((r: any) => r.type === 'daily').slice(0, 10)
+            ]);
 
-            const res5 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_5days.json?t=${timeMap}`, { cache: 'no-store' });
-            if (res5.ok) {
-                const raw5 = await res5.text();
-                const mapped5 = JSON.parse(raw5.replace(/\bNaN\b/g, '0')).map((item: any) => ({
-                    ...item,
-                    current_price: parseNum(item.current_price || item.price),
-                    change_rate: parseNum(item.change_rate),
-                    sparkline_price: Array.isArray(item.sparkline_price) ? item.sparkline_price : [],
-                    sparkline_posts: Array.isArray(item.sparkline_posts) ? item.sparkline_posts : []
-                }));
-                setFiveDayData(mapped5);
-            }
+            // 4. 5일/3일 누적 데이터
+            const mapTrend = (t: any) => ({
+                ...t,
+                current_price: parseNum(t.current_price || t.price),
+                change_rate: parseNum(t.change_rate),
+                sparkline_price: Array.isArray(t.sparkline_price) ? t.sparkline_price : [],
+                sparkline_posts: Array.isArray(t.sparkline_posts) ? t.sparkline_posts : []
+            });
 
-            const res3 = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/db-data/data/analysis_3days.json?t=${timeMap}`, { cache: 'no-store' });
-            if (res3.ok) {
-                const raw3 = await res3.text();
-                const mapped3 = JSON.parse(raw3.replace(/\bNaN\b/g, '0')).map((item: any) => ({
-                    ...item,
-                    current_price: parseNum(item.current_price || item.price),
-                    change_rate: parseNum(item.change_rate),
-                    sparkline_price: Array.isArray(item.sparkline_price) ? item.sparkline_price : [],
-                    sparkline_posts: Array.isArray(item.sparkline_posts) ? item.sparkline_posts : []
-                }));
-                setThreeDayData(mapped3);
-            }
+            setFiveDayData((data.analysis_5days || []).map(mapTrend));
+            setThreeDayData((data.analysis_3days || []).map(mapTrend));
+
         } catch (e: any) {
             console.error(e);
-            addSystemLog(`❌ ERROR: ${e.message}`);
+            addSystemLog(`❌ 데이터 갱신 ERROR: ${e.message}`);
         }
         setLoading(false);
     }, [addSystemLog]);

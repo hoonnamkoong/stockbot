@@ -129,10 +129,22 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         
         fixed_csv = "data/trending_integrated.csv"
         fixed_xlsx = "data/trending_integrated.xlsx"
+        fixed_json = "data/latest_stocks.json"
         
         # Overwrite CSV (Force Sync)
         df.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
         
+        # [V8.6.2 Hotfix] Save JSON for Vercel/GitHub Dashboard
+        df_json = df.to_json(orient='records', force_ascii=False)
+        with open(fixed_json, 'w', encoding='utf-8') as f:
+            f.write(df_json)
+        
+        # [V8.6.2 Hotfix] Update status.json with current KST
+        now_kst = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+        status_json = "data/status.json"
+        with open(status_json, 'w', encoding='utf-8') as f:
+            json.dump({"last_updated": now_kst, "status": "ok", "message": "Synced V8.6.2"}, f, ensure_ascii=False, indent=4)
+
         # Overwrite Excel (Force Sync)
         with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Trending_Stocks', index=False)

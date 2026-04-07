@@ -29,7 +29,8 @@ class OriginalSimulator(BaseSimulator):
             
             qty = int(target_amount / price)
             if qty > 0:
-                reason = f"[오리지널] 1단계 Buzz Filter 통과 ({stock.get('recent_posts_count')} posts) 동일 비중 진입"
+                ai_summary = stock.get('posts_summary', 'AI 요약 데이터 없음').replace("•", "").strip()
+                reason = f"[오리지널] {ai_summary}"
                 self.buy(code, stock['name'], price, qty, reason=reason)
 
     def check_liquidation(self, candidates_codes):

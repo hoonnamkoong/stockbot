@@ -19,97 +19,75 @@ from src.trade.balance import get_balance
 
 class GeminiAgent:
     """
-    [V8.5.8] 최신 모델 동적 탐색 및 Fail-Fast 재시도 엔진
+    [V8.6.0] Fixed Gemini Engine & Singleton Controller
+    - 싱글톤 패턴으로 인스턴스 중복 생성 방지
+    - 모델 하드코딩 (Batch: Flash-Lite, Report: Pro)
+    - 429 발생 시 즉시 중단 (Fail-Fast)
     """
+    _instance = None
+    exhausted_models = set() # 429(Daily) 발생 모델 기록
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(GeminiAgent, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
-        # 환경변수 통합 로드 (Double Defense)
+        if self._initialized: return
+        
+        # [V8.6.0] 모델 명칭 선설정 (API 키 부재 시에도 속성 참조 가능하도록 보장)
+        self.batch_model_name = "models/gemini-2.5-flash-lite"
+        self.report_model_name = "models/gemini-2.5-pro"
+        self.exhausted_models = set() if not hasattr(self, 'exhausted_models') else self.exhausted_models
+
         self.api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY')
-        self.model = None
-        self.model_name = "Unknown"
-        self.all_available_models = []
-        self.model_index = 0
         
         if not self.api_key:
-            print("[GeminiAgent] 🚨 에러: API 키(GOOGLE_API_KEY)가 감지되지 않습니다.")
+            print("[GeminiAgent] 🚨 에러: API 키가 감지되지 않습니다. 모델은 초기화되지 않았습니다.")
+            self.batch_model = None
+            self.report_model = None
+            self._initialized = True # 반복 에러 방지
             return
 
         genai.configure(api_key=self.api_key)
-        self._update_available_models()
-
-    def _update_available_models(self):
-        """[V8.5.8] 사용 가능한 모델 리스트를 동적으로 갱신하고 최신 2.5 시리즈 순으로 선택합니다."""
-        try:
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            
-            # [V8.5.8] 진짜 동적 모델 우선순위 (Lite 우선)
-            priority_list = [
-                'models/gemini-2.5-flash-lite', 
-                'models/gemini-2.5-flash', 
-                'models/gemini-2.0-flash'
-            ]
-            self.all_available_models = []
-            
-            # 우선순위 항목 먼저 배치
-            for p in priority_list:
-                if p in available_models:
-                    self.all_available_models.append(p)
-            
-            # 리스트에 없는 나머지 모델들도 추가
-            for am in available_models:
-                if am not in self.all_available_models:
-                    self.all_available_models.append(am)
-            
-            if self.all_available_models:
-                self.model_index = 0
-                self.model_name = self.all_available_models[self.model_index]
-                self.model = genai.GenerativeModel(self.model_name)
-                print(f"[GeminiAgent] ✅ 최신 모델 초기화: {self.model_name}")
-            else:
-                self.model = None
-                print("[GeminiAgent] 🚨 사용 가능한 텍스트 생성 모델이 없습니다.")
-                
-        except Exception as e:
-            print(f"[GeminiAgent] 🚨 API 모델 조회 실패: {e}")
-            self.all_available_models = []
-            self.model = None
-
-    def _call_gemini_safe(self, prompt, generation_config=None):
-        """
-        [V8.5.8 Fail-Fast] 429 발생 시 5초 대기 후 백업 모델로 단 1회만 재시도
-        """
-        if not self.model: return None
         
-        # 1차 시도
+        # [V8.6.0] 모델 고정 (유료 티어 성능 100% 활용)
+        self.batch_model = genai.GenerativeModel(self.batch_model_name)
+        self.report_model = genai.GenerativeModel(self.report_model_name)
+        
+        self._initialized = True
+        print(f"[GeminiAgent] ✅ V8.6.0 싱글톤 엔진 가동 (Lite & Pro Fixed)")
+
+    # [V8.6.0] 동적 모델 업데이트 로직 폐기 (Fixed Engine 체제)
+
+    def _call_gemini_safe(self, prompt, model_type='batch', generation_config=None):
+        """
+        [V8.6.0 Fail-Fast] 고정 모델 체제. 429 발생 시 즉시 중단 및 블랙리스트 등록
+        model_type: 'batch' (Flash-Lite) or 'report' (Pro)
+        """
+        target_model = self.batch_model if model_type == 'batch' else self.report_model
+        target_name = self.batch_model_name if model_type == 'batch' else self.report_model_name
+        
+        if target_name in self.exhausted_models:
+            print(f"[GeminiAgent] ⛔ {target_name}은 쿼터 소진으로 인해 호출 불가 상태입니다.")
+            return None
+
         try:
-            return self.model.generate_content(prompt, generation_config=generation_config)
+            return target_model.generate_content(prompt, generation_config=generation_config)
         except Exception as e:
             err_msg = str(e)
             if ("429" in err_msg or "Quota" in err_msg or "ResourceExhausted" in err_msg):
-                print(f"[GeminiAgent] ⚠️ Quota Exceeded ({self.model_name}). 5초 대기 후 백업 모델 전환...")
-                time.sleep(5)
-                
-                # 백업 모델 전환 (다음 순위 모델)
-                self.model_index += 1
-                if self.model_index < len(self.all_available_models):
-                    self.model_name = self.all_available_models[self.model_index]
-                    self.model = genai.GenerativeModel(self.model_name)
-                    print(f"[GeminiAgent] 🔄 백업 모델로 2차 시도 (Fail-Fast): {self.model_name}")
-                    
-                    # 2차 시도 (단 1회)
-                    try:
-                        return self.model.generate_content(prompt, generation_config=generation_config)
-                    except Exception as e2:
-                        print(f"[GeminiAgent] ❌ 백업 모델({self.model_name}) 2차 시도마저 실패: {str(e2)}")
-                else:
-                    print(f"[GeminiAgent] 🚨 가용 백업 모델이 없습니다. 분석 스킵.")
+                print(f"[GeminiAgent] 🚨 Quota Exceeded ({target_name}). 즉시 분석 중단 및 블랙리스트 등록.")
+                self.exhausted_models.add(target_name)
             else:
-                print(f"[GeminiAgent] 🚨 API 에러: {err_msg}")
+                print(f"[GeminiAgent] 🚨 API 에러 ({target_name}): {err_msg}")
         
         return None
 
     def generate_trading_guide(self, market_context, signals):
         """[V8.4.6] 31개 종목 누락 방지 및 딥다이브 리포트 생성"""
-        if not self.model: return "⚠️ Gemini API 초기화 실패: 리포트를 생성할 수 없습니다."
+        if not self.report_model: return "⚠️ Gemini API 초기화 실패: 리포트를 생성할 수 없습니다."
         if not signals: return "⚠️ 분석할 시그널 종목 데이터가 전달되지 않았습니다."
 
         # [데이터 정제] 토론방 본문이 너무 길어 API 용량을 초과하지 않도록 300자 제한
@@ -125,17 +103,23 @@ class GeminiAgent:
         당신은 대한민국 주식 시장 전문 퀀트 애널리스트입니다.
         아래 시장 상황과 {len(cleaned_signals)}개 종목의 토론방 Buzz 데이터를 바탕으로 '오늘 밤의 필독 리포트'를 작성하세요.
         
+        [V8.6.1 리포트 초간결화(Brevity) 절대 규칙]
+        1. 모든 문장은 불렛포인트(•)로 시작하며 단답형 키워드 위주로 작성한다.
+        2. "~입니다", "~라 판단됩니다" 등의 서술어를 전면 제거하고 명사형으로 종결한다.
+        3. 섹션당 불렛포인트는 최대 3개를 넘지 않는다.
+        4. 핵심 재료와 수급 주체는 반드시 **두꺼운 글씨(Bold)**를 사용한다.
+        5. '가즈아', '무조건' 등 게시판 노이즈는 무시하고 팩트만 남긴다.
+
         [시장상황] {market_context}
         [데이터] {json.dumps(cleaned_signals, ensure_ascii=False)}
         
         **출력 가이드:**
-        1. 가장 유망한 'Top 3 대장주'를 선정하고 그 이유를 토론방 여론과 연계해 설명할 것.
-        2. 주의해야 할 '리스크 종목'을 1개 선정할 것.
-        3. 강조는 오직 마크다운(**)만 사용하고, 전문적이고 신뢰감 있는 어조를 유지할 것.
-        4. HTML 태그(<br>, <b> 등)를 절대 사용하지 말 것.
+        1. [Top 3 대장주]: 선정 이유를 핵심 키워드 중심(•)으로 기술.
+        2. [주의 리스크]: 리스크가 없을 경우 단 한 줄 "• **특이사항 없음**"으로 끝낼 것.
+        3. 마크다운(**) 외 HTML 태그는 절대 사용 금지.
         """
         try:
-            response = self._call_gemini_safe(prompt)
+            response = self._call_gemini_safe(prompt, model_type='report')
             if response and response.text:
                 res_text = response.text
                 # HTML 태그 강제 제거 (보안 레이어)
@@ -147,7 +131,7 @@ class GeminiAgent:
 
     def evaluate_momentum(self, stock, news, dart):
         """[V8.4.7] 개별 종목의 모멘텀을 AI가 최종 검증 (Engine 호출용)"""
-        if not self.model: return "WATCH"
+        if not self.batch_model: return "WATCH"
         
         prompt = f"""
         종목명: {stock.get('name')} ({stock.get('code')})
@@ -155,10 +139,12 @@ class GeminiAgent:
         최근 뉴스: {news}
         공시 분석: {dart}
         
+        [V8.6.0 노이즈 필터] 단순 선동이나 감정적 글은 무시하고 팩트 위주로 모멘텀을 평가하세요.
+
         위 데이터를 바탕으로 이 종목의 단기 모멘텀을 평가하세요.
         """
         try:
-            response = self._call_gemini_safe(prompt)
+            response = self._call_gemini_safe(prompt, model_type='batch')
             return response.text.strip() if response and response.text else "WATCH"
         except:
             return "WATCH"
@@ -169,7 +155,7 @@ class GeminiAgent:
         - 한 번의 API 호출로 모든 종목의 감정/요약/키워드 추출
         - Quota 절감 및 분석 속도 개선
         """
-        if not self.model or not batch_data: 
+        if not self.batch_model or not batch_data: 
             return {s.get('code', s.get('name')): {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []} for s in batch_data}
         
         # [V8.5.5] 데이터 경량화 및 정합성 보전 (body 대신 title + likes 활용)
@@ -183,29 +169,30 @@ class GeminiAgent:
             })
             
         prompt = f"""
-        당신은 실시간 주식 수급 분석 전문가입니다. 아래 리스트에 포함된 각 종목의 토론방 데이터를 분석하세요.
+        당신은 구동계(Body)를 제외한 핵심 정보만을 추출하는 주식 수급 분석 전문가입니다.
+        아래 리스트에 포함된 각 종목의 토론방 데이터를 분석하세요.
         
-        [데이터 정제 및 평가 필수 규칙 - 절대 준수]
-        1. 노이즈 배제: '가자', '가즈아', '존버', '상한가', '떡상', '구조대', '세력', '개미털기', '설거지', 'ㅋㅋ', 'ㅎㅎ' 등 단순 감정적 선동, 음모론 단어는 분석 대상에서 철저히 무시한다.
-        2. 팩트 기반 키워드: keywords는 기업 펀더멘털, 수급 변화, 공시, 테마 모멘텀을 나타내는 '명사형 팩트 단어'만 추출한다.
-        3. 감정 점수 기준: 근거 없는 맹신은 0점 처리. 객관적 호재(실적, 수주 등)가 동반된 여론만 긍정(+), 객관적 악재가 동반된 여론만 부정(-)으로 평가한다.
+        [V8.6.1 분석 규칙 - 절대 준수]
+        1. 선동/감탄사(가즈아, 영차 등)는 무조건 0점 처리하고 summary에 '노이즈' 표기.
+        2. summary는 반드시 20자 이내의 명사형 핵심 요약으로 작성. (예: **신사업 공시** 기대감 유입)
+        3. keywords는 3개 이내의 핵심 단어만 추출.
 
         [분석 대상 데이터]
         {json.dumps(cleaned_batch, ensure_ascii=False)}
         
-        각 종목별로 종목코드(code)를 Key로 사용하여 다음 JSON 형식으로만 응답하세요 (반드시 유효한 JSON 객체 하나만 반환하세요):
+        각 종목별로 종목코드(code)를 Key로 사용하여 다음 JSON 형식으로만 응답하세요:
         {{
             "005930": {{
                 "sentiment_score": 점수(-10 ~ 10),
-                "summary": "게시글 한 줄 요약 (50자 이내)",
-                "keywords": ["키워드1", "키워드2", "키워드3"]
-            }},
-            "066570": {{ ... }}
+                "summary": "**핵심키워드** 중심 요약",
+                "keywords": ["키워드1", "키워드2"]
+            }}
         }}
         """
         try:
             response = self._call_gemini_safe(
-                prompt, 
+                prompt,
+                model_type='batch',
                 generation_config={"response_mime_type": "application/json"}
             )
             if response and response.text:
@@ -221,7 +208,7 @@ class GeminiAgent:
 
     def analyze_bulk_sentiment(self, bulk_data):
         """기존 벌크 감성 분석 로직 유지 (모델 동적 적용)"""
-        if not self.model: return {}
+        if not self.batch_model: return {}
         try:
             processed_bulk = []
             for s in bulk_data:
@@ -235,6 +222,7 @@ class GeminiAgent:
             
             response = self._call_gemini_safe(
                 prompt,
+                model_type='batch',
                 generation_config={"response_mime_type": "application/json"}
             )
             return json.loads(response.text)
@@ -272,7 +260,7 @@ class StrategyAdvisor:
         """
         [Legacy / Fallback] 1차 통과 종목 전용 최적화 분석 (개별 호출)
         """
-        if not self.gemini.model: return {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []}
+        if not self.gemini.batch_model: return {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []}
         
         # 대표글 본문/제목 결합 (용량 제한)
         text_content = "\n".join([f"[{p.get('title')}] {str(p.get('body', ''))[:200]}" for p in posts])
@@ -282,15 +270,21 @@ class StrategyAdvisor:
         최근 토론방 게시글:
         {text_content}
 
-        위 내용을 바탕으로 다음 형식의 JSON으로만 답변하세요:
+        [V8.6.0 노이즈 배제 및 팩트 추출 규칙]
+        - '가즈아', '상한가', '세력' 등 단순 선동 문구는 무시한다.
+        - 게시글의 팩트(재료, 수급)에 집중하여 다음 형식의 JSON으로만 답변하세요:
         {{
             "sentiment_score": 점수(-10에서 10),
-            "summary": "게시글 내용을 관통하는 한 줄 요약 (50자 이내)",
-            "keywords": ["키워드1", "키워드2", "키워드3"]
+            "summary": "팩트 기반 한 줄 요약 (50자 이내)",
+            "keywords": ["키워드1", "키워드2"]
         }}
         """
         try:
-            response = self.gemini._call_gemini_safe(prompt, generation_config={"response_mime_type": "application/json"})
+            response = self.gemini._call_gemini_safe(
+                prompt, 
+                model_type='batch',
+                generation_config={"response_mime_type": "application/json"}
+            )
             if response and response.text:
                 return json.loads(response.text)
         except: pass
@@ -310,27 +304,22 @@ class StrategyAdvisor:
             news_data = "최근 수급 유입 및 시장 관심도 증가" # TODO: 통합 뉴스 검색 엔진 연동 예정
             dart_data = dart_res.get('reason', '특이 공시 없음')
             
-            # [지침 준수] DART 악재가 있어도 탈락시키지 않고 리포트에 포함
+            # [V8.6.1 Brevity Policy]
             prompt = f"""
-            당신은 시니어 퀀트 애널리스트입니다. 아래 종목에 대해 실매매 가부를 결정하는 '딥다이브 리포트'를 작성하세요.
+            시니어 퀀트 애널리스트로서 아래 종목에 대한 '초간결 딥다이브 리포트'를 작성하세요.
             
             종목: {stock['name']} ({stock['code']})
-            현재가: {stock.get('price')}
-            당일 등락: {stock.get('change_rate')}
-            누적 Buzz: {stock.get('recent_posts_count')}
             AI 요약: {stock.get('posts_summary')}
-            핵심 키워드: {', '.join(stock.get('keywords', []))}
-            DART 공시 현황: {dart_data}
-            뉴스 요약: {news_data}
+            DART 공시/뉴스: {dart_data} / {news_data}
             
-            **작성 가이드 (지시사항 엄수):**
-            1. [Risk Report]: 반드시 제일 먼저 작성하세요. CB/BW, 유상증자 등 공시 데이터에 구체적 위험 요소가 있는지 판별하여 보고하세요. (없다면 '특이사항 없음'으로 보고)
-            2. [Analysis]: Buzz의 질(감정 점수: {stock.get('sentiment_score')})과 수급 상황을 종합 분석하세요.
-            3. [Final Verdict]: BUY(매도), WATCH(관망), REJECT(제외) 중 하나를 선택하고 명확한 근거를 제시하세요.
-            4. **마크다운(**)**만 사용하고 HTML 태그는 절성 금지합니다.
+            [V8.6.1 간결성 규칙]
+            1. 모든 내용은 불렛포인트(•)와 단답형으로 기술.
+            2. 문장 종결 어미("~함", "~임" 등)까지도 최소화.
+            3. 리스크 보고: 특이사항 없을 경우 "• **특이사항 없음**" 한 줄만 출력.
+            4. 결론: BUY, WATCH, REJECT 중 택1 + 한 줄 근거.
             """
             try:
-                response = self.gemini._call_gemini_safe(prompt)
+                response = self.gemini._call_gemini_safe(prompt, model_type='report')
                 if response and response.text:
                     # HTML 강제 제거 및 정제
                     cleaned_text = re.sub(r'<[^>]*>', '', response.text.strip())

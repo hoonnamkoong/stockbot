@@ -92,10 +92,10 @@ class BaseSimulator:
         with open(self.csv_file, 'a', encoding='utf-8-sig', newline='') as f:
             writer = csv.writer(f)
             if not file_exists:
-                writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "reason"])
+                writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "reason"])
             writer.writerow([
                 log_entry['timestamp'], f"{name}({code})", action, 
-                f"{price:,.0f}", quantity, reason
+                f"{price:,.0f}", quantity, f"{(quantity * price):,.0f}", reason
             ])
 
     def buy(self, code, name, price, quantity, reason=""):

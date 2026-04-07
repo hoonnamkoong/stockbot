@@ -316,18 +316,25 @@ if __name__ == "__main__":
 
     print(f"[System] 최종 분석 대상: {len(results)}개 종목")
 
-    # --- [V8.5.5] Batch AI Discovery 분석 ---
+    # --- [V8.6.0] Batch AI Discovery 분석 (Fail-Fast 적용) ---
     if results:
         print(f"[System] Gemini Batch AI 분석 시작 ({len(results)}개 종목, 10개씩 분할)...")
         advisor = StrategyAdvisor()
         batch_results = {}
         chunk_size = 10
+        
         for i in range(0, len(results), chunk_size):
+            # [V8.6.0 Fail-Fast] 이미 쿼터가 소진된 경우 이후 분석 스킵
+            if advisor.gemini.batch_model_name in advisor.gemini.exhausted_models:
+                print(f"   [Batch] 🚨 쿼터 소진 감지. 잔여 {len(results)-i}개 종목 분석을 중단합니다.")
+                break
+                
             chunk = results[i:i + chunk_size]
             batch_input = [{"code": r['code'], "name": r['name'], "posts": r.get('representative_posts', [])} for r in chunk]
             
             print(f"   [Batch] Chunk {i//chunk_size + 1} 분석 중 ({len(chunk)}개 종목)...")
             chunk_res = advisor.analyze_batch_discovery(batch_input)
+            
             if chunk_res:
                 batch_results.update(chunk_res)
             
@@ -335,7 +342,7 @@ if __name__ == "__main__":
                 time.sleep(3) # API Rate Limit 방어용 지연
                 
         for r in results:
-            insight = batch_results.get(r['code'], {"sentiment_score": 0, "summary": "분석 오류", "keywords": []})
+            insight = batch_results.get(r['code'], {"sentiment_score": 0, "summary": "분석 스킵(Quota)", "keywords": []})
             r.update({
                 'posts_summary': insight.get('summary', '요약 실패'),
                 'keywords': insight.get('keywords', []),
@@ -358,9 +365,8 @@ if __name__ == "__main__":
     
     if elite_candidates:
         print(f"[System] 3차 필터 통과 종목({len(elite_candidates)}개) 심층 분석 중...")
-        # [V8.5.3] 최종 5개 종목에 대해 DART/뉴스 결합 리포트 생성
+        # [V8.6.0] 기존 advisor 인스턴스 재사용 (Singleton Gemini 활용)
         final_top_5 = elite_candidates[:5]
-        advisor = StrategyAdvisor()
         
         # deep_dive_report 내에서 DART/뉴스 검색 및 Gemini 리포트 생성 수행
         advisor_report = advisor.generate_deep_dive_report(final_top_5)

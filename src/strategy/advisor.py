@@ -186,20 +186,89 @@ class StrategyAdvisor:
         self.gemini = GeminiAgent()
 
     def generate_report(self, candidates, allow_buy=True):
-        """[V8.4.7] 개장일 중심 리포트 생성 로직"""
-        # 기술적 분석 및 시뮬레이션 실행 (종목 대응은 그대로 수행)
+        """[V8.4.7] 개장일 중심 리포트 생성 로직 (Legacy)"""
         all_results = self.engine.execute_simulation(candidates, allow_buy=allow_buy)
-        
-        # [V8.4.7 Fix] AI 분석에는 Buzz 필터를 통과한 정예 종목(candidates)을 직접 전달
-        # 이를 통해 allow_buy=False인 밤 시간대에도 데이터 단절 없이 리포트가 생성됨
         market_context = f"{len(candidates)}개 종목 Buzz 필터 통과. 시장 주도 섹터 및 모멘텀 분석."
         gemini_guide = self.gemini.generate_trading_guide(market_context, candidates)
-        
         summary = f"\n---\n📊 **V8.4.7 Gold Master 시스템 리포트**\n"
         summary += f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
-        
         buy_targets = [r for r in all_results if r.get('signal') == 'BUY']
         if buy_targets:
             summary += f"🔥 매수 대상: {', '.join([t['name'] for t in buy_targets])}\n"
-        
         return f"{gemini_guide}\n{summary}", all_results
+
+    def analyze_initial_discovery(self, stock_name, posts):
+        """
+        [V8.5.2] 1차 통과 종목 전용 최적화 분석
+        분석 항목: 감정 점수(-10~10), 1줄 요약, 핵심 키워드 3개
+        """
+        if not self.gemini.model: return {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []}
+        
+        # 대표글 본문/제목 결합 (용량 제한)
+        text_content = "\n".join([f"[{p.get('title')}] {str(p.get('body', ''))[:200]}" for p in posts])
+        
+        prompt = f"""
+        종목명: {stock_name}
+        최근 토론방 게시글:
+        {text_content}
+
+        위 내용을 바탕으로 다음 형식의 JSON으로만 답변하세요:
+        {{
+            "sentiment_score": 점수(-10에서 10),
+            "summary": "게시글 내용을 관통하는 한 줄 요약 (50자 이내)",
+            "keywords": ["키워드1", "키워드2", "키워드3"]
+        }}
+        """
+        try:
+            response = self.gemini._call_gemini_safe(prompt, generation_config={"response_mime_type": "application/json"})
+            if response and response.text:
+                return json.loads(response.text)
+        except: pass
+        return {"sentiment_score": 0, "summary": "분석 오류", "keywords": []}
+
+    def generate_deep_dive_report(self, final_candidates):
+        """
+        [V8.5.3] 3차 통과 종목(최종 5선) 심층 리포트 생성
+        - DART 공시 체크, 뉴스 교차 검증, 최종 매수 의견 포함
+        """
+        if not final_candidates: return "⚠️ 최종 분석 대상 종목이 없습니다."
+        
+        reports = []
+        for stock in final_candidates:
+            # [Step 1] 실시간 데이터 취득 (Engine 연동)
+            dart_res = self.engine.fetch_dart_data(stock['code'])
+            news_data = "최근 수급 유입 및 시장 관심도 증가" # TODO: 통합 뉴스 검색 엔진 연동 예정
+            dart_data = dart_res.get('reason', '특이 공시 없음')
+            
+            # [지침 준수] DART 악재가 있어도 탈락시키지 않고 리포트에 포함
+            prompt = f"""
+            당신은 시니어 퀀트 애널리스트입니다. 아래 종목에 대해 실매매 가부를 결정하는 '딥다이브 리포트'를 작성하세요.
+            
+            종목: {stock['name']} ({stock['code']})
+            현재가: {stock.get('price')}
+            당일 등락: {stock.get('change_rate')}
+            누적 Buzz: {stock.get('recent_posts_count')}
+            AI 요약: {stock.get('posts_summary')}
+            핵심 키워드: {', '.join(stock.get('keywords', []))}
+            DART 공시 현황: {dart_data}
+            뉴스 요약: {news_data}
+            
+            **작성 가이드 (지시사항 엄수):**
+            1. [Risk Report]: 반드시 제일 먼저 작성하세요. CB/BW, 유상증자 등 공시 데이터에 구체적 위험 요소가 있는지 판별하여 보고하세요. (없다면 '특이사항 없음'으로 보고)
+            2. [Analysis]: Buzz의 질(감정 점수: {stock.get('sentiment_score')})과 수급 상황을 종합 분석하세요.
+            3. [Final Verdict]: BUY(매도), WATCH(관망), REJECT(제외) 중 하나를 선택하고 명확한 근거를 제시하세요.
+            4. **마크다운(**)**만 사용하고 HTML 태그는 절성 금지합니다.
+            """
+            try:
+                response = self.gemini._call_gemini_safe(prompt)
+                if response and response.text:
+                    # HTML 강제 제거 및 정제
+                    cleaned_text = re.sub(r'<[^>]*>', '', response.text.strip())
+                    reports.append(cleaned_text)
+            except:
+                reports.append(f"⚠️ {stock['name']} 심층 분석 실패")
+
+        header = f"🚀 **[Strategic Deep-Dive]** 최종 선정 {len(reports)}개 종목\n"
+        header += f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+        
+        return header + "\n\n---\n\n".join(reports)

@@ -23,13 +23,18 @@ def get_current_kst_time():
 
 def get_threshold_by_time(hour):
     """
-    [V8.4.8] 사용자 지정 누적 Buzz 문턱값 최종 적용
+    [V8.5.0] 사용자 지정 일 누적 Buzz 문턱값 최종 적용
+    - 00:00 ~ 08:59 : 20개
+    - 00:00 ~ 10:00 : 40개
+    - 00:00 ~ 13:00 : 80개
+    - 00:00 ~ 15:00 : 120개
+    - 이후 : 130개
     """
-    if 0 <= hour < 9: return 20       # 00:00 ~ 08:59: 20개
-    elif 9 <= hour < 10: return 40    # 09:00 ~ 10:00: 40개
-    elif 10 <= hour < 13: return 80   # 10:01 ~ 13:00: 80개
-    elif 13 <= hour < 15: return 120  # 13:01 ~ 15:00: 120개
-    return 130 # 15:01 ~ 23:59: 130개 (사용자 요청 반영)
+    if 0 <= hour < 9: return 20       # 08:59까지
+    elif 9 <= hour < 11: return 40    # 10:00대까지 (10시 59분까지 포함하여 넉넉히)
+    elif 11 <= hour < 14: return 80   # 13:00대까지
+    elif 14 <= hour < 16: return 120  # 15:00대까지
+    return 130 # 16:00 이후 최종 누적 기준
 
 def is_trading_day(dt):
     """
@@ -77,75 +82,114 @@ def load_env_manual():
     if gemini_key and not google_key: os.environ['GOOGLE_API_KEY'] = gemini_key
     elif google_key and not gemini_key: os.environ['GEMINI_KEY'] = google_key
 
-def fetch_post_body(link_suffix):
-    try:
-        url = f"https://finance.naver.com{link_suffix}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        time.sleep(0.3)
-        res = requests.get(url, headers=headers, timeout=5)
-        soup = BeautifulSoup(res.content, 'html.parser')
-        body_tag = soup.select_one('#body') or soup.select_one('.view_se') or soup.select_one('.scr01')
-        return body_tag.get_text(strip=True) if body_tag else ""
-    except: return ""
+def load_sync_state():
+    """[V8.5.1] 종목별 당일 누적 데이터 및 마지막 게시글 ID를 로드합니다."""
+    state_path = 'data/sync_state.json'
+    today_str = get_current_kst_time().strftime('%Y%m%d')
+    
+    if os.path.exists(state_path):
+        try:
+            with open(state_path, 'r', encoding='utf-8') as f:
+                state = json.load(f)
+                # [V8.5.1] 날짜가 바뀌었으면 리셋 (00:00 KST 기준)
+                if state.get('last_update_date') != today_str:
+                    print(f"[Sync] 🆕 날짜 변경 감지 ({state.get('last_update_date')} -> {today_str}) - 당일 데이터 초기화")
+                    return {'last_update_date': today_str, 'stocks': {}}
+                return state
+        except Exception as e:
+            print(f"[Sync] ⚠️ 상태 로드 실패 (초기화 진행): {e}")
+            
+    return {'last_update_date': today_str, 'stocks': {}}
 
-def get_discussion_stats(code, threshold_time):
+def save_sync_state(state):
+    """[V8.5.1] 갱신된 누적 데이터를 저장합니다."""
+    os.makedirs('data', exist_ok=True)
+    with open('data/sync_state.json', 'w', encoding='utf-8') as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+def extract_nid(link):
+    """네이버 게시글 링크에서 고유 ID(NID)를 추출합니다."""
+    match = re.search(r'nid=(\d+)', link)
+    return match.group(1) if match else None
+
+def get_discussion_stats(code, threshold_time, prev_state):
     """
-    [V8.4.4] 수집 하드닝: 셀렉터 확장 및 실시간 데이터 진단 로깅 적용
+    [V8.5.1] 복합 식별(NID+시간) 기반 증분 수집 알고리즘
+    - 이전 실행 이후의 새 글만 수집하여 기존 누적치와 합산합니다.
     """
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    collected_posts = []
-    today_prefix = get_current_kst_time().strftime('%Y.%m.%d')
+    stock_state = prev_state.get(code, {'cumulative_count': 0, 'last_nid': None})
     
-    for page in range(1, 16):
+    new_posts = []
+    today_prefix = get_current_kst_time().strftime('%Y.%m.%d')
+    found_prev_marker = False
+    
+    # [꼼꼼한 수집] 최대 50페이지까지 훑으며 새 글 탐색
+    for page in range(1, 51):
+        if found_prev_marker: break
+        
         url = f"https://finance.naver.com/item/board.naver?code={code}&page={page}"
         try:
             res = requests.get(url, headers=headers, timeout=10)
-            if res.status_code != 200:
-                print(f"   [Warning] {code} 접속 실패: {res.status_code}")
-                return {'recent_posts_count': 0, 'latest_posts': []}
-
+            if res.status_code != 200: break
             soup = BeautifulSoup(res.content, 'html.parser')
-            
-            # [V8.4.4 하드닝] 속성 필터링을 제거하고 모든 tr에서 데이터 추출 시도
             rows = soup.select('table.type2 tr')
             
             for row in rows:
                 cols = row.select('td')
-                # 데이터가 실린 행은 최소 5개 이상의 컬럼을 가짐
                 if len(cols) < 5: continue
                 
                 date_text = cols[0].get_text(strip=True)
-                if not date_text: continue # 비어있는 날짜 칸 제외
-
-                # [V8.4.4 날짜 판정 견고화] 마침표와 콜론 유무로 당일글 판별
+                if not date_text: continue
+                
+                # 날짜 및 시간 파싱
                 try:
                     if ":" in date_text and "." not in date_text:
                         full_date = f"{today_prefix} {date_text}"
                     else:
                         full_date = date_text
                     post_date = datetime.strptime(full_date, "%Y.%m.%d %H:%M")
-                except:
-                    continue
+                except: continue
                 
-                # 디버깅: 삼성전자 등에서 0개 발생 시 이 로그를 추적
-                if page == 1 and len(collected_posts) == 0:
-                     print(f"   [Debug] {code} Sample Date: '{date_text}' -> Parsed: {post_date}")
-
-                if post_date < threshold_time: 
-                    return {'recent_posts_count': len(collected_posts), 'latest_posts': collected_posts}
-                
+                # 이전 실행에서의 마지막 글을 만났는지 확인 (NID 기준)
                 title_tag = row.select_one('td.title a')
-                if title_tag:
-                    collected_posts.append({
-                        'title': title_tag.get_text(strip=True),
-                        'likes': cols[4].get_text(strip=True) if len(cols) > 4 else '0',
-                        'link': title_tag['href']
-                    })
-        except Exception as e:
-            print(f"   [Error] {code} Scraping Page {page}: {e}")
-            break
+                if not title_tag: continue
+                
+                current_nid = extract_nid(title_tag['href'])
+                if current_nid == stock_state['last_nid']:
+                    found_prev_marker = True
+                    break
+                
+                # 당일 글인지 최종 확인 (장 시작 08시 이후)
+                if post_date < threshold_time:
+                    found_prev_marker = True
+                    break
+                
+                new_posts.append({
+                    'nid': current_nid,
+                    'title': title_tag.get_text(strip=True),
+                    'likes': cols[4].get_text(strip=True) if len(cols) > 4 else '0',
+                    'link': title_tag['href'],
+                    'time': post_date.strftime('%Y-%m-%d %H:%M')
+                })
+        except: break
             
-    return {'recent_posts_count': len(collected_posts), 'latest_posts': collected_posts}
+    # [V8.5.1] 증분 수집 결과 계산
+    new_count = len(new_posts)
+    total_cumulative = stock_state['cumulative_count'] + new_count
+    
+    # 마지막 NID 업데이트 (수집된 글 중 가장 첫 번째 글이 최신글)
+    latest_nid = new_posts[0]['nid'] if new_posts else stock_state['last_nid']
+    
+    # [V8.5.1] 추천수/조회수 기반 상위 5개 대표글 정렬
+    # (제목 필터링 및 요약/키워드 추출의 기초 자료가 됨)
+    sorted_posts = sorted(new_posts, key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
+    
+    return {
+        'recent_posts_count': total_cumulative, 
+        'representative_posts': sorted_posts[:5], # 2단계 분석을 위한 대표글 5개
+        'updated_state': {'cumulative_count': total_cumulative, 'last_nid': latest_nid}
+    }
 
 def get_stock_details(code):
     details = {}
@@ -166,33 +210,41 @@ def get_stock_details(code):
     except: pass
     return details
 
-def process_single_stock(stock, yesterday_codes, threshold, threshold_time):
+def process_single_stock(stock, yesterday_codes, threshold, threshold_time, prev_sync_state):
     try:
         details = get_stock_details(stock['code'])
         stock.update(details)
         
-        stats = get_discussion_stats(stock['code'], threshold_time)
+        # [V8.5.1] 누적 데이터 로드
+        stats = get_discussion_stats(stock['code'], threshold_time, prev_sync_state)
         count = stats.get('recent_posts_count', 0)
         
-        # [V8.4.3 로깅 강화] 통과 여부와 상관없이 수집된 원본 수 출력 (블랙박스 제거)
-        print(f"   [Buzz] {stock['name']}: {count} posts found (Threshold: {threshold})")
+        # [V8.4.3 로깅 강화] 통과 여부와 상관없이 수집된 원본 수 출력
+        print(f"   [Buzz] {stock['name']}: {count} posts accum (Threshold: {threshold})")
         
         if count >= threshold:
             stock['recent_posts_count'] = count
-            raw_posts = stats.get('latest_posts', [])
-            raw_posts.sort(key=lambda x: int(x['likes']) if str(x['likes']).isdigit() else 0, reverse=True)
-            best_posts = raw_posts[:5]
-            for p in best_posts:
-                p['body'] = fetch_post_body(p['link'])
+            rep_posts = stats.get('representative_posts', [])
             
-            stock['latest_posts'] = best_posts
-            stock['post_count'] = count
-            stock['is_consecutive'] = stock['code'] in yesterday_codes
-            return stock
-        return None
+            # [V8.5.2] 1차 통과 종목 대상: Gemini 감정/요약/키워드 추출 (리소스 최적화)
+            print(f"   [Gemini] {stock['name']} 초기 분석 중... (대표글 {len(rep_posts)}개)")
+            advisor = StrategyAdvisor()
+            discovery_res = advisor.analyze_initial_discovery(stock['name'], rep_posts)
+            
+            stock.update({
+                'posts_summary': discovery_res.get('summary', '요약 실패'),
+                'keywords': discovery_res.get('keywords', []),
+                'sentiment_score': discovery_res.get('sentiment_score', 0),
+                'is_consecutive': stock['code'] in yesterday_codes
+            })
+            
+            # [V8.5.1] 갱신된 상태 정보를 함께 반환하도록 수정 (코드 포함)
+            updated_info = stats.get('updated_state', {})
+            return stock, {stock['code']: updated_info}
+        return None, {stock['code']: stats.get('updated_state', {})}
     except Exception as e:
         print(f"[Error] {stock.get('name', 'Unknown')} 처리 중 오류: {e}")
-        return None
+        return None, None
 
 # --- Main Flow ---
 if __name__ == "__main__":
@@ -217,24 +269,44 @@ if __name__ == "__main__":
     print(f"[System] 유니크 후보 {len(unique_candidates)}개 수집 완료")
 
     yesterday_codes = set() 
+    # --- 2. 1단계 Buzz Filter ---
+    prev_sync_state = load_sync_state()
+    current_stocks_state = prev_sync_state.get('stocks', {})
+    
     results = []
-    # [V8.4.3 스레드 최적화] 방화벽 자극을 줄이기 위해 max_workers=5로 하향
+    # [V8.5.1] 병렬 처리된 각 종목의 갱신된 상태를 저장할 딕셔너리
+    updated_full_state = current_stocks_state.copy()
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(process_single_stock, s, yesterday_codes, threshold, threshold_time) for s in unique_candidates]
+        # process_single_stock에 prev_sync_state를 전달하여 누적치 합산 수행
+        futures = [executor.submit(process_single_stock, s, yesterday_codes, threshold, threshold_time, current_stocks_state) for s in unique_candidates]
         for f in concurrent.futures.as_completed(futures):
-            res = f.result()
-            if res: results.append(res)
+            res_stock, res_state = f.result()
+            if res_state:
+                # 종목별 갱신된 누적 상태(상태, 마지막 NID 등)를 병합
+                updated_full_state.update(res_state) if isinstance(res_state, dict) else None
+            
+            if res_stock:
+                results.append(res_stock)
+
+    # 갱신된 전체 상태 저장
+    prev_sync_state['stocks'] = updated_full_state
+    save_sync_state(prev_sync_state)
 
     print(f"[System] 1단계 Buzz Filter 통과: {len(results)}개")
 
+    # --- 3. 3차 필터링 & 심층 리뷰 (DART/뉴스) ---
     advisor_report = ""
     elite_candidates = sorted(results, key=lambda x: x.get('recent_posts_count', 0), reverse=True)[:15]
     
     if elite_candidates:
-        print(f"[System] Gemini Strategic Guide 생성 중...")
+        print(f"[System] 3차 필터 통과 종목({len(elite_candidates)}개) 심층 분석 중...")
+        # [V8.5.3] 최종 5개 종목에 대해 DART/뉴스 결합 리포트 생성
+        final_top_5 = elite_candidates[:5]
         advisor = StrategyAdvisor()
-        # [V8.4.7] allow_buy를 개장일 여부로 설정 (밤에도 분석 결과 생성 가능)
-        advisor_report, _ = advisor.generate_report(elite_candidates, allow_buy=force_run or is_open_day)
+        
+        # deep_dive_report 내에서 DART/뉴스 검색 및 Gemini 리포트 생성 수행
+        advisor_report = advisor.generate_deep_dive_report(final_top_5)
     else:
         advisor_report = "⚠️ 금일 분석 기준(Buzz Threshold)을 충족하는 종목이 없습니다."
 
@@ -261,11 +333,12 @@ if __name__ == "__main__":
     else:
         print("[System] 🚨 알림 서비스 비활성화 상태 (리포트 전송 스킵)")
 
-    print("[System] Simulator 가동 중...")
+    # --- 5. 시뮬레이션 (Virtual Only - KIS와 완전 분리) ---
+    print("[System] Sandbox Simulator 가동 중...")
     from src.strategy.engine import StrategyEngine
     engine = StrategyEngine()
-    # [V8.4.7] 시뮬레이션 및 데이터 보존을 위해 allow_buy=is_open_day 적용
-    engine.execute_simulation(results, allow_buy=force_run or is_open_day)
+    # [V8.5.4] KIS 실계좌와 완전히 단절된 가상 포트폴리오 매매만 수행
+    engine.execute_sandbox_simulation(results, allow_buy=force_run or is_open_day)
 
     elapsed = time.perf_counter() - start_time
     print(f"[System] 프로세스 종료 ({elapsed:.2f}s)")

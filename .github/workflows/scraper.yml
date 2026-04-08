@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: 'requirements-scraper.txt'
+          cache-dependency-path: 'logs/requirements-scraper.txt'
 
       - name: Check if market is closed (Weekend or Holiday)
         id: market_check
@@ -79,7 +79,7 @@ jobs:
       - name: Install dependencies
         if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
-          pip install -r requirements-scraper.txt
+          pip install -r logs/requirements-scraper.txt
           pip install openpyxl
 
       - name: Download Existing Monthly Report
@@ -126,7 +126,7 @@ jobs:
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
           KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
         run: |
-          python scraper.py
+          python scripts/scraper.py
 
       - name: Run Trade Executor (Reservations)
         if: steps.market_check.outputs.is_market_closed == 'false'

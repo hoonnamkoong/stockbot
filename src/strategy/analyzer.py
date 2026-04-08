@@ -60,8 +60,7 @@ def analyze_discussion_trend(data_list):
     final_cols = [c for c in desired_order if c in df_final.columns]
     
     # code는 식별용으로 남겨둠
-    if 'code' in df_final.columns:
-        final_cols.append('code') 
+    # code는 식별용으로 남겨둠 (desired_order에 이미 포함되어 있음)
 
     df_result = df_final[final_cols].rename(columns=col_map)
 
@@ -168,6 +167,9 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
 
         # 3. 나머지 숫자형 데이터 결측치 처리 (NaN 방지)
         df_for_json = df_for_json.fillna(0)
+        
+        # 4. 중복 컬럼 제거 (Safety Layer for orient='records')
+        df_for_json = df_for_json.loc[:, ~df_for_json.columns.duplicated()]
         
         json_data = df_for_json.to_json(orient='records', force_ascii=False)
         with open(fixed_json, 'w', encoding='utf-8') as f:

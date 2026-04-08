@@ -6,7 +6,8 @@ on:
 jobs:
   ai_trading:
     runs-on: ubuntu-latest
-    
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -19,7 +20,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-scraper.txt
+          if [ -f scripts/requirements-scraper.txt ]; then pip install -r scripts/requirements-scraper.txt; fi
           # Explicitly ensure AI lib is installed (redundant if in requirements, but safe)
           pip install google-generativeai
 
@@ -29,6 +30,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python -m src.features.sentinel_v
+          KIS_API_KEY: ${{ secrets.KIS_API_KEY }}
+          KIS_API_SECRET: ${{ secrets.KIS_API_SECRET }}
+          KOREAINVESTMENT_PY_ACCOUNT: ${{ secrets.KOREAINVESTMENT_PY_ACCOUNT }}
+          KOREAINVESTMENT_PY_PASSWORD: ${{ secrets.KOREAINVESTMENT_PY_PASSWORD }}
+          KIS_VIRTUAL_ACCOUNT: ${{ secrets.KIS_VIRTUAL_ACCOUNT }}
+          KIS_VIRTUAL_PASSWORD: ${{ secrets.KIS_VIRTUAL_PASSWORD }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+        run: python -m src.features.sentinel_v

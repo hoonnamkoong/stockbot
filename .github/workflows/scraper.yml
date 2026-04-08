@@ -24,6 +24,8 @@ on:
 jobs:
   scrape-and-report:
     runs-on: ubuntu-latest
+        env:
+              PYTHONPATH: ${{ github.workspace }}
     permissions:
       contents: write
     

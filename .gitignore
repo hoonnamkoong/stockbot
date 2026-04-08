@@ -51,3 +51,9 @@ yarn-error.log*
 frontend/
 .vercel
 .env*.local
+
+# Cleanup folders
+_legacy_backups/
+logs/
+docs/
+scripts/

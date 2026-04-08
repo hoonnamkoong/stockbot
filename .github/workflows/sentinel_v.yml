@@ -26,15 +26,17 @@ jobs:
 
       - name: Run Sentinel-V Core
         env:
-          # Secrets mapping
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-          KIS_API_KEY: ${{ secrets.KIS_API_KEY }}
-          KIS_API_SECRET: ${{ secrets.KIS_API_SECRET }}
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
           KOREAINVESTMENT_PY_ACCOUNT: ${{ secrets.KOREAINVESTMENT_PY_ACCOUNT }}
           KOREAINVESTMENT_PY_PASSWORD: ${{ secrets.KOREAINVESTMENT_PY_PASSWORD }}
           KIS_VIRTUAL_ACCOUNT: ${{ secrets.KIS_VIRTUAL_ACCOUNT }}
           KIS_VIRTUAL_PASSWORD: ${{ secrets.KIS_VIRTUAL_PASSWORD }}
           KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: python -m src.features.sentinel_v

@@ -1,2 +1,0 @@
-﻿src/app/trade/page.tsx(266,32): error TS2322: Type '{ children: Element; striped: true; size: string; }' is not assignable to type 'IntrinsicAttributes & TableProps & RefAttributes<HTMLTableElement> & { component?: any; renderRoot?: ((props: Record<...>) => ReactNode) | undefined; }'.
-  Property 'size' does not exist on type 'IntrinsicAttributes & TableProps & RefAttributes<HTMLTableElement> & { component?: any; renderRoot?: ((props: Record<...>) => ReactNode) | undefined; }'.

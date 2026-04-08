@@ -1,0 +1,847 @@
+{
+  "cash": 1586.681399999885,
+  "holdings": {
+    "049080": {
+      "qty": 208,
+      "avg_price": 2045.0,
+      "buy_date": "2026-04-02",
+      "days_held": 4,
+      "name": "기가레인",
+      "target_prob": 79.53017347680718
+    },
+    "008350": {
+      "qty": 1,
+      "avg_price": 1780.0,
+      "buy_date": "2026-04-03",
+      "days_held": 3,
+      "name": "남선알미늄",
+      "target_prob": 70.74625221074359
+    },
+    "092790": {
+      "qty": 35,
+      "avg_price": 13820.0,
+      "buy_date": "2026-04-03",
+      "days_held": 3,
+      "name": "넥스틸",
+      "target_prob": 80.58042931557257
+    },
+    "001250": {
+      "qty": 2,
+      "avg_price": 3260.0,
+      "buy_date": "2026-04-03",
+      "days_held": 3,
+      "name": "GS글로벌",
+      "target_prob": 80.91887970814953
+    },
+    "005010": {
+      "qty": 82,
+      "avg_price": 6035.0,
+      "buy_date": "2026-04-03",
+      "days_held": 3,
+      "name": "휴스틸",
+      "target_prob": 77.03529655570122
+    },
+    "024060": {
+      "qty": 28,
+      "avg_price": 21250.0,
+      "buy_date": "2026-04-06",
+      "days_held": 0,
+      "name": "흥구석유",
+      "target_prob": 78.40969967208503
+    },
+    "003280": {
+      "qty": 62,
+      "avg_price": 4030.0,
+      "buy_date": "2026-04-06",
+      "days_held": 0,
+      "name": "흥아해운",
+      "target_prob": 75.39984509260846
+    },
+    "279570": {
+      "qty": 1,
+      "avg_price": 6190.0,
+      "buy_date": "2026-04-06",
+      "days_held": 0,
+      "name": "케이뱅크",
+      "target_prob": 76.92256458206657
+    },
+    "001780": {
+      "qty": 2,
+      "avg_price": 2790.0,
+      "buy_date": "2026-04-06",
+      "days_held": 0,
+      "name": "알루코",
+      "target_prob": 78.6718777362241
+    },
+    "408470": {
+      "qty": 32,
+      "avg_price": 16680.0,
+      "buy_date": "2026-04-06",
+      "days_held": 0,
+      "name": "한패스",
+      "target_prob": 78.97230598275911
+    },
+    "017900": {
+      "qty": 1,
+      "avg_price": 5790.0,
+      "buy_date": "2026-04-06",
+      "days_held": 0,
+      "name": "광전자",
+      "target_prob": 76.3275431255425
+    },
+    "187660": {
+      "qty": 39,
+      "avg_price": 11280.0,
+      "buy_date": "2026-04-06",
+      "days_held": 0,
+      "name": "페니트리움바이오",
+      "target_prob": 77.9556309993607
+    }
+  },
+  "trade_log": [
+    {
+      "date": "2026-03-21 05:23:19",
+      "type": "BUY",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 221,
+      "price": 2710.0,
+      "prob": 76.47653487072093,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-21 05:23:19",
+      "type": "BUY",
+      "code": "069540",
+      "name": "빛과전자",
+      "qty": 273,
+      "price": 2190.0,
+      "prob": 75.25607752318957,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-21 05:23:19",
+      "type": "BUY",
+      "code": "187660",
+      "name": "현대ADM",
+      "qty": 40,
+      "price": 14790.0,
+      "prob": 74.82338144455544,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-21 05:23:19",
+      "type": "BUY",
+      "code": "004960",
+      "name": "한신공영",
+      "qty": 33,
+      "price": 17730.0,
+      "prob": 74.12643661999797,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-23 00:15:42",
+      "type": "SELL",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 221,
+      "price": 3520.0,
+      "profit_rate": 29.88929889298893,
+      "reason": "Max Target Met (+29.9%)"
+    },
+    {
+      "date": "2026-03-23 00:15:42",
+      "type": "SELL",
+      "code": "069540",
+      "name": "빛과전자",
+      "qty": 273,
+      "price": 2845.0,
+      "profit_rate": 29.908675799086758,
+      "reason": "Max Target Met (+29.9%)"
+    },
+    {
+      "date": "2026-03-23 00:15:42",
+      "type": "BUY",
+      "code": "003280",
+      "name": "흥아해운",
+      "qty": 163,
+      "price": 3670.0,
+      "prob": 79.35275779986492,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-23 00:15:42",
+      "type": "BUY",
+      "code": "024060",
+      "name": "흥구석유",
+      "qty": 27,
+      "price": 21950.0,
+      "prob": 78.58011055799766,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-23 00:15:42",
+      "type": "BUY",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 170,
+      "price": 3520.0,
+      "prob": 74.81978491377,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-23 00:15:42",
+      "type": "BUY",
+      "code": "100090",
+      "name": "SK오션플랜트",
+      "qty": 14,
+      "price": 27700.0,
+      "prob": 73.90510549080842,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-24 01:22:06",
+      "type": "SELL",
+      "code": "004960",
+      "name": "한신공영",
+      "qty": 33,
+      "price": 15870.0,
+      "profit_rate": -10.490693739424705,
+      "reason": "Stop Loss hit at -10.5% (Regime: BULL)"
+    },
+    {
+      "date": "2026-03-24 01:22:06",
+      "type": "SELL",
+      "code": "100090",
+      "name": "SK오션플랜트",
+      "qty": 14,
+      "price": 25000.0,
+      "profit_rate": -9.747292418772563,
+      "reason": "Stop Loss hit at -9.7% (Regime: BULL)"
+    },
+    {
+      "date": "2026-03-24 01:22:06",
+      "type": "BUY",
+      "code": "100590",
+      "name": "머큐리",
+      "qty": 101,
+      "price": 5900.0,
+      "prob": 82.07951722092457,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-24 01:22:06",
+      "type": "BUY",
+      "code": "368770",
+      "name": "파이버프로",
+      "qty": 14,
+      "price": 18790.0,
+      "prob": 80.97570103352736,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-24 01:22:06",
+      "type": "BUY",
+      "code": "001510",
+      "name": "SK증권",
+      "qty": 5,
+      "price": 2440.0,
+      "prob": 78.42323073996396,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-25 01:08:06",
+      "type": "SELL",
+      "code": "003280",
+      "name": "흥아해운",
+      "qty": 163,
+      "price": 3395.0,
+      "profit_rate": -7.493188010899182,
+      "reason": "Stop Loss hit at -7.5% (Regime: BULL)"
+    },
+    {
+      "date": "2026-03-25 01:08:06",
+      "type": "SELL",
+      "code": "024060",
+      "name": "흥구석유",
+      "qty": 27,
+      "price": 18940.0,
+      "profit_rate": -13.712984054669706,
+      "reason": "Stop Loss hit at -13.7% (Regime: BULL)"
+    },
+    {
+      "date": "2026-03-25 01:08:06",
+      "type": "SELL",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 170,
+      "price": 5940.0,
+      "profit_rate": 68.75,
+      "reason": "Max Target Met (+68.8%)"
+    },
+    {
+      "date": "2026-03-25 01:08:06",
+      "type": "BUY",
+      "code": "321370",
+      "name": "센서뷰",
+      "qty": 157,
+      "price": 3820.0,
+      "prob": 78.80176754266077,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-25 01:08:06",
+      "type": "BUY",
+      "code": "010170",
+      "name": "대한광통신",
+      "qty": 65,
+      "price": 9190.0,
+      "prob": 77.93051602811376,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-25 01:08:06",
+      "type": "BUY",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 101,
+      "price": 5940.0,
+      "prob": 76.42412237113801,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-03-25 01:08:06",
+      "type": "BUY",
+      "code": "279570",
+      "name": "케이뱅크",
+      "qty": 42,
+      "price": 6380.0,
+      "prob": 75.9793101650074,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "SELL",
+      "code": "187660",
+      "name": "현대ADM",
+      "qty": 40,
+      "price": 10410.0,
+      "profit_rate": -29.61460446247465,
+      "reason": "Stop Loss hit at -29.6% (Regime: BEAR)"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "SELL",
+      "code": "100590",
+      "name": "머큐리",
+      "qty": 101,
+      "price": 5190.0,
+      "profit_rate": -12.033898305084746,
+      "reason": "Stop Loss hit at -12.0% (Regime: BEAR)"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "SELL",
+      "code": "368770",
+      "name": "파이버프로",
+      "qty": 14,
+      "price": 23650.0,
+      "profit_rate": 25.86482171367749,
+      "reason": "Max Target Met (+25.9%)"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "SELL",
+      "code": "001510",
+      "name": "SK증권",
+      "qty": 5,
+      "price": 1891.0,
+      "profit_rate": -22.5,
+      "reason": "Stop Loss hit at -22.5% (Regime: BEAR)"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "SELL",
+      "code": "321370",
+      "name": "센서뷰",
+      "qty": 157,
+      "price": 3290.0,
+      "profit_rate": -13.874345549738221,
+      "reason": "Stop Loss hit at -13.9% (Regime: BEAR)"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "SELL",
+      "code": "279570",
+      "name": "케이뱅크",
+      "qty": 42,
+      "price": 5860.0,
+      "profit_rate": -8.150470219435736,
+      "reason": "Stop Loss hit at -8.2% (Regime: BEAR)"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "BUY",
+      "code": "152550",
+      "name": "한국ANKOR유전",
+      "qty": 2061,
+      "price": 291.0,
+      "prob": 84.35887899947734,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "BUY",
+      "code": "065450",
+      "name": "빅텍",
+      "qty": 97,
+      "price": 6130.0,
+      "prob": 82.23444197425576,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "BUY",
+      "code": "012205",
+      "name": "계양전기우",
+      "qty": 66,
+      "price": 9030.0,
+      "prob": 81.87944918646082,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-02 03:47:23",
+      "type": "BUY",
+      "code": "038110",
+      "name": "에코플라스틱",
+      "qty": 60,
+      "price": 4230.0,
+      "prob": 81.08092910708616,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-02 04:49:07",
+      "type": "SELL",
+      "code": "010170",
+      "name": "대한광통신",
+      "qty": 65,
+      "price": 10000.0,
+      "profit_rate": 8.8139281828074,
+      "reason": "Time Stop reached (7 days in BEAR)"
+    },
+    {
+      "date": "2026-04-02 04:49:07",
+      "type": "SELL",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 101,
+      "price": 7150.0,
+      "profit_rate": 20.37037037037037,
+      "reason": "Max Target Met (+20.4%)"
+    },
+    {
+      "date": "2026-04-02 04:49:07",
+      "type": "BUY",
+      "code": "137950",
+      "name": "제이씨케미칼",
+      "qty": 103,
+      "price": 5780.0,
+      "prob": 81.5301620126141,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-02 04:49:07",
+      "type": "BUY",
+      "code": "459510",
+      "name": "나우로보틱스",
+      "qty": 26,
+      "price": 22550.0,
+      "prob": 80.68275601354924,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-02 05:34:37",
+      "type": "SELL",
+      "code": "038110",
+      "name": "에코플라스틱",
+      "qty": 60,
+      "price": 3990.0,
+      "profit_rate": -5.673758865248227,
+      "reason": "Stop Loss hit at -5.7% (Regime: BEAR)"
+    },
+    {
+      "date": "2026-04-02 05:34:37",
+      "type": "BUY",
+      "code": "049080",
+      "name": "기가레인",
+      "qty": 208,
+      "price": 2045.0,
+      "prob": 79.53017347680718,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 01:06:48",
+      "type": "BUY",
+      "code": "023790",
+      "name": "동일스틸럭스",
+      "qty": 1,
+      "price": 1039.0,
+      "prob": 81.31491351243281,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 09:02:39",
+      "type": "SELL",
+      "code": "065450",
+      "name": "빅텍",
+      "qty": 97,
+      "price": 5670.0,
+      "profit_rate": -7.504078303425775,
+      "reason": "Stop Loss hit at -7.5% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-03 09:02:39",
+      "type": "BUY",
+      "code": "003280",
+      "name": "흥아해운",
+      "qty": 122,
+      "price": 4470.0,
+      "prob": 73.11349322474555,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 09:02:39",
+      "type": "BUY",
+      "code": "008350",
+      "name": "남선알미늄",
+      "qty": 1,
+      "price": 1780.0,
+      "prob": 70.74625221074359,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 09:20:06",
+      "type": "SELL",
+      "code": "003280",
+      "name": "흥아해운",
+      "qty": 122,
+      "price": 4045.0,
+      "profit_rate": -9.507829977628637,
+      "reason": "Stop Loss hit at -9.5% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-03 09:20:06",
+      "type": "BUY",
+      "code": "092790",
+      "name": "넥스틸",
+      "qty": 35,
+      "price": 13820.0,
+      "prob": 80.58042931557257,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 09:20:06",
+      "type": "BUY",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 1,
+      "price": 8070.0,
+      "prob": 77.42594481537455,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 10:34:22",
+      "type": "BUY",
+      "code": "009730",
+      "name": "이렘",
+      "qty": 3,
+      "price": 642.0,
+      "prob": 79.22764180913089,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 11:04:44",
+      "type": "SELL",
+      "code": "459510",
+      "name": "나우로보틱스",
+      "qty": 26,
+      "price": 20850.0,
+      "profit_rate": -7.5388026607538805,
+      "reason": "Stop Loss hit at -7.5% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-03 11:04:45",
+      "type": "BUY",
+      "code": "100790",
+      "name": "미래에셋벤처투자",
+      "qty": 18,
+      "price": 29550.0,
+      "prob": 80.85870688486395,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 11:04:45",
+      "type": "BUY",
+      "code": "006490",
+      "name": "인스코비",
+      "qty": 18,
+      "price": 496.0,
+      "prob": 80.75472158288053,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 11:39:38",
+      "type": "SELL",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 1,
+      "price": 7430.0,
+      "profit_rate": -7.930607187112764,
+      "reason": "Stop Loss hit at -7.9% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-03 11:39:39",
+      "type": "BUY",
+      "code": "001250",
+      "name": "GS글로벌",
+      "qty": 2,
+      "price": 3260.0,
+      "prob": 80.91887970814953,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 14:04:59",
+      "type": "SELL",
+      "code": "009730",
+      "name": "이렘",
+      "qty": 3,
+      "price": 577.0,
+      "profit_rate": -10.12461059190031,
+      "reason": "Stop Loss hit at -10.1% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-03 14:34:36",
+      "type": "SELL",
+      "code": "006490",
+      "name": "인스코비",
+      "qty": 18,
+      "price": 461.0,
+      "profit_rate": -7.056451612903227,
+      "reason": "Stop Loss hit at -7.1% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-03 14:34:36",
+      "type": "BUY",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 1,
+      "price": 7610.0,
+      "prob": 80.08310998394701,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-03 15:35:43",
+      "type": "SELL",
+      "code": "100790",
+      "name": "미래에셋벤처투자",
+      "qty": 18,
+      "price": 27450.0,
+      "profit_rate": -7.1065989847715745,
+      "reason": "Stop Loss hit at -7.1% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-03 15:35:43",
+      "type": "BUY",
+      "code": "005010",
+      "name": "휴스틸",
+      "qty": 82,
+      "price": 6035.0,
+      "prob": 77.03529655570122,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 09:17:37",
+      "type": "SELL",
+      "code": "012205",
+      "name": "계양전기우",
+      "qty": 66,
+      "price": 12830.0,
+      "profit_rate": 42.08194905869325,
+      "reason": "Max Target Met (+42.1%)"
+    },
+    {
+      "date": "2026-04-06 09:17:38",
+      "type": "SELL",
+      "code": "023790",
+      "name": "동일스틸럭스",
+      "qty": 1,
+      "price": 964.0,
+      "profit_rate": -7.218479307025986,
+      "reason": "Stop Loss hit at -7.2% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-06 09:17:38",
+      "type": "BUY",
+      "code": "024060",
+      "name": "흥구석유",
+      "qty": 28,
+      "price": 21250.0,
+      "prob": 78.40969967208503,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 09:17:38",
+      "type": "BUY",
+      "code": "003280",
+      "name": "흥아해운",
+      "qty": 62,
+      "price": 4030.0,
+      "prob": 75.39984509260846,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 11:03:53",
+      "type": "BUY",
+      "code": "018470",
+      "name": "조일알미늄",
+      "qty": 1,
+      "price": 1734.0,
+      "prob": 82.78877749441699,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 11:27:20",
+      "type": "SELL",
+      "code": "137950",
+      "name": "제이씨케미칼",
+      "qty": 103,
+      "price": 5360.0,
+      "profit_rate": -7.26643598615917,
+      "reason": "Stop Loss hit at -7.3% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-06 11:27:20",
+      "type": "BUY",
+      "code": "012205",
+      "name": "계양전기우",
+      "qty": 40,
+      "price": 13630.0,
+      "prob": 81.72382227633135,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 11:27:21",
+      "type": "BUY",
+      "code": "279570",
+      "name": "케이뱅크",
+      "qty": 1,
+      "price": 6190.0,
+      "prob": 76.92256458206657,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 12:33:48",
+      "type": "SELL",
+      "code": "046970",
+      "name": "우리로",
+      "qty": 1,
+      "price": 7050.0,
+      "profit_rate": -7.35873850197109,
+      "reason": "Stop Loss hit at -7.4% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-06 12:33:48",
+      "type": "BUY",
+      "code": "001780",
+      "name": "알루코",
+      "qty": 2,
+      "price": 2790.0,
+      "prob": 78.6718777362241,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 13:44:04",
+      "type": "SELL",
+      "code": "018470",
+      "name": "조일알미늄",
+      "qty": 1,
+      "price": 1611.0,
+      "profit_rate": -7.093425605536333,
+      "reason": "Stop Loss hit at -7.1% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-06 13:44:04",
+      "type": "BUY",
+      "code": "340440",
+      "name": "세림B&G",
+      "qty": 1,
+      "price": 2425.0,
+      "prob": 80.26306521322299,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 14:07:09",
+      "type": "SELL",
+      "code": "152550",
+      "name": "한국ANKOR유전",
+      "qty": 2061,
+      "price": 262.0,
+      "profit_rate": -9.965635738831615,
+      "reason": "Stop Loss hit at -10.0% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-06 14:07:09",
+      "type": "BUY",
+      "code": "408470",
+      "name": "한패스",
+      "qty": 32,
+      "price": 16680.0,
+      "prob": 78.97230598275911,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 14:25:47",
+      "type": "BUY",
+      "code": "017900",
+      "name": "광전자",
+      "qty": 1,
+      "price": 5790.0,
+      "prob": 76.3275431255425,
+      "reason": "ML Strong Buy Signal"
+    },
+    {
+      "date": "2026-04-06 15:22:15",
+      "type": "SELL",
+      "code": "340440",
+      "name": "세림B&G",
+      "qty": 1,
+      "price": 2250.0,
+      "profit_rate": -7.216494845360824,
+      "reason": "Stop Loss hit at -7.2% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-06 15:36:37",
+      "type": "SELL",
+      "code": "012205",
+      "name": "계양전기우",
+      "qty": 40,
+      "price": 11000.0,
+      "profit_rate": -19.29567131327953,
+      "reason": "Stop Loss hit at -19.3% (Regime: BULL)"
+    },
+    {
+      "date": "2026-04-06 15:36:37",
+      "type": "BUY",
+      "code": "187660",
+      "name": "페니트리움바이오",
+      "qty": 39,
+      "price": 11280.0,
+      "prob": 77.9556309993607,
+      "reason": "ML Strong Buy Signal"
+    }
+  ],
+  "last_update": "2026-04-06",
+  "algo_version": "v2026-01-02--2026-02-28",
+  "market_regime": "BULL",
+  "benchmark_base": {}
+}

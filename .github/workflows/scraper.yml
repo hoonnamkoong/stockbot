@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: 'logs/requirements-scraper.txt'
+          cache-dependency-path: 'scripts/requirements-scraper.txt'
 
       - name: Check if market is closed (Weekend or Holiday)
         id: market_check
@@ -79,7 +79,7 @@ jobs:
       - name: Install dependencies
         if: steps.market_check.outputs.is_market_closed == 'false'
         run: |
-          pip install -r logs/requirements-scraper.txt
+          pip install -r scripts/requirements-scraper.txt
           pip install openpyxl
 
       - name: Download Existing Monthly Report

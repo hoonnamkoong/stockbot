@@ -45,7 +45,7 @@ export default function ResearchClient() {
                 opened={quickOrderOpen} onClose={() => setQuickOrderOpen(false)}
                 initialCode={selectedQuickStock.code} initialName={selectedQuickStock.name}
                 onOrderDispatched={(odno) => {
-                    setNotification({ title: '명령 송신 완료', msg: '모바일로 전송되었습니다.', color: 'blue' });
+                    setNotification({ title: '주문 전송 완료', msg: '한국투자증권 API로 주문이 직접 전송되었습니다.', color: 'teal' });
                     if (odno) setTrackingOrders(prev => [...prev, odno]);
                 }}
             />

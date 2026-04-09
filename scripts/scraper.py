@@ -7,6 +7,7 @@ import os
 import sys
 import json
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 
 # [V8.9.9.5] 4단계 파이프라인 오케스트레이션 복구 버전
@@ -18,11 +19,11 @@ SCRAPER_VERSION = "8.9.9.5 Orchestration Recovery"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from strategy import analyzer
-from strategy.advisor import StrategyAdvisor
-from strategy.engine import StrategyEngine
-from strategy.simulators.original_simulator import OriginalSimulator
-from telegram_manager import TelegramManager
+from src.strategy import analyzer
+from src.strategy.advisor import GeminiAgent
+from src.strategy.engine import StrategyEngine
+from src.strategy.simulators.original_simulator import OriginalSimulator
+from src.telegram_manager import TelegramManager
 
 def get_current_kst_time():
     return datetime.utcnow() + timedelta(hours=9)
@@ -191,7 +192,7 @@ if __name__ == "__main__":
     
     # 0. 모듈 초기화
     print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 🚀 파이프라인 시퀀스 가동 (v{SCRAPER_VERSION})")
-    advisor = StrategyAdvisor()
+    advisor = GeminiAgent()
     engine = StrategyEngine()
     tg = TelegramManager()
     sim1 = OriginalSimulator()
@@ -275,6 +276,13 @@ if __name__ == "__main__":
                     s['posts_summary'] = batch_ai_results[code].get('summary', '분석 오류')
                     s['keywords'] = batch_ai_results[code].get('keywords', [])
             print(f"[Stage 2] AI 배치 분석 완료")
+
+            # [V8.9.9.5 Recovery] 정밀 정제 로직 및 데이터 저장 강제 주입
+            print(f"[Recovery] analyzer.analyze_discussion_trend 실행 중...")
+            df_final, _ = analyzer.analyze_discussion_trend(results)
+            analyzer.save_data(df_final)
+            print(f"[Recovery] latest_stocks.json 및 status.json 저장 완료 (data/)")
+
         except Exception as e:
             print(f"[Stage 2 Error] AI 배치 분석 실패: {e}")
 

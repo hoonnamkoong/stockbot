@@ -60,13 +60,21 @@ jobs:
           # 기타 설정
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
-        run: python scripts/scraper.py
+        run: PYTHONPATH=. python scripts/scraper.py
 
-      - name: Commit and Push Data Updates
+      - name: Deploy Data to db-data branch
         if: always()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/*.json data/*.csv status.json || true
-          git commit -m "[V8.9.9.8] Auto Update: Cloud Research Data & Simulation" || echo "No changes to commit"
-          git push origin main
+          # db-data 브랜치가 없으면 생성하고, 있으면 거기로 푸시
+          mkdir -p deploy_data/data
+          cp data/*.json deploy_data/data/ || true
+          cp status.json deploy_data/ || true
+          cd deploy_data
+          git init
+          git checkout -b db-data
+          git add .
+          git commit -m "[V8.9.9.5 Recovery] Data Sync to Cloud DB"
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git push -f origin db-data

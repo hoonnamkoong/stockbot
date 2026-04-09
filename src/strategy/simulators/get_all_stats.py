@@ -6,12 +6,14 @@ import requests
 from bs4 import BeautifulSoup
 
 # 경로 설정
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
-from src.strategy.simulators.original_simulator import OriginalSimulator
-from src.strategy.simulators.aggressive_simulator import AggressiveSimulator
-from src.strategy.simulators.conviction_simulator import ConvictionSimulator
-from src.strategy.simulators.base_simulator import BaseSimulator
+# 신규 시뮬레이터 클래스 임포트
+from src.strategy.simulators.sim1_original import OriginalSimulator
+from src.strategy.simulators.sim2_conservative import ConservativeSimulator
+from src.strategy.simulators.sim3_aggressive import AggressiveSimulator
 
 def get_current_price(code):
     """네이버 금융에서 실시간 현재가 추출"""
@@ -26,38 +28,64 @@ def get_current_price(code):
     except: pass
     return None
 
-def get_all_simulation_stats():
+def run_all_simulators(data_list):
     """
-    [V8.6.2 Tripod Sync] 
-    - 3개 시뮬레이터 인스턴스 생성 및 상태 로드
-    - 보유 종목 현재가 일괄 업데이트 및 NAV 산출
+    [V8.9.9.5] 수석 아키텍트 지침에 따른 모듈형 통합 실행 엔진
+    - 3개 시뮬레이터를 딕셔너리로 관리하고 루프를 돌려 일괄 실행
     """
-    sims = {
-        "sim1": OriginalSimulator(),
-        "sim2": AggressiveSimulator(),
-        "sim3": ConvictionSimulator(),
-        "real": BaseSimulator("Real")
+    # 3M 초기화가 보장된 인스턴스 생성
+    simulators = {
+        "sim1_Standard": OriginalSimulator(initial_cash=3000000),
+        "sim2_Conservative": ConservativeSimulator(initial_cash=3000000),
+        "sim3_Aggressive": AggressiveSimulator(initial_cash=3000000)
     }
     
-    # 모든 종목의 현재가 수집 리스트
+    results = {}
+    print(f"\n[Simulator] {len(simulators)}개 알고리즘 동시 가동 시작...")
+    
+    for sim_name, simulator in simulators.items():
+        try:
+            # 모든 시뮬레이터는 동일한 run() 인터페이스를 가짐
+            stats = simulator.run(data_list)
+            results[sim_name] = stats
+            print(f"  - {sim_name} 실행 완료: 승률 {stats.get('win_rate', 0):.1f}% | 자산 {stats.get('total_asset', 0):,.0f}원")
+        except Exception as e:
+            print(f"  - [Error] {sim_name} 실행 중 오류 발생: {e}")
+            results[sim_name] = {"error": str(e)}
+            
+    return results
+
+def get_all_simulation_stats():
+    """
+    통합 통계를 위한 래퍼 함수 (호환성 유지)
+    """
+    # 이 함수는 단순히 현재 상태를 조회할 때 사용 (run() 없이)
+    sims = {
+        "sim1": OriginalSimulator(),
+        "sim2": ConservativeSimulator(),
+        "sim3": AggressiveSimulator()
+    }
+    
     all_codes = set()
     for s in sims.values():
         all_codes.update(s.state.get('portfolio', {}).keys())
     
-    # 실시간 가격 맵핑
     price_map = {}
     for code in all_codes:
         price = get_current_price(code)
         if price: price_map[code] = price
         
-    # 결과 취합
     results = {}
     for key, sim in sims.items():
         results[key] = sim.get_normalized_stats(current_prices=price_map)
         
+    # Vercel 대시보드 호환성을 위해 키 값 통일 (sim1, sim2, sim3)
     results["last_updated"] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return results
 
 if __name__ == "__main__":
+    # 테스트용 가짜 데이터 리스트 (실제 scraper.py 연동 시 data_list를 넘겨야 함)
+    # python -m src.strategy.simulators.get_all_stats 등으로 테스트
+    print("[get_all_stats] CLI 직접 호출 테스트 (상태 조회)")
     stats = get_all_simulation_stats()
     print(json.dumps(stats, ensure_ascii=False, indent=2))

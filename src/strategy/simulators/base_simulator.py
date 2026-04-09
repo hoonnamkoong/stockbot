@@ -122,16 +122,24 @@ class BaseSimulator:
         self.state['cash'] -= total_cost
         self.state['invested'] += cost
         if code in self.state['portfolio']:
-            old_q = self.state['portfolio'][code]['quantity']
-            old_p = self.state['portfolio'][code].get('avg_price', self.state['portfolio'][code].get('price', 0))
+            old_item = self.state['portfolio'][code]
+            old_q = old_item['quantity']
+            old_p = old_item.get('avg_price', old_item.get('price', 0))
             new_q = old_q + quantity
             new_p = ((old_q * old_p) + cost) / new_q
             self.state['portfolio'][code]['quantity'] = new_q
             self.state['portfolio'][code]['avg_price'] = new_p
+            # 평균 단가가 바뀌어도 고점은 초기화하지 않거나 유지 (전략에 따라 다름)
+            if price > self.state['portfolio'][code].get('peak_price', 0):
+                self.state['portfolio'][code]['peak_price'] = price
         else:
             self.state['portfolio'][code] = {
-                "name": name, "quantity": quantity, "avg_price": price, 
-                "buy_date": datetime.datetime.now().strftime('%Y-%m-%d')
+                "name": name, 
+                "quantity": quantity, 
+                "avg_price": price, 
+                "entry_date": datetime.datetime.now().strftime('%Y-%m-%d'),
+                "peak_price": price,
+                "is_scaled_out": False  # [Sim 3용] 분할 매수/매도 여부
             }
         self.log_trade("BUY", code, name, quantity, price, reason)
         self.save_state()
@@ -157,9 +165,17 @@ class BaseSimulator:
             del self.state['portfolio'][code]
         else:
             self.state['portfolio'][code]['quantity'] -= q_to_sell
+            self.state['portfolio'][code]['is_scaled_out'] = True # 일부 매도 발생 시 플래그 설정
         self.log_trade("SELL", code, p_item['name'], q_to_sell, price, reason)
         self.save_state()
         return True
+
+    def update_peak_price(self, code, current_price):
+        """[Sim 2용] 고점 갱신 로직"""
+        if code in self.state['portfolio']:
+            if current_price > self.state['portfolio'][code].get('peak_price', 0):
+                self.state['portfolio'][code]['peak_price'] = current_price
+                self.save_state()
 
     def calculate_stats(self, current_prices=None):
         """V8.6.2 실시간 자산 총액 산출 로직"""

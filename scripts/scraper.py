@@ -148,16 +148,17 @@ def get_discussion_stats(code, today_str, prev_state):
     }
 
 def get_stock_details(code):
-    """[V8.9.9.7] 네이버 증권 HTML 정밀 분석 및 데이터 추출"""
+    """[V8.9.9.5] 네이버 증권 HTML 정밀 분석 및 데이터 추출 (전일 외인비중 포함)"""
     details = {
         'foreign_rate': 0.0, 
         'foreign_change': 0.0, 
         'foreign_net_buy': 0,
-        'prev_close': 0
+        'prev_close': 0,
+        'prev_foreign_rate': 0.0  # [V8.9.9.5 신규] 전일 외인비중
     }
     url = f"https://finance.naver.com/item/frgn.naver?code={code}"
     try:
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
         soup = BeautifulSoup(res.content, 'html.parser')
         rows = soup.select('table.type2 tr')
         
@@ -170,17 +171,20 @@ def get_stock_details(code):
 
         if len(data_rows) >= 2:
             # 1. 외인 보유율 및 변화량
-            details['foreign_rate'] = float(data_rows[0][8].get_text().replace('%','').replace(',',''))
-            prev_rate = float(data_rows[1][8].get_text().replace('%','').replace(',',''))
+            details['foreign_rate'] = float(data_rows[0][8].get_text().replace('%','').replace(',','').strip())
+            prev_rate = float(data_rows[1][8].get_text().replace('%','').replace(',','').strip())
             details['foreign_change'] = round(details['foreign_rate'] - prev_rate, 3)
             
             # 2. 외인 순매수량
-            details['foreign_net_buy'] = int(data_rows[0][6].get_text().replace(',',''))
+            details['foreign_net_buy'] = int(data_rows[0][6].get_text().replace(',','').replace('+','').strip() or 0)
             
-            # 3. 전일 종가 (data_rows[1]의 종가 컬럼)
-            details['prev_close'] = int(data_rows[1][1].get_text().replace(',',''))
+            # 3. 전일 종가
+            details['prev_close'] = int(data_rows[1][1].get_text().replace(',','').strip() or 0)
             
-            print(f"   [Parse Success] {code}: 외인비중 {details['foreign_rate']}% (변화 {details['foreign_change']}), 전일종가 {details['prev_close']:,}원")
+            # 4. [V8.9.9.5 신규] 전일 외인비중
+            details['prev_foreign_rate'] = prev_rate
+            
+            print(f"   [Parse Success] {code}: 외인비중 {details['foreign_rate']}% (변화 {details['foreign_change']}), 전일종가 {details['prev_close']:,}원, 전일외인 {details['prev_foreign_rate']}%")
     except Exception as e:
         print(f"   [Parse Error] {code}: {e}")
     return details

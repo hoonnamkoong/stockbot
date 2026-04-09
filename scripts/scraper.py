@@ -192,7 +192,10 @@ if __name__ == "__main__":
     
     # 0. 모듈 초기화
     print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 🚀 파이프라인 시퀀스 가동 (v{SCRAPER_VERSION})")
-    advisor = GeminiAgent()
+    # [V8.9.9.5 Fix] advisor는 StrategyAdvisor를 쓸 것.
+    # generate_deep_dive_report, analyze_batch_discovery 메서드는 StrategyAdvisor에만 있음
+    from src.strategy.advisor import StrategyAdvisor
+    advisor = StrategyAdvisor()
     engine = StrategyEngine()
     tg = TelegramManager()
     sim1 = OriginalSimulator()

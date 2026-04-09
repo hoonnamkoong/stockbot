@@ -207,8 +207,12 @@ class GeminiAgent:
                     raw_text = response.text.strip()
                     if raw_text.startswith("```"):
                         raw_text = re.sub(r"^(?:```[a-z]*\n)|(?:```$)", "", raw_text, flags=re.MULTILINE).strip()
-                    group_results = json.loads(raw_text)
-                    all_results.update(group_results)
+                    parsed = json.loads(raw_text)
+                    # [V8.9.9.5 Fix] 파싱 결과가 반드시 dict여야 함 (문자열 오인 방지)
+                    if isinstance(parsed, dict):
+                        all_results.update(parsed)
+                    else:
+                        print(f"[GeminiAgent] 응답이 dict가 아님, 스킵: {type(parsed)}")
             except Exception as e:
                 print(f"[GeminiAgent] Group Batch 분석 오류 ({i//GROUP_SIZE + 1}번 그룹): {e}")
 

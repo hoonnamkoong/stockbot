@@ -33,12 +33,23 @@ class GeminiAgent:
             cls._instance._initialized = False
         return cls._instance
 
+    @staticmethod
+    def clean_text(text):
+        if not text: return ""
+        # ㅋㅋ, ㅎㅎ, ㅠㅠ 등 3번 이상 반복되는 자모음 압축
+        text = re.sub(r'([ㄱ-ㅎㅏ-ㅣ])\\1{2,}', r'\\1', text)
+        # 불필요한 특수문자 여러개 압축
+        text = re.sub(r'([!?.~])\\1{2,}', r'\\1', text)
+        # 여러개 공백을 하나로 압축
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()[:200]
+
     def __init__(self):
         if self._initialized: return
         
         # [V8.6.0] 모델 명칭 선설정 (API 키 부재 시에도 속성 참조 가능하도록 보장)
-        self.batch_model_name = "models/gemini-2.5-flash-lite"
-        self.report_model_name = "models/gemini-2.5-pro"
+        self.batch_model_name = "models/gemini-2.0-flash"
+        self.report_model_name = "models/gemini-2.0-flash"
         self.exhausted_models = set() if not hasattr(self, 'exhausted_models') else self.exhausted_models
 
         self.api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY')
@@ -168,7 +179,7 @@ class GeminiAgent:
             cleaned_batch = []
             for stock in group:
                 # 추천수가 높은 본문(Body)을 요약에 활용 (글자 수 제한 준수)
-                posts_text = "\n".join([f"[{p.get('title')}] {str(p.get('body', ''))[:150]}" for p in stock.get('posts', [])])
+                posts_text = "\n".join([f"[{p.get('title')}] {GeminiAgent.clean_text(str(p.get('body', '')))}" for p in stock.get('posts', [])])
                 cleaned_batch.append({
                     "code": stock.get('code'),
                     "name": stock.get('name'),
@@ -182,8 +193,8 @@ class GeminiAgent:
 
             [V8.6.1 분석 규칙 - 절대 준수]
             1. 선동/감탄사(가즈아 등)는 무조건 0점 처리하고 summary에 '노이즈' 표기.
-            2. summary는 반드시 20자 이내의 명사형 핵심 요약으로 작성. (예: **신사업 공시** 기대감 유입)
-            3. keywords는 3개 이내의 핵심 단어만 추출.
+            2. summary는 10자 이내 2~3단어 초간결 명사형 요약. (예: 신사업기대감, 외인매수)
+            3. keywords는 2개 이내 핵심 단어만 추출.
 
             [분석 대상 데이터]
             {json.dumps(cleaned_batch, ensure_ascii=False)}
@@ -192,7 +203,7 @@ class GeminiAgent:
             {{
                 "005930": {{
                     "sentiment": 점수(-10 ~ 10),
-                    "summary": "**핵심키워드** 중심 요약",
+                    "summary": "초간결 명사 요약",
                     "keywords": ["키워드1", "키워드2"]
                 }}
             }}
@@ -330,18 +341,19 @@ class StrategyAdvisor:
             AI 요약: {stock.get('posts_summary')}
             DART 공시/뉴스: {dart_data} / {news_data}
             
-            [V8.6.1 간결성 규칙]
-            1. 모든 내용은 불렛포인트(•)와 단답형/명사형으로 기술.
-            2. 문장 종결 어미를 전면 제거하고 팩트만 나열.
-            3. 리스크 보고: 특이사항 없을 경우 "• **특이사항 없음**" 한 줄만 출력.
-            4. 결론: BUY, WATCH, REJECT 중 택1 + 한 줄 근거.
+            [V8.6.2 극한 압축 규칙]
+            긴 문장 절대 금지. 오직 아래 JSON 형식으로만 짧은 단어들로 답변하세요.
+            {
+              "decision": "BUY|WATCH|REJECT",
+              "reason": "단답형 한줄 액션 근거",
+              "risk": "종토방/공시 리스크 (없으면 없음)",
+              "highlights": ["키워드1", "키워드2"]
+            }
             """
             try:
-                response = self.gemini._call_gemini_safe(prompt, model_type='report')
+                response = self.gemini._call_gemini_safe(prompt, model_type='report', generation_config={"response_mime_type": "application/json"})
                 if response and response.text:
-                    # HTML 강제 제거 및 정제
-                    cleaned_text = re.sub(r'<[^>]*>', '', response.text.strip())
-                    reports.append(cleaned_text)
+                    reports.append(response.text.strip())
             except:
                 reports.append(f"⚠️ {stock['name']} 심층 분석 실패")
 

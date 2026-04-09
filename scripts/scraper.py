@@ -41,15 +41,18 @@ def is_trading_day(dt):
     return True
 
 def load_env_manual():
-    for filepath in [".env", ".env.local"]:
+    """시스템 환경변수 및 로컬 .env 파일을 로딩합니다. (.env.production 우선)"""
+    for filepath in [".env.production", ".env.final", ".env", ".env.local"]:
         if os.path.exists(filepath):
-            with open(filepath, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip() and not line.startswith('#'):
-                        try:
-                            key, val = line.strip().split('=', 1)
-                            os.environ[key.strip()] = val.strip().strip('"').strip("'")
-                        except: continue
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(filepath)
+                print(f"[Env] Loaded from {filepath}")
+                # 주요 키가 로드되면 중단 (우선순위 보장)
+                if os.environ.get('GEMINI_KEY') or os.environ.get('GOOGLE_API_KEY'):
+                    break
+            except:
+                continue
 
 def load_sync_state():
     state_path = 'data/sync_state.json'
@@ -144,19 +147,41 @@ def get_discussion_stats(code, today_str, prev_state):
     }
 
 def get_stock_details(code):
-    details = {'foreign_rate': 0.0, 'foreign_change': 0.0, 'foreign_net_buy': 0}
+    """[V8.9.9.7] 네이버 증권 HTML 정밀 분석 및 데이터 추출"""
+    details = {
+        'foreign_rate': 0.0, 
+        'foreign_change': 0.0, 
+        'foreign_net_buy': 0,
+        'prev_close': 0
+    }
     url = f"https://finance.naver.com/item/frgn.naver?code={code}"
     try:
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
         soup = BeautifulSoup(res.content, 'html.parser')
         rows = soup.select('table.type2 tr')
-        data_rows = [r.select('td') for r in rows if len(r.select('td')) == 9 and re.match(r'\d{4}', r.select('td')[0].get_text())]
+        
+        # 실제 데이터가 담긴 행만 추출 (날짜 형식이 있는 행)
+        data_rows = []
+        for r in rows:
+            cols = r.select('td')
+            if len(cols) == 9 and re.match(r'\d{4}', cols[0].get_text(strip=True)):
+                data_rows.append(cols)
+
         if len(data_rows) >= 2:
-            details['foreign_rate'] = float(data_rows[0][8].get_text().replace('%',''))
-            prev_rate = float(data_rows[1][8].get_text().replace('%',''))
+            # 1. 외인 보유율 및 변화량
+            details['foreign_rate'] = float(data_rows[0][8].get_text().replace('%','').replace(',',''))
+            prev_rate = float(data_rows[1][8].get_text().replace('%','').replace(',',''))
             details['foreign_change'] = round(details['foreign_rate'] - prev_rate, 3)
+            
+            # 2. 외인 순매수량
             details['foreign_net_buy'] = int(data_rows[0][6].get_text().replace(',',''))
-    except: pass
+            
+            # 3. 전일 종가 (data_rows[1]의 종가 컬럼)
+            details['prev_close'] = int(data_rows[1][1].get_text().replace(',',''))
+            
+            print(f"   [Parse Success] {code}: 외인비중 {details['foreign_rate']}% (변화 {details['foreign_change']}), 전일종가 {details['prev_close']:,}원")
+    except Exception as e:
+        print(f"   [Parse Error] {code}: {e}")
     return details
 
 if __name__ == "__main__":

@@ -78,24 +78,22 @@ def analyze_discussion_trend(data_list):
 
 def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
     """
-    DataFrame을 CSV 및 Excel 파일로 저장합니다.
-    파일명에 타임스탬프를 포함합니다.
-    extra_sheets: { 'SheetName': DataFrame } 형태의 추가 시트 데이터
-    저장된 파일명의 딕셔너리를 반환합니다.
+    [V8.9.9.5] DataFrame을 CSV/Excel/JSON으로 저장합니다.
+    - 고정 파일(trending_integrated.xlsx): Vercel 대시보드 및 사이드바 엑셀 다운로드용
+    - 날짜별 스냅샷(trending_integrated_YYYYMMDD_HHMMSS.xlsx): 5일/3일 분석기 전용
     """
     if df.empty:
         print("No data to save.")
         return {}
 
-    # [V8.9.9] 타임스탬프 중복 파일 생성 중단 (저장소 최적화)
-    # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # base_name = f"data/{filename_prefix}_{timestamp}"
-    # csv_filename = f"{base_name}.csv"
-    # xlsx_filename = f"{base_name}.xlsx"
-    
     saved_files = {}
+    os.makedirs('data', exist_ok=True)
 
-    # 1. Save Fixed CSV (Force Sync)
+    # [공통] 현재 KST 타임스탬프
+    now_kst = datetime.utcnow() + timedelta(hours=9)
+    timestamp = now_kst.strftime("%Y%m%d_%H%M%S")
+
+    # 1. 고정 CSV 저장 (Force Sync)
     try:
         fixed_csv = "data/trending_integrated.csv"
         df.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
@@ -104,7 +102,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
     except Exception as e:
         print(f"Error saving to CSV: {e}")
 
-    # 2. Save Fixed Excel
+    # 2. 고정 Excel 저장 (사이드바 다운로드용)
     try:
         fixed_xlsx = "data/trending_integrated.xlsx"
         with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
@@ -113,21 +111,38 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
                 for sheet_name, sheet_df in extra_sheets.items():
                     if not sheet_df.empty:
                         sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
-                        
         print(f"[Fixed] Data saved to Excel: {os.path.abspath(fixed_xlsx)}")
         saved_files['excel'] = fixed_xlsx
     except Exception as e:
         print(f"Error saving to Excel: {e}")
-                        
-    # 3. [V8.6.0] Save Fixed Filename for Vercel Dashboard
+
+    # 3. [V8.9.9.5 신규] 날짜별 스냅샷 Excel 저장 (5일/3일 분석기 전용)
+    # analyzer_5days.py가 trending_integrated_YYYYMMDD_HHMMSS.xlsx 패턴을 탐색함
     try:
-        os.makedirs('data', exist_ok=True)
+        snapshot_xlsx = f"data/trending_integrated_{timestamp}.xlsx"
+        with pd.ExcelWriter(snapshot_xlsx, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
+        print(f"[Snapshot] Daily snapshot saved: {os.path.basename(snapshot_xlsx)}")
+        saved_files['snapshot'] = snapshot_xlsx
+
+        # [스토리지 절약] 오늘 날짜 파일이 이미 있으면 구파일 제거 (최신 1개만 유지)
+        today_prefix = f"data/trending_integrated_{now_kst.strftime('%Y%m%d')}"
+        import glob as _glob
+        existing_today = sorted(_glob.glob(f"{today_prefix}_*.xlsx"))
+        # 새로 저장한 파일 외의 같은 날 파일 제거
+        for old_file in existing_today[:-1]:
+            try:
+                os.remove(old_file)
+                print(f"[Cleanup] Removed old snapshot: {os.path.basename(old_file)}")
+            except:
+                pass
+    except Exception as e:
+        print(f"Error saving snapshot Excel: {e}")
+
+    # 4. Vercel JSON 저장 (latest_stocks.json + status.json)
+    try:
         fixed_json = "data/latest_stocks.json"
         
-        # 1. 컬럼명 정제 및 필드 확장 (대시보드 호환용 전용)
-        # V8.9.9.5: UI에서 기대하는 영어 필드명과 한글 필드명을 모두 포함하여 안전성 극대화
-        
-        # 기본 데이터 복사
         df_for_json = df.copy()
         
         mapping_pairs = [
@@ -149,7 +164,6 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
             elif kor in df_for_json.columns and eng not in df_for_json.columns:
                 df_for_json[eng] = df_for_json[kor]
 
-        # 2. 필수 필드 결측치 처리 (프론트엔드 Crash 방지)
         text_fields = ['게시물_요약', 'posts_summary', '감정', 'sentiment', '키워드', 'keywords']
         for field in text_fields:
             if field in df_for_json.columns:
@@ -160,28 +174,23 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
                 else:
                     df_for_json[field] = df_for_json[field].fillna("")
             else:
-                # 필드가 아예 없는 경우 기본값으로 생성
                 if '요약' in field or 'summary' in field: df_for_json[field] = "분석 대기중"
                 elif '감정' in field or 'sentiment' in field: df_for_json[field] = "중립 (0)"
                 else: df_for_json[field] = ""
 
-        # 3. 나머지 숫자형 데이터 결측치 처리 (NaN 방지)
         df_for_json = df_for_json.fillna(0)
-        
-        # 4. 중복 컬럼 제거 (Safety Layer for orient='records')
         df_for_json = df_for_json.loc[:, ~df_for_json.columns.duplicated()]
         
         json_data = df_for_json.to_json(orient='records', force_ascii=False)
         with open(fixed_json, 'w', encoding='utf-8') as f:
             f.write(json_data)
         
-        # [V8.6.2 Hotfix] Update status.json with current KST
-        now_kst = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+        status_str = now_kst.strftime("%Y-%m-%d %H:%M:%S")
         status_json = "data/status.json"
         with open(status_json, 'w', encoding='utf-8') as f:
-            json.dump({"last_updated": now_kst, "status": "ok", "message": "V8.9.9.6 LIVE"}, f, ensure_ascii=False, indent=4)
+            json.dump({"last_updated": status_str, "status": "ok", "message": "V8.9.9.5 LIVE"}, f, ensure_ascii=False, indent=4)
             
-        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.6)")
+        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.5)")
     except Exception as e:
         print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
         

@@ -67,7 +67,7 @@ export const ResearchNavBar = ({ reports, repoOwner, repoName }: ResearchNavBarP
                         description=".xlsx 형식"
                         leftSection={<IconFileSpreadsheet size={16} color={item.isLatest ? '#2f9e44' : '#868e96'} />}
                         component="a"
-                        href={item.url}
+                        href="/api/download/excel"
                         download={`stockbot_${new Date().toISOString().slice(0,10)}.xlsx`}
                         variant={item.isLatest ? 'light' : 'subtle'}
                         color="green"

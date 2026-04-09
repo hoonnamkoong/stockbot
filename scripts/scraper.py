@@ -203,37 +203,56 @@ if __name__ == "__main__":
         today_str = now_kst.strftime('%Y.%m.%d')
         results = []
         
-        print(f"[Stage 1] 후보 종목 분석 시작 (총 {len(current_candidates)}개)")
-        for s in current_candidates:
-            d = get_stock_details(s['code'])
-            s.update(d)
-            # 오늘 날짜 기반 누적 카운트
-            stats = get_discussion_stats(s['code'], today_str, prev_sync_state['stocks'])
-            
-            # 연속 일수 업데이트
-            prev_info = yesterday_data.get(s['code'], {'consecutive_days': 0})
-            s['consecutive_days'] = prev_info['consecutive_days'] + 1
-            
-            # 문턱값 체크
-            if stats['recent_posts_count'] >= threshold:
-                s['recent_posts_count'] = stats['recent_posts_count']
+        print(f"[Stage 1] 후보 종목 분석 시작 (총 {len(current_candidates)}개, 병렬 엔진 가동)")
+        
+        def process_stock_candidate(s):
+            """개별 종목 데이터를 수집하고 1차 필터링을 수행하는 내부 함수"""
+            try:
+                # 1. 상세 수급 및 전일 종가 수집
+                d = get_stock_details(s['code'])
+                s.update(d)
                 
-                # [V8.9.9.6] 1차 필터 통과 종목: 추천순 TOP 5 본문 수집
-                all_today_posts = stats['new_posts']
-                # 기존 posts에 있던 데이터도 포함될 수 있도록 처리하거나, 
-                # 단순히 현재 수집된 오늘 글 중 추천수 높은 순으로 5개 선정
-                sorted_posts = sorted(all_today_posts, key=lambda x: x['likes'], reverse=True)[:5]
+                # 2. 오늘 날짜 토론글 누적 카운트
+                stats = get_discussion_stats(s['code'], today_str, prev_sync_state['stocks'])
                 
-                print(f"   - {s['name']} 통과 ({stats['recent_posts_count']}/{threshold}). 상위 게시글 본문 수집 중...")
-                for p in sorted_posts:
-                    p['body'] = get_post_body(s['code'], p['nid'])
+                # 3. 연속 일수 업데이트
+                prev_info = yesterday_data.get(s['code'], {'consecutive_days': 0})
+                s['consecutive_days'] = prev_info['consecutive_days'] + 1
                 
-                s['posts'] = sorted_posts
-                results.append(s)
+                # 4. 문턱값 체크 및 통과 시 추가 데이터 수집
+                if stats['recent_posts_count'] >= threshold:
+                    s['recent_posts_count'] = stats['recent_posts_count']
+                    all_today_posts = stats['new_posts']
+                    sorted_posts = sorted(all_today_posts, key=lambda x: x['likes'], reverse=True)[:5]
+                    
+                    # 통과 종목만 본문 추가 수집 (여기가 병목이므로 병렬화의 이점이 큼)
+                    for p in sorted_posts:
+                        p['body'] = get_post_body(s['code'], p['nid'])
+                    
+                    s['posts'] = sorted_posts
+                    return s, stats['updated_state']
+                
+                return None, stats['updated_state']
+            except Exception as e:
+                print(f"   [Error] {s['name']} 스킵: {e}")
+                return None, None
+
+        # [V8.9.9.8] ThreadPoolExecutor 적용 (여유 있는 5개 스레드)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_stock = {executor.submit(process_stock_candidate, s): s for s in current_candidates}
             
-            # 상태 저장용 데이터 업데이트
-            prev_sync_state['stocks'][s['code']] = stats['updated_state']
-            prev_sync_state['stocks'][s['code']]['consecutive_days'] = s['consecutive_days']
+            for future in as_completed(future_to_stock):
+                stock_res, updated_state = future.result()
+                s_orig = future_to_stock[future]
+                
+                if updated_state:
+                    # 공유 자원(sync_state) 업데이트
+                    prev_sync_state['stocks'][s_orig['code']] = updated_state
+                    prev_sync_state['stocks'][s_orig['code']]['consecutive_days'] = s_orig.get('consecutive_days', 1)
+                
+                if stock_res:
+                    print(f"   ✅ {stock_res['name']} 통과 ({stock_res['recent_posts_count']}/{threshold})")
+                    results.append(stock_res)
 
         save_sync_state(prev_sync_state)
         print(f"[Stage 1] 수집 완료 ({len(results)}개 종목 1차 필터 통과, 문턱: {threshold})")

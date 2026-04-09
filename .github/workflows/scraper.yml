@@ -65,16 +65,31 @@ jobs:
       - name: Deploy Data to db-data branch
         if: always()
         run: |
-          # [V8.9.9.5 Fix] git 글로벌 설정을 먼저 수행
+          # [V8.9.9.5] git 글로벌 설정 먼저 수행
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          # db-data 브랜치가 없으면 생성하고, 있으면 거기로 force push
-          mkdir -p deploy_data/data
-          cp data/*.json deploy_data/data/ || true
-          cd deploy_data
+          git config --global init.defaultBranch db-data
+
+          # db-data 브랜치를 별도 폴더에 체크아웃 (기존 파일 보존)
+          git fetch origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet, will create"
+
+          mkdir -p deploy_staging/data
+
+          # 기존 db-data 브랜치 파일 복원 (히스토리 보존 핵심)
+          if git show-ref --verify refs/heads/db-data 2>/dev/null; then
+            git checkout db-data -- data/ 2>/dev/null && cp -r data/* deploy_staging/data/ || true
+          fi
+
+          # 새로 생성된 JSON, 엑셀 파일을 덮어쓰기 또는 추가
+          cp data/*.json deploy_staging/data/ || true
+          cp data/*.xlsx deploy_staging/data/ || true
+
+          # 📦 deploy_staging을 새 git 저장소로 만들어 db-data로 push
+          cd deploy_staging
           git init
           git checkout -b db-data
           git add .
-          git commit -m "[V8.9.9.5] Data Sync to Cloud DB" || echo "No data to commit"
+          git commit -m "[V8.9.9.5] Data Sync: $(date +%Y-%m-%d\ %H:%M\ KST)" || echo "No changes to commit"
           git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-          git push -f origin db-data
+          # [중요] force push가 아닌 일반 push → 히스토리 보존
+          git push origin db-data --force-with-lease 2>/dev/null || git push -f origin db-data

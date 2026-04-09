@@ -77,6 +77,43 @@ def save_sync_state(state):
     with open('data/sync_state.json', 'w', encoding='utf-8') as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
+# ====================================================================
+# [V8.9.9.5] 연속일 별도 영구 보존 시스템
+# 코드 수정/재배포 시에도 data/consecutive_days.json을 통해 값이 유지됨
+# ====================================================================
+CONSECUTIVE_DAYS_PATH = 'data/consecutive_days.json'
+
+def load_consecutive_days():
+    """순위 병도 consecutive_days.json에서 연속일 데이터 로드"""
+    # 1. 먹저 GitHub db-data 브랜치에서 최신 데이터 다운로드 시도 (클라우드 환경)
+    github_url = "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/consecutive_days.json"
+    try:
+        import urllib.request
+        with urllib.request.urlopen(github_url, timeout=5) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            # 롤카운 성공 시 로컈 저장
+            os.makedirs('data', exist_ok=True)
+            with open(CONSECUTIVE_DAYS_PATH, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            print(f"[ConsecDays] GitHub에서 {len(data)}개 종목 연속일 로드")
+            return data
+    except Exception as e:
+        print(f"[ConsecDays] GitHub 로드 실패, 로컈 파일 시도: {e}")
+    # 2. 로컈 파일 시도
+    if os.path.exists(CONSECUTIVE_DAYS_PATH):
+        try:
+            with open(CONSECUTIVE_DAYS_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except: pass
+    return {}
+
+def save_consecutive_days(data: dict):
+    """연속일 데이터를 로컈에 저장 (db-data 브랜치로도 자동 배포됨)"""
+    os.makedirs('data', exist_ok=True)
+    with open(CONSECUTIVE_DAYS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    print(f"[ConsecDays] {len(data)}개 종목 연속일 저장 완료")
+
 def get_post_body(code, nid):
     """게시물의 본문 내용을 스크래핑합니다."""
     url = f"https://finance.naver.com/item/board_read.naver?code={code}&nid={nid}"
@@ -209,7 +246,11 @@ if __name__ == "__main__":
         current_candidates = analyzer.get_top_trending_stocks('KOSPI') + analyzer.get_top_trending_stocks('KOSDAQ')
         prev_sync_state, yesterday_data = load_sync_state()
         today_str = now_kst.strftime('%Y.%m.%d')
+        today_date = now_kst.strftime('%Y%m%d')
         results = []
+        
+        # [V8.9.9.5] 연속일 영구 파일 로드
+        consec_days = load_consecutive_days()
         
         print(f"[Stage 1] 후보 종목 분석 시작 (총 {len(current_candidates)}개, 병렬 엔진 가동)")
         
@@ -223,10 +264,6 @@ if __name__ == "__main__":
                 # 2. 오늘 날짜 토론글 누적 카운트
                 stats = get_discussion_stats(s['code'], today_str, prev_sync_state['stocks'])
                 
-                # 3. 연속 일수 업데이트
-                prev_info = yesterday_data.get(s['code'], {'consecutive_days': 0})
-                s['consecutive_days'] = prev_info['consecutive_days'] + 1
-                
                 # 4. 문턱값 체크 및 통과 시 추가 데이터 수집
                 if stats['recent_posts_count'] >= threshold:
                     s['recent_posts_count'] = stats['recent_posts_count']
@@ -238,30 +275,43 @@ if __name__ == "__main__":
                         p['body'] = get_post_body(s['code'], p['nid'])
                     
                     s['posts'] = sorted_posts
-                    return s, stats['updated_state']
+                    return s, stats['updated_state'], True  # 통과
                 
-                return None, stats['updated_state']
+                return None, stats['updated_state'], False  # 미통과
             except Exception as e:
                 print(f"   [Error] {s['name']} 스킵: {e}")
-                return None, None
+                return None, None, False
 
         # [V8.9.9.8] ThreadPoolExecutor 적용 (여유 있는 5개 스레드)
+        passed_codes = set()  # 오늘 통과한 종목 코드
         with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_stock = {executor.submit(process_stock_candidate, s): s for s in current_candidates}
             
             for future in as_completed(future_to_stock):
-                stock_res, updated_state = future.result()
+                stock_res, updated_state, passed = future.result()
                 s_orig = future_to_stock[future]
+                code = s_orig['code']
                 
                 if updated_state:
-                    # 공유 자원(sync_state) 업데이트
-                    prev_sync_state['stocks'][s_orig['code']] = updated_state
-                    prev_sync_state['stocks'][s_orig['code']]['consecutive_days'] = s_orig.get('consecutive_days', 1)
+                    prev_sync_state['stocks'][code] = updated_state
                 
-                if stock_res:
-                    print(f"   ✅ {stock_res['name']} 통과 ({stock_res['recent_posts_count']}/{threshold})")
+                if passed and stock_res:
+                    # [V8.9.9.5] 연속일: 영구 파일에서 박아서 +1 (코드 수정 시에도 보존)
+                    prev_days_info = consec_days.get(code, {'days': 0, 'last_date': ''})
+                    if prev_days_info['last_date'] == today_date:
+                        # 오늘 이미 카운트된 종목
+                        stock_res['consecutive_days'] = prev_days_info['days']
+                    else:
+                        # 새롭게 연속일 +1
+                        new_days = prev_days_info['days'] + 1
+                        consec_days[code] = {'days': new_days, 'last_date': today_date, 'name': stock_res.get('name', '')}
+                        stock_res['consecutive_days'] = new_days
+                    passed_codes.add(code)
+                    print(f"   ✅ {stock_res['name']} 통과 ({stock_res['recent_posts_count']}/{threshold}), 연속 {stock_res['consecutive_days']}일")
                     results.append(stock_res)
 
+        # [V8.9.9.5] 연속일 영구 저장 (코드좌야 날아감)
+        save_consecutive_days(consec_days)
         save_sync_state(prev_sync_state)
         print(f"[Stage 1] 수집 완료 ({len(results)}개 종목 1차 필터 통과, 문턱: {threshold})")
     except Exception as e:

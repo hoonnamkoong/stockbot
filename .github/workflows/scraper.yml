@@ -65,16 +65,16 @@ jobs:
       - name: Deploy Data to db-data branch
         if: always()
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          # db-data 브랜치가 없으면 생성하고, 있으면 거기로 푸시
+          # [V8.9.9.5 Fix] git 글로벌 설정을 먼저 수행
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          # db-data 브랜치가 없으면 생성하고, 있으면 거기로 force push
           mkdir -p deploy_data/data
           cp data/*.json deploy_data/data/ || true
-          cp status.json deploy_data/ || true
           cd deploy_data
           git init
           git checkout -b db-data
           git add .
-          git commit -m "[V8.9.9.5 Recovery] Data Sync to Cloud DB"
+          git commit -m "[V8.9.9.5] Data Sync to Cloud DB" || echo "No data to commit"
           git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           git push -f origin db-data

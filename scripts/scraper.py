@@ -73,13 +73,32 @@ def save_sync_state(state):
     with open('data/sync_state.json', 'w', encoding='utf-8') as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
-def get_discussion_stats(code, threshold_time, prev_state):
+def get_post_body(code, nid):
+    """게시물의 본문 내용을 스크래핑합니다."""
+    url = f"https://finance.naver.com/item/board_read.naver?code={code}&nid={nid}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        soup = BeautifulSoup(res.content, 'html.parser')
+        body = soup.select_one('#body')
+        if body:
+            return body.get_text(strip=True)
+    except: pass
+    return ""
+
+def get_discussion_stats(code, today_str, prev_state):
+    """
+    [V8.9.9.6] 오늘 날짜 기준 게시글 수 누적 및 수집
+    today_str: '2026.04.09' 형식
+    """
     headers = {'User-Agent': 'Mozilla/5.0'}
     stock_state = prev_state.get(code, {'cumulative_count': 0, 'last_nid': None})
     new_posts = []
     found_prev_marker = False
+    stop_by_date = False
+
     for page in range(1, 10):
-        if found_prev_marker: break
+        if found_prev_marker or stop_by_date: break
         url = f"https://finance.naver.com/item/board.naver?code={code}&page={page}"
         try:
             res = requests.get(url, headers=headers, timeout=10)
@@ -88,20 +107,39 @@ def get_discussion_stats(code, threshold_time, prev_state):
             for row in rows:
                 cols = row.select('td')
                 if len(cols) < 5: continue
+                
+                # 날짜 확인 (cols[0] -> '2026.04.09 11:32')
+                date_text = cols[0].get_text(strip=True)
+                if today_str not in date_text:
+                    # 오늘 글이 아니면 수집 중단 (누적 카운트의 정확성 보장)
+                    stop_by_date = True
+                    break
+
                 title_tag = row.select_one('td.title a')
                 if not title_tag: continue
+                
                 current_nid = re.search(r'nid=(\d+)', title_tag['href']).group(1)
                 if current_nid == stock_state['last_nid']: 
                     found_prev_marker = True
                     break
-                # API Batch 분석용 제목 수집
-                new_posts.append({'nid': current_nid, 'title': title_tag.get_text(strip=True), 'likes': cols[4].get_text(strip=True)})
+                
+                try:
+                    likes = int(cols[4].get_text(strip=True))
+                except: likes = 0
+                
+                new_posts.append({
+                    'nid': current_nid, 
+                    'title': title_tag.get_text(strip=True), 
+                    'likes': likes
+                })
         except: break
+    
     total_cumulative = stock_state['cumulative_count'] + len(new_posts)
     latest_nid = new_posts[0]['nid'] if new_posts else stock_state['last_nid']
+    
     return {
         'recent_posts_count': total_cumulative, 
-        'posts': new_posts[:10], # Batch 분석용 최신 10개 게시물
+        'new_posts': new_posts,
         'updated_state': {'cumulative_count': total_cumulative, 'last_nid': latest_nid}
     }
 
@@ -137,20 +175,35 @@ if __name__ == "__main__":
     try:
         current_candidates = analyzer.get_top_trending_stocks('KOSPI') + analyzer.get_top_trending_stocks('KOSDAQ')
         prev_sync_state, yesterday_data = load_sync_state()
+        today_str = now_kst.strftime('%Y.%m.%d')
         results = []
         
+        print(f"[Stage 1] 후보 종목 분석 시작 (총 {len(current_candidates)}개)")
         for s in current_candidates:
             d = get_stock_details(s['code'])
             s.update(d)
-            stats = get_discussion_stats(s['code'], None, prev_sync_state['stocks'])
+            # 오늘 날짜 기반 누적 카운트
+            stats = get_discussion_stats(s['code'], today_str, prev_sync_state['stocks'])
             
             # 연속 일수 업데이트
             prev_info = yesterday_data.get(s['code'], {'consecutive_days': 0})
             s['consecutive_days'] = prev_info['consecutive_days'] + 1
             
+            # 문턱값 체크
             if stats['recent_posts_count'] >= threshold:
                 s['recent_posts_count'] = stats['recent_posts_count']
-                s['posts'] = stats['posts']
+                
+                # [V8.9.9.6] 1차 필터 통과 종목: 추천순 TOP 5 본문 수집
+                all_today_posts = stats['new_posts']
+                # 기존 posts에 있던 데이터도 포함될 수 있도록 처리하거나, 
+                # 단순히 현재 수집된 오늘 글 중 추천수 높은 순으로 5개 선정
+                sorted_posts = sorted(all_today_posts, key=lambda x: x['likes'], reverse=True)[:5]
+                
+                print(f"   - {s['name']} 통과 ({stats['recent_posts_count']}/{threshold}). 상위 게시글 본문 수집 중...")
+                for p in sorted_posts:
+                    p['body'] = get_post_body(s['code'], p['nid'])
+                
+                s['posts'] = sorted_posts
                 results.append(s)
             
             # 상태 저장용 데이터 업데이트

@@ -158,53 +158,67 @@ class GeminiAgent:
         if not self.batch_model or not batch_data: 
             return {s.get('code', s.get('name')): {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []} for s in batch_data}
         
-        # [V8.5.5] 데이터 경량화 및 정합성 보전 (body 대신 title + likes 활용)
-        cleaned_batch = []
-        for stock in batch_data:
-            posts_text = "\n".join([f"[{p.get('title')}] (추천:{p.get('likes')})" for p in stock.get('posts', [])])
-            cleaned_batch.append({
-                "code": stock.get('code'),
-                "name": stock.get('name'),
-                "content": posts_text
-            })
-            
-        prompt = f"""
-        당신은 구동계(Body)를 제외한 핵심 정보만을 추출하는 주식 수급 분석 전문가입니다.
-        아래 리스트에 포함된 각 종목의 토론방 데이터를 분석하세요.
+        # [V8.9.9.6] 데이터 경량화 및 정합성 보전 (Body 일부 포함하여 분석 품질 향상)
+        # 종목 수가 많을 경우 10개씩 그룹화하여 API 호출
+        GROUP_SIZE = GroupSize = 10
+        all_results = {}
         
-        [V8.6.1 분석 규칙 - 절대 준수]
-        1. 선동/감탄사(가즈아, 영차 등)는 무조건 0점 처리하고 summary에 '노이즈' 표기.
-        2. summary는 반드시 20자 이내의 명사형 핵심 요약으로 작성. (예: **신사업 공시** 기대감 유입)
-        3. keywords는 3개 이내의 핵심 단어만 추출.
+        for i in range(0, len(batch_data), GROUP_SIZE):
+            group = batch_data[i:i + GROUP_SIZE]
+            cleaned_batch = []
+            for stock in group:
+                # 추천수가 높은 본문(Body)을 요약에 활용 (글자 수 제한 준수)
+                posts_text = "\n".join([f"[{p.get('title')}] {str(p.get('body', ''))[:150]}" for p in stock.get('posts', [])])
+                cleaned_batch.append({
+                    "code": stock.get('code'),
+                    "name": stock.get('name'),
+                    "content": posts_text
+                })
+            
+            # 그룹별 프롬프트 생성 및 호출
+            prompt = f"""
+            당신은 주식 종목 토론방의 대중 심리와 팩트를 분석하는 전문가입니다.
+            아래 리스트({len(cleaned_batch)}개 종목)의 데이터를 분석하여 결과를 도출하세요.
 
-        [분석 대상 데이터]
-        {json.dumps(cleaned_batch, ensure_ascii=False)}
-        
-        각 종목별로 종목코드(code)를 Key로 사용하여 다음 JSON 형식으로만 응답하세요:
-        {{
-            "005930": {{
-                "sentiment": 점수(-10 ~ 10),
-                "summary": "**핵심키워드** 중심 요약",
-                "keywords": ["키워드1", "키워드2"]
-            }}
-        }}
-        """
-        try:
-            response = self._call_gemini_safe(
-                prompt,
-                model_type='batch',
-                generation_config={"response_mime_type": "application/json"}
-            )
-            if response and response.text:
-                # [V8.5.5] 마크다운 코드 블록(```json 등) 제거 안전장치
-                raw_text = response.text.strip()
-                if raw_text.startswith("```"):
-                    raw_text = re.sub(r"^(?:```[a-z]*\n)|(?:```$)", "", raw_text, flags=re.MULTILINE).strip()
-                return json.loads(raw_text)
-        except Exception as e:
-            print(f"[GeminiAgent] Batch 분석 오류: {e}")
+            [V8.6.1 분석 규칙 - 절대 준수]
+            1. 선동/감탄사(가즈아 등)는 무조건 0점 처리하고 summary에 '노이즈' 표기.
+            2. summary는 반드시 20자 이내의 명사형 핵심 요약으로 작성. (예: **신사업 공시** 기대감 유입)
+            3. keywords는 3개 이내의 핵심 단어만 추출.
+
+            [분석 대상 데이터]
+            {json.dumps(cleaned_batch, ensure_ascii=False)}
             
-        return {s.get('code', s.get('name')): {"sentiment": 0, "summary": "분석 오류", "keywords": []} for s in batch_data}
+            각 종목별로 종목코드(code)를 Key로 사용하여 다음 JSON 형식으로만 응답하세요:
+            {{
+                "005930": {{
+                    "sentiment": 점수(-10 ~ 10),
+                    "summary": "**핵심키워드** 중심 요약",
+                    "keywords": ["키워드1", "키워드2"]
+                }}
+            }}
+            """
+            try:
+                response = self._call_gemini_safe(
+                    prompt,
+                    model_type='batch',
+                    generation_config={"response_mime_type": "application/json"}
+                )
+                if response and response.text:
+                    raw_text = response.text.strip()
+                    if raw_text.startswith("```"):
+                        raw_text = re.sub(r"^(?:```[a-z]*\n)|(?:```$)", "", raw_text, flags=re.MULTILINE).strip()
+                    group_results = json.loads(raw_text)
+                    all_results.update(group_results)
+            except Exception as e:
+                print(f"[GeminiAgent] Group Batch 분석 오류 ({i//GROUP_SIZE + 1}번 그룹): {e}")
+
+        # 분석 실패한 종목들에 대한 기본값 처리
+        final_results = {}
+        for s in batch_data:
+            code = s.get('code')
+            final_results[code] = all_results.get(code, {"sentiment": 0, "summary": "분석 오류", "keywords": []})
+            
+        return final_results
 
     def analyze_bulk_sentiment(self, bulk_data):
         """기존 벌크 감성 분석 로직 유지 (모델 동적 적용)"""

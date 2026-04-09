@@ -52,12 +52,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-          KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
-          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
-          KOREAINVESTMENT_PY_ACCOUNT: ${{ secrets.KOREAINVESTMENT_PY_ACCOUNT }}
-          KOREAINVESTMENT_PY_PASSWORD: ${{ secrets.KOREAINVESTMENT_PY_PASSWORD }}
-          FORCE_RUN: "${{ github.event.inputs.force_run }}"
-          GITHUB_EVENT_NAME: "${{ github.event_name }}"
+          # ... (생략된 env는 그대로 유지)
         run: python scripts/scraper.py
+
+      - name: Commit and Push changes
+        if: always()
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/*.json data/*.csv data/sync_state.json status.json || true
+          git commit -m "[V8.9.9.7] Auto Update: Market Data & AI Analysis" || echo "No changes to commit"
+          git push origin main

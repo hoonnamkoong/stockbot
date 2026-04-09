@@ -363,9 +363,9 @@ function TradeContent() {
     function renderSimulationTripod() {
         if (!geminiBalance) return null;
         const simConfigs = [
-            { id: 'sim1', key: 'sim1', label: '안정 지향형', color: 'blue', type: 'sim_original' },
-            { id: 'sim2', key: 'sim2', label: '공격 투자형', color: 'red', type: 'sim_aggressive' },
-            { id: 'sim3', key: 'sim3', label: '신념 집중형', color: 'violet', type: 'sim_conviction' }
+            { id: 'sim1', key: 'sim1', label: '안정 지향형', color: 'blue', type: 'sim_standard' },
+            { id: 'sim2', key: 'sim2', label: '보수적 방어형', color: 'violet', type: 'sim_conservative' },
+            { id: 'sim3', key: 'sim3', label: '공격적 추세추종형', color: 'red', type: 'sim_aggressive' }
         ];
         return (
             <Stack gap="xl">
@@ -401,7 +401,7 @@ function TradeContent() {
                                     <Group grow mb="md">
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">예수금 (잔고)</Text>
-                                            <Text fw={700} size="md">{(Math.round(stats.deposit || 0)).toLocaleString()}원</Text>
+                                            <Text fw={700} size="md">{(Math.round(stats.cash || 0)).toLocaleString()}원</Text>
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">수익률</Text>

@@ -52,14 +52,21 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-          # ... (생략된 env는 그대로 유지)
+          # KIS API 계정 정보
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
+          # 기타 설정
+          FORCE_RUN: "${{ github.event.inputs.force_run }}"
+          GITHUB_EVENT_NAME: "${{ github.event_name }}"
         run: python scripts/scraper.py
 
-      - name: Commit and Push changes
+      - name: Commit and Push Data Updates
         if: always()
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add data/*.json data/*.csv data/sync_state.json status.json || true
-          git commit -m "[V8.9.9.7] Auto Update: Market Data & AI Analysis" || echo "No changes to commit"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/*.json data/*.csv status.json || true
+          git commit -m "[V8.9.9.8] Auto Update: Cloud Research Data & Simulation" || echo "No changes to commit"
           git push origin main

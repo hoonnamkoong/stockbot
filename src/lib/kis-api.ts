@@ -35,26 +35,48 @@ let tokenExpiry: number = 0;
 const TOKEN_CACHE_PATH = path.join(process.cwd(), 'data', 'kis_token_cache.json');
 
 async function readTokenCache() {
+    // [V8.9.9.5] auth.py(ISO 문자열)와 kis-api.ts(밀리초 숫자) 두 형식 모두 호환
+    const parseExpiry = (v: any): number => {
+        if (typeof v === 'number') return v; // ms 숫자
+        if (typeof v === 'string') return new Date(v).getTime(); // ISO 문자열
+        return 0;
+    };
+    const isTokenValid = (cache: any): boolean => {
+        if (!cache?.access_token) return false;
+        const expiresMs = parseExpiry(cache.expires_at);
+        const now = Date.now();
+        // 만료 1시간 전까지 유효
+        if (expiresMs > now + 3600000) return true;
+        // issued_at 기준 오늘 발급 여부 확인 (KIS 정책: 1일 1회)
+        if (cache.issued_at) {
+            const issuedDate = new Date(cache.issued_at).toDateString();
+            const todayDate = new Date().toDateString();
+            if (issuedDate === todayDate) return true;
+        }
+        return false;
+    };
+
     // 1. Try Remote GitHub Cache (for Vercel persistence)
     if (process.env.VERCEL) {
         try {
             const owner = "hoonnamkoong";
             const repo = "stockbot";
-            const path = "data/kis_token_cache.json";
+            const ghPath = "data/kis_token_cache.json";
             const branch = "db-data";
-            const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+            const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${ghPath}?t=${Date.now()}`;
             
             console.log(`[KIS-API] Fetching remote token cache from GitHub...`);
             const res = await axios.get(url, { headers: { 'Cache-Control': 'no-cache' } });
             const cache = res.data;
-            const config = getKISConfig();
             
-            if (cache.appkey === config.APP_KEY && cache.expires_at > Date.now() + 3600000) {
-                console.log(`[KIS-API] Successfully retrieved valid GITHUB token cache.`);
+            if (isTokenValid(cache)) {
+                console.log(`[KIS-API] ✅ GitHub 캐시 토큰 유효 - 재사용 (issued_at: ${cache.issued_at})`);
                 return cache;
+            } else {
+                console.log(`[KIS-API] GitHub 캐시 토큰 만료됨. 재발급 필요.`);
             }
         } catch (e: any) {
-            console.log(`[KIS-API] Remote cache check skipped or failed: ${e.message}`);
+            console.log(`[KIS-API] Remote cache check failed: ${e.message}`);
         }
     }
 
@@ -62,8 +84,8 @@ async function readTokenCache() {
     try {
         const data = await fs.readFile(TOKEN_CACHE_PATH, 'utf-8');
         const cache = JSON.parse(data);
-        const config = getKISConfig();
-        if (cache.appkey === config.APP_KEY && cache.expires_at > Date.now() + 3600000) {
+        if (isTokenValid(cache)) {
+            console.log(`[KIS-API] ✅ 로컬 캐시 토큰 유효 - 재사용 (issued_at: ${cache.issued_at})`);
             return cache;
         }
     } catch (e: any) {

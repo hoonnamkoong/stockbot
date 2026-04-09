@@ -193,6 +193,17 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.5)")
     except Exception as e:
         print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
+
+    # [V8.9.9.5] 3-Track 지능형 시뮬레이터 실행 (안정/보수/공격)
+    try:
+        from src.strategy.simulators.get_all_stats import run_all_simulators
+        # df_final에서 필요한 데이터 추출 (list of dict)
+        if 'data_list' in locals() or 'df' in locals():
+            sim_data = df.to_dict('records')
+            run_all_simulators(sim_data)
+            print("[Simulator] 3-Track 시뮬레이션 업데이트 완료")
+    except Exception as e:
+        print(f"[Simulator] 🚨 시뮬레이션 실행 중 오류: {e}")
         
     return saved_files
 

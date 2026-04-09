@@ -7,7 +7,8 @@ const getKISConfig = () => {
     const IS_VIRTUAL = process.env.KIS_IS_VIRTUAL === 'true'; 
     const APP_KEY = (process.env.KIS_APP_KEY || '').trim();
     const APP_SECRET = (process.env.KIS_APP_SECRET || '').trim();
-    const ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim();
+    // [V8.9.9.5] 하이픈 제거 - auth.py와 동일하게 '12345678-01' → '1234567801'
+    const ACCOUNT_NO = (process.env.KIS_ACCOUNT_NO || '').trim().replace(/-/g, '');
     const BASE_URL = process.env.KIS_BASE_URL || 
         (IS_VIRTUAL 
             ? 'https://openapivts.koreainvestment.com:29443' 

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { AppShell, Burger, Group, Title, Button, Text, ActionIcon, Tabs, Notification, useMantineTheme } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
-import { IconRefresh, IconRobot, IconSettings, IconCoin } from '@tabler/icons-react';
+import { IconRefresh, IconRobot, IconSettings, IconCoin, IconFileSpreadsheet } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 
@@ -78,6 +78,18 @@ export default function ResearchClient() {
                         <ActionIcon variant="light" color="violet" size="lg" onClick={openControl} visibleFrom="mobile" hiddenFrom="sm">
                             <IconSettings size={18} />
                         </ActionIcon>
+                        {/* [V8.9.9.5] 엑셀 다운로드 버튼 추가 */}
+                        <Button
+                            component="a"
+                            href="https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/trending_integrated.xlsx"
+                            download="stockbot_research.xlsx"
+                            variant="light"
+                            color="green"
+                            leftSection={<IconFileSpreadsheet size={16} />}
+                            visibleFrom="sm"
+                        >
+                            엑셀 다운로드
+                        </Button>
                         <Button variant="default" onClick={() => fetchData()} leftSection={<IconRefresh size={16} className={loading ? 'animate-spin' : ''} />}>
                             {loading ? '...' : '갱신'}
                         </Button>

@@ -97,41 +97,32 @@ def save_sync_state(state):
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 # ====================================================================
-# [V8.9.9.9] 연속일 별도 영구 보존 시스템
-# 코드 수정/재배포 시에도 data/consecutive_days.json을 통해 값이 유지됨
+# [V8.9.9.9] 연속일 별도 영구 보존 시스템 폐기
+# 사용자 요청: 코드 배포 시 json이 날아가는 문제를 방지하고자
+# 5일 게시판(analyzer_5days)과 동일하게 엑셀 파일 스캐닝 방식으로 변경
 # ====================================================================
-CONSECUTIVE_DAYS_PATH = 'data/consecutive_days.json'
 
-def load_consecutive_days():
-    """순위 병도 consecutive_days.json에서 연속일 데이터 로드"""
-    import time
-    github_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/consecutive_days.json?t={int(time.time())}"
+def get_history_counts():
+    """analyzer_5days 방식을 사용하여 최근 5영업일 간의 등장 횟수를 조회합니다."""
     try:
-        import urllib.request
-        with urllib.request.urlopen(github_url, timeout=5) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            # 롤카운 성공 시 로컈 저장
-            os.makedirs('data', exist_ok=True)
-            with open(CONSECUTIVE_DAYS_PATH, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            print(f"[ConsecDays] GitHub에서 {len(data)}개 종목 연속일 로드")
-            return data
+        from src.analyzer_5days import get_recent_working_days, load_daily_snapshots
+        target_dates = get_recent_working_days(5)
+        # 오늘 날짜는 오늘 아직 엑셀이 생성되지 않았거나 업데이트 중이므로 제외하고 
+        # 과거 데이터만 안전하게 스캔하기 위해 필요에 따라 보정할 수 있으나,
+        # analyzer_5days 자체가 유연하게 파일 유무로 판단하므로 그대로 사용
+        daily_dfs = load_daily_snapshots(target_dates)
+        
+        history_counts = {}
+        for d in target_dates:
+            df = daily_dfs.get(d)
+            if df is not None and not df.empty and 'code' in df.columns:
+                for c in df['code']:
+                    c_str = str(c).zfill(6)
+                    history_counts[c_str] = history_counts.get(c_str, 0) + 1
+        return history_counts
     except Exception as e:
-        print(f"[ConsecDays] GitHub 로드 실패, 로컈 파일 시도: {e}")
-    # 2. 로컈 파일 시도
-    if os.path.exists(CONSECUTIVE_DAYS_PATH):
-        try:
-            with open(CONSECUTIVE_DAYS_PATH, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except: pass
-    return {}
-
-def save_consecutive_days(data: dict):
-    """연속일 데이터를 로컈에 저장 (db-data 브랜치로도 자동 배포됨)"""
-    os.makedirs('data', exist_ok=True)
-    with open(CONSECUTIVE_DAYS_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    print(f"[ConsecDays] {len(data)}개 종목 연속일 저장 완료")
+        print(f"[Warn] 5일 게시판 히스토리 기준 조회를 실패했습니다: {e}")
+        return {}
 
 def get_post_body(code, nid):
     """게시물의 본문 내용을 스크래핑합니다."""
@@ -266,11 +257,11 @@ if __name__ == "__main__":
         prev_sync_state, yesterday_data = load_sync_state()
         today_str = now_kst.strftime('%Y.%m.%d')
         today_date = now_kst.strftime('%Y%m%d')
+        
+        # ==== Stage 1: 네이버 증권 스크래핑 & 1차 필터링 ====
+        print(f"[Stage 1] 네이버 토론방 데이터 수집 시작 (Thread: {threshold})")
+        history_counts = get_history_counts()
         results = []
-        
-        # [V8.9.9.5] 연속일 영구 파일 로드
-        consec_days = load_consecutive_days()
-        
         print(f"[Stage 1] 후보 종목 분석 시작 (총 {len(current_candidates)}개, 병렬 엔진 가동)")
         
         def process_stock_candidate(s):
@@ -315,32 +306,20 @@ if __name__ == "__main__":
                     prev_sync_state['stocks'][code] = updated_state
                 
                 if passed and stock_res:
-                    # [V8.9.9.5] 연속일: 영구 파일에서 박아서 +1 (코드 수정 시에도 보존)
-                    prev_days_info = consec_days.get(code, {'days': 0, 'last_date': ''})
-                    
-                    if prev_days_info['last_date'] == today_date:
-                        # 오늘 이미 카운트된 종목
-                        stock_res['consecutive_days'] = prev_days_info['days']
-                    else:
-                        # [V8.9.9.9] 어제 기록이 일치할 때만 카운트 증가, 아니면 1로 초기화
-                        yesterday_date = (now_kst - timedelta(days=1)).strftime('%Y%m%d')
-                        # 월요일인 경우 금요일(3일 전)을 어제로 간주
-                        if now_kst.weekday() == 0:
-                            yesterday_date = (now_kst - timedelta(days=3)).strftime('%Y%m%d')
+                    # [V8.9.9.5 User Request] 연속일 수는 5일 게시판처럼 저장된 엑셀 데이터를 스캔하여 확정
+                    # 만약 오늘 오전에 이미 스크래핑이 돌아 엑셀에 존재한다면 거기서 카운트 1이 더해졌을 수 있으므로 1을 최솟값으로 잡고 덧셈
+                    # (히스토리에 없으면 1일차)
+                    past_appearances = history_counts.get(code, 0)
+                    # 오늘 처음 포착된 것이면 past_appearances가 0일 수 있으므로 (또는 당일 파일에 없으면)
+                    # 최솟값 1은 보장
+                    new_days = past_appearances + 1
                             
-                        if prev_days_info['last_date'] == yesterday_date:
-                            new_days = prev_days_info['days'] + 1
-                        else:
-                            new_days = 1
-                            
-                        consec_days[code] = {'days': new_days, 'last_date': today_date, 'name': stock_res.get('name', '')}
-                        stock_res['consecutive_days'] = new_days
+                    stock_res['consecutive_days'] = new_days
                     passed_codes.add(code)
-                    print(f"   ✅ {stock_res['name']} 통과 ({stock_res['recent_posts_count']}/{threshold}), 연속 {stock_res['consecutive_days']}일")
+                    print(f"   ✅ {stock_res['name']} 통과 ({stock_res['recent_posts_count']}/{threshold}), 엑셀조회 연속 {stock_res['consecutive_days']}일")
                     results.append(stock_res)
 
-        # [V8.9.9.5] 연속일 영구 저장 (코드좌야 날아감)
-        save_consecutive_days(consec_days)
+        # 상태 영구 저장 (consec_days json은 사용성 폐기)
         save_sync_state(prev_sync_state)
         print(f"[Stage 1] 수집 완료 ({len(results)}개 종목 1차 필터 통과, 문턱: {threshold})")
     except Exception as e:

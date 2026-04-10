@@ -66,12 +66,17 @@ def load_sync_state():
     import time
     import urllib.request
     
-    # [V8.9.9.11 Fix] 시뮬레이터 상태 파일들도 함께 다운로드하여 잔고 초기화 문제 해결
+    # [V8.9.9.15 Persistence] 동기화 대상 파일 리스트 확장 (CSV 및 월별 엑셀 포함)
     files_to_sync = [
         'sync_state.json',
         'sim_original_state.json',
         'sim_conservative_state.json',
-        'sim_aggressive_state.json'
+        'sim_aggressive_state.json',
+        'trade_history_sim_original.csv',
+        'trade_history_sim_conservative.csv',
+        'trade_history_sim_aggressive.csv',
+        'trade_history_sim_conviction.csv',
+        f'trending_integrated_{get_current_kst_time().strftime("%Y-%m")}.xlsx'
     ]
     
     os.makedirs('data', exist_ok=True)
@@ -80,24 +85,40 @@ def load_sync_state():
         try:
             req = urllib.request.Request(github_url)
             with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                with open(os.path.join('data', filename), 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
+                data_content = resp.read()
+                # 파일 확장자에 따른 저장 방식 분기
+                mode = 'wb' if filename.endswith('.xlsx') else 'w'
+                final_content = data_content if filename.endswith('.xlsx') else data_content.decode('utf-8')
+                
+                with open(os.path.join('data', filename), mode, **({} if filename.endswith('.xlsx') else {'encoding': 'utf-8'})) as f:
+                    if filename.endswith('.xlsx'): f.write(final_content)
+                    else: f.write(final_content)
                 print(f"[Sync] {filename} 로드 완료")
         except:
-            # [Migration] sim_original_state.json이 없을 경우 기존의 sim_standard_state.json 시도
+            # [Migration] 원본 파일이 없을 경우 예전 Standard 명칭 파일들 시도
             if filename == 'sim_original_state.json':
-                old_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/sim_standard_state.json?t={int(time.time())}"
+                old_files = ['sim_standard_state.json']
+                target = 'sim_original_state.json'
+            elif filename == 'trade_history_sim_original.csv':
+                old_files = ['trade_history_sim_standard.csv']
+                target = 'trade_history_sim_original.csv'
+            else:
+                old_files = []
+                
+            for old_filename in old_files:
+                old_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/{old_filename}?t={int(time.time())}"
                 try:
                     req = urllib.request.Request(old_url)
                     with urllib.request.urlopen(req, timeout=5) as resp:
-                        data = json.loads(resp.read().decode('utf-8'))
-                        with open(os.path.join('data', 'sim_original_state.json'), 'w', encoding='utf-8') as f:
-                            json.dump(data, f, ensure_ascii=False, indent=2)
-                        print(f"[Sync] sim_standard_state.json을 sim_original_state.json으로 마이그레이션 완료")
-                        continue
+                        content = resp.read().decode('utf-8')
+                        with open(os.path.join('data', target), 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        print(f"[Sync] {old_filename}을 {target}으로 마이그레이션 완료")
+                        break
                 except: pass
-            print(f"[Sync] {filename} 로드 실패 (신규 생성 예정)")
+            
+            if not any(filename.startswith(f) for f in ['sim_original', 'trade_history_sim_original']):
+                print(f"[Sync] {filename} 로드 실패 (파일 없음)")
         
     if os.path.exists(state_path):
         try:

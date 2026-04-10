@@ -78,9 +78,10 @@ jobs:
             git checkout db-data -- data/ 2>/dev/null && cp -r data/* deploy_staging/data/ || true
           fi
 
-          # 새로 생성된 JSON, 엑셀 파일을 덮어쓰기 또는 추가
+          # 새로 생성된 JSON, 엑셀, CSV 파일을 덮어쓰기 또는 추가
           cp data/*.json deploy_staging/data/ || true
           cp data/*.xlsx deploy_staging/data/ || true
+          cp data/*.csv deploy_staging/data/ || true
 
           # 📦 deploy_staging을 새 git 저장소로 만들어 db-data로 push
           cd deploy_staging

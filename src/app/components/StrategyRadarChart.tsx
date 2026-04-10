@@ -60,15 +60,15 @@ export default function StrategyRadarChart() {
           return {
             subject,
             fullMark: 100,
-            real: stats.Real?.normalized[subject] || 0,
-            sim1: stats.Sim1?.normalized[subject] || 0,
-            sim2: stats.Sim2?.normalized[subject] || 0,
-            sim3: stats.Sim3?.normalized[subject] || 0,
+            real: stats.real?.normalized[subject] || 0,
+            sim1: stats.sim1?.normalized[subject] || 0,
+            sim2: stats.sim2?.normalized[subject] || 0,
+            sim3: stats.sim3?.normalized[subject] || 0,
             rawValues: {
-              real: formatRaw(apiKey, stats.Real?.raw[apiKey]),
-              sim1: formatRaw(apiKey, stats.Sim1?.raw[apiKey]),
-              sim2: formatRaw(apiKey, stats.Sim2?.raw[apiKey]),
-              sim3: formatRaw(apiKey, stats.Sim3?.raw[apiKey]),
+              real: formatRaw(apiKey, stats.real?.raw[apiKey]),
+              sim1: formatRaw(apiKey, stats.sim1?.raw[apiKey]),
+              sim2: formatRaw(apiKey, stats.sim2?.raw[apiKey]),
+              sim3: formatRaw(apiKey, stats.sim3?.raw[apiKey]),
             }
           };
         });

@@ -103,25 +103,25 @@ def save_sync_state(state):
 # ====================================================================
 
 def get_history_counts():
-    """analyzer_5days 방식을 사용하여 최근 5영업일 간의 등장 횟수를 조회합니다."""
+    """[V8.9.9.11] 5일 게시판(analysis_5days.json)의 연속 카운트 데이터를 직접 땡겨옵니다."""
+    import urllib.request
+    github_url = "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/analysis_5days.json"
     try:
-        from src.analyzer_5days import get_recent_working_days, load_daily_snapshots
-        target_dates = get_recent_working_days(5)
-        # 오늘 날짜는 오늘 아직 엑셀이 생성되지 않았거나 업데이트 중이므로 제외하고 
-        # 과거 데이터만 안전하게 스캔하기 위해 필요에 따라 보정할 수 있으나,
-        # analyzer_5days 자체가 유연하게 파일 유무로 판단하므로 그대로 사용
-        daily_dfs = load_daily_snapshots(target_dates)
-        
-        history_counts = {}
-        for d in target_dates:
-            df = daily_dfs.get(d)
-            if df is not None and not df.empty and 'code' in df.columns:
-                for c in df['code']:
-                    c_str = str(c).zfill(6)
-                    history_counts[c_str] = history_counts.get(c_str, 0) + 1
-        return history_counts
+        req = urllib.request.Request(github_url)
+        # 캐시 방지 타임스탬프
+        req.full_url = f"{github_url}?t={int(time.time())}"
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            history_counts = {}
+            for item in data:
+                code = item.get('code')
+                counts = item.get('consecutive_days', 0)
+                if code:
+                    history_counts[str(code).zfill(6)] = counts
+            print(f"[History] 5일 게시판 데이터로부터 {len(history_counts)}개 종목 이력 로드 완료")
+            return history_counts
     except Exception as e:
-        print(f"[Warn] 5일 게시판 히스토리 기준 조회를 실패했습니다: {e}")
+        print(f"[Warn] 5일 게시판 히스토리 데이터 fetch 실패: {e}")
         return {}
 
 def get_post_body(code, nid):
@@ -376,10 +376,11 @@ if __name__ == "__main__":
                 
                 deep_dive_report = advisor.generate_deep_dive_report(detail_picks)
                 
-                # [V8.9.9.9] 리포트 생성 성공 시 보고된 목록에 추가 및 상태 저장
-                prev_sync_state['reported_codes'].extend([p['code'] for p in final_picks])
-                save_sync_state(prev_sync_state)
-                print(f"[Stage 3] 리포트 생성 완료 (오늘의 누적 보고 종목: {len(prev_sync_state['reported_codes'])}개)")
+                # [V8.9.9.5] 리포트 결과 저장 및 상태 업데이트
+                if final_picks:
+                    prev_sync_state['reported_codes'].extend([p['code'] for p in final_picks])
+                    save_sync_state(prev_sync_state)
+                    print(f"[Stage 3] 리포트 생성 완료 (오늘의 누적 보고 종목: {len(prev_sync_state['reported_codes'])}개)")
         except Exception as e:
             print(f"[Stage 3 Error] 리포트 생성 실패: {e}")
 
@@ -387,8 +388,9 @@ if __name__ == "__main__":
     if results:
         try:
             # 1. 대시보드 데이터 저장 (기존 analyzer 로직 활용)
+            # [V8.9.9.11] scraper 기동 시각(now_kst)을 analyzer에 전달하여 status.json 시간 고정
             df, _ = analyzer.analyze_discussion_trend(results)
-            analyzer.save_data(df, "trending_integrated")
+            analyzer.save_data(df, "trending_integrated", start_time=now_kst)
             
             # 2. 텔레그램 발송 (링크 + KOSPI + KOSDAQ + 리포트 : 총 4개)
             tg.send_dashboard_link()

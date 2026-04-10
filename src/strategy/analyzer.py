@@ -76,7 +76,7 @@ def analyze_discussion_trend(data_list):
     return df_sorted
 
 
-def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
+def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_time=None):
     """
     [V8.9.9.5] DataFrame을 CSV/Excel/JSON으로 저장합니다.
     - 고정 파일(trending_integrated.xlsx): Vercel 대시보드 및 사이드바 엑셀 다운로드용
@@ -89,8 +89,9 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
     saved_files = {}
     os.makedirs('data', exist_ok=True)
 
-    # [공통] 현재 KST 타임스탬프
-    now_kst = datetime.utcnow() + timedelta(hours=9)
+    # [V8.9.9.11] 기동 시각 동기화 로직 적용
+    # [공통] 현재 KST 타임스탬프 (전달받은 start_time 우선, 없으면 현재 시각)
+    now_kst = start_time if start_time else (datetime.utcnow() + timedelta(hours=9))
     timestamp = now_kst.strftime("%Y%m%d_%H%M%S")
 
     # 1. 고정 CSV 저장 (Force Sync)
@@ -188,9 +189,9 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         status_str = now_kst.strftime("%Y-%m-%d %H:%M:%S")
         status_json = "data/status.json"
         with open(status_json, 'w', encoding='utf-8') as f:
-            json.dump({"last_updated": status_str, "status": "ok", "message": "V8.9.9.9 LIVE"}, f, ensure_ascii=False, indent=4)
+            json.dump({"last_updated": status_str, "status": "ok", "message": "V8.9.9.11 LIVE-SYNC"}, f, ensure_ascii=False, indent=4)
             
-        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.9)")
+        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.11, Time: {status_str})")
     except Exception as e:
         print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
 

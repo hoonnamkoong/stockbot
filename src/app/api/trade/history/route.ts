@@ -31,10 +31,21 @@ export async function GET(req: NextRequest) {
                 const lines = content.split('\n').filter(line => line.trim().length > 0);
                 
                 if (lines.length > 1) { // Header exists
-                    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                    // CSV 파싱 정규식: 쉼표로 구분하되 따옴표 내부의 쉼표는 무시
+                    const csvRegex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g;
+                    const parseCSVLine = (text: string) => {
+                        const results = [];
+                        let match;
+                        while ((match = csvRegex.exec(text)) !== null) {
+                            results.push((match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2]) || '');
+                        }
+                        return results;
+                    };
+
+                    const headers = parseCSVLine(lines[0]).map(h => h.trim());
                     
                     for (let i = 1; i < lines.length; i++) {
-                        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                        const values = parseCSVLine(lines[i]).map(v => v.trim());
                         if (values.length < headers.length) continue;
 
                         const entry: any = { type: fileInfo.type };

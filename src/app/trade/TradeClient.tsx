@@ -273,7 +273,7 @@ function TradeContent() {
             );
         }
         return (
-            <ScrollArea h={180} offsetScrollbars>
+            <ScrollArea h={450} offsetScrollbars>
                 <Table striped highlightOnHover stickyHeader verticalSpacing="xs" style={{ minWidth: 500 }}>
                     <Table.Thead>
                         <Table.Tr>

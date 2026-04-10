@@ -41,16 +41,14 @@ export async function GET() {
                 const returnRate = (profit / initialCash) * 100;
 
                 results[type.id] = {
-                    raw: {
+                    raw: state.raw_stats || {
                         cash: state.cash,
                         portfolio_value: portfolioValue,
                         total_asset: totalAsset,
                         profit: profit,
-                        profit_rate: returnRate,
-                        current_prices: Object.fromEntries(
-                            Object.entries(state.portfolio || {}).map(([c, p]: [string, any]) => [c, p.current_price || p.avg_price || 0])
-                        )
+                        profit_rate: returnRate
                     },
+                    normalized: state.normalized_stats || {},
                     portfolio: state.portfolio || {}
                 };
             } catch (err) {

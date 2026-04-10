@@ -178,42 +178,59 @@ class BaseSimulator:
                 self.save_state()
 
     def calculate_stats(self, current_prices=None):
-        """V8.6.2 실시간 자산 총액 산출 로직"""
+        """성과 지표 정밀 산출"""
         current_prices = current_prices or {}
         eval_invested = 0
         for code, item in self.state['portfolio'].items():
             cur_p = current_prices.get(code, item['avg_price'])
             eval_invested += (item['quantity'] * cur_p)
         current_nav = self.state['cash'] + eval_invested
+        
         logs = []
         if os.path.exists(self.log_file):
             try:
                 with open(self.log_file, 'r', encoding='utf-8') as f:
                     logs = json.load(f)
             except: pass
+        
         win_rate = 0
         pf = 1.0
+        turnover = 0
+        freq = 0
+        
         if logs:
             trades = []
             temp_buy = {}
+            total_volume = 0
             for l in logs:
                 c = l['code']
+                total_volume += l['amount']
                 if l['action'] == "BUY": temp_buy.setdefault(c, []).append(l)
                 elif l['action'] == "SELL" and c in temp_buy and temp_buy[c]:
                     b = temp_buy[c].pop(0)
                     trades.append(l['amount'] - b['amount'])
+            
             if trades:
                 win_rate = (len([t for t in trades if t > 0]) / len(trades) * 100)
                 gp = sum([t for t in trades if t > 0])
                 gl = abs(sum([t for t in trades if t < 0]))
                 pf = gp / gl if gl > 0 else (gp if gp > 0 else 1.0)
+            
+            # 자본 회전율: 총 거래대금 / 초기자본
+            turnover = total_volume / self.initial_cash
+            
+            # 거래 빈도: 시작일로부터 현재까지 하루 평균 거래 횟수
+            try:
+                start_date = datetime.datetime.strptime(logs[0]['timestamp'], '%Y-%m-%d %H:%M:%S')
+                days = (datetime.datetime.now() - start_date).days + 1
+                freq = len(logs) / days
+            except: freq = len(logs)
+            
         mdd = 0
-        peak = 0
-        if not self.state.get('history'): self.state['history'] = [self.initial_cash]
-        for nav in self.state['history']:
-            if nav > peak: peak = nav
-            dd = (peak - nav) / peak * 100 if peak > 0 else 0
-            if dd > mdd: mdd = dd
+        peak = self.state.get('peak_nav', current_nav)
+        if current_nav > peak: peak = current_nav
+        mdd = (peak - current_nav) / peak * 100 if peak > 0 else 0
+        
         return {
             "cash": self.state['cash'],
             "total_asset": current_nav,
@@ -222,6 +239,8 @@ class BaseSimulator:
             "win_rate": win_rate,
             "profit_factor": pf,
             "mdd": mdd,
+            "turnover": turnover,
+            "frequency": freq,
             "current_prices": current_prices
         }
 

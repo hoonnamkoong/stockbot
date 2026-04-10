@@ -48,8 +48,8 @@ class GeminiAgent:
         if self._initialized: return
         
         # [V8.6.0] 모델 명칭 선설정 (API 키 부재 시에도 속성 참조 가능하도록 보장)
-        self.batch_model_name = "models/gemini-2.0-flash"
-        self.report_model_name = "models/gemini-2.0-flash"
+        self.batch_model_name = "gemini-2.5-flash"
+        self.report_model_name = "gemini-2.5-flash"
         self.exhausted_models = set() if not hasattr(self, 'exhausted_models') else self.exhausted_models
 
         self.api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY')
@@ -199,14 +199,15 @@ class GeminiAgent:
             [분석 대상 데이터]
             {json.dumps(cleaned_batch, ensure_ascii=False)}
             
-            각 종목별로 종목코드(code)를 Key로 사용하여 다음 JSON 형식으로만 응답하세요:
-            {{
-                "005930": {{
+            각 종목별로 다음 JSON 배열 형식으로만 응답하세요:
+            [
+                {{
+                    "code": "005930",
                     "sentiment": 점수(-10 ~ 10),
                     "summary": "초간결 명사 요약",
                     "keywords": ["키워드1", "키워드2"]
                 }}
-            }}
+            ]
             """
             try:
                 response = self._call_gemini_safe(
@@ -216,18 +217,25 @@ class GeminiAgent:
                 )
                 if response and response.text:
                     raw_text = response.text.strip()
+                    print(f"DEBUG(Batch): {raw_text}")
                     if raw_text.startswith("```"):
                         raw_text = re.sub(r"^(?:```[a-z]*\n)|(?:```$)", "", raw_text, flags=re.MULTILINE).strip()
                     parsed = json.loads(raw_text)
-                    # [V8.9.9.9 Fix] 파싱 결과가 list일 경우 dict로 변환 (Gemini 응답 변동성 대응)
+                    
+                    if isinstance(parsed, dict) and 'results' in parsed:
+                        parsed = parsed['results']
+                        
                     if isinstance(parsed, list):
-                        parsed = {item.get('code', str(i)): item for i, item in enumerate(parsed) if isinstance(item, dict)}
-
-                    # [V8.9.9.5 Fix] 파싱 결과가 반드시 dict여야 함 (문자열 오인 방지)
-                    if isinstance(parsed, dict):
+                        for item in parsed:
+                            if isinstance(item, dict):
+                                if 'code' in item:
+                                    all_results[item['code']] = item
+                                else:
+                                    # {"005930": {...}} 형태가 리스트에 들어있는 경우
+                                    for k, v in item.items():
+                                        all_results[k] = v
+                    elif isinstance(parsed, dict):
                         all_results.update(parsed)
-                    else:
-                        print(f"[GeminiAgent] 응답이 dict가 아님, 스킵: {type(parsed)}")
             except Exception as e:
                 print(f"[GeminiAgent] Group Batch 분석 오류 ({i//GROUP_SIZE + 1}번 그룹): {e}")
 
@@ -345,14 +353,18 @@ class StrategyAdvisor:
             AI 요약: {stock.get('posts_summary')}
             DART 공시/뉴스: {dart_data} / {news_data}
             
-            [V8.6.2 극한 압축 규칙]
-            긴 문장 절대 금지. 오직 아래 JSON 형식으로만 짧은 단어들로 답변하세요.
-            {{
-              "decision": "BUY|WATCH|REJECT",
-              "reason": "단답형 한줄 액션 근거",
-              "risk": "종토방/공시 리스크 (없으면 없음)",
-              "highlights": ["키워드1", "키워드2"]
-            }}
+            [리포트 작성 규칙]
+            1. 이 종목이 왜 Top 5에 선정되었는지(수급/재료 등 배경)와 향후 예상을 반드시 포함하세요.
+            2. 'reason' 항목은 텔레그램에서 읽기 좋게 3~6줄 길이가 되도록 구체적으로 작성하세요.
+            3. 오직 아래 JSON 배열 형식으로만 답변하세요:
+            [
+              {{
+                "decision": "BUY|WATCH|REJECT",
+                "reason": "Top 5 선정 배경 및 향후 예상 (3~6줄 분량)",
+                "risk": "종토방/공시 리스크 (없으면 없음)",
+                "highlights": ["키워드1", "키워드2"]
+              }}
+            ]
             """
             try:
                 response = self.gemini._call_gemini_safe(prompt, model_type='report', generation_config={"response_mime_type": "application/json"})

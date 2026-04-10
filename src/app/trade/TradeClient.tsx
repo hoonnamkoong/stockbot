@@ -363,7 +363,7 @@ function TradeContent() {
     function renderSimulationTripod() {
         if (!geminiBalance) return null;
         const simConfigs = [
-            { id: 'sim1', key: 'sim1', label: '안정 지향형', color: 'blue', type: 'sim_standard' },
+            { id: 'sim1', key: 'sim1', label: '안정 지향형', color: 'blue', type: 'sim_original' },
             { id: 'sim2', key: 'sim2', label: '보수적 방어형', color: 'violet', type: 'sim_conservative' },
             { id: 'sim3', key: 'sim3', label: '공격적 추세추종형', color: 'red', type: 'sim_aggressive' }
         ];
@@ -388,6 +388,7 @@ function TradeContent() {
                                 name: p.name,
                                 qty: p.quantity,
                                 avg_price: avgVal,
+                                current_price: curVal,
                                 pl_rate: pl || (stats.profit_rate || 0)
                             };
                         });

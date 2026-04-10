@@ -59,6 +59,20 @@ def load_sync_state():
     state_path = 'data/sync_state.json'
     today_str = get_current_kst_time().strftime('%Y%m%d')
     yesterday_data = {}
+    
+    # 1. 타임스탬프로 캐시를 우회하여 db-data 브랜치의 최신 상태 로드
+    import time
+    github_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/sync_state.json?t={int(time.time())}"
+    try:
+        import urllib.request
+        with urllib.request.urlopen(github_url, timeout=5) as resp:
+            state = json.loads(resp.read().decode('utf-8'))
+            os.makedirs('data', exist_ok=True)
+            with open(state_path, 'w', encoding='utf-8') as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+    except:
+        pass
+        
     if os.path.exists(state_path):
         try:
             with open(state_path, 'r', encoding='utf-8') as f:
@@ -90,8 +104,8 @@ CONSECUTIVE_DAYS_PATH = 'data/consecutive_days.json'
 
 def load_consecutive_days():
     """순위 병도 consecutive_days.json에서 연속일 데이터 로드"""
-    # 1. 먹저 GitHub db-data 브랜치에서 최신 데이터 다운로드 시도 (클라우드 환경)
-    github_url = "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/consecutive_days.json"
+    import time
+    github_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/consecutive_days.json?t={int(time.time())}"
     try:
         import urllib.request
         with urllib.request.urlopen(github_url, timeout=5) as resp:
@@ -303,12 +317,22 @@ if __name__ == "__main__":
                 if passed and stock_res:
                     # [V8.9.9.5] 연속일: 영구 파일에서 박아서 +1 (코드 수정 시에도 보존)
                     prev_days_info = consec_days.get(code, {'days': 0, 'last_date': ''})
+                    
                     if prev_days_info['last_date'] == today_date:
                         # 오늘 이미 카운트된 종목
                         stock_res['consecutive_days'] = prev_days_info['days']
                     else:
-                        # 새롭게 연속일 +1
-                        new_days = prev_days_info['days'] + 1
+                        # [V8.9.9.9] 어제 기록이 일치할 때만 카운트 증가, 아니면 1로 초기화
+                        yesterday_date = (now_kst - timedelta(days=1)).strftime('%Y%m%d')
+                        # 월요일인 경우 금요일(3일 전)을 어제로 간주
+                        if now_kst.weekday() == 0:
+                            yesterday_date = (now_kst - timedelta(days=3)).strftime('%Y%m%d')
+                            
+                        if prev_days_info['last_date'] == yesterday_date:
+                            new_days = prev_days_info['days'] + 1
+                        else:
+                            new_days = 1
+                            
                         consec_days[code] = {'days': new_days, 'last_date': today_date, 'name': stock_res.get('name', '')}
                         stock_res['consecutive_days'] = new_days
                     passed_codes.add(code)

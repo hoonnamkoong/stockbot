@@ -7,7 +7,7 @@ class OriginalSimulator(BaseSimulator):
     - 1/N 동일 비중 (10개 슬롯)
     """
     def __init__(self, initial_cash=3000000):
-        super().__init__("Standard", initial_cash) # 파일명: sim_standard_state.json
+        super().__init__("Original", initial_cash) # 파일명: sim_original_state.json
 
     def run(self, candidates):
         """

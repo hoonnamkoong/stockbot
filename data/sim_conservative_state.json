@@ -1,7 +1,7 @@
 {
   "initial_cash": 3000000,
-  "cash": 52792.9852500002,
-  "invested": 2946765.0,
+  "cash": 46547.087250000215,
+  "invested": 2943095.0,
   "portfolio": {
     "088800": {
       "name": "에이스테크",
@@ -16,7 +16,7 @@
       "quantity": 100,
       "avg_price": 3000.0,
       "entry_date": "2026-04-10",
-      "peak_price": 3035,
+      "peak_price": 3070,
       "is_scaled_out": false
     },
     "010170": {
@@ -32,7 +32,7 @@
       "quantity": 16,
       "avg_price": 17730.0,
       "entry_date": "2026-04-10",
-      "peak_price": 17730.0,
+      "peak_price": 17890,
       "is_scaled_out": false
     },
     "011930": {
@@ -40,7 +40,7 @@
       "quantity": 77,
       "avg_price": 3855.0,
       "entry_date": "2026-04-10",
-      "peak_price": 3855.0,
+      "peak_price": 3970,
       "is_scaled_out": false
     },
     "069540": {
@@ -48,7 +48,7 @@
       "quantity": 58,
       "avg_price": 5120.0,
       "entry_date": "2026-04-10",
-      "peak_price": 5160,
+      "peak_price": 5200,
       "is_scaled_out": false
     },
     "010820": {
@@ -59,20 +59,12 @@
       "peak_price": 11380.0,
       "is_scaled_out": false
     },
-    "215790": {
-      "name": "이노인스트루먼트",
-      "quantity": 98,
-      "avg_price": 3035.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 3035.0,
-      "is_scaled_out": false
-    },
     "452300": {
       "name": "캡스톤파트너스",
       "quantity": 60,
       "avg_price": 4955.0,
       "entry_date": "2026-04-10",
-      "peak_price": 4955.0,
+      "peak_price": 5100,
       "is_scaled_out": false
     },
     "100590": {
@@ -82,11 +74,24 @@
       "entry_date": "2026-04-10",
       "peak_price": 10020,
       "is_scaled_out": false
+    },
+    "064260": {
+      "name": "다날",
+      "quantity": 36,
+      "avg_price": 8160.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 8160.0,
+      "is_scaled_out": false
     }
   },
   "peak_nav": 3000000,
   "history": [
     3000000
   ],
-  "daily_trades": []
+  "daily_trades": [
+    {
+      "date": "2026-04-10",
+      "is_win": false
+    }
+  ]
 }

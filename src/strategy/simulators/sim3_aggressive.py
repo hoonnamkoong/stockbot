@@ -73,6 +73,7 @@ class AggressiveSimulator(BaseSimulator):
             
             qty = int(target_amount / price)
             if qty > 0:
-                self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason="[공격] 적극적 지향형 시그널")
+                reason = stock.get('posts_summary', '[공격] 적극적 지향형 시그널')
+                self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason=reason)
 
         return self.calculate_stats(current_prices={c: s.get('price', s.get('현재가', 0)) for c, s in candidate_map.items()})

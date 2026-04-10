@@ -66,7 +66,8 @@ def load_sync_state():
     import time
     import urllib.request
     
-    # [V8.9.9.15 Persistence] 동기화 대상 파일 리스트 확장 (CSV 및 월별 엑셀 포함)
+    # [V8.9.9.16 Persistence] 동기화 대상 파일 리스트 확장 (CSV 및 모든 월별 엑셀 포함)
+    current_kst = get_current_kst_time()
     files_to_sync = [
         'sync_state.json',
         'sim_original_state.json',
@@ -75,9 +76,19 @@ def load_sync_state():
         'trade_history_sim_original.csv',
         'trade_history_sim_conservative.csv',
         'trade_history_sim_aggressive.csv',
-        'trade_history_sim_conviction.csv',
-        f'trending_integrated_{get_current_kst_time().strftime("%Y-%m")}.xlsx'
+        'trade_history_sim_conviction.csv'
     ]
+    
+    # 2026-01부터 현재 달까지 모든 월별 엑셀 파일 추가
+    start_year, start_month = 2026, 1
+    curr_date = datetime.datetime(start_year, start_month, 1)
+    while curr_date <= current_kst:
+        files_to_sync.append(f'trending_integrated_{curr_date.strftime("%Y-%m")}.xlsx')
+        # 다음 달로 이동
+        if curr_date.month == 12:
+            curr_date = datetime.datetime(curr_date.year + 1, 1, 1)
+        else:
+            curr_date = datetime.datetime(curr_date.year, curr_date.month + 1, 1)
     
     os.makedirs('data', exist_ok=True)
     for filename in files_to_sync:

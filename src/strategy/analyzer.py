@@ -103,7 +103,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
     except Exception as e:
         print(f"Error saving to CSV: {e}")
 
-    # 2. 고정 Excel 저장 (사이드바 다운로드용)
+    # 2. 고정 Excel 저장 (사이드바 '★ 최신' 다운로드용)
     try:
         fixed_xlsx = "data/trending_integrated.xlsx"
         with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
@@ -116,6 +116,34 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
         saved_files['excel'] = fixed_xlsx
     except Exception as e:
         print(f"Error saving to Excel: {e}")
+
+    # 2-1. [V8.9.9.5 User Request] 월간 누적 Excel 저장 (예: trending_integrated_2024-04.xlsx)
+    try:
+        month_str = now_kst.strftime("%Y-%m")
+        monthly_xlsx = f"data/trending_integrated_{month_str}.xlsx"
+        
+        # 데이터 수집 시각 컬럼 추가 (누적 데이터 식별용)
+        df_monthly = df.copy()
+        df_monthly.insert(0, '데이터_수집시각', now_kst.strftime("%Y-%m-%d %H:%M:%S"))
+        
+        if os.path.exists(monthly_xlsx):
+            try:
+                existing_df = pd.read_excel(monthly_xlsx)
+                # 새로운 데이터를 하단에 결합 (누적)
+                combined_df = pd.concat([existing_df, df_monthly], ignore_index=True)
+                # 너무 커지는 것을 방지하거나 중복 처리가 필요할 수 있으나, 일단 누적 (User Request)
+                combined_df.to_excel(monthly_xlsx, index=False)
+                print(f"[Monthly] Cumulative data appended to: {monthly_xlsx}")
+            except Exception as ex:
+                print(f"[Monthly] Read/Append failed ({ex}), overwriting as new.")
+                df_monthly.to_excel(monthly_xlsx, index=False)
+        else:
+            df_monthly.to_excel(monthly_xlsx, index=False)
+            print(f"[Monthly] New monthly file created: {monthly_xlsx}")
+        
+        saved_files['monthly'] = monthly_xlsx
+    except Exception as e:
+        print(f"Error saving monthly Excel: {e}")
 
     # 3. [V8.9.9.5 신규] 날짜별 스냅샷 Excel 저장 (5일/3일 분석기 전용)
     # analyzer_5days.py가 trending_integrated_YYYYMMDD_HHMMSS.xlsx 패턴을 탐색함

@@ -96,7 +96,7 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 </Badge>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                {s.consecutive_days > 1 && <Badge size="xs" color="red" variant="filled" style={{ flexShrink: 0, minWidth: '40px' }}>{s.consecutive_days}d</Badge>}
+                                {s.consecutive_days >= 1 && <Badge size="xs" color="red" variant="filled" style={{ flexShrink: 0, minWidth: '40px' }}>{s.consecutive_days}d</Badge>}
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Tooltip label={s.posts_summary} multiline w={300} withArrow position="top">

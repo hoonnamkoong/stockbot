@@ -63,7 +63,7 @@ jobs:
         run: PYTHONPATH=. python scripts/scraper.py
 
       - name: Deploy Data to db-data branch
-        if: always()
+        if: success()
         run: |
           # [V8.9.9.5] git 글로벌 설정 먼저 수행
           git config --global user.email "github-actions[bot]@users.noreply.github.com"

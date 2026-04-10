@@ -15,25 +15,31 @@ export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: Re
     
     const downloadItems = useMemo(() => {
         const items = [];
-        // [V8.9.9.5 User Request] 하드코딩된 오늘 날짜(new Date())가 아닌, 
-        // status.json에서 가져온 실제 업데이트 시점(lastUpdated)을 기준으로 메뉴의 날짜 텍스트 렌더링
         const baseDateStr = lastUpdated ? lastUpdated.split(' ')[0].replace(/-/g, '/') : null;
         const now = baseDateStr ? new Date(baseDateStr) : new Date();
-        
-        for (let i = 0; i < 10; i++) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            const dateStr = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-            const dateKey = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-            // 최신 파일을 별도 저장하는 방식도 가능하지만, 현재는 단일 파일로 통일
+
+        // 1. 최신 파일 (고정)
+        const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+        items.push({
+            label: `★ 최신 (${dateStr})`,
+            url: `/api/download/excel`,
+            isLatest: true
+        });
+
+        // 2. 월간 누적 파일 (최근 5개월)
+        for (let i = 0; i < 5; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const monthLabel = `${d.getFullYear()}년 ${d.getMonth() + 1}월 데이터`;
+            
             items.push({
-                label: i === 0 ? `★ 최신 (${dateStr})` : dateStr,
-                url: `${GITHUB_BASE}/trending_integrated.xlsx`,
-                isLatest: i === 0
+                label: monthLabel,
+                url: `/api/download/excel?month=${monthKey}`,
+                isLatest: false
             });
         }
-        return items.slice(0, 1); // 현재 단일 파일이므로 최신 1개만 (TODO: 다중 날짜별 구현 시 확장)
-    }, [GITHUB_BASE]);
+        return items;
+    }, [lastUpdated]);
 
     return (
         <Stack gap="xs">
@@ -72,7 +78,7 @@ export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: Re
                         description=".xlsx 형식"
                         leftSection={<IconFileSpreadsheet size={16} color={item.isLatest ? '#2f9e44' : '#868e96'} />}
                         component="a"
-                        href="/api/download/excel"
+                        href={item.url}
                         download={`stockbot_${new Date().toISOString().slice(0,10)}.xlsx`}
                         variant={item.isLatest ? 'light' : 'subtle'}
                         color="green"

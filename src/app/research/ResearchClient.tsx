@@ -65,21 +65,27 @@ export default function ResearchClient() {
                     <Title order={3} size={isMobile ? 'h5' : 'h3'}>
                         StockBot {(versionInfo && typeof versionInfo !== 'string') ? versionInfo.version : 'v10.6-stable'}
                     </Title>
-                    <Group ml="auto" gap="xs">
+                    <Group ml="auto" gap={isMobile ? 4 : 'xs'}>
                         <Button
                             variant="light" color="blue" onClick={() => router.push('/trade')}
                             leftSection={<IconCoin size={16} />}
+                            px={isMobile ? 8 : 'md'}
                         >
-                            트레이딩 보드
+                            {!isMobile && '트레이딩 보드'}
                         </Button>
-                        <Button variant="light" color="violet" onClick={openControl} leftSection={<IconSettings size={16} />}>
-                            스크래퍼 제어
+                        <Button 
+                            variant="light" color="violet" onClick={openControl} 
+                            leftSection={<IconSettings size={16} />}
+                            px={isMobile ? 8 : 'md'}
+                        >
+                            {!isMobile && '스크래퍼 제어'}
                         </Button>
-                        <ActionIcon variant="light" color="violet" size="lg" onClick={openControl} visibleFrom="mobile" hiddenFrom="sm">
-                            <IconSettings size={18} />
-                        </ActionIcon>
-                        <Button variant="default" onClick={() => fetchData()} leftSection={<IconRefresh size={16} className={loading ? 'animate-spin' : ''} />}>
-                            {loading ? '...' : '갱신'}
+                        <Button 
+                            variant="default" onClick={() => fetchData()} 
+                            leftSection={<IconRefresh size={16} className={loading ? 'animate-spin' : ''} />}
+                            px={isMobile ? 8 : 'md'}
+                        >
+                            {isMobile ? '' : (loading ? '...' : '갱신')}
                         </Button>
                         {!isMobile && <Button variant="subtle" color="gray" onClick={() => signOut({ callbackUrl: '/login' })}>Sign Out</Button>}
                     </Group>
@@ -91,18 +97,20 @@ export default function ResearchClient() {
             </AppShell.Navbar>
 
             <AppShell.Main>
-                <Group justify="space-between" mb="md" align="center">
-                    <Tabs value={activeTab} onChange={setActiveTab}>
-                        <Tabs.List grow={isMobile}>
-                            <Tabs.Tab value="ALL">전체</Tabs.Tab>
-                            <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
-                            <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
-                            <Tabs.Tab value="5DAYS">📅 5일</Tabs.Tab>
-                            <Tabs.Tab value="3DAYS">📅 3일</Tabs.Tab>
-                        </Tabs.List>
-                    </Tabs>
-                    <Text size="xs" c="dimmed">🕒 Update: {lastUpdated}</Text>
-                </Group>
+                <Stack gap="xs" mb="md">
+                    <Group justify="space-between" align="center">
+                        <Tabs value={activeTab} onChange={setActiveTab} style={{ flex: 1 }}>
+                            <Tabs.List grow={isMobile}>
+                                <Tabs.Tab value="ALL">전체</Tabs.Tab>
+                                <Tabs.Tab value="KOSPI">KOSPI</Tabs.Tab>
+                                <Tabs.Tab value="KOSDAQ">KOSDAQ</Tabs.Tab>
+                                <Tabs.Tab value="5DAYS">📅 5일</Tabs.Tab>
+                                <Tabs.Tab value="3DAYS">📅 3일</Tabs.Tab>
+                            </Tabs.List>
+                        </Tabs>
+                    </Group>
+                    <Text size="xs" c="dimmed" ta={isMobile ? 'left' : 'right'}>🕒 Update: {lastUpdated}</Text>
+                </Stack>
 
                 {activeTab === '5DAYS' ? (
                     <TrendTable data={fiveDayData} sortConfig={sortConfig} onSort={handleSort} onCellClick={handleCellClick} title="5일 누적 분석" titleColor="blue" />

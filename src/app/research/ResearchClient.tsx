@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AppShell, Burger, Group, Title, Button, Text, ActionIcon, Tabs, Notification, useMantineTheme } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Text, ActionIcon, Tabs, Notification, Stack, useMantineTheme } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { IconRefresh, IconRobot, IconSettings, IconCoin } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';

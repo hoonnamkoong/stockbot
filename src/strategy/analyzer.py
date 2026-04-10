@@ -188,13 +188,13 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None):
         status_str = now_kst.strftime("%Y-%m-%d %H:%M:%S")
         status_json = "data/status.json"
         with open(status_json, 'w', encoding='utf-8') as f:
-            json.dump({"last_updated": status_str, "status": "ok", "message": "V8.9.9.5 LIVE"}, f, ensure_ascii=False, indent=4)
+            json.dump({"last_updated": status_str, "status": "ok", "message": "V8.9.9.9 LIVE"}, f, ensure_ascii=False, indent=4)
             
-        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.5)")
+        print(f"[Vercel] ✅ Fixed data synchronized: latest_stocks.json (V8.9.9.9)")
     except Exception as e:
         print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
 
-    # [V8.9.9.5] 3-Track 지능형 시뮬레이터 실행 (안정/보수/공격)
+    # [V8.9.9.9] 3-Track 지능형 시뮬레이터 실행 (안정/보수/공격)
     try:
         from src.strategy.simulators.get_all_stats import run_all_simulators
         # df_final에서 필요한 데이터 추출 (list of dict)
@@ -494,7 +494,7 @@ def get_top_trending_stocks(market_type='KOSPI'):
                     'change_rate': change_rate,
                     'source': 'volume'
                 })
-        return data[:35]
+        return data[:20]
     except Exception as e:
         print(f"[Error] get_top_trending_stocks failed: {e}")
         raise e # 에러 은폐 금지 (글로벌 룰)
@@ -544,7 +544,7 @@ def get_top_rising_stocks(market_type='KOSPI'):
                     'change_rate': change_rate,
                     'source': 'rising'
                 })
-        return data[:35]
+        return data[:20]
     except Exception as e:
         print(f"[Error] get_top_rising_stocks failed: {e}")
         raise e # 에러 은폐 금지 (글로벌 룰)

@@ -1,9 +1,92 @@
 {
   "initial_cash": 3000000,
-  "cash": 3000000,
-  "invested": 0,
-  "portfolio": {},
+  "cash": 52792.9852500002,
+  "invested": 2946765.0,
+  "portfolio": {
+    "088800": {
+      "name": "에이스테크",
+      "quantity": 54,
+      "avg_price": 5500.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 5500.0,
+      "is_scaled_out": false
+    },
+    "005880": {
+      "name": "대한해운",
+      "quantity": 100,
+      "avg_price": 3000.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 3000.0,
+      "is_scaled_out": false
+    },
+    "010170": {
+      "name": "대한광통신",
+      "quantity": 16,
+      "avg_price": 17830.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 17830.0,
+      "is_scaled_out": false
+    },
+    "050890": {
+      "name": "쏠리드",
+      "quantity": 16,
+      "avg_price": 17730.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 17730.0,
+      "is_scaled_out": false
+    },
+    "011930": {
+      "name": "신성이엔지",
+      "quantity": 77,
+      "avg_price": 3855.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 3855.0,
+      "is_scaled_out": false
+    },
+    "069540": {
+      "name": "빛과전자",
+      "quantity": 58,
+      "avg_price": 5120.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 5120.0,
+      "is_scaled_out": false
+    },
+    "010820": {
+      "name": "퍼스텍",
+      "quantity": 26,
+      "avg_price": 11380.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 11380.0,
+      "is_scaled_out": false
+    },
+    "215790": {
+      "name": "이노인스트루먼트",
+      "quantity": 98,
+      "avg_price": 3035.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 3035.0,
+      "is_scaled_out": false
+    },
+    "452300": {
+      "name": "캡스톤파트너스",
+      "quantity": 60,
+      "avg_price": 4955.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 4955.0,
+      "is_scaled_out": false
+    },
+    "100590": {
+      "name": "머큐리",
+      "quantity": 30,
+      "avg_price": 9880.0,
+      "entry_date": "2026-04-10",
+      "peak_price": 9880.0,
+      "is_scaled_out": false
+    }
+  },
   "peak_nav": 3000000,
-  "history": [3000000],
+  "history": [
+    3000000
+  ],
   "daily_trades": []
 }

@@ -26,7 +26,7 @@ class ConservativeSimulator(BaseSimulator):
             stock = candidate_map.get(code)
             
             # 현재가 확보 (candidates에 없으면 평단가 활용)
-            current_price = stock['price'] if stock else p_item['avg_price']
+            current_price = stock.get('price', stock.get('현재가', p_item['avg_price'])) if stock else p_item['avg_price']
             if current_price <= 0: continue
             
             # 고점 갱신
@@ -65,11 +65,11 @@ class ConservativeSimulator(BaseSimulator):
             code = stock['code']
             if code in self.state['portfolio']: continue
             
-            price = float(stock.get('price', 0))
+            price = float(stock.get('price', stock.get('현재가', 0)))
             if price <= 0: continue
             
             qty = int(target_amount / price)
             if qty > 0:
-                self.buy(code, stock['name'], price, qty, reason="[보수] 안정적 진입 시그널")
+                self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason="[보수] 안정적 진입 시그널")
 
-        return self.calculate_stats(current_prices={c: s['price'] for c, s in candidate_map.items()})
+        return self.calculate_stats(current_prices={c: s.get('price', s.get('현재가', 0)) for c, s in candidate_map.items()})

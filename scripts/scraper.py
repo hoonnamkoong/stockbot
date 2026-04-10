@@ -10,12 +10,12 @@ import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 
-# [V8.9.9.5] 4단계 파이프라인 오케스트레이션 복구 버전
+# [V8.9.9.9] Gemini 2.5 Flash + 리포트 중복 방지 최적화 버전
 # [Stage 1] 수집 및 문턱 필터링 + 연속 일수 데이터 보존
-# [Stage 2] Gemini 1.5 Flash-Lite 일괄(Batch) 분석
-# [Stage 3] 2차 필터(Algo04V2) 및 Pro 딥다이브 리포트
+# [Stage 2] Gemini 2.5 Flash 일괄(Batch) 분석 (Parsing 보강)
+# [Stage 3] 2차 필터(Algo04V2) 및 Top 3 딥다이브 리포트
 # [Stage 4] 텔레그램 전송 및 시뮬레이터 트리거
-SCRAPER_VERSION = "8.9.9.5 Orchestration Recovery"
+SCRAPER_VERSION = "8.9.9.9 Gemini 2.5 Flash Optimized"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
@@ -67,10 +67,15 @@ def load_sync_state():
                 if state.get('last_update_date') != today_str:
                     for code, info in stocks.items():
                         yesterday_data[code] = {'consecutive_days': info.get('consecutive_days', 1), 'last_nid': info.get('last_nid')}
-                    return {'last_update_date': today_str, 'stocks': {}}, yesterday_data
+                    # 날짜 변경 시 reported_codes 초기화
+                    return {'last_update_date': today_str, 'stocks': {}, 'reported_codes': []}, yesterday_data
+                
+                # 기존 상태 로드 시 필드 누락 방지
+                if 'reported_codes' not in state:
+                    state['reported_codes'] = []
                 return state, yesterday_data
         except: pass
-    return {'last_update_date': today_str, 'stocks': {}}, yesterday_data
+    return {'last_update_date': today_str, 'stocks': {}, 'reported_codes': []}, yesterday_data
 
 def save_sync_state(state):
     os.makedirs('data', exist_ok=True)
@@ -78,7 +83,7 @@ def save_sync_state(state):
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 # ====================================================================
-# [V8.9.9.5] 연속일 별도 영구 보존 시스템
+# [V8.9.9.9] 연속일 별도 영구 보존 시스템
 # 코드 수정/재배포 시에도 data/consecutive_days.json을 통해 값이 유지됨
 # ====================================================================
 CONSECUTIVE_DAYS_PATH = 'data/consecutive_days.json'
@@ -352,22 +357,26 @@ if __name__ == "__main__":
             allow_buy = 9 <= now_kst.hour < 16 and is_trading_day(now_kst)
             simulation_results = engine.execute_simulation(results, allow_buy=allow_buy)
             
-            # 4월 알고리즘 통과 종목 (BUY/WATCH 사유가 있는 종목 중 상위 5선)
-            final_picks = [r for r in simulation_results if r.get('signal') in ['BUY', 'WATCH']][:5]
+            # 4월 알고리즘 통과 종목 (BUY/WATCH 사유 종목 중 당일 중복 제외 상위 3선)
+            reported_already = prev_sync_state.get('reported_codes', [])
+            final_picks = [r for r in simulation_results if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in reported_already][:3]
             
             if final_picks:
                 print(f"[Stage 3] 최종 {len(final_picks)}개 종목 딥다이브 리포트 생성 중...")
                 # 429 방어용 sleep
                 time.sleep(2)
                 # StrategyEngine/Advisor 연동하여 리포트 생성
-                # final_picks 리스트와 원래 results의 상세 정보를 병합하여 전달
                 detail_picks = []
                 for p in final_picks:
                     full_info = next((s for s in results if s['code'] == p['code']), p)
                     detail_picks.append(full_info)
                 
                 deep_dive_report = advisor.generate_deep_dive_report(detail_picks)
-                print(f"[Stage 3] 리포트 생성 완료")
+                
+                # [V8.9.9.9] 리포트 생성 성공 시 보고된 목록에 추가 및 상태 저장
+                prev_sync_state['reported_codes'].extend([p['code'] for p in final_picks])
+                save_sync_state(prev_sync_state)
+                print(f"[Stage 3] 리포트 생성 완료 (오늘의 누적 보고 종목: {len(prev_sync_state['reported_codes'])}개)")
         except Exception as e:
             print(f"[Stage 3 Error] 리포트 생성 실패: {e}")
 

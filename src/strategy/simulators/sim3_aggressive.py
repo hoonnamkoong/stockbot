@@ -25,7 +25,7 @@ class AggressiveSimulator(BaseSimulator):
             stock = candidate_map.get(code)
             
             # 현재가 확보 (candidates에 없으면 평단가 활용)
-            current_price = stock['price'] if stock else p_item['avg_price']
+            current_price = stock.get('price', stock.get('현재가', p_item['avg_price'])) if stock else p_item['avg_price']
             if current_price <= 0: continue
             
             # 수익률 계산
@@ -50,7 +50,11 @@ class AggressiveSimulator(BaseSimulator):
                 # 전일 종가 정보가 후보 리스트에 있는지 확인 (보통 change_rate를 통해 현재가/전일종가 계산 가능)
                 # change_rate = (current - prev) / prev * 100 
                 # -> prev = current / (1 + change_rate/100)
-                change_rate = float(stock.get('change_rate', 0)) if stock else 0
+                change_rate_raw = stock.get('change_rate', stock.get('등락률', 0)) if stock else 0
+                if isinstance(change_rate_raw, str):
+                    change_rate = float(change_rate_raw.replace('%', '').replace('+', ''))
+                else:
+                    change_rate = float(change_rate_raw)
                 prev_close = current_price / (1 + change_rate/100) if change_rate != 0 else current_price
                 
                 # 전일 종가 대비 -5% 하락한 음봉 발생 시 전량 청산
@@ -64,11 +68,11 @@ class AggressiveSimulator(BaseSimulator):
             code = stock['code']
             if code in self.state['portfolio']: continue
             
-            price = float(stock.get('price', 0))
+            price = float(stock.get('price', stock.get('현재가', 0)))
             if price <= 0: continue
             
             qty = int(target_amount / price)
             if qty > 0:
-                self.buy(code, stock['name'], price, qty, reason="[공격] 적극적 지향형 시그널")
+                self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason="[공격] 적극적 지향형 시그널")
 
-        return self.calculate_stats(current_prices={c: s['price'] for c, s in candidate_map.items()})
+        return self.calculate_stats(current_prices={c: s.get('price', s.get('현재가', 0)) for c, s in candidate_map.items()})

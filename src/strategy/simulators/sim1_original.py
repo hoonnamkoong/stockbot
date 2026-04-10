@@ -39,6 +39,6 @@ class OriginalSimulator(BaseSimulator):
             
             qty = int(target_amount / price)
             if qty > 0:
-                self.buy(code, stock['name'], price, qty, reason="[안정] Buzz 필터 통과")
+                self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason="[안정] Buzz 필터 통과")
 
         return self.calculate_stats()

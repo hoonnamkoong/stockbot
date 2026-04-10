@@ -219,6 +219,10 @@ class GeminiAgent:
                     if raw_text.startswith("```"):
                         raw_text = re.sub(r"^(?:```[a-z]*\n)|(?:```$)", "", raw_text, flags=re.MULTILINE).strip()
                     parsed = json.loads(raw_text)
+                    # [V8.9.9.9 Fix] 파싱 결과가 list일 경우 dict로 변환 (Gemini 응답 변동성 대응)
+                    if isinstance(parsed, list):
+                        parsed = {item.get('code', str(i)): item for i, item in enumerate(parsed) if isinstance(item, dict)}
+
                     # [V8.9.9.5 Fix] 파싱 결과가 반드시 dict여야 함 (문자열 오인 방지)
                     if isinstance(parsed, dict):
                         all_results.update(parsed)
@@ -343,12 +347,12 @@ class StrategyAdvisor:
             
             [V8.6.2 극한 압축 규칙]
             긴 문장 절대 금지. 오직 아래 JSON 형식으로만 짧은 단어들로 답변하세요.
-            {
+            {{
               "decision": "BUY|WATCH|REJECT",
               "reason": "단답형 한줄 액션 근거",
               "risk": "종토방/공시 리스크 (없으면 없음)",
               "highlights": ["키워드1", "키워드2"]
-            }
+            }}
             """
             try:
                 response = self.gemini._call_gemini_safe(prompt, model_type='report', generation_config={"response_mime_type": "application/json"})

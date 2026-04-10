@@ -22,7 +22,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 's
 from src.strategy import analyzer
 from src.strategy.advisor import GeminiAgent
 from src.strategy.engine import StrategyEngine
-from src.strategy.simulators.original_simulator import OriginalSimulator
+from src.strategy.simulators.sim1_original import OriginalSimulator
+from src.strategy.simulators.sim2_conservative import ConservativeSimulator
+from src.strategy.simulators.sim3_aggressive import AggressiveSimulator
 from src.telegram_manager import TelegramManager
 
 def get_current_kst_time():
@@ -60,36 +62,73 @@ def load_sync_state():
     today_str = get_current_kst_time().strftime('%Y%m%d')
     yesterday_data = {}
     
-    # 1. 타임스탬프로 캐시를 우회하여 db-data 브랜치의 최신 상태 로드
+    # 1. 타임스탬프로 캐시를 우회하여 db-data 브랜치에서 필요한 모든 상태 파일 로드
     import time
-    github_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/sync_state.json?t={int(time.time())}"
-    try:
-        import urllib.request
-        with urllib.request.urlopen(github_url, timeout=5) as resp:
-            state = json.loads(resp.read().decode('utf-8'))
-            os.makedirs('data', exist_ok=True)
-            with open(state_path, 'w', encoding='utf-8') as f:
-                json.dump(state, f, ensure_ascii=False, indent=2)
-    except:
-        pass
+    import urllib.request
+    
+    # [V8.9.9.11 Fix] 시뮬레이터 상태 파일들도 함께 다운로드하여 잔고 초기화 문제 해결
+    files_to_sync = [
+        'sync_state.json',
+        'sim_original_state.json',
+        'sim_conservative_state.json',
+        'sim_aggressive_state.json'
+    ]
+    
+    os.makedirs('data', exist_ok=True)
+    for filename in files_to_sync:
+        github_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/{filename}?t={int(time.time())}"
+        try:
+            req = urllib.request.Request(github_url)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                with open(os.path.join('data', filename), 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                print(f"[Sync] {filename} 로드 완료")
+        except:
+            # [Migration] sim_original_state.json이 없을 경우 기존의 sim_standard_state.json 시도
+            if filename == 'sim_original_state.json':
+                old_url = f"https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/sim_standard_state.json?t={int(time.time())}"
+                try:
+                    req = urllib.request.Request(old_url)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = json.loads(resp.read().decode('utf-8'))
+                        with open(os.path.join('data', 'sim_original_state.json'), 'w', encoding='utf-8') as f:
+                            json.dump(data, f, ensure_ascii=False, indent=2)
+                        print(f"[Sync] sim_standard_state.json을 sim_original_state.json으로 마이그레이션 완료")
+                        continue
+                except: pass
+            print(f"[Sync] {filename} 로드 실패 (신규 생성 예정)")
         
     if os.path.exists(state_path):
         try:
             with open(state_path, 'r', encoding='utf-8') as f:
                 state = json.load(f)
                 stocks = state.get('stocks', {})
-                if state.get('last_update_date') != today_str:
+                # [V8.9.9.11] 하루 단위 리포트 관리 초기화 로직
+                last_date = state.get('last_update_date')
+                if last_date != today_str:
                     for code, info in stocks.items():
                         yesterday_data[code] = {'consecutive_days': info.get('consecutive_days', 1), 'last_nid': info.get('last_nid')}
-                    # 날짜 변경 시 reported_codes 초기화
-                    return {'last_update_date': today_str, 'stocks': {}, 'reported_codes': []}, yesterday_data
+                    # 날짜 변경 시 모든 일일 제한 리스트 초기화
+                    return {
+                        'last_update_date': today_str, 
+                        'stocks': {}, 
+                        'reported_codes': [],           # 텔레그램 한 줄 시장 요약용 중복 방지
+                        'reported_daily_top3': []       # 하루 최대 9개 상세 리포트 관리용
+                    }, yesterday_data
                 
                 # 기존 상태 로드 시 필드 누락 방지
-                if 'reported_codes' not in state:
-                    state['reported_codes'] = []
+                if 'reported_codes' not in state: state['reported_codes'] = []
+                if 'reported_daily_top3' not in state: state['reported_daily_top3'] = []
+                
                 return state, yesterday_data
         except: pass
-    return {'last_update_date': today_str, 'stocks': {}, 'reported_codes': []}, yesterday_data
+    return {
+        'last_update_date': today_str, 
+        'stocks': {}, 
+        'reported_codes': [], 
+        'reported_daily_top3': []
+    }, yesterday_data
 
 def save_sync_state(state):
     os.makedirs('data', exist_ok=True)
@@ -250,6 +289,8 @@ if __name__ == "__main__":
     engine = StrategyEngine()
     tg = TelegramManager()
     sim1 = OriginalSimulator()
+    sim2 = ConservativeSimulator()
+    sim3 = AggressiveSimulator()
     
     # 1. 수집 및 1차 필터링
     try:
@@ -360,15 +401,27 @@ if __name__ == "__main__":
             allow_buy = 9 <= now_kst.hour < 16 and is_trading_day(now_kst)
             simulation_results = engine.execute_simulation(results, allow_buy=allow_buy)
             
-            # 4월 알고리즘 통과 종목 (BUY/WATCH 사유 종목 중 당일 중복 제외 상위 3선)
+            # [V8.9.9.11] 상세 리포트 중복 방지 로직 보강
+            # reported_already: 텔레그램 한 줄 요약용 (중복 메시지 방지)
             reported_already = prev_sync_state.get('reported_codes', [])
-            final_picks = [r for r in simulation_results if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in reported_already][:3]
+            # daily_reported_top3: 하루 최대 9개 종목 관리용
+            daily_reported_top3 = prev_sync_state.get('reported_daily_top3', [])
+            
+            # 이번 턴에 뽑힌 Top 3 중에서 신규 종목들만 골라내기
+            new_picks_for_report = []
+            if len(daily_reported_top3) < 9:
+                for r in simulation_results:
+                    if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in daily_reported_top3:
+                        new_picks_for_report.append(r)
+                        if len(daily_reported_top3) + len(new_picks_for_report) >= 9:
+                            break # 최대 9개까지만 선착순 확보
+            
+            # 최종 이번 턴의 보고 대상 (3개로 한정)
+            final_picks = new_picks_for_report[:3]
             
             if final_picks:
-                print(f"[Stage 3] 최종 {len(final_picks)}개 종목 딥다이브 리포트 생성 중...")
-                # 429 방어용 sleep
+                print(f"[Stage 3] 최종 {len(final_picks)}개 신규 종목 딥다이브 리포트 생성 중...")
                 time.sleep(2)
-                # StrategyEngine/Advisor 연동하여 리포트 생성
                 detail_picks = []
                 for p in final_picks:
                     full_info = next((s for s in results if s['code'] == p['code']), p)
@@ -376,11 +429,13 @@ if __name__ == "__main__":
                 
                 deep_dive_report = advisor.generate_deep_dive_report(detail_picks)
                 
-                # [V8.9.9.5] 리포트 결과 저장 및 상태 업데이트
-                if final_picks:
-                    prev_sync_state['reported_codes'].extend([p['code'] for p in final_picks])
-                    save_sync_state(prev_sync_state)
-                    print(f"[Stage 3] 리포트 생성 완료 (오늘의 누적 보고 종목: {len(prev_sync_state['reported_codes'])}개)")
+                # 리포트 결과 저장 및 상태 업데이트
+                prev_sync_state['reported_daily_top3'].extend([p['code'] for p in final_picks])
+                save_sync_state(prev_sync_state)
+            elif any(r.get('signal') in ['BUY', 'WATCH'] for r in simulation_results):
+                # 종목은 뽑혔으나 모두 이미 보고된 경우
+                deep_dive_report = "📣 [안내] 이번 회차의 모든 Top 3 종목은 오늘 이미 상세 리포트가 생성되었습니다. (대시보드 실시간 기록 참고)"
+            
         except Exception as e:
             print(f"[Stage 3 Error] 리포트 생성 실패: {e}")
 
@@ -392,24 +447,40 @@ if __name__ == "__main__":
             df, _ = analyzer.analyze_discussion_trend(results)
             analyzer.save_data(df, "trending_integrated", start_time=now_kst)
             
-            # 2. 텔레그램 발송 (링크 + KOSPI + KOSDAQ + 리포트 : 총 4개)
-            tg.send_dashboard_link()
+            # 2. 텔레그램 발송 및 리포트 (정각 또는 수동 실행 시에만)
+            github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual') # 기본값 설정
+            is_on_the_hour = (now_kst.minute == 0)
+            is_manual = (github_event == 'workflow_dispatch')
             
-            kospi_results = [r for r in results if r.get('market') == 'KOSPI']
-            kosdaq_results = [r for r in results if r.get('market') == 'KOSDAQ']
+            if is_on_the_hour or is_manual:
+                print(f"[Stage 4] 알림 조건 충족 (정각:{is_on_the_hour}, 수동:{is_manual}) -> 발송 시작")
+                tg.send_dashboard_link()
+                
+                kospi_results = [r for r in results if r.get('market') == 'KOSPI']
+                kosdaq_results = [r for r in results if r.get('market') == 'KOSDAQ']
+                
+                if kospi_results:
+                    tg.send_market_report("KOSPI 실시간 어텐션", kospi_results)
+                if kosdaq_results:
+                    tg.send_market_report("KOSDAQ 실시간 어텐션", kosdaq_results)
+                if deep_dive_report:
+                    tg.send_message(deep_dive_report)
+                
+                # 한 줄 요약 보고 이력(reported_codes) 업데이트 (시장 알림 중복 방지)
+                # 이번 턴에 알림 나간 종목들을 기록
+                all_current_results = results
+                prev_sync_state['reported_codes'].extend([r['code'] for r in all_current_results if r['code'] not in reported_already])
+                save_sync_state(prev_sync_state)
+            else:
+                print(f"[Stage 4] 현재 분({now_kst.minute}분)은 알림 미발송 구간입니다. (데이터만 축적)")
             
-            if kospi_results:
-                tg.send_market_report("KOSPI 실시간 어텐션", kospi_results)
-            if kosdaq_results:
-                tg.send_market_report("KOSDAQ 실시간 어텐션", kosdaq_results)
-            if deep_dive_report:
-                tg.send_message(deep_dive_report)
+            # 3. 시뮬레이터 3종 트리거 (항상 작동)
+            print(f"[Stage 4] 시뮬레이션 3종 가동 (SIM1, SIM2, SIM3)")
+            sim1.run(results)
+            sim2.run(results)
+            sim3.run(results)
             
-            # 3. 시뮬레이터 트리거 (Sim 1: Original)
-            sim1.execute_strategy(results)
-            sim1.check_liquidation([s['code'] for s in results])
-            
-            print(f"[Stage 4] 텔레그램 전송 및 시뮬레이터 트리거 완료")
+            print(f"[Stage 4] 모든 파이프라인 작업 완료")
         except Exception as e:
             print(f"[Stage 4 Error] {e}")
 

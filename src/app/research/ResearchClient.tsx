@@ -87,7 +87,7 @@ export default function ResearchClient() {
             </AppShell.Header>
 
             <AppShell.Navbar p="md">
-                <ResearchNavBar reports={reports} repoOwner="hoonnamkoong" repoName="stockbot" />
+                <ResearchNavBar reports={reports} repoOwner="hoonnamkoong" repoName="stockbot" lastUpdated={lastUpdated} />
             </AppShell.Navbar>
 
             <AppShell.Main>

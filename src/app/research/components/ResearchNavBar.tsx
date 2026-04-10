@@ -6,15 +6,20 @@ interface ResearchNavBarProps {
     reports: any[];
     repoOwner: string;
     repoName: string;
+    lastUpdated?: string;
 }
 
-export const ResearchNavBar = ({ reports, repoOwner, repoName }: ResearchNavBarProps) => {
+export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: ResearchNavBarProps) => {
     // 최신 10개 다운로드 항목 생성 (db-data 브랜치 엑셀 직접 링크)
     const GITHUB_BASE = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/db-data/data`;
     
     const downloadItems = useMemo(() => {
         const items = [];
-        const now = new Date();
+        // [V8.9.9.5 User Request] 하드코딩된 오늘 날짜(new Date())가 아닌, 
+        // status.json에서 가져온 실제 업데이트 시점(lastUpdated)을 기준으로 메뉴의 날짜 텍스트 렌더링
+        const baseDateStr = lastUpdated ? lastUpdated.split(' ')[0].replace(/-/g, '/') : null;
+        const now = baseDateStr ? new Date(baseDateStr) : new Date();
+        
         for (let i = 0; i < 10; i++) {
             const d = new Date(now);
             d.setDate(d.getDate() - i);

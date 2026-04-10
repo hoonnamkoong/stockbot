@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
         const fileInfos = [
             { type: 'real', name: 'trade_history_real.csv' },
             { type: 'sim_original', name: 'trade_history_sim_original.csv' },
+            { type: 'sim_conservative', name: 'trade_history_sim_conservative.csv' },
             { type: 'sim_aggressive', name: 'trade_history_sim_aggressive.csv' },
             { type: 'sim_conviction', name: 'trade_history_sim_conviction.csv' }
         ];

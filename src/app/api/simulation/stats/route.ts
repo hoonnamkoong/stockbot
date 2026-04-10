@@ -8,7 +8,7 @@ export async function GET() {
     try {
         const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
         const types = [
-            { id: 'sim1', file: 'sim_standard_state.json' },
+            { id: 'sim1', file: 'sim_original_state.json' },
             { id: 'sim2', file: 'sim_conservative_state.json' },
             { id: 'sim3', file: 'sim_aggressive_state.json' }
         ];

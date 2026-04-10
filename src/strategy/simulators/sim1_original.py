@@ -20,8 +20,8 @@ class OriginalSimulator(BaseSimulator):
         for code in portfolio_codes:
             if code not in candidate_codes:
                 p_item = self.state['portfolio'][code]
-                # 현재가가 candidates에 있으면 사용, 없으면 보수적으로 평단가 사용
-                current_price = next((s['price'] for s in candidates if s['code'] == code), 0)
+                stock = next((s for s in candidates if s['code'] == code), None)
+                current_price = stock.get('price', stock.get('현재가', 0)) if stock else 0
                 if current_price == 0: continue
                 
                 self.sell(code, current_price, reason="[안정] Buzz Filter 이탈")
@@ -34,7 +34,7 @@ class OriginalSimulator(BaseSimulator):
             code = stock['code']
             if code in self.state['portfolio']: continue
             
-            price = float(stock.get('price', 0))
+            price = float(stock.get('price', stock.get('현재가', 0)))
             if price <= 0: continue
             
             qty = int(target_amount / price)

@@ -63,19 +63,19 @@ class TelegramManager:
             return False
             
         # Sorting just in case
-        sorted_stocks = sorted(stock_data_list, key=lambda x: x.get('당일_게시글수', 0), reverse=True)
+        sorted_stocks = sorted(stock_data_list, key=lambda x: x.get('당일_게시글수', x.get('recent_posts_count', 0)), reverse=True)
         top_stocks = sorted_stocks[:5]
         
         msg = f"📉 <b>[{market_name}] Top 5 (토론 급등) (v7.0)</b>\n\n"
         
         for stock in top_stocks:
-            name = stock.get('종목명', 'Unknown')
-            price = stock.get('현재가', 0)
+            name = stock.get('종목명', stock.get('name', 'Unknown'))
+            price = stock.get('현재가', stock.get('price', 0))
             if isinstance(price, (int, float)):
                 price = f"{price:,}"
-            rate = stock.get('등락률', '0%')
-            posts = stock.get('당일_게시글수', 0)
-            summary = stock.get('게시물_요약', '요약 없음')
+            rate = stock.get('등락률', stock.get('change_rate', '0%'))
+            posts = stock.get('당일_게시글수', stock.get('recent_posts_count', 0))
+            summary = stock.get('게시물_요약', stock.get('posts_summary', '요약 없음'))
             
             # Truncate summary to 80 chars
             if len(summary) > 80:

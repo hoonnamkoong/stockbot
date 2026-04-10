@@ -357,7 +357,15 @@ class StrategyAdvisor:
             try:
                 response = self.gemini._call_gemini_safe(prompt, model_type='report', generation_config={"response_mime_type": "application/json"})
                 if response and response.text:
-                    reports.append(response.text.strip())
+                    try:
+                        data = json.loads(response.text)
+                        formatted = f"🔥 <b>{stock['name']}</b> [{data.get('decision', 'N/A')}]\n"
+                        formatted += f"💡 <b>근거:</b> {data.get('reason', '')}\n"
+                        formatted += f"⚠️ <b>리스크:</b> {data.get('risk', '없음')}\n"
+                        formatted += f"✨ <b>핵심:</b> {', '.join(data.get('highlights', []))}\n"
+                        reports.append(formatted)
+                    except:
+                        reports.append(response.text.strip())
             except:
                 reports.append(f"⚠️ {stock['name']} 심층 분석 실패")
 

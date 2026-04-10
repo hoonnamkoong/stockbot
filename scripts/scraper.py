@@ -387,9 +387,16 @@ if __name__ == "__main__":
             df, _ = analyzer.analyze_discussion_trend(results)
             analyzer.save_data(df, "trending_integrated")
             
-            # 2. 텔레그램 발송
+            # 2. 텔레그램 발송 (링크 + KOSPI + KOSDAQ + 리포트 : 총 4개)
             tg.send_dashboard_link()
-            tg.send_market_report("KOSPI/KOSDAQ 실시간 어텐션", results)
+            
+            kospi_results = [r for r in results if r.get('market') == 'KOSPI']
+            kosdaq_results = [r for r in results if r.get('market') == 'KOSDAQ']
+            
+            if kospi_results:
+                tg.send_market_report("KOSPI 실시간 어텐션", kospi_results)
+            if kosdaq_results:
+                tg.send_market_report("KOSDAQ 실시간 어텐션", kosdaq_results)
             if deep_dive_report:
                 tg.send_message(deep_dive_report)
             

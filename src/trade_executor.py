@@ -175,44 +175,49 @@ def main():
     executed_count = 0
     failed_count = 0
 
+    # [V8.9.9.18 End-of-Day Audit] 당일 장 마감(15:30) 이후에는 처리 안 된 모든 예약을 취소 처리
+    is_market_closed = now_kst.hour >= 16 or (now_kst.hour == 15 and now_kst.minute >= 40)
+    
     for res in reservations:
         res_id = res.get('id', 'unknown')
         try:
-            # [V8.9.9.16] 'targetTime'과 'time' 필드 모두 지원
+            # [기존 예약 파싱 로직]
             target_time_str = res.get('targetTime', res.get('time', '')).strip()
             if not target_time_str:
                 pending_reservations.append(res)
                 continue
 
-            # "15:15"와 같은 시간 전용 포맷 처리
             if ":" in target_time_str and "-" not in target_time_str:
                 h, m = map(int, target_time_str.split(":"))
                 target_time = now_kst.replace(hour=h, minute=m, second=0, microsecond=0)
             else:
-                # ISO 포맷 처리 (기존 로직)
                 if target_time_str.endswith('Z'):
                     target_time_str = target_time_str[:-1] + '+00:00'
                 target_time_dt = datetime.fromisoformat(target_time_str)
-                # UTC -> KST 변환 (executor가 KST 기준이므로)
                 if target_time_dt.tzinfo is not None:
                     target_time = target_time_dt.astimezone(timezone(timedelta(hours=9))).replace(tzinfo=None)
                 else:
                     target_time = target_time_dt
 
-            # [Catch-up 로직] 예약 상태가 'pending'이고 실행 목표 시간이 현재보다 과거인 경우 즉시 실행
             status = res.get('status', 'pending')
-            if status == 'executed': continue
+            if status == 'executed' or status == 'cancelled': continue
             
+            # 장 마감 후 미처리 건은 자동 취소
+            if is_market_closed:
+                print(f"  [Audit] 예약 {res_id}: 장 마감으로 인한 자동 취소 처리.")
+                append_order_history({
+                    'id': res_id, 'executed_at': now_kst.isoformat(),
+                    'side': res.get('side', ''), 'code': res.get('code', ''), 'qty': res.get('qty', 0), 'price': res.get('price', 0),
+                    'status': 'cancelled', 'reason': 'Market Closed (End-of-Day Audit)'
+                })
+                continue
+
             is_overdue = now_kst >= target_time
             if not is_overdue:
-                # 미래 예약이므로 건너뜀
                 pending_reservations.append(res)
                 continue
 
-            # 이 시점에서는 target_time <= now_kst 이고 status != 'executed'임
-            print(f"  [Catch-up] 예약 {res_id}: 목표시간({target_time.strftime('%H:%M')}) 도래/경과됨. 실행 시도.")
-
-            # ── 실행 ──
+            # [실행 로직]
             code  = res.get('code', '')
             side  = res.get('side', 'buy')
             qty   = int(res.get('qty', 1))

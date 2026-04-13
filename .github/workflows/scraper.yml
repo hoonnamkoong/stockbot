@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
     permissions:
       contents: write
     steps:

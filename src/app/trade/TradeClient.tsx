@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -16,7 +17,11 @@ import {
 } from '@tabler/icons-react';
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
-import StrategyRadarChart from '../components/StrategyRadarChart';
+// [V8.9.9.22] 차트 라이브러리 SSR 충돌 방지를 위한 동적 임포트 적용
+const StrategyRadarChart = dynamic(() => import('../components/StrategyRadarChart'), { 
+    ssr: false,
+    loading: () => <div style={{ height: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>차트 로딩 중...</div>
+});
 
 interface Holding {
     name: string;

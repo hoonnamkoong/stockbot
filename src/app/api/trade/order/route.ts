@@ -69,35 +69,9 @@ export async function POST(request: Request) {
             result = await placeRealOrder(code, Number(qty), Number(price), side);
         }
 
-        // 2. AI Analysis & Telegram Reporting
-        try {
-            const report = await generateAiReport(code, side, isVirtual);
-            await sendTelegramMessage(`[거래봇 알림]\n종목: ${code}\n구분: ${side.toUpperCase()}\n모드: ${isVirtual ? 'VIRTUAL' : 'REAL'}\n\n🤖 AI 코멘트:\n${report}`);
-        } catch (e) {
-            console.error('Report Error:', e);
-        }
-
         return NextResponse.json({ success: true, data: result });
     } catch (error: any) {
         console.error('[API-Order] Error:', error.message);
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    }
-}
-
-async function generateAiReport(code: string, side: string, isVirtual: boolean) {
-    const GEMINI_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY;
-    if (!GEMINI_KEY) return "AI 리포트 기능을 사용할 수 없습니다. (API Key 누락)";
-
-    const prompt = `주식 종목 ${code}를 ${isVirtual ? '가상' : '실전'}으로 ${side === 'buy' ? '매수' : '매도'} 했습니다. 
-    이 거래의 전략적 의미를 4월 모멘텀 알고리즘(Adaptive Attention Momentum) 관점에서 2~3문장으로 분석해줘.`;
-
-    try {
-        const res = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
-            { contents: [{ parts: [{ text: prompt }] }] }
-        );
-        return res.data.candidates[0].content.parts[0].text;
-    } catch {
-        return "AI 리포트 생성 중 오류가 발생했습니다.";
     }
 }

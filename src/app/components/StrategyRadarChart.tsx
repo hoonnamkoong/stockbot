@@ -112,22 +112,22 @@ export default function StrategyRadarChart() {
               name="안정 지향형 (Sim 1)"
               dataKey="sim1"
               stroke="#228be6" // Blue
-              fill="#228be6"
-              fillOpacity={0.5}
+              fill="none"
+              strokeWidth={3}
             />
             <Radar
               name="보수적 방어형 (Sim 2)"
               dataKey="sim2"
               stroke="#7950f2" // Violet
-              fill="#7950f2"
-              fillOpacity={0.3}
+              fill="none"
+              strokeWidth={3}
             />
             <Radar
               name="공격적 추세추종형 (Sim 3)"
               dataKey="sim3"
               stroke="#fa5252" // Red
-              fill="#fa5252"
-              fillOpacity={0.2}
+              fill="none"
+              strokeWidth={3}
             />
             
             <Tooltip content={<CustomTooltip />} />

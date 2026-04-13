@@ -147,8 +147,10 @@ def append_order_history(record: dict) -> None:
 # ─── 메인 로직 ───────────────────────────────────────────────────────────────
 
 def main():
-    now_utc = datetime.now(timezone.utc)
-    print(f"\n[TradeExecutor] 실행 — {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    # [V8.9.9.16] 기준 시각을 KST로 통일 (한국 시장 기준)
+    from datetime import timedelta
+    now_kst = datetime.utcnow() + timedelta(hours=9)
+    print(f"\n[TradeExecutor] 실행 — {now_kst.strftime('%Y-%m-%d %H:%M:%S')} KST")
 
     # --- KIS 잔고 조회 의존성 제거 (Vercel Proxy) ---
     print("\n[TradeExecutor] 로컬에서의 KIS 직접 호출 방식을 제거하고 Vercel Proxy로 이관되었습니다.")
@@ -176,30 +178,39 @@ def main():
     for res in reservations:
         res_id = res.get('id', 'unknown')
         try:
-            target_time_str = res.get('targetTime', '').strip()
+            # [V8.9.9.16] 'targetTime'과 'time' 필드 모두 지원
+            target_time_str = res.get('targetTime', res.get('time', '')).strip()
             if not target_time_str:
                 pending_reservations.append(res)
                 continue
 
-            if target_time_str.endswith('Z'):
-                target_time_str = target_time_str[:-1] + '+00:00'
-
-            target_time = datetime.fromisoformat(target_time_str)
-            if target_time.tzinfo is None:
-                target_time = target_time.replace(tzinfo=timezone.utc)
+            # "15:15"와 같은 시간 전용 포맷 처리
+            if ":" in target_time_str and "-" not in target_time_str:
+                h, m = map(int, target_time_str.split(":"))
+                target_time = now_kst.replace(hour=h, minute=m, second=0, microsecond=0)
+            else:
+                # ISO 포맷 처리 (기존 로직)
+                if target_time_str.endswith('Z'):
+                    target_time_str = target_time_str[:-1] + '+00:00'
+                target_time_dt = datetime.fromisoformat(target_time_str)
+                # UTC -> KST 변환 (executor가 KST 기준이므로)
+                if target_time_dt.tzinfo is not None:
+                    target_time = target_time_dt.astimezone(timezone(timedelta(hours=9))).replace(tzinfo=None)
+                else:
+                    target_time = target_time_dt
 
             # [Catch-up 로직] 예약 상태가 'pending'이고 실행 목표 시간이 현재보다 과거인 경우 즉시 실행
             status = res.get('status', 'pending')
             if status == 'executed': continue
             
-            is_overdue = now_utc >= target_time
+            is_overdue = now_kst >= target_time
             if not is_overdue:
                 # 미래 예약이므로 건너뜀
                 pending_reservations.append(res)
                 continue
 
-            # 이 시점에서는 target_time <= now_utc 이고 status != 'executed'임
-            print(f"  [Catch-up] 예약 {res_id}: 목표시간({target_time_str}) 경과됨. 즉시 실행 시도.")
+            # 이 시점에서는 target_time <= now_kst 이고 status != 'executed'임
+            print(f"  [Catch-up] 예약 {res_id}: 목표시간({target_time.strftime('%H:%M')}) 도래/경과됨. 실행 시도.")
 
             # ── 실행 ──
             code  = res.get('code', '')

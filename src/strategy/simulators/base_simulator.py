@@ -4,7 +4,9 @@ import datetime
 from datetime import timedelta
 
 def get_kst_now():
-    return datetime.datetime.utcnow() + timedelta(hours=9)
+    # [V8.9.9.19] 표준 timezone 객체를 사용하여 정밀도 확보
+    from datetime import timezone
+    return datetime.datetime.now(timezone(timedelta(hours=9)))
 
 class TradeLog:
     """
@@ -87,9 +89,13 @@ class BaseSimulator:
             self.state['normalized_stats'] = full_stats['normalized']
             
             # [V8.9.9.17] 계산된 수수료를 최상위 필드에 동기화 (대시보드 표시용)
-            if 'total_fees' in full_stats['raw']:
-                self.state['total_fees'] = full_stats['raw']['total_fees']
-        except: pass
+            # [V8.9.9.19] full_stats 외에 self.calculate_stats()를 다시 한번 참조하여 강제 업데이트
+            stats = self.calculate_stats()
+            if stats.get('total_fees', 0) > 0:
+                self.state['total_fees'] = stats['total_fees']
+        except Exception as e:
+            print(f"[Sim Error] {self.name} 성과 지표 계산 실패: {e}")
+            pass
 
         with open(self.state_file, 'w', encoding='utf-8') as f:
             json.dump(self.state, f, ensure_ascii=False, indent=2)

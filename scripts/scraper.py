@@ -146,12 +146,12 @@ def load_sync_state():
                         'last_update_date': today_str, 
                         'stocks': {}, 
                         'reported_codes': [],           # 텔레그램 한 줄 시장 요약용 중복 방지
-                        'reported_daily_top3': []       # 하루 최대 9개 상세 리포트 관리용
+                        'daily_reported_info': []       # [V8.9.9.12] (이름, 코드) 페어 저장
                     }, yesterday_data
                 
                 # 기존 상태 로드 시 필드 누락 방지
                 if 'reported_codes' not in state: state['reported_codes'] = []
-                if 'reported_daily_top3' not in state: state['reported_daily_top3'] = []
+                if 'daily_reported_info' not in state: state['daily_reported_info'] = []
                 
                 return state, yesterday_data
         except: pass
@@ -433,20 +433,20 @@ if __name__ == "__main__":
             allow_buy = 9 <= now_kst.hour < 16 and is_trading_day(now_kst)
             simulation_results = engine.execute_simulation(results, allow_buy=allow_buy)
             
-            # [V8.9.9.11] 상세 리포트 중복 방지 로직 보강
-            # reported_already: 텔레그램 한 줄 요약용 (중복 메시지 방지)
+            # [V8.9.9.12] 상세 리포트 중복 방지 로직 보강
             reported_already = prev_sync_state.get('reported_codes', [])
-            # daily_reported_top3: 하루 최대 9개 종목 관리용
-            daily_reported_top3 = prev_sync_state.get('reported_daily_top3', [])
+            daily_reported_info = prev_sync_state.get('daily_reported_info', []) # (이름, 코드) 리스트
             
             # 이번 턴에 뽑힌 Top 3 중에서 신규 종목들만 골라내기
             new_picks_for_report = []
-            if len(daily_reported_top3) < 9:
+            reported_codes_only = [item['code'] for item in daily_reported_info]
+            
+            if len(reported_codes_only) < 9:
                 for r in simulation_results:
-                    if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in daily_reported_top3:
+                    if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in reported_codes_only:
                         new_picks_for_report.append(r)
-                        if len(daily_reported_top3) + len(new_picks_for_report) >= 9:
-                            break # 최대 9개까지만 선착순 확보
+                        if len(reported_codes_only) + len(new_picks_for_report) >= 9:
+                            break 
             
             # 최종 이번 턴의 보고 대상 (3개로 한정)
             final_picks = new_picks_for_report[:3]
@@ -462,11 +462,13 @@ if __name__ == "__main__":
                 deep_dive_report = advisor.generate_deep_dive_report(detail_picks)
                 
                 # 리포트 결과 저장 및 상태 업데이트
-                prev_sync_state['reported_daily_top3'].extend([p['code'] for p in final_picks])
+                prev_sync_state['daily_reported_info'].extend([{'code': p['code'], 'name': p['name']} for p in final_picks])
                 save_sync_state(prev_sync_state)
             elif any(r.get('signal') in ['BUY', 'WATCH'] for r in simulation_results):
-                # 종목은 뽑혔으나 모두 이미 보고된 경우
-                deep_dive_report = "📣 [안내] 이번 회차의 모든 Top 3 종목은 오늘 이미 상세 리포트가 생성되었습니다. (대시보드 실시간 기록 참고)"
+                # 종목은 뽑혔으나 모두 이미 보고된 경우 명단 출력
+                stock_names = [item['name'] for item in daily_reported_info]
+                names_str = ", ".join(stock_names)
+                deep_dive_report = f"📣 [안내] 이번 회차의 모든 top3 종목은 오늘 이미 상세 리포트가 생성되었습니다.\n\n✅ 오늘 보고된 종목: {names_str}"
             
         except Exception as e:
             print(f"[Stage 3 Error] 리포트 생성 실패: {e}")
@@ -507,11 +509,14 @@ if __name__ == "__main__":
             else:
                 print(f"[Stage 4] 현재 분({now_kst.minute}분)은 알림 미발송 구간입니다. (데이터만 축적)")
             
-            # 3. 시뮬레이터 3종 트리거 (항상 작동)
-            print(f"[Stage 4] 시뮬레이션 3종 가동 (SIM1, SIM2, SIM3)")
-            sim1.run(results)
-            sim2.run(results)
-            sim3.run(results)
+            # 3. 시뮬레이터 3종 트리거 (장중에만 작동)
+            if allow_buy:
+                print(f"[Stage 4] 시뮬레이션 3종 가동 (SIM1, SIM2, SIM3)")
+                sim1.run(results)
+                sim2.run(results)
+                sim3.run(results)
+            else:
+                print(f"[Stage 4] 비거래 시간대이므로 시뮬레이션 매매를 건너뜁니다.")
             
             print(f"[Stage 4] 모든 파이프라인 작업 완료")
         except Exception as e:

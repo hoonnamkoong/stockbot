@@ -73,4 +73,6 @@ class ConservativeSimulator(BaseSimulator):
                 reason = stock.get('posts_summary', '[보수] 안정적 진입 시그널')
                 self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason=reason)
 
+        # [V8.9.9.17] 매매 결과와 관계없이 성과 지표 상시 업데이트 및 저장
+        self.save_state()
         return self.calculate_stats(current_prices={c: s.get('price', s.get('현재가', 0)) for c, s in candidate_map.items()})

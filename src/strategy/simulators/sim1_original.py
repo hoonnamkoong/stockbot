@@ -37,8 +37,10 @@ class OriginalSimulator(BaseSimulator):
             price = float(stock.get('price', stock.get('현재가', 0)))
             if price <= 0: continue
             
-            qty = int(target_amount / price)
+                qty = int(target_amount / price)
             if qty > 0:
                 self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason="[안정] Buzz 필터 통과")
 
+        # [V8.9.9.17] 매매 결과와 관계없이 성과 지표 상시 업데이트 및 저장
+        self.save_state()
         return self.calculate_stats()

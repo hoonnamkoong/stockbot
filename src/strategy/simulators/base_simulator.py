@@ -85,6 +85,10 @@ class BaseSimulator:
             full_stats = self.get_normalized_stats()
             self.state['raw_stats'] = full_stats['raw']
             self.state['normalized_stats'] = full_stats['normalized']
+            
+            # [V8.9.9.17] 계산된 수수료를 최상위 필드에 동기화 (대시보드 표시용)
+            if 'total_fees' in full_stats['raw']:
+                self.state['total_fees'] = full_stats['raw']['total_fees']
         except: pass
 
         with open(self.state_file, 'w', encoding='utf-8') as f:

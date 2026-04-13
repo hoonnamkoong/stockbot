@@ -151,13 +151,24 @@ function TradeContent() {
         if (codeParam) setCode(codeParam);
     }, [searchParams, fetchBalance, fetchStocks, fetchReservations, fetchSimulationStats, fetchHistory]);
 
-    // [V8.9.9.14] PIN 모달 오픈 시 강제 포커스 (Mantine 자동 포커스 오버라이드)
+    // [V8.9.9.17] PIN 모달 오픈 시 강제 포커스 보강 (다단계 시도)
     useEffect(() => {
         if (pinModalOpen) {
-            const timer = setTimeout(() => {
-                const el = document.getElementById('pin-input-0') as HTMLInputElement;
-                if (el) el.focus();
-            }, 100);
+            const focusInput = () => {
+                const el = document.querySelector('input[type="password"]') as HTMLInputElement || 
+                           document.getElementById('pin-input-0') as HTMLInputElement;
+                if (el) {
+                    el.focus();
+                    return true;
+                }
+                return false;
+            };
+
+            // 1차: 즉시 시도
+            focusInput();
+            
+            // 2차: 애니메이션 종료 시점(250ms)에 다시 시도
+            const timer = setTimeout(focusInput, 250);
             return () => clearTimeout(timer);
         }
     }, [pinModalOpen]);

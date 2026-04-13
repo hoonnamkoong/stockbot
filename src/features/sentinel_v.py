@@ -267,6 +267,6 @@ class SentinelV:
         except Exception as e:
             print(f"[Sentinel-V Error] 시뮬레이터 연동 실패: {e}")
 
-if __name__ == \"__main__\":
+if __name__ == "__main__":
     bot = SentinelV()
     bot.run()

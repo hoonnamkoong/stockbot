@@ -76,7 +76,8 @@ def load_sync_state():
         'trade_history_sim_original.csv',
         'trade_history_sim_conservative.csv',
         'trade_history_sim_aggressive.csv',
-        'trade_history_sim_conviction.csv'
+        'trade_history_sim_conviction.csv',
+        'reservations.json'
     ]
     
     # 2026-01부터 현재 달까지 모든 월별 엑셀 파일 추가
@@ -515,6 +516,14 @@ if __name__ == "__main__":
                 sim1.run(results)
                 sim2.run(results)
                 sim3.run(results)
+                
+                # [V8.9.9.16] 실거래 예약 주문(Reservation) 처리 엔진 가동
+                try:
+                    print(f"[Stage 4] 실거래 예약 주문 처리 엔진(TradeExecutor) 가동")
+                    from src import trade_executor
+                    trade_executor.main()
+                except Exception as e:
+                    print(f"[Stage 4 Error] TradeExecutor 실행 실패: {e}")
             else:
                 print(f"[Stage 4] 비거래 시간대이므로 시뮬레이션 매매를 건너뜁니다.")
             

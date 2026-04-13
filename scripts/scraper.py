@@ -15,7 +15,7 @@ import re
 # [Stage 2] Gemini 2.5 Flash 일괄(Batch) 분석 (Parsing 보강)
 # [Stage 3] 2차 필터(Algo04V2) 및 Top 3 딥다이브 리포트
 # [Stage 4] 텔레그램 전송 및 시뮬레이터 트리거
-SCRAPER_VERSION = "8.9.9.10 Gemini 2.5 Flash Optimized (BugFix)"
+SCRAPER_VERSION = "8.9.9.11 Gemini 2.5 Flash Optimized (Notification Fix)"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
@@ -479,13 +479,14 @@ if __name__ == "__main__":
             df, _ = analyzer.analyze_discussion_trend(results)
             analyzer.save_data(df, "trending_integrated", start_time=now_kst)
             
-            # 2. 텔레그램 발송 및 리포트 (정각 또는 수동 실행 시에만)
-            github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual') # 기본값 설정
-            is_on_the_hour = (now_kst.minute == 0)
-            is_manual = (github_event == 'workflow_dispatch')
+            # 2. 텔레그램 발송 및 리포트 (정각 부근 또는 수동 실행 시에만)
+            github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
+            is_scheduled = (github_event == 'repository_dispatch')
+            is_near_the_hour = (now_kst.minute < 10)
+            is_manual_event = (github_event in ['workflow_dispatch', 'push', 'manual'])
             
-            if is_on_the_hour or is_manual:
-                print(f"[Stage 4] 알림 조건 충족 (정각:{is_on_the_hour}, 수동:{is_manual}) -> 발송 시작")
+            if (is_scheduled and is_near_the_hour) or (not is_scheduled) or is_manual_event:
+                print(f"[Stage 4] 알림 조건 충족 (이벤트:{github_event}, 정각부근:{is_near_the_hour}) -> 발송 시작")
                 tg.send_dashboard_link()
                 
                 kospi_results = [r for r in results if r.get('market') == 'KOSPI']

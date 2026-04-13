@@ -88,5 +88,26 @@
   "history": [
     3000000
   ],
-  "daily_trades": []
+  "daily_trades": [],
+  "raw_stats": {
+    "cash": 152837.98975,
+    "total_asset": 2999572.98975,
+    "profit_rate": -0.014233674999993914,
+    "holdings_count": 10,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0.014233674999993914,
+    "turnover": 0.9489116666666667,
+    "frequency": 2.5,
+    "total_fees": 2846.735,
+    "current_prices": {}
+  },
+  "normalized_stats": {
+    "승률": 0.0,
+    "수익팩터": 33.3,
+    "MDD": 99.92883162500003,
+    "거래빈도": 50.0,
+    "자본회전율": 4.744558333333334
+  },
+  "total_fees": 2846.735
 }

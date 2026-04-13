@@ -1,15 +1,15 @@
 {
   "initial_cash": 3000000,
-  "cash": 52792.9852500002,
-  "invested": 2946765.0,
+  "cash": 125428.98525000026,
+  "invested": 2958530.0,
   "portfolio": {
     "088800": {
       "name": "에이스테크",
-      "quantity": 54,
+      "quantity": 27,
       "avg_price": 5500.0,
       "entry_date": "2026-04-10",
       "peak_price": 5500.0,
-      "is_scaled_out": false
+      "is_scaled_out": true
     },
     "005880": {
       "name": "대한해운",
@@ -21,11 +21,11 @@
     },
     "010170": {
       "name": "대한광통신",
-      "quantity": 16,
+      "quantity": 8,
       "avg_price": 17830.0,
       "entry_date": "2026-04-10",
       "peak_price": 17830.0,
-      "is_scaled_out": false
+      "is_scaled_out": true
     },
     "050890": {
       "name": "쏠리드",
@@ -61,11 +61,11 @@
     },
     "215790": {
       "name": "이노인스트루먼트",
-      "quantity": 98,
+      "quantity": 49,
       "avg_price": 3035.0,
       "entry_date": "2026-04-10",
       "peak_price": 3035.0,
-      "is_scaled_out": false
+      "is_scaled_out": true
     },
     "452300": {
       "name": "캡스톤파트너스",
@@ -77,16 +77,70 @@
     },
     "100590": {
       "name": "머큐리",
-      "quantity": 30,
+      "quantity": 15,
       "avg_price": 9880.0,
       "entry_date": "2026-04-10",
       "peak_price": 9880.0,
+      "is_scaled_out": true
+    },
+    "900300": {
+      "name": "오가닉티코스메틱",
+      "quantity": 2400,
+      "avg_price": 125.0,
+      "entry_date": "2026-04-13",
+      "peak_price": 125.0,
+      "is_scaled_out": false
+    },
+    "270520": {
+      "name": "앱튼",
+      "quantity": 1315,
+      "avg_price": 228.0,
+      "entry_date": "2026-04-13",
+      "peak_price": 228.0,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 3000000,
+  "peak_nav": 3084048.95825,
   "history": [
     3000000
   ],
-  "daily_trades": []
+  "daily_trades": [
+    {
+      "date": "2026-04-13",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": true
+    }
+  ],
+  "total_fees": 1404.0,
+  "raw_stats": {
+    "cash": 125428.98525000026,
+    "total_asset": 3083958.9852500004,
+    "profit_rate": 2.7986328416666795,
+    "holdings_count": 12,
+    "win_rate": 0.0,
+    "profit_factor": 0.0,
+    "mdd": 0.0029173661384033025,
+    "turnover": 1.406815,
+    "frequency": 4.0,
+    "total_fees": 1404.0,
+    "current_prices": {}
+  },
+  "normalized_stats": {
+    "승률": 0.0,
+    "수익팩터": 0.0,
+    "MDD": 99.98541316930799,
+    "거래빈도": 80.0,
+    "자본회전율": 7.034075
+  }
 }

@@ -14,10 +14,10 @@ interface SimulationStat {
 }
 
 interface StatsData {
-  Real: SimulationStat;
-  Sim1: SimulationStat;
-  Sim2: SimulationStat;
-  Sim3: SimulationStat;
+  real: SimulationStat;
+  sim1: SimulationStat;
+  sim2: SimulationStat;
+  sim3: SimulationStat;
 }
 
 const CustomTooltip = ({ active, payload }: any) => {

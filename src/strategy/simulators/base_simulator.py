@@ -153,7 +153,7 @@ class BaseSimulator:
                 "name": name, 
                 "quantity": quantity, 
                 "avg_price": price, 
-                "entry_date": datetime.datetime.now().strftime('%Y-%m-%d'),
+                "entry_date": get_kst_now().strftime('%Y-%m-%d'),
                 "peak_price": price,
                 "is_scaled_out": False  # [Sim 3용] 분할 매수/매도 여부
             }
@@ -176,7 +176,7 @@ class BaseSimulator:
         is_win = net > (q_to_sell * avg_price)
         self.state['cash'] += net
         self.state['invested'] -= (q_to_sell * avg_price)
-        today_str = datetime.datetime.now().strftime('%Y-%m-%d')
+        today_str = get_kst_now().strftime('%Y-%m-%d')
         self.state.setdefault('daily_trades', []).append({"date": today_str, "is_win": is_win})
         if q_to_sell >= p_item['quantity']:
             del self.state['portfolio'][code]

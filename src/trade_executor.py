@@ -222,7 +222,7 @@ def main():
             place_order_via_vercel(side=side, code=code, qty=qty, price=price)
 
             append_order_history({
-                'id': res_id, 'executed_at': now_utc.isoformat(),
+                'id': res_id, 'executed_at': now_kst.isoformat(),
                 'side': side, 'code': code, 'qty': qty, 'price': price,
                 'status': 'executed'
             })

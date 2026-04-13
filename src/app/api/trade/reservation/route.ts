@@ -51,7 +51,7 @@ export async function POST(request: Request) {
             side,
             time: time || '15:15',
             status: 'PENDING',
-            created_at: new Date().toISOString()
+            created_at: new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '').replace('T', ' ').split('.')[0]
         };
 
         const updatedContent = [...content, newRes];

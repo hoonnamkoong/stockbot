@@ -211,7 +211,6 @@ class SentinelV:
             except Exception as e:
                 print(f"Error enriching {stock['name']}: {e}")
                 continue
-
         # 2. Monitor Recommendations
         self.monitor_recommendations(enriched_stocks)
 

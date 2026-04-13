@@ -89,10 +89,9 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
     saved_files = {}
     os.makedirs('data', exist_ok=True)
 
-    # [V8.9.9.11] 기동 시각 동기화 로직 적용
-    # [공통] 현재 KST 타임스탬프 (전달받은 start_time 우선, 없으면 현재 시각)
+    # [V8.9.9.11] 기동 시각 동기화 및 스냅샷 시간 단위 통합 (파일 개수 최적화)
     now_kst = start_time if start_time else (datetime.utcnow() + timedelta(hours=9))
-    timestamp = now_kst.strftime("%Y%m%d_%H%M%S")
+    timestamp = now_kst.strftime("%Y%m%d_%H")
 
     # 1. 고정 CSV 저장 (Force Sync)
     try:
@@ -223,16 +222,8 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
     except Exception as e:
         print(f"[Vercel] 🚨 Error during fixed data synchronization: {e}")
 
-    # [V8.9.9.9] 3-Track 지능형 시뮬레이터 실행 (안정/보수/공격)
-    try:
-        from src.strategy.simulators.get_all_stats import run_all_simulators
-        # df_final에서 필요한 데이터 추출 (list of dict)
-        if 'data_list' in locals() or 'df' in locals():
-            sim_data = df.to_dict('records')
-            run_all_simulators(sim_data)
-            print("[Simulator] 3-Track 시뮬레이션 업데이트 완료")
-    except Exception as e:
-        print(f"[Simulator] 🚨 시뮬레이션 실행 중 오류: {e}")
+    # [V8.9.9.20 Migration] 시뮬레이터 실행은 오직 scraper.py의 장 시간 확인 블록(allow_buy)에서만 수행됨.
+    # save_data 내부의 무조건적인 호출부(run_all_simulators)는 제거됨.
         
     return saved_files
 

@@ -289,7 +289,7 @@ function TradeContent() {
             );
         }
         return (
-            <ScrollArea offsetScrollbars>
+            <ScrollArea h={500} offsetScrollbars>
                 <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 650 : 600 }}>
                     <Table.Thead>
                         <Table.Tr>
@@ -365,7 +365,7 @@ function TradeContent() {
             );
         }
         return (
-            <ScrollArea h={550} offsetScrollbars>
+            <ScrollArea h={500} offsetScrollbars>
                 <Table striped highlightOnHover stickyHeader verticalSpacing="xs" style={{ minWidth: 500 }}>
                     <Table.Thead>
                         <Table.Tr>
@@ -521,6 +521,10 @@ function TradeContent() {
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">누적 수수료</Text>
                                             <Text size="md" fw={700} c="gray.6">{(Math.round(stats.total_fees || 0)).toLocaleString()}원</Text>
+                                        </Stack>
+                                        <Stack gap={2}>
+                                            <Text size="xs" c="dimmed">보유 종목</Text>
+                                            <Text size="md" fw={800} c={sim.color}>{holdings.length}개</Text>
                                         </Stack>
                                     </Group>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />

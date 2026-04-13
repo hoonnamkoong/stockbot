@@ -51,7 +51,7 @@ export default function StrategyRadarChart() {
         const response = await fetch('/api/simulation/stats');
         const stats: StatsData = await response.json();
 
-        // 5대 지표 (subject 명칭은 BaseSimulator.get_normalized_stats와 일치해야 함)
+        // 5대 지표 (BaseSimulator.get_normalized_stats와 일치됨)
         const subjects = ['승률', '수익팩터', 'MDD', '거래빈도', '자본회전율'];
         const apiKeys = ['win_rate', 'profit_factor', 'mdd', 'frequency', 'turnover'];
 

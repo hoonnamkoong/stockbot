@@ -1,15 +1,17 @@
 import json
 import os
 import datetime
-import math
-import csv
+from datetime import timedelta
+
+def get_kst_now():
+    return datetime.datetime.utcnow() + timedelta(hours=9)
 
 class TradeLog:
     """
     [V8.5.0] 단일 매매 기록 데이터 구조
     """
     def __init__(self, symbol, side, price, qty, reason):
-        self.timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.timestamp = get_kst_now().strftime('%Y-%m-%d %H:%M:%S')
         self.symbol = symbol
         self.side = side # BUY or SELL
         self.price = price
@@ -66,23 +68,32 @@ class BaseSimulator:
             "invested": 0,
             "portfolio": {},
             "peak_nav": self.initial_cash,
+            "total_fees": 0, # [V8.9.9.12] 누적 수수료+제세금
             "history": [self.initial_cash],
             "daily_trades": []
         }
         self.save_state()
 
     def save_state(self):
-        """상태 영속성 저장"""
+        """상태 및 실시간 분석 통계 영속성 저장"""
         current_nav = self.state['cash'] + self.state['invested']
         if current_nav > self.state.get('peak_nav', 0):
             self.state['peak_nav'] = current_nav
+        
+        # [V8.9.9.12] 저장 시점에 통계를 계산하여 포함 (Radar Chart 연동용)
+        try:
+            full_stats = self.get_normalized_stats()
+            self.state['raw_stats'] = full_stats['raw']
+            self.state['normalized_stats'] = full_stats['normalized']
+        except: pass
+
         with open(self.state_file, 'w', encoding='utf-8') as f:
             json.dump(self.state, f, ensure_ascii=False, indent=2)
 
     def log_trade(self, action, code, name, quantity, price, reason):
         """매매 이력 기록 (JSON & CSV)"""
         log_entry = {
-            "timestamp": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "timestamp": get_kst_now().strftime('%Y-%m-%d %H:%M:%S'),
             "action": action,
             "code": code,
             "name": name,
@@ -121,6 +132,7 @@ class BaseSimulator:
         if self.state['cash'] < total_cost: return False
         self.state['cash'] -= total_cost
         self.state['invested'] += cost
+        self.state['total_fees'] = self.state.get('total_fees', 0) + fee # 수수료 누적
         if code in self.state['portfolio']:
             old_item = self.state['portfolio'][code]
             old_q = old_item['quantity']
@@ -155,6 +167,7 @@ class BaseSimulator:
         fee = gross * 0.00015
         tax = gross * 0.0018
         net = gross - fee - tax
+        self.state['total_fees'] = self.state.get('total_fees', 0) + (fee + tax) # 수수료+세금 누적
         avg_price = p_item.get('avg_price', 0)
         is_win = net > (q_to_sell * avg_price)
         self.state['cash'] += net
@@ -241,15 +254,18 @@ class BaseSimulator:
             "mdd": mdd,
             "turnover": turnover,
             "frequency": freq,
+            "total_fees": self.state.get('total_fees', 0), # [V8.9.9.12] 수수료 필드 보강
             "current_prices": current_prices
         }
 
     def get_normalized_stats(self, current_prices=None):
+        """[V8.9.9.12] 5대 지표 분석 결과 정규화 (Radar Chart용)"""
         raw = self.calculate_stats(current_prices)
         norm = {
             "승률": min(100, raw['win_rate'] * 1.25),
             "수익팩터": min(100, raw['profit_factor'] * 33.3),
             "MDD": max(0, 100 - raw['mdd'] * 5),
-            "자산평가": min(100, (raw['total_asset'] / self.initial_cash) * 50)
+            "거래빈도": min(100, raw['frequency'] * 20),
+            "자본회전율": min(100, raw['turnover'] * 5)
         }
         return {"raw": raw, "normalized": norm, "portfolio": self.state['portfolio']}

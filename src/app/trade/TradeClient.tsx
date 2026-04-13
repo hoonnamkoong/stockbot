@@ -264,7 +264,7 @@ function TradeContent() {
     }
 
     function renderHistoryTable(targetType: string) {
-        const filtered = history.filter(h => h.type === targetType).slice(0, 20);
+        const filtered = history.filter(h => h.type === targetType).slice(0, 100);
         if (filtered.length === 0) {
             return (
                 <Box py="md" style={{ textAlign: 'center' }}>
@@ -273,7 +273,7 @@ function TradeContent() {
             );
         }
         return (
-            <ScrollArea h={450} offsetScrollbars>
+            <ScrollArea offsetScrollbars>
                 <Table striped highlightOnHover stickyHeader verticalSpacing="xs" style={{ minWidth: 500 }}>
                     <Table.Thead>
                         <Table.Tr>
@@ -409,6 +409,10 @@ function TradeContent() {
                                             <Text size="md" fw={800} c={(stats.profit_rate || 0) >= 0 ? 'red' : 'blue'}>
                                                 {(stats.profit_rate || 0).toFixed(2)}%
                                             </Text>
+                                        </Stack>
+                                        <Stack gap={2}>
+                                            <Text size="xs" c="dimmed">누적 수수료</Text>
+                                            <Text size="md" fw={700} c="gray.6">{(Math.round(stats.total_fees || 0)).toLocaleString()}원</Text>
                                         </Stack>
                                     </Group>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />

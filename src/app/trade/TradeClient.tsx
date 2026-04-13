@@ -151,6 +151,17 @@ function TradeContent() {
         if (codeParam) setCode(codeParam);
     }, [searchParams, fetchBalance, fetchStocks, fetchReservations, fetchSimulationStats, fetchHistory]);
 
+    // [V8.9.9.14] PIN 모달 오픈 시 강제 포커스 (Mantine 자동 포커스 오버라이드)
+    useEffect(() => {
+        if (pinModalOpen) {
+            const timer = setTimeout(() => {
+                const el = document.getElementById('pin-input-0') as HTMLInputElement;
+                if (el) el.focus();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [pinModalOpen]);
+
     const balancePoller = useInterval(() => fetchBalance(0, true), 30000);
     useEffect(() => {
         balancePoller.start();

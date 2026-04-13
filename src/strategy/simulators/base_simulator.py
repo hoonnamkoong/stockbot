@@ -195,7 +195,7 @@ class BaseSimulator:
         current_prices = current_prices or {}
         eval_invested = 0
         for code, item in self.state['portfolio'].items():
-            cur_p = current_prices.get(code, item['avg_price'])
+            cur_p = current_prices.get(code, item.get('avg_price', item.get('price', 0)))
             eval_invested += (item['quantity'] * cur_p)
         current_nav = self.state['cash'] + eval_invested
         
@@ -210,18 +210,22 @@ class BaseSimulator:
         pf = 1.0
         turnover = 0
         freq = 0
+        total_fees = self.state.get('total_fees', 0)
         
         if logs:
             trades = []
             temp_buy = {}
             total_volume = 0
             for l in logs:
-                c = l['code']
-                total_volume += l['amount']
-                if l['action'] == "BUY": temp_buy.setdefault(c, []).append(l)
-                elif l['action'] == "SELL" and c in temp_buy and temp_buy[c]:
+                c = l.get('code', '')
+                amt = l.get('amount', l.get('price', 0) * l.get('quantity', 0))
+                total_volume += amt
+                action = l.get('action', 'BUY')
+                if action == "BUY": 
+                    temp_buy.setdefault(c, []).append(l)
+                elif action == "SELL" and c in temp_buy and temp_buy[c]:
                     b = temp_buy[c].pop(0)
-                    trades.append(l['amount'] - b['amount'])
+                    trades.append(amt - b.get('amount', b.get('price', 0) * b.get('quantity', 0)))
             
             if trades:
                 win_rate = (len([t for t in trades if t > 0]) / len(trades) * 100)
@@ -230,14 +234,21 @@ class BaseSimulator:
                 pf = gp / gl if gl > 0 else (gp if gp > 0 else 1.0)
             
             # 자본 회전율: 총 거래대금 / 초기자본
-            turnover = total_volume / self.initial_cash
+            turnover = total_volume / self.initial_cash if self.initial_cash > 0 else 0
             
             # 거래 빈도: 시작일로부터 현재까지 하루 평균 거래 횟수
             try:
-                start_date = datetime.datetime.strptime(logs[0]['timestamp'], '%Y-%m-%d %H:%M:%S')
-                days = (datetime.datetime.now() - start_date).days + 1
-                freq = len(logs) / days
+                # [V8.9.9.14] 로그가 있을 때만 시간 파싱
+                if len(logs) > 0:
+                    start_date = datetime.datetime.strptime(logs[0]['timestamp'], '%Y-%m-%d %H:%M:%S')
+                    days = (datetime.datetime.now() - start_date).days + 1
+                    freq = len(logs) / days
             except: freq = len(logs)
+
+            # [V8.9.9.14] 수수료 소급 계산 (state에 수수료가 0인 경우 로그 기반 추정)
+            if total_fees == 0 and total_volume > 0:
+                # 평균 거래 수수료+세금 약 0.1%(매수 0.015, 매도 0.2) -> 평균 0.1% 적용
+                total_fees = total_volume * 0.001 
             
         mdd = 0
         peak = self.state.get('peak_nav', current_nav)
@@ -247,14 +258,14 @@ class BaseSimulator:
         return {
             "cash": self.state['cash'],
             "total_asset": current_nav,
-            "profit_rate": ((current_nav - self.initial_cash) / self.initial_cash) * 100,
+            "profit_rate": ((current_nav - self.initial_cash) / self.initial_cash) * 100 if self.initial_cash > 0 else 0,
             "holdings_count": len(self.state['portfolio']),
             "win_rate": win_rate,
             "profit_factor": pf,
             "mdd": mdd,
             "turnover": turnover,
             "frequency": freq,
-            "total_fees": self.state.get('total_fees', 0), # [V8.9.9.12] 수수료 필드 보강
+            "total_fees": total_fees,
             "current_prices": current_prices
         }
 

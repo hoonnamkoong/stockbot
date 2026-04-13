@@ -116,17 +116,17 @@ export default function StrategyRadarChart() {
               fillOpacity={0.5}
             />
             <Radar
-              name="공격 투자형 (Sim 2)"
+              name="보수적 방어형 (Sim 2)"
               dataKey="sim2"
-              stroke="#fa5252" // Red
-              fill="#fa5252"
+              stroke="#7950f2" // Violet
+              fill="#7950f2"
               fillOpacity={0.3}
             />
             <Radar
-              name="신념 집중형 (Sim 3)"
+              name="공격적 추세추종형 (Sim 3)"
               dataKey="sim3"
-              stroke="#7950f2" // Violet
-              fill="#7950f2"
+              stroke="#fa5252" // Red
+              fill="#fa5252"
               fillOpacity={0.2}
             />
             

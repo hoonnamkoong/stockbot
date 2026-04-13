@@ -524,7 +524,7 @@ function TradeContent() {
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">보유 종목</Text>
-                                            <Text size="md" fw={800} c={sim.color}>{holdings.length}개</Text>
+                                            <Text size="md" fw={800} c={sim.color}>{(holdings?.length || 0)}개</Text>
                                         </Stack>
                                     </Group>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />

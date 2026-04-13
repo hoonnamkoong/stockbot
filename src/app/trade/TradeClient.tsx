@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';

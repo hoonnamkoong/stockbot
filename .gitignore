@@ -40,6 +40,8 @@ wheels/
 node_modules/
 /.next/
 /out/
+.vercel
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

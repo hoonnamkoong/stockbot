@@ -4,9 +4,8 @@ import datetime
 from datetime import timedelta
 
 def get_kst_now():
-    # [V8.9.9.19] 표준 timezone 객체를 사용하여 정밀도 확보
-    from datetime import timezone
-    return datetime.datetime.now(timezone(timedelta(hours=9)))
+    # [V8.9.9.20] 시스템 레벨(TZ=Asia/Seoul)에서 설정된 시간을 사용하도록 간소화
+    return datetime.datetime.now()
 
 class TradeLog:
     """

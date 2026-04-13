@@ -28,11 +28,24 @@ jobs:
 
       - name: Run Sentinel-V Core
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
+          TZ: Asia/Seoul
+          GEMINI_API_KEY: ${{ secrets.GEMINI_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # KIS API 계정 정보 (전략 실행에 필요)
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KOREAINVESTMENT_PY_ACCOUNT: ${{ secrets.KOREAINVESTMENT_PY_ACCOUNT }}
+          KOREAINVESTMENT_PY_PASSWORD: ${{ secrets.KOREAINVESTMENT_PY_PASSWORD }}
+          KIS_VIRTUAL_ACCOUNT: ${{ secrets.KIS_VIRTUAL_ACCOUNT }}
+          KIS_VIRTUAL_PASSWORD: ${{ secrets.KIS_VIRTUAL_PASSWORD }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
-          export PYTHONPATH=${PYTHONPATH}:$(pwd)
           python -m src.features.sentinel_v
 
       - name: Deploy Data to db-data branch

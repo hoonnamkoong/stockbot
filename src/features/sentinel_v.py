@@ -12,6 +12,9 @@ sys.path.append(os.path.join(os.getcwd(), 'scripts'))
 import scraper 
 
 from src.analyzer_5days import safe_float, safe_int, get_recent_working_days, load_daily_snapshots
+from src.strategy.simulators.sim1_original import OriginalSimulator
+from src.strategy.simulators.sim2_conservative import ConservativeSimulator
+from src.strategy.simulators.sim3_aggressive import AggressiveSimulator
 
 class SentinelV:
     """
@@ -249,6 +252,21 @@ class SentinelV:
                 
         if not action_taken:
             print("[Sentinel-V] No new buy signals.")
+
+        # [V8.9.9.20] 시뮬레이션 3종 파이프라인 통합 (대시보드 데이터 즉시 갱신)
+        try:
+            print("\n[Sentinel-V] 통합 시뮬레이션 3종(Sim 1, 2, 3) 구동 시작...")
+            sim1 = OriginalSimulator()
+            sim2 = ConservativeSimulator()
+            sim3 = AggressiveSimulator()
+            
+            # 봇이 분석한 동일한 종목 리스트(enriched_stocks)를 기반으로 시뮬레이션 수행
+            sim1.run(enriched_stocks)
+            sim2.run(enriched_stocks)
+            sim3.run(enriched_stocks)
+            print("[Sentinel-V] 모든 시뮬레이터 상태 업데이트 및 저장 완료.")
+        except Exception as e:
+            print(f"[Sentinel-V Error] 시뮬레이터 연동 실패: {e}")
 
 if __name__ == "__main__":
     bot = SentinelV()

@@ -20,6 +20,7 @@ SCRAPER_VERSION = "8.9.9.11 Gemini 2.5 Flash Optimized (Notification Fix)"
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from src.strategy import analyzer
+get_top_trending_stocks = analyzer.get_top_trending_stocks
 from src.strategy.advisor import GeminiAgent
 from src.strategy.engine import StrategyEngine
 from src.strategy.simulators.sim1_original import OriginalSimulator

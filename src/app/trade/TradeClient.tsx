@@ -273,7 +273,7 @@ function TradeContent() {
             );
         }
         return (
-            <ScrollArea offsetScrollbars>
+            <ScrollArea h={550} offsetScrollbars>
                 <Table striped highlightOnHover stickyHeader verticalSpacing="xs" style={{ minWidth: 500 }}>
                     <Table.Thead>
                         <Table.Tr>
@@ -492,7 +492,7 @@ function TradeContent() {
             <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security PIN" centered zIndex={2000}>
                 <Stack align="center" py="md" ref={pinContainerRef}>
                     <Text size="sm">보안 PIN 4자리를 입력하세요.</Text>
-                    <PinInput length={4} type="number" mask value={pin} onChange={setPin} onComplete={confirmOrder} />
+                    <PinInput id="pin-input" data-autofocus length={4} type="number" mask value={pin} onChange={setPin} onComplete={confirmOrder} />
                     <Group mt="md">
                         <Button variant="default" onClick={() => setPinModalOpen(false)}>취소</Button>
                         <Button color="blue" onClick={confirmOrder} disabled={pin.length !== 4}>확인</Button>

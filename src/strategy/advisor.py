@@ -48,7 +48,7 @@ class GeminiAgent:
         if self._initialized: return
         
         # [V8.6.0] 모델 명칭 선설정 (API 키 부재 시에도 속성 참조 가능하도록 보장)
-        self.batch_model_name = "gemini-2.5-flash"
+        self.batch_model_name = "gemini-2.5-flash-lite"
         self.report_model_name = "gemini-2.5-flash"
         self.exhausted_models = set() if not hasattr(self, 'exhausted_models') else self.exhausted_models
 

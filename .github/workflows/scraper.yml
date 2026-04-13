@@ -61,13 +61,6 @@ jobs:
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
         run: PYTHONPATH=. python scripts/scraper.py
 
-      - name: Run Sentinel-V (AI Analysis & Simulation)
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: PYTHONPATH=. python src/features/sentinel_v.py
-
       - name: Deploy Data to db-data branch
         if: success()
         run: |

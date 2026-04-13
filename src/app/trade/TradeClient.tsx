@@ -72,6 +72,10 @@ function TradeContent() {
     const [reasonModalOpen, setReasonModalOpen] = useState(false);
     const [selectedReason, setSelectedReason] = useState({ title: '', content: '' });
 
+    // Multi-select for Portfolio
+    const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+    const [bulkActionType, setBulkActionType] = useState<{ type: 'immediate' | 'reservation' } | null>(null);
+
     const pinContainerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
 
@@ -215,6 +219,56 @@ function TradeContent() {
         }
     };
 
+    const handleBulkOrder = (isReservation: boolean) => {
+        if (selectedCodes.length === 0) {
+            showNotify('Error', '매도할 종목을 선택하세요.', 'red');
+            return;
+        }
+        setBulkActionType({ type: isReservation ? 'reservation' : 'immediate' });
+        setPinModalOpen(true);
+    };
+
+    const confirmBulkOrder = async () => {
+        if (!bulkActionType || !balance) return;
+        setPinModalOpen(false);
+        setOrderLoading(true);
+        
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const targetCode of selectedCodes) {
+            const holding = balance.holdings.find(h => h.code === targetCode);
+            if (!holding) continue;
+
+            try {
+                const isReservation = bulkActionType.type === 'reservation';
+                const endpoint = isReservation ? '/api/trade/reservation' : '/api/trade/order';
+                const payload: any = { 
+                    code: targetCode, 
+                    qty: holding.qty, 
+                    price: 0, // 시장가 전량 매도
+                    side: 'sell', 
+                    pin 
+                };
+                if (isReservation) payload.time = `${resHour}:${resMin}`;
+                
+                const res = await axios.post(endpoint, payload);
+                if (res.data.success) successCount++;
+                else failCount++;
+            } catch (e) {
+                failCount++;
+            }
+        }
+
+        showNotify('일괄 처리 결과', `성공: ${successCount}, 실패: ${failCount}`, failCount > 0 ? 'orange' : 'green');
+        setSelectedCodes([]);
+        fetchBalance();
+        fetchReservations();
+        fetchHistory();
+        setOrderLoading(false);
+        setBulkActionType(null);
+    };
+
     const cancelReservation = async (id: string) => {
         if (!confirm('예약을 취소하시겠습니까?')) return;
         try {
@@ -239,6 +293,7 @@ function TradeContent() {
                 <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 650 : 600 }}>
                     <Table.Thead>
                         <Table.Tr>
+                            {isReal && <Table.Th style={{ width: 40 }}></Table.Th>}
                             <Table.Th style={{ width: 120 }}>종목명</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>수량</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>평단가</Table.Th>
@@ -253,9 +308,24 @@ function TradeContent() {
                             const currentPrice = h.current_price || h.price || 0; 
                             const plRate = h.pl_rate ?? 0;
                             const amount = (h.qty || h.quantity || 0) * avgPrice;
+                            const isSelected = selectedCodes.includes(h.code);
+
                             return (
-                                <Table.Tr key={h.code} style={{ cursor: isReal ? 'pointer' : 'default' }} onClick={() => isReal && setCode(h.code)}>
-                                    <Table.Td>
+                                <Table.Tr key={h.code} style={{ cursor: isReal ? 'pointer' : 'default' }}>
+                                    {isReal && (
+                                        <Table.Td onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox 
+                                                checked={isSelected} 
+                                                onChange={(event) => {
+                                                    const checked = event.currentTarget.checked;
+                                                    setSelectedCodes(prev => 
+                                                        checked ? [...prev, h.code] : prev.filter(c => c !== h.code)
+                                                    );
+                                                }}
+                                            />
+                                        </Table.Td>
+                                    )}
+                                    <Table.Td onClick={() => isReal && setCode(h.code)}>
                                         <Text size="sm" fw={700} truncate maw={100}>{h.name}</Text>
                                         <Text size="xs" c="dimmed">{h.code}</Text>
                                     </Table.Td>
@@ -361,8 +431,14 @@ function TradeContent() {
                     </Group>
                     <Group grow mb="md" align="flex-end">
                         <Stack gap={2}>
-                            <Text size="xs" c="dimmed">추정 예수금</Text>
+                            <Text size="xs" c="dimmed">예수금 (잔고)</Text>
                             <Text fw={700} size="lg">{(Number(deposit) || 0).toLocaleString()} 원</Text>
+                        </Stack>
+                        <Stack gap={2}>
+                            <Text size="xs" c="dimmed">총 자산수익률</Text>
+                            <Text fw={800} size="lg" c={totalPL >= 0 ? 'red' : 'blue'}>
+                                {totalPL >= 0 ? '+' : ''}{(totalEval > 0 ? (totalPL / (totalEval - totalPL)) * 100 : 0).toFixed(2)}%
+                            </Text>
                         </Stack>
                         <Stack gap={2}>
                             <Text size="xs" c="dimmed">총 평가손익</Text>
@@ -371,8 +447,18 @@ function TradeContent() {
                             </Text>
                         </Stack>
                     </Group>
-                    <Divider mb="xs" label="보유 포트폴리오" labelPosition="center" />
+                    <Divider mb="xs" label="보유 포트폴리오 (일괄 매도 가능)" labelPosition="center" />
                     {renderPortfolioTable(holdings, true)}
+                    {selectedCodes.length > 0 && (
+                        <Group mt="md" grow>
+                            <Button color="red" leftSection={<IconTrash size={16}/>} onClick={() => handleBulkOrder(false)}>
+                                {selectedCodes.length}건 즉시 매도
+                            </Button>
+                            <Button color="violet" leftSection={<IconClock size={16}/>} onClick={() => handleBulkOrder(true)}>
+                                {selectedCodes.length}건 예약 매도
+                            </Button>
+                        </Group>
+                    )}
                 </Paper>
                 <Paper p="md" withBorder radius="md">
                     <Title order={5} mb="sm"><IconHistory size={18} style={{ marginBottom: -4, marginRight: 8 }}/>실거래 매매 히스토리</Title>
@@ -514,10 +600,10 @@ function TradeContent() {
             <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security PIN" centered zIndex={2000}>
                 <Stack align="center" py="md" ref={pinContainerRef}>
                     <Text size="sm">보안 PIN 4자리를 입력하세요.</Text>
-                    <PinInput id="pin-input" data-autofocus length={4} type="number" mask value={pin} onChange={setPin} onComplete={confirmOrder} />
+                    <PinInput id="pin-input" data-autofocus length={4} type="number" mask value={pin} onChange={setPin} onComplete={bulkActionType ? confirmBulkOrder : confirmOrder} />
                     <Group mt="md">
                         <Button variant="default" onClick={() => setPinModalOpen(false)}>취소</Button>
-                        <Button color="blue" onClick={confirmOrder} disabled={pin.length !== 4}>확인</Button>
+                        <Button color="blue" onClick={bulkActionType ? confirmBulkOrder : confirmOrder} disabled={pin.length !== 4}>확인</Button>
                     </Group>
                 </Stack>
             </Modal>

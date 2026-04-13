@@ -212,59 +212,92 @@ def get_post_body(code, nid):
 
 def get_discussion_stats(code, today_str, prev_state):
     """
-    [V8.9.9.6] 오늘 날짜 기준 게시글 수 누적 및 수집
-    today_str: '2026.04.09' 형식
+    [V8.9.9.18 High-Speed Accuracy Fix]
+    - 누적 합산 방식(prev + new) 폐기. 중복 오류 방지를 위해 매 실행 시 '오늘' 글 전체 재스캔
+    - 중첩 병렬화(Nested Threading)로 40페이지 스캔 속도 극대화
+    - today_str: '2026.04.13' 형식
     """
     headers = {'User-Agent': 'Mozilla/5.0'}
-    stock_state = prev_state.get(code, {'cumulative_count': 0, 'last_nid': None})
+    session = requests.Session()
+    session.headers.update(headers)
+    
+    unique_nids = set()
     new_posts = []
-    found_prev_marker = False
-    stop_by_date = False
-
-    for page in range(1, 10):
-        if found_prev_marker or stop_by_date: break
-        url = f"https://finance.naver.com/item/board.naver?code={code}&page={page}"
+    
+    # [Nested Parallel] 40페이지를 5페이지씩 청크로 나누어 병렬 수집
+    max_pages = 40
+    chunk_size = 8
+    
+    def fetch_page(p_idx):
+        url = f"https://finance.naver.com/item/board.naver?code={code}&page={p_idx}"
         try:
-            res = requests.get(url, headers=headers, timeout=10)
+            res = session.get(url, timeout=5)
             soup = BeautifulSoup(res.content, 'html.parser')
             rows = soup.select('table.type2 tr')
+            page_posts = []
+            stop_signal = False
+            
             for row in rows:
                 cols = row.select('td')
                 if len(cols) < 5: continue
                 
-                # 날짜 확인 (cols[0] -> '2026.04.09 11:32')
                 date_text = cols[0].get_text(strip=True)
+                # 오늘 날짜가 아니면 스캔 중단 신호
                 if today_str not in date_text:
-                    # 오늘 글이 아니면 수집 중단 (누적 카운트의 정확성 보장)
-                    stop_by_date = True
+                    stop_signal = True
                     break
 
                 title_tag = row.select_one('td.title a')
                 if not title_tag: continue
                 
-                current_nid = re.search(r'nid=(\d+)', title_tag['href']).group(1)
-                if current_nid == stock_state['last_nid']: 
-                    found_prev_marker = True
-                    break
-                
+                nid = re.search(r'nid=(\d+)', title_tag['href']).group(1)
                 try:
                     likes = int(cols[4].get_text(strip=True))
                 except: likes = 0
                 
-                new_posts.append({
-                    'nid': current_nid, 
+                page_posts.append({
+                    'nid': nid, 
                     'title': title_tag.get_text(strip=True), 
                     'likes': likes
                 })
-        except: break
-    
-    total_cumulative = stock_state['cumulative_count'] + len(new_posts)
-    latest_nid = new_posts[0]['nid'] if new_posts else stock_state['last_nid']
+            return page_posts, stop_signal
+        except:
+            return [], False
+
+    # 페이지 묶음 단위로 스캔
+    for start_p in range(1, max_pages + 1, chunk_size):
+        chunk_range = range(start_p, start_p + chunk_size)
+        with ThreadPoolExecutor(max_workers=chunk_size) as page_exec:
+            future_to_p = {page_exec.submit(fetch_page, p): p for p in chunk_range}
+            
+            # 페이지 순서대로 처리하기 위해 정렬된 결과를 수합
+            chunk_results = []
+            for future in as_completed(future_to_p):
+                res_posts, stop = future.result()
+                chunk_results.append((future_to_p[future], res_posts, stop))
+            
+            chunk_results.sort(key=lambda x: x[0])
+            
+            all_stop = False
+            for p_num, posts, stop in chunk_results:
+                for p in posts:
+                    if p['nid'] not in unique_nids:
+                        unique_nids.add(p['nid'])
+                        new_posts.append(p)
+                if stop:
+                    all_stop = True
+                    break
+            
+            if all_stop: break
+
+    # [V8.9.9.18] 오늘 전체 글 수 확정 (누적 방식 아님)
+    total_today_count = len(unique_nids)
+    latest_nid = new_posts[0]['nid'] if new_posts else None
     
     return {
-        'recent_posts_count': total_cumulative, 
+        'recent_posts_count': total_today_count, 
         'new_posts': new_posts,
-        'updated_state': {'cumulative_count': total_cumulative, 'last_nid': latest_nid}
+        'updated_state': {'cumulative_count': total_today_count, 'last_nid': latest_nid}
     }
 
 def get_stock_details(code):
@@ -367,9 +400,9 @@ if __name__ == "__main__":
                 print(f"   [Error] {s['name']} 스킵: {e}")
                 return None, None, False
 
-        # [V8.9.9.8] ThreadPoolExecutor 적용 (여유 있는 5개 스레드)
-        passed_codes = set()  # 오늘 통과한 종목 코드
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        # [V8.9.9.18] 고속 병렬 처리 (최대 12개 워커)
+        passed_codes = set()
+        with ThreadPoolExecutor(max_workers=12) as executor:
             future_to_stock = {executor.submit(process_stock_candidate, s): s for s in current_candidates}
             
             for future in as_completed(future_to_stock):

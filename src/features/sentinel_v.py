@@ -205,7 +205,8 @@ class SentinelV:
              try:
                  details = scraper.get_stock_details(stock['code'])
                  stock.update(details)
-                 stats = scraper.get_discussion_stats(stock['code'])
+                 today_str = datetime.now().strftime('%Y-%m-%d')
+                stats = scraper.get_discussion_stats(stock['code'], today_str, {})
                  stock.update(stats)
                  enriched_stocks.append(stock)
              except Exception as e:

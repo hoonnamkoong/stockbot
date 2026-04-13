@@ -15,7 +15,7 @@ import re
 # [Stage 2] Gemini 2.5 Flash 일괄(Batch) 분석 (Parsing 보강)
 # [Stage 3] 2차 필터(Algo04V2) 및 Top 3 딥다이브 리포트
 # [Stage 4] 텔레그램 전송 및 시뮬레이터 트리거
-SCRAPER_VERSION = "8.9.9.9 Gemini 2.5 Flash Optimized"
+SCRAPER_VERSION = "8.9.9.10 Gemini 2.5 Flash Optimized (BugFix)"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
@@ -81,14 +81,14 @@ def load_sync_state():
     
     # 2026-01부터 현재 달까지 모든 월별 엑셀 파일 추가
     start_year, start_month = 2026, 1
-    curr_date = datetime.datetime(start_year, start_month, 1)
+    curr_date = datetime(start_year, start_month, 1)
     while curr_date <= current_kst:
         files_to_sync.append(f'trending_integrated_{curr_date.strftime("%Y-%m")}.xlsx')
         # 다음 달로 이동
         if curr_date.month == 12:
-            curr_date = datetime.datetime(curr_date.year + 1, 1, 1)
+            curr_date = datetime(curr_date.year + 1, 1, 1)
         else:
-            curr_date = datetime.datetime(curr_date.year, curr_date.month + 1, 1)
+            curr_date = datetime(curr_date.year, curr_date.month + 1, 1)
     
     os.makedirs('data', exist_ok=True)
     for filename in files_to_sync:

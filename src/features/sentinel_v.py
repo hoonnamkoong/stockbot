@@ -1,4 +1,3 @@
-
 import sys
 import os
 import json
@@ -7,7 +6,11 @@ from datetime import datetime
 from src.core.config import SENTINEL_V, MESSAGES
 from src.features.gemini_agent import GeminiAgent
 from src.telegram_manager import TelegramManager
+
+# [V8.9.9.19] scripts 디렉토리를 path에 추가하여 scraper 임포트 해결
+sys.path.append(os.path.join(os.getcwd(), 'scripts'))
 import scraper 
+
 from src.analyzer_5days import safe_float, safe_int, get_recent_working_days, load_daily_snapshots
 
 class SentinelV:

@@ -1,19 +1,21 @@
 name: Sentinel-V AI Trader
 
 on:
-  workflow_dispatch: # Triggered via API
+  schedule:
+    - cron: '30 3 * * 1-5'  # 매일(월-금) 12:30 KST
+  workflow_dispatch:      # 수동 실행 허용
 
 jobs:
   ai_trading:
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -21,22 +23,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f scripts/requirements-scraper.txt ]; then pip install -r scripts/requirements-scraper.txt; fi
-          # Explicitly ensure AI lib is installed (redundant if in requirements, but safe)
-          pip install google-generativeai
 
       - name: Run Sentinel-V Core
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-          KOREAINVESTMENT_PY_ACCOUNT: ${{ secrets.KOREAINVESTMENT_PY_ACCOUNT }}
-          KOREAINVESTMENT_PY_PASSWORD: ${{ secrets.KOREAINVESTMENT_PY_PASSWORD }}
-          KIS_VIRTUAL_ACCOUNT: ${{ secrets.KIS_VIRTUAL_ACCOUNT }}
-          KIS_VIRTUAL_PASSWORD: ${{ secrets.KIS_VIRTUAL_PASSWORD }}
-          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
-          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-        run: python -m src.features.sentinel_v
+        run: |
+          export PYTHONPATH=${PYTHONPATH}:$(pwd)
+          python -m src.features.sentinel_v
+
+      - name: Deploy Data to db-data branch
+        if: always()
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          if [ -d "data" ]; then
+            git fetch origin db-data:db-data || git checkout --orphan db-data
+            git checkout db-data
+            cp -r data/* .
+            git add .
+            git commit -m "Auto-update data from Sentinel-V [$(date +'%Y-%m-%d %H:%M:%S KST')]" || echo "No changes"
+            git push origin db-data
+          fi

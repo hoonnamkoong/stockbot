@@ -1,7 +1,8 @@
 import os
 import requests
 import json
-from datetime import datetime, timedelta
+import base64
+from datetime import datetime, timedelta, timezone
 try:
     from dotenv import load_dotenv
     HAS_DOTENV = True
@@ -153,6 +154,10 @@ def get_access_token(force_refresh=False):
                     json.dump(token_data, f, indent=2)
                 
                 print(f"[Auth] 새 토큰 저장 완료: {token_path}")
+                
+                # [V8.9.9.22 Persistence] 깃허브 원격 저장소에 즉시 동기화하여 중복 발급 방지
+                _update_github_token_cache(token_data)
+                
                 return access_token
         else:
             print(f"[Auth] KIS API 오류 {res.status_code}: {res.text}")
@@ -160,6 +165,52 @@ def get_access_token(force_refresh=False):
         print(f"[Auth] 토큰 발급 예외 발생: {e}")
         
     return None
+
+def _update_github_token_cache(token_data):
+    """실시간으로 발급된 토큰을 GitHub db-data 브랜치에 동기화합니다."""
+    gh_token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_PAT") or os.environ.get("GITHUB_TOKEN")
+    if not gh_token:
+        print("[Auth] Skip: GH_PAT가 없어 원격 동기화를 수행하지 않습니다.")
+        return False
+
+    repo_owner = "hoonnamkoong"
+    repo_name = "stockbot"
+    branch = "db-data"
+    gh_file_path = "data/kis_token_cache.json"
+    
+    api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{gh_file_path}"
+    headers = {
+        "Authorization": f"token {gh_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    try:
+        # 1. 기존 파일의 SHA 값 획득 (업데이트를 위해 필수)
+        res_get = requests.get(api_url + f"?ref={branch}", headers=headers, timeout=5)
+        sha = None
+        if res_get.status_code == 200:
+            sha = res_get.json().get('sha')
+
+        # 2. 파일 업데이트 실행
+        content_b64 = base64.b64encode(json.dumps(token_data, indent=2).encode('utf-8')).decode('utf-8')
+        payload = {
+            "message": f"[V8.9.9.22] Sync KIS Token: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "content": content_b64,
+            "branch": branch
+        }
+        if sha:
+            payload["sha"] = sha
+
+        res_put = requests.put(api_url, headers=headers, json=payload, timeout=5)
+        if res_put.status_code in [200, 201]:
+            print(f"[Auth] GitHub 원격 동기화 성공: {gh_file_path} ({branch})")
+            return True
+        else:
+            print(f"[Auth] GitHub 동기화 실패: {res_put.status_code} {res_put.text}")
+    except Exception as e:
+        print(f"[Auth] GitHub 동기화 중 오류 발생: {e}")
+    
+    return False
 
 def get_account_info():
     """

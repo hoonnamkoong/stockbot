@@ -56,7 +56,7 @@ export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: Re
                     leftSection={<IconReport size={16} stroke={1.5} />}
                     rightSection={<IconExternalLink size={14} />}
                     component="a"
-                    href={`https://github.com/${repoOwner}/${repoName}/blob/db-data/reports/${report.filename}`}
+                    href={`https://github.com/${repoOwner}/${repoName}/blob/db-data/data/reports/${report.filename}`}
                     target="_blank"
                     variant="light"
                     color={report.type === 'monthly' ? 'violet' : 'blue'}

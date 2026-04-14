@@ -525,13 +525,17 @@ if __name__ == "__main__":
             analyzer.save_data(df, "trending_integrated", start_time=now_kst)
             
             # 2. 텔레그램 발송 및 리포트 (정각 부근 또는 수동 실행 시에만)
+            # [V8.9.9.22 Fix] 'repository_dispatch' 외에도 모든 스케줄링(Cron) 작업 포함
             github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
-            is_scheduled = (github_event == 'repository_dispatch')
-            is_near_the_hour = (now_kst.minute < 10)
             is_manual_event = (github_event in ['workflow_dispatch', 'push', 'manual'])
+            is_near_the_hour = (now_kst.minute < 5)
             
-            if (is_scheduled and is_near_the_hour) or (not is_scheduled) or is_manual_event:
-                print(f"[Stage 4] 알림 조건 충족 (이벤트:{github_event}, 정각부근:{is_near_the_hour}) -> 발송 시작")
+            # 매뉴얼 실행이 아니라면 무조건 '정시(0~5분)' 조건을 통과해야 함
+            should_send_notification = is_manual_event or is_near_the_hour
+            
+            print(f"[Stage 4] 알림 조건 체크 - 이벤트: {github_event}, 현재분: {now_kst.minute}분 -> 발송여부: {should_send_notification}")
+            
+            if should_send_notification:
                 tg.send_dashboard_link()
                 
                 kospi_results = [r for r in results if r.get('market') == 'KOSPI']

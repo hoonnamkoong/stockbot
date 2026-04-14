@@ -50,9 +50,14 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { code, qty, price, side, isVirtual, pin } = body;
 
-        // 1. PIN Verification
-        if (pin !== (process.env.TRADE_PIN || '1234')) {
-            return NextResponse.json({ success: false, error: 'Invalid TRADING PIN' }, { status: 403 });
+        // 1. PIN 또는 Webhook Secret Verification (자동화 엔진 대응)
+        const authHeader = request.headers.get('Authorization');
+        const webhookSecret = process.env.WEBHOOK_SECRET;
+        const isAuthorizedByWebhook = webhookSecret && authHeader === `Bearer ${webhookSecret}`;
+
+        if (!isAuthorizedByWebhook && pin !== (process.env.TRADE_PIN || '1234')) {
+            console.error('[API-Order] ❌ Unauthorized order attempt (Invalid PIN or Secret)');
+            return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 403 });
         }
 
         let result: any;

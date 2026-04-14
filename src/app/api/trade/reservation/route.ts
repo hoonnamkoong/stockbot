@@ -29,7 +29,59 @@ async function getFileFromGithub() {
 export async function GET() {
     try {
         const { content } = await getFileFromGithub();
-        return NextResponse.json({ success: true, data: content });
+        
+        // [V8.9.9.22 Fix] 한국 시간(KST) 기준 오늘 날짜가 지난 예약은 필터링 (자동 만료)
+        const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+        const todayStr = nowKst.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        const activeReservations = content.filter((res: any) => {
+            if (!res.created_at) return true;
+            const resDate = res.created_at.split(' ')[0];
+            return resDate >= todayStr;
+        });
+
+        return NextResponse.json({ success: true, data: activeReservations });
+    } catch (error: any) {
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get('id');
+        if (!id) return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
+
+        // 1. 기존 파일 및 SHA 획득
+        const { sha, content } = await getFileFromGithub();
+
+        // 2. 해당 ID 제외
+        const updatedContent = content.filter((res: any) => res.id !== id);
+
+        if (content.length === updatedContent.length) {
+            return NextResponse.json({ success: false, error: 'Reservation not found' }, { status: 404 });
+        }
+
+        // 3. GitHub 업데이트
+        const base64Content = Buffer.from(JSON.stringify(updatedContent, null, 2)).toString('base64');
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 
+                'Authorization': `token ${GITHUB_PAT}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: `[V8.9.9.22] Delete reservation: ${id}`,
+                content: base64Content,
+                sha: sha,
+                branch: BRANCH
+            })
+        });
+
+        if (!res.ok) throw new Error('GitHub sync failed during deletion');
+
+        return NextResponse.json({ success: true });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }

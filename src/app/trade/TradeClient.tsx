@@ -278,9 +278,11 @@ function TradeContent() {
         if (!confirm('예약을 취소하시겠습니까?')) return;
         try {
             await axios.delete(`/api/trade/reservation?id=${id}`);
-            showNotify('Success', 'Cancelled', 'green');
-            fetchReservations();
-        } catch (error) {}
+            showNotify('성공', '예약이 취소되었습니다.', 'green');
+            fetchReservations(); // 취소 후 즉시 목록 갱신
+        } catch (error: any) {
+            showNotify('실패', error.response?.data?.error || '취소 중 오류 발생', 'red');
+        }
     };
 
     // --- Helper UI Renderers ---
@@ -330,8 +332,16 @@ function TradeContent() {
                                             />
                                         </Table.Td>
                                     )}
-                                    <Table.Td onClick={() => isReal && setCode(h.code)}>
-                                        <Text size="sm" fw={700} truncate maw={100}>{h.name}</Text>
+                                    <Table.Td 
+                                        onClick={() => {
+                                            setCode(h.code);
+                                            // [Quick Fix] 종목 선택 시 수량을 기본 1로, 가격을 현재가 부근으로 유도할 수 있으나 
+                                            // 여기서는 사용자 요청대로 종목 입력창 활성화에 집중
+                                            showNotify('Info', `${h.name} 종목이 선택되었습니다.`, 'blue');
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <Text size="sm" fw={700} truncate maw={100} c="blue" style={{ textDecoration: 'underline', textUnderlineOffset: '2px' }}>{h.name}</Text>
                                         <Text size="xs" c="dimmed">{h.code}</Text>
                                     </Table.Td>
                                     <Table.Td style={{ textAlign: 'right' }}>

@@ -276,7 +276,7 @@ def update_reports_index(filename, now_kst):
     
     new_entry = {
         "type": "research",
-        "title": f"심층 분석 리포트 ({now_kst.strftime('%m/%d %H:%M')})",
+        "title": f"📊 심층 분석 리포트 ({now_kst.strftime('%m/%d %H:%M')})",
         "date": now_kst.strftime("%Y-%m-%d %H:%M"),
         "filename": filename,
         "timestamp": time.time()
@@ -620,13 +620,14 @@ if __name__ == "__main__":
             
             # 2. 텔레그램 발송 및 리포트 (정각 부근 또는 수동 실행 시에만)
             # [V8.9.9.22 Fix] 'repository_dispatch' 외에도 모든 스케줄링(Cron) 작업 포함
+            # [V8.9.9.29 Fix] 'push' 이벤트는 알림 제외. 오직 정시 또는 수동 UI 실행 시에만.
             github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
-            is_manual_event = (github_event in ['workflow_dispatch', 'push', 'manual'])
+            is_manual_ui = (github_event == 'workflow_dispatch')
             is_near_the_hour = (now_kst.minute < 5)
             
-            # 매뉴얼 실행이 아니라면 무조건 '정시(0~5분)' 조건을 통과해야 함
-            should_send_notification = is_manual_event or is_near_the_hour
-            
+            # 매뉴얼 실행이거나 정시(0~5분)일 때만 알림
+            should_send_notification = is_manual_ui or is_near_the_hour
+             
             print(f"[Stage 4] 알림 조건 체크 - 이벤트: {github_event}, 현재분: {now_kst.minute}분 -> 발송여부: {should_send_notification}")
             
             if should_send_notification:

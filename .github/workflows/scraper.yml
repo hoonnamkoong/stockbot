@@ -43,6 +43,15 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f scripts/requirements-scraper.txt ]; then pip install -r scripts/requirements-scraper.txt; fi
 
+      - name: Fetch remote data (db-data)
+        run: |
+          git fetch origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet"
+          if git show-ref --verify refs/heads/db-data 2>/dev/null; then
+            git checkout db-data -- data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
+          fi
+          mkdir -p data # Ensure directory exists even if fetch fails
+          echo "[System] Remote data synchronized."
+
       - name: Run Scraper
         env:
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}

@@ -249,26 +249,6 @@ async function triggerTokenRefresh() {
         console.error('[Token] ❌ Failed to dispatch:', err.message);
     }
 }
-            tokenExpiry = now + (expiresIn * 1000);
-            
-            // 3. Save to Disk Cache
-            await writeTokenCache(cachedToken!, expiresIn);
-            
-            console.log(`[KIS-API] NEW Token issued successfully. Expires in ${expiresIn}s`);
-            return cachedToken!;
-        }
-        throw new Error(`KIS Token issuance failed: ${res.data.msg_cd || ''} ${res.data.msg1 || ''}`);
-    } catch (error: any) {
-        const errorData = error.response?.data;
-        if (errorData?.error_code === 'EGW00133') {
-            console.warn('[KIS-API] Rate Limit EGW00133: Access token issued too frequently. Wait 1 min.');
-            throw new Error('한투 API 보완: 1분당 1회 토큰 발급 제한에 걸렸습니다. 잠시 후 다시 조회를 눌러주세요.');
-        }
-        const errorDetail = errorData ? JSON.stringify(errorData) : error.message;
-        console.error('[KIS-API] Token Issuance Error:', errorDetail);
-        throw new Error(`인증 토큰 발급 실패: ${errorDetail}`);
-    }
-}
 
 /**
  * [REAL] My Portfolio: 한국투자증권 실시간 잔고 조회

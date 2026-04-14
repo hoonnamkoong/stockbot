@@ -193,7 +193,38 @@ async function getHashKey(body: any): Promise<string> {
 }
 
 /**
- * KIS OAuth2 Access Token 발급 (Direct)
+ * KIS 토큰 유효성 검사 (1시간 여유)
+ */
+function isTokenValid(cache: any): boolean {
+    if (!cache || !cache.access_token) return false;
+    const now = Date.now();
+    // 발급 데이터에 expires_at이 타임스탬프(ms)로 저장되어 있다고 가정
+    return now < (cache.expires_at || 0) - 3600000;
+}
+
+/**
+ * GitHub에서 토큰 캐시 읽기
+ */
+async function readTokenCache() {
+    try {
+        const { content } = await getFileFromGithub('data/kis_token_cache.json');
+        return content;
+    } catch (e) {
+        console.error('[Token] Failed to read token cache from GitHub:', e);
+        return null;
+    }
+}
+
+/**
+ * [V8.9.9.39 후속] 토큰 캐시는 이제 GitHub Action이 전담하여 쓰지만, 
+ * 인터페이스 호환성을 위해 빈 함수 또는 로그용으로 남겨둡니다.
+ */
+async function writeTokenCache(token: string, expiresIn: number) {
+    console.log('[Token] writeTokenCache called but suppressed (GitHub Action handles this now).');
+}
+
+/**
+ * KIS OAuth2 Access Token 발급 (GitHub Sync Mode)
  */
 async function getAccessToken(): Promise<string> {
     const now = Date.now();

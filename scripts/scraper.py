@@ -170,32 +170,123 @@ def save_sync_state(state):
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 # ====================================================================
-# [V8.9.9.9] 연속일 별도 영구 보존 시스템 폐기
-# 사용자 요청: 코드 배포 시 json이 날아가는 문제를 방지하고자
-# 5일 게시판(analyzer_5days)과 동일하게 엑셀 파일 스캐닝 방식으로 변경
+# [V8.9.9.25 Structural Fix] 독립적 연속 카운트 레지스트리 시스템
+# 사용자 요청: 코드 배포나 환경 변화에 영향받지 않는 독립적 누적 체계 구축
+# - data/consecutive_registry.json을 Single Source of Truth로 사용
 # ====================================================================
 
-def get_history_counts():
-    """[V8.9.9.11] 5일 게시판(analysis_5days.json)의 연속 카운트 데이터를 직접 땡겨옵니다."""
-    import urllib.request
-    github_url = "https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/analysis_5days.json"
-    try:
-        req = urllib.request.Request(github_url)
-        # 캐시 방지 타임스탬프
-        req.full_url = f"{github_url}?t={int(time.time())}"
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            history_counts = {}
-            for item in data:
-                code = item.get('code')
-                counts = item.get('consecutive_days', 0)
-                if code:
-                    history_counts[str(code).zfill(6)] = counts
-            print(f"[History] 5일 게시판 데이터로부터 {len(history_counts)}개 종목 이력 로드 완료")
-            return history_counts
-    except Exception as e:
-        print(f"[Warn] 5일 게시판 히스토리 데이터 fetch 실패: {e}")
-        return {}
+def load_consecutive_registry():
+    """연속 카운트 등록부를 로드합니다."""
+    path = 'data/consecutive_registry.json'
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except: pass
+    return {"last_reset_date": "", "counts": {}}
+
+def save_consecutive_registry(registry):
+    """연속 카운트 등록부를 저장합니다."""
+    os.makedirs('data', exist_ok=True)
+    with open('data/consecutive_registry.json', 'w', encoding='utf-8') as f:
+        json.dump(registry, f, ensure_ascii=False, indent=2)
+
+def update_consecutive_counts(passed_codes, now_kst):
+    """
+    [V8.9.9.25] 독립적 레지스트리를 기반으로 연속 카운트를 업데이트합니다.
+    - 하루에 한 번만 증가하며, 포착되지 않은 날은 유지하거나 초기화 정책에 따름
+    """
+    registry = load_consecutive_registry()
+    today_str = now_kst.strftime('%Y%m%d')
+    counts = registry.get("counts", {})
+    
+    # 날짜가 바뀌었을 때만 업데이트 수행 (중복 실행 방지)
+    if registry.get("last_reset_date") != today_str:
+        # 1. 오늘 포착된 종목은 카운트 증가
+        for code in passed_codes:
+            counts[code] = counts.get(code, 0) + 1
+        
+        # 2. 오늘 포착되지 않은 종목은 카운트 동결 혹은 초기화 (사용자 정책: 포착 안되면 0)
+        all_tracked_codes = list(counts.keys())
+        for code in all_tracked_codes:
+            if code not in passed_codes:
+                counts[code] = 0 # 연속 등장 실패 시 초기화
+        
+        registry["last_reset_date"] = today_str
+        registry["counts"] = counts
+        save_consecutive_registry(registry)
+    
+    return counts
+
+def save_html_report(report_content, now_kst):
+    """
+    [V8.9.9.25] 제미나이 리포트를 가독성 좋은 HTML 파일로 저장합니다.
+    """
+    if not report_content or "[안내]" in report_content: return None
+    
+    os.makedirs('data/reports', exist_ok=True)
+    timestamp = now_kst.strftime("%Y%m%d_%H%M%S")
+    filename = f"research_report_{timestamp}.html"
+    filepath = os.path.join('data/reports', filename)
+    
+    # HTML 템플릿 (가독성 최적화)
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>StockBot 리서치 리포트 - {now_kst.strftime('%Y-%m-%d %H:%M')}</title>
+        <style>
+            body {{ font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f8f9fa; }}
+            .container {{ background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+            h1 {{ color: #1c7ed6; border-bottom: 2px solid #e7f5ff; padding-bottom: 10px; }}
+            .date {{ color: #868e96; font-size: 0.9em; margin-bottom: 30px; }}
+            .content {{ white-space: pre-wrap; font-size: 1.1em; }}
+            .footer {{ margin-top: 50px; text-align: center; font-size: 0.8em; color: #adb5bd; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>📊 StockBot 리서치 리포트</h1>
+            <div class="date">발행 일시: {now_kst.strftime('%Y-%m-%d %H:%M:%S')} KST</div>
+            <div class="content">{report_content}</div>
+            <div class="footer">본 리포트는 AI(Gemini 2.5 Flash)에 의해 자동 생성되었습니다.</div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html_template)
+    
+    # reports.json 업데이트
+    update_reports_index(filename, now_kst)
+    return filename
+
+def update_reports_index(filename, now_kst):
+    """reports.json 목록에 새 리포트를 추가합니다."""
+    index_path = 'data/reports.json'
+    reports = []
+    if os.path.exists(index_path):
+        try:
+            with open(index_path, 'r', encoding='utf-8') as f:
+                reports = json.load(f)
+        except: pass
+    
+    new_entry = {
+        "type": "research",
+        "title": f"심층 분석 리포트 ({now_kst.strftime('%m/%d %H:%M')})",
+        "date": now_kst.strftime("%Y-%m-%d %H:%M"),
+        "filename": filename,
+        "timestamp": time.time()
+    }
+    reports.insert(0, new_entry)
+    # 최신 50개만 유지
+    reports = reports[:50]
+    
+    with open(index_path, 'w', encoding='utf-8') as f:
+        json.dump(reports, f, ensure_ascii=False, indent=2)
 
 def get_post_body(code, nid):
     """게시물의 본문 내용을 스크래핑합니다."""
@@ -400,35 +491,16 @@ if __name__ == "__main__":
                 print(f"   [Error] {s['name']} 스킵: {e}")
                 return None, None, False
 
-        # [V8.9.9.18] 고속 병렬 처리 (최대 12개 워커)
-        passed_codes = set()
-        with ThreadPoolExecutor(max_workers=12) as executor:
-            future_to_stock = {executor.submit(process_stock_candidate, s): s for s in current_candidates}
-            
-            for future in as_completed(future_to_stock):
-                stock_res, updated_state, passed = future.result()
-                s_orig = future_to_stock[future]
-                code = s_orig['code']
-                
-                if updated_state:
-                    prev_sync_state['stocks'][code] = updated_state
-                
-                if passed and stock_res:
-                    # [V8.9.9.5 User Request] 연속일 수는 5일 게시판처럼 저장된 엑셀 데이터를 스캔하여 확정
-                    # 만약 오늘 오전에 이미 스크래핑이 돌아 엑셀에 존재한다면 거기서 카운트 1이 더해졌을 수 있으므로 1을 최솟값으로 잡고 덧셈
-                    # (히스토리에 없으면 1일차)
-                    past_appearances = history_counts.get(code, 0)
-                    # 오늘 처음 포착된 것이면 past_appearances가 0일 수 있으므로 (또는 당일 파일에 없으면)
-                    # 최솟값 1은 보장
-                    new_days = past_appearances + 1
-                            
-                    stock_res['consecutive_days'] = new_days
-                    passed_codes.add(code)
-                    print(f"   ✅ {stock_res['name']} 통과 ({stock_res['recent_posts_count']}/{threshold}), 엑셀조회 연속 {stock_res['consecutive_days']}일")
-                    results.append(stock_res)
+        # 1.5. [V8.9.9.25] 독립적 레지스트리 기반 연속 카운트 확정
+        # passed_codes를 기반으로 카운트 증가/유지 결정
+        final_consecutive_counts = update_consecutive_counts(passed_codes, now_kst)
+        
+        for s in results:
+            s['consecutive_days'] = final_consecutive_counts.get(s['code'], 1)
 
-        # 상태 영구 저장 (consec_days json은 사용성 폐기)
+        # 상태 영구 저장
         save_sync_state(prev_sync_state)
+        print(f"[Stage 1] 수집 완료 ({len(results)}개 종목 1차 필터 통과, 문턱: {threshold})")
         print(f"[Stage 1] 수집 완료 ({len(results)}개 종목 1차 필터 통과, 문턱: {threshold})")
     except Exception as e:
         print(f"[Stage 1 Error] {e}")
@@ -504,6 +576,11 @@ if __name__ == "__main__":
                 
                 deep_dive_report = advisor.generate_deep_dive_report(detail_picks)
                 
+                # [V8.9.9.25] 리포트 파일로 저장 (비어있는 링크 해결)
+                html_filename = save_html_report(deep_dive_report, now_kst)
+                if html_filename:
+                    print(f"[Stage 3] HTML 리포트 저장 완료: {html_filename}")
+                
                 # 리포트 결과 저장 및 상태 업데이트
                 prev_sync_state['daily_reported_info'].extend([{'code': p['code'], 'name': p['name']} for p in final_picks])
                 save_sync_state(prev_sync_state)
@@ -520,9 +597,17 @@ if __name__ == "__main__":
     if results:
         try:
             # 1. 대시보드 데이터 저장 (기존 analyzer 로직 활용)
-            # [V8.9.9.11] scraper 기동 시각(now_kst)을 analyzer에 전달하여 status.json 시간 고정
             df, _ = analyzer.analyze_discussion_trend(results)
             analyzer.save_data(df, "trending_integrated", start_time=now_kst)
+            
+            # [V8.9.9.25 Structural Fix] 5일/3일 누적 보드용 데이터 강제 동기화 (불일치 해결)
+            # 이제 모든 보드가 최신 레지스트리 기반 데이터를 바라보게 됨
+            os.makedirs('data', exist_ok=True)
+            with open('data/analysis_5days.json', 'w', encoding='utf-8') as f:
+                json.dump(results, f, ensure_ascii=False, indent=2)
+            with open('data/analysis_3days.json', 'w', encoding='utf-8') as f:
+                json.dump(results, f, ensure_ascii=False, indent=2)
+            print(f"[Sync] 5일/3일 누적 보드 데이터 동기화 완료")
             
             # 2. 텔레그램 발송 및 리포트 (정각 부근 또는 수동 실행 시에만)
             # [V8.9.9.22 Fix] 'repository_dispatch' 외에도 모든 스케줄링(Cron) 작업 포함

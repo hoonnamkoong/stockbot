@@ -35,27 +35,29 @@ let tokenExpiry: number = 0;
 
 const TOKEN_CACHE_PATH = path.join(process.cwd(), 'data', 'kis_token_cache.json');
 
+// --- Authentication Helpers (Global) ---
+const parseExpiry = (v: any): number => {
+    if (typeof v === 'number') return v; 
+    if (typeof v === 'string') return new Date(v).getTime(); 
+    return 0;
+};
+
+const isTokenValid = (cache: any): boolean => {
+    if (!cache?.access_token) return false;
+    const expiresMs = parseExpiry(cache.expires_at);
+    const now = Date.now();
+    // 1. 만료 1시간 전까지는 안전하게 유효함
+    if (expiresMs > now + 3600000) return true;
+    // 2. [V8.9.9.5 Policy] 오늘 발급된 이력이 있다면 유효로 간주 (KIS 1일 1회 제한 대응)
+    if (cache.issued_at) {
+        const issuedDate = new Date(cache.issued_at).toDateString();
+        const todayDate = new Date().toDateString();
+        if (issuedDate === todayDate) return true;
+    }
+    return false;
+};
+
 async function readTokenCache() {
-    // [V8.9.9.5] auth.py(ISO 문자열)와 kis-api.ts(밀리초 숫자) 두 형식 모두 호환
-    const parseExpiry = (v: any): number => {
-        if (typeof v === 'number') return v; // ms 숫자
-        if (typeof v === 'string') return new Date(v).getTime(); // ISO 문자열
-        return 0;
-    };
-    const isTokenValid = (cache: any): boolean => {
-        if (!cache?.access_token) return false;
-        const expiresMs = parseExpiry(cache.expires_at);
-        const now = Date.now();
-        // 만료 1시간 전까지 유효
-        if (expiresMs > now + 3600000) return true;
-        // issued_at 기준 오늘 발급 여부 확인 (KIS 정책: 1일 1회)
-        if (cache.issued_at) {
-            const issuedDate = new Date(cache.issued_at).toDateString();
-            const todayDate = new Date().toDateString();
-            if (issuedDate === todayDate) return true;
-        }
-        return false;
-    };
 
     // 1. Try Remote GitHub Cache (for Vercel persistence)
     if (process.env.VERCEL) {
@@ -193,38 +195,8 @@ async function getHashKey(body: any): Promise<string> {
 }
 
 /**
- * KIS 토큰 유효성 검사 (1시간 여유)
- */
-function isTokenValid(cache: any): boolean {
-    if (!cache || !cache.access_token) return false;
-    const now = Date.now();
-    // 발급 데이터에 expires_at이 타임스탬프(ms)로 저장되어 있다고 가정
-    return now < (cache.expires_at || 0) - 3600000;
-}
-
-/**
- * GitHub에서 토큰 캐시 읽기
- */
-async function readTokenCache() {
-    try {
-        const { content } = await getFileFromGithub('data/kis_token_cache.json');
-        return content;
-    } catch (e) {
-        console.error('[Token] Failed to read token cache from GitHub:', e);
-        return null;
-    }
-}
-
-/**
- * [V8.9.9.39 후속] 토큰 캐시는 이제 GitHub Action이 전담하여 쓰지만, 
- * 인터페이스 호환성을 위해 빈 함수 또는 로그용으로 남겨둡니다.
- */
-async function writeTokenCache(token: string, expiresIn: number) {
-    console.log('[Token] writeTokenCache called but suppressed (GitHub Action handles this now).');
-}
-
-/**
  * KIS OAuth2 Access Token 발급 (GitHub Sync Mode)
+ * [V8.9.9.39 Logic] Vercel은 더 이상 직접 토큰을 발급하지 않고 깃허브 캐시만 읽습니다.
  */
 async function getAccessToken(): Promise<string> {
     const now = Date.now();

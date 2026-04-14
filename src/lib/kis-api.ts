@@ -198,36 +198,57 @@ async function getHashKey(body: any): Promise<string> {
 async function getAccessToken(): Promise<string> {
     const now = Date.now();
     
-    // 1. Check Memory Cache
-    if (cachedToken && now < tokenExpiry - 3600000) { // 1 hour safety margin
+    // 1. 메모리 캐시 확인 (1시간 여유)
+    if (cachedToken && now < tokenExpiry - 3600000) {
         return cachedToken;
     }
 
-    // 2. Check Disk Cache
+    // 2. 디스크(GitHub) 캐시 확인
+    console.log('[Token] Checking GitHub token cache...');
     const diskCache = await readTokenCache();
-    if (diskCache) {
-        console.log(`[KIS-API] Using valid token from disk cache (Expires: ${new Date(diskCache.expires_at).toLocaleString()})`);
+    
+    if (isTokenValid(diskCache)) {
+        console.log(`[KIS-API] ✨ Using valid token from disk cache (Expires: ${new Date(diskCache.expires_at).toLocaleString()})`);
         cachedToken = diskCache.access_token;
         tokenExpiry = diskCache.expires_at;
         return cachedToken!;
     }
 
-    const config = getKISConfig();
-    if (!config.APP_KEY || !config.APP_SECRET) {
-        throw new Error(`KIS Credentials Missing (Key:${!!config.APP_KEY}, Secret:${!!config.APP_SECRET}). Check Vercel Env Vars.`);
+    // 3. [V8.9.9.39 Logic] 직접 발급 대신 GitHub에 갱신 요청
+    console.warn('[Token] ❌ No valid token found. Triggering GitHub Action refresh...');
+    
+    // GitHub Repository Dispatch 호출 (비동기)
+    triggerTokenRefresh();
+
+    throw new Error('인증 토큰이 만료되었습니다. GitHub에서 갱신 중입니다. 1분 후 다시 시도해 주세요.');
+}
+
+async function triggerTokenRefresh() {
+    const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER || 'hoonnamkoong';
+    const repo = process.env.NEXT_PUBLIC_GITHUB_REPO || 'stockbot';
+    const pat = process.env.GH_PAT;
+
+    if (!pat) {
+        console.error('[Token] GH_PAT is missing. Cannot trigger refresh.');
+        return;
     }
 
     try {
-        console.log(`[KIS-API] No valid cache. Requesting NEW token from: ${config.BASE_URL}`);
-        const res = await axios.post(`${config.BASE_URL}/oauth2/tokenP`, {
-            grant_type: 'client_credentials',
-            appkey: config.APP_KEY,
-            appsecret: config.APP_SECRET
-        });
-
-        if (res.data.access_token) {
-            cachedToken = res.data.access_token;
-            const expiresIn = parseInt(res.data.expires_in);
+        await axios.post(
+            `https://api.github.com/repos/${owner}/${repo}/dispatches`,
+            { event_type: 'refresh_token' },
+            {
+                headers: {
+                    'Authorization': `Bearer ${pat}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            }
+        );
+        console.log('[Token] ✅ GitHub refresh event dispatched.');
+    } catch (err: any) {
+        console.error('[Token] ❌ Failed to dispatch:', err.message);
+    }
+}
             tokenExpiry = now + (expiresIn * 1000);
             
             // 3. Save to Disk Cache

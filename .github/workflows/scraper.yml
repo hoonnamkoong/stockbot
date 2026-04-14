@@ -49,8 +49,20 @@ jobs:
           if git show-ref --verify refs/heads/db-data 2>/dev/null; then
             git checkout db-data -- data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
           fi
-          mkdir -p data # Ensure directory exists even if fetch fails
-          echo "[System] Remote data synchronized."
+          mkdir -p data
+          # 필수 파일 부재 시 기본 구조로 생성 (유실 방지)
+          [ -f data/reservations.json ] || echo "[]" > data/reservations.json
+          [ -f data/order_history.json ] || echo "[]" > data/order_history.json
+          [ -f data/reports.json ] || echo "[]" > data/reports.json
+          [ -f data/kis_token_cache.json ] || echo "{}" > data/kis_token_cache.json
+          echo "[System] Remote data synchronized and verified."
+
+      - name: Manage KIS Token
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          FORCE_TOKEN_REFRESH: ${{ github.event.inputs.force_token_refresh || 'false' }} 
+        run: python scripts/token_manager.py
 
       - name: Run Scraper
         env:
@@ -60,12 +72,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-          # KIS API 계정 정보
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
           KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
           KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
-          # 기타 설정
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
         run: PYTHONPATH=. python scripts/scraper.py

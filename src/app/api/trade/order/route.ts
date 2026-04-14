@@ -96,7 +96,8 @@ export async function POST(request: Request) {
         } else {
             // [REAL] Direct KIS REST API 
             result = await placeRealOrder(code, Number(qty), Number(price), side);
-            if (result.status !== 'SUCCESS') throw new Error(result.msg || '거래 체결 실패');
+            // [V8.9.9.39] 판정 로직 교정: placeRealOrder가 예외 없이 성공하면 rt_cd='0' 상태임
+            // KIS 원본 응답에는 status 필드가 없으므로 기존 체크는 버그였음
         }
 
         // [Common] Sync Trade History to GitHub
@@ -121,17 +122,22 @@ export async function POST(request: Request) {
             console.error('[History Sync Error]', hErr);
         }
 
-        return NextResponse.json({ success: true, data: result });
+        return NextResponse.json({ 
+            success: true, 
+            data: {
+                odno: result.ODNO || result.KRX_FWDG_ORD_ORGNO || 'UNKNOWN',
+                rt_cd: result.rt_cd || '0',
+                msg: result.msg1 || '주문이 성공적으로 접수되었습니다.'
+            }
+        });
     } catch (error: any) {
         console.error('[API-Order] ❌ 주문 집행 에러:', error.message);
         
-        // [V8.9.9.28 Robustness Fix] 알려진 시장 거부 사유(거래정지 등)는 500 에러를 던지는 대신 
-        // success: false를 포함한 200 응답을 주어 엔진이 스킵하고 다음 작업을 계속할 수 있게 함
+        // [V8.9.9.39 Robustness] 증권사 거절 사유(msg1 등)가 있을 경우 이를 에러 대신 처리
         return NextResponse.json({ 
             success: false, 
-            error: error.message,
-            rejected: true, // 시장 사유에 의한 거부임을 명시
-            timestamp: new Date().toISOString()
-        });
+            error: error.message || '거래 처리 중 예상치 못한 오류가 발생했습니다.',
+            rejected: true
+        }, { status: 200 }); // 대시보드에서 가시적으로 에러 메시지를 보여주기 위해 200으로 반환
     }
 }

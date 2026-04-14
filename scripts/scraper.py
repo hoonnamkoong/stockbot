@@ -459,7 +459,6 @@ if __name__ == "__main__":
         
         # ==== Stage 1: 네이버 증권 스크래핑 & 1차 필터링 ====
         print(f"[Stage 1] 네이버 토론방 데이터 수집 시작 (Thread: {threshold})")
-        history_counts = get_history_counts()
         results = []
         print(f"[Stage 1] 후보 종목 분석 시작 (총 {len(current_candidates)}개, 병렬 엔진 가동)")
         
@@ -491,8 +490,19 @@ if __name__ == "__main__":
                 print(f"   [Error] {s['name']} 스킵: {e}")
                 return None, None, False
 
+        # 1.1. [V8.9.9.27] 병렬 처리 실행
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=threshold) as executor:
+            future_results = list(executor.map(process_stock_candidate, current_candidates))
+            
+        for res, updated_state, passed in future_results:
+            if updated_state:
+                prev_sync_state['stocks'].update(updated_state)
+            if passed and res:
+                results.append(res)
+        
         # 1.5. [V8.9.9.25] 독립적 레지스트리 기반 연속 카운트 확정
-        # passed_codes를 기반으로 카운트 증가/유지 결정
+        passed_codes = [s['code'] for s in results] if results else []
         final_consecutive_counts = update_consecutive_counts(passed_codes, now_kst)
         
         for s in results:
@@ -500,7 +510,6 @@ if __name__ == "__main__":
 
         # 상태 영구 저장
         save_sync_state(prev_sync_state)
-        print(f"[Stage 1] 수집 완료 ({len(results)}개 종목 1차 필터 통과, 문턱: {threshold})")
         print(f"[Stage 1] 수집 완료 ({len(results)}개 종목 1차 필터 통과, 문턱: {threshold})")
     except Exception as e:
         print(f"[Stage 1 Error] {e}")

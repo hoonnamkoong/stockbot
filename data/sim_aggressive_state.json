@@ -1,7 +1,7 @@
 {
   "initial_cash": 3000000,
-  "cash": 125428.98525000026,
-  "invested": 2958530.0,
+  "cash": 68369.74000000028,
+  "invested": 3016550.0,
   "portfolio": {
     "088800": {
       "name": "에이스테크",
@@ -10,14 +10,6 @@
       "entry_date": "2026-04-10",
       "peak_price": 5500.0,
       "is_scaled_out": true
-    },
-    "005880": {
-      "name": "대한해운",
-      "quantity": 100,
-      "avg_price": 3000.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 3000.0,
-      "is_scaled_out": false
     },
     "010170": {
       "name": "대한광통신",
@@ -45,11 +37,11 @@
     },
     "069540": {
       "name": "빛과전자",
-      "quantity": 58,
+      "quantity": 29,
       "avg_price": 5120.0,
       "entry_date": "2026-04-10",
       "peak_price": 5120.0,
-      "is_scaled_out": false
+      "is_scaled_out": true
     },
     "010820": {
       "name": "퍼스텍",
@@ -98,9 +90,25 @@
       "entry_date": "2026-04-13",
       "peak_price": 228.0,
       "is_scaled_out": false
+    },
+    "025860": {
+      "name": "남해화학",
+      "quantity": 30,
+      "avg_price": 9950.0,
+      "entry_date": "2026-04-14",
+      "peak_price": 9950.0,
+      "is_scaled_out": false
+    },
+    "005930": {
+      "name": "삼성전자",
+      "quantity": 1,
+      "avg_price": 208000.0,
+      "entry_date": "2026-04-14",
+      "peak_price": 208000.0,
+      "is_scaled_out": false
     }
   },
-  "peak_nav": 3084048.95825,
+  "peak_nav": 3084995.7150000003,
   "history": [
     3000000
   ],
@@ -120,27 +128,35 @@
     {
       "date": "2026-04-13",
       "is_win": true
+    },
+    {
+      "date": "2026-04-14",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-14",
+      "is_win": true
     }
   ],
-  "total_fees": 1404.0,
+  "total_fees": 2358.24525,
   "raw_stats": {
-    "cash": 125428.98525000026,
-    "total_asset": 3083958.9852500004,
-    "profit_rate": 2.7986328416666795,
-    "holdings_count": 12,
+    "cash": 68369.74000000028,
+    "total_asset": 3084919.74,
+    "profit_rate": 2.8306580000000072,
+    "holdings_count": 13,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 0.0029173661384033025,
-    "turnover": 1.406815,
-    "frequency": 4.0,
-    "total_fees": 1404.0,
+    "mdd": 0.0024627262731900788,
+    "turnover": 1.72578,
+    "frequency": 5.0,
+    "total_fees": 2358.24525,
     "current_prices": {}
   },
   "normalized_stats": {
     "승률": 0.0,
     "수익팩터": 0.0,
-    "MDD": 99.98541316930799,
-    "거래빈도": 80.0,
-    "자본회전율": 7.034075
+    "MDD": 99.98768636863404,
+    "거래빈도": 100,
+    "자본회전율": 8.6289
   }
 }

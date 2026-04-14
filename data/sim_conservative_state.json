@@ -1,7 +1,7 @@
 {
   "initial_cash": 3000000,
-  "cash": 136890.2628500003,
-  "invested": 2981941.0,
+  "cash": 226474.42285000026,
+  "invested": 2891741.0,
   "portfolio": {
     "010170": {
       "name": "대한광통신",
@@ -33,14 +33,6 @@
       "avg_price": 228.0,
       "entry_date": "2026-04-13",
       "peak_price": 228.0,
-      "is_scaled_out": false
-    },
-    "046970": {
-      "name": "우리로",
-      "quantity": 30,
-      "avg_price": 9990.0,
-      "entry_date": "2026-04-13",
-      "peak_price": 11610,
       "is_scaled_out": false
     },
     "321260": {
@@ -81,6 +73,14 @@
       "avg_price": 1992.0,
       "entry_date": "2026-04-13",
       "peak_price": 1992.0,
+      "is_scaled_out": false
+    },
+    "005930": {
+      "name": "삼성전자",
+      "quantity": 1,
+      "avg_price": 209500.0,
+      "entry_date": "2026-04-14",
+      "peak_price": 209500.0,
       "is_scaled_out": false
     }
   },
@@ -132,27 +132,31 @@
     {
       "date": "2026-04-13",
       "is_win": false
+    },
+    {
+      "date": "2026-04-14",
+      "is_win": false
     }
   ],
   "raw_stats": {
-    "cash": 136890.2628500003,
-    "total_asset": 3118831.2628500005,
-    "profit_rate": 3.9610420950000176,
+    "cash": 226474.42285000026,
+    "total_asset": 3118215.42285,
+    "profit_rate": 3.940514095000007,
     "holdings_count": 10,
-    "win_rate": 27.27272727272727,
+    "win_rate": 25.0,
     "profit_factor": 9.208576998050683,
-    "mdd": 0.03269781229252062,
-    "turnover": 3.1964403333333333,
-    "frequency": 8.0,
-    "total_fees": 9979.469400000002,
+    "mdd": 0.052437214071843596,
+    "turnover": 3.3661736666666666,
+    "frequency": 6.8,
+    "total_fees": 10595.309400000002,
     "current_prices": {}
   },
   "normalized_stats": {
-    "승률": 34.090909090909086,
+    "승률": 31.25,
     "수익팩터": 100,
-    "MDD": 99.8365109385374,
+    "MDD": 99.73781392964078,
     "거래빈도": 100,
-    "자본회전율": 15.982201666666667
+    "자본회전율": 16.830868333333335
   },
-  "total_fees": 9979.469400000002
+  "total_fees": 10595.309400000002
 }

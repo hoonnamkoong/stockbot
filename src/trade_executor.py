@@ -67,7 +67,17 @@ def place_order_via_vercel(side, code, qty, price):
     if res.status_code != 200:
         print(f"[TradeExecutor] ❌ Vercel API Error: {res.status_code} - {res.text}")
         raise RuntimeError(f"Vercel API failed with {res.status_code}")
+    
+    data = res.json()
+    if not data.get('success'):
+        # [V8.9.9.28 Robustness Fix] 시장 사유로 인한 거부 시 특수 로깅
+        if data.get('rejected'):
+            print(f"[TradeExecutor] ⚠️ 시장 사유로 주문 거부됨: {data.get('error')}")
+            return data # 실패가 아닌 '거부됨' 데이터를 반환
+        raise RuntimeError(f"API success false: {data.get('error')}")
+        
     print(f"[TradeExecutor] ✅ Vercel API 응답: {res.text}")
+    return data
 
 
 # ─── 파일 경로 상수 ───────────────────────────────────────────────────────────
@@ -225,12 +235,21 @@ def main():
             price = int(res.get('price', 0))
 
             print(f"  [Execute] 예약 {res_id}: {side.upper()} {code} {qty}주 -> Vercel Proxy 요청")
-            place_order_via_vercel(side=side, code=code, qty=qty, price=price)
+            exec_res = place_order_via_vercel(side=side, code=code, qty=qty, price=price)
+
+            if exec_res.get('success'):
+                status = 'executed'
+                reason = 'Executed via Vercel Proxy'
+            else:
+                # [V8.9.9.28] 거부된 종목 처리
+                status = 'cancelled'
+                reason = f"Rejected by Broker: {exec_res.get('error')}"
+                print(f"  [Skip] 예약 {res_id} 거부됨 -> 취소 처리 ({reason})")
 
             append_order_history({
                 'id': res_id, 'executed_at': now_kst.isoformat(),
                 'side': side, 'code': code, 'qty': qty, 'price': price,
-                'status': 'executed'
+                'status': status, 'reason': reason
             })
             executed_count += 1
 

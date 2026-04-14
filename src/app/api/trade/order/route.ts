@@ -123,7 +123,15 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, data: result });
     } catch (error: any) {
-        console.error('[API-Order] Error:', error.message);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        console.error('[API-Order] ❌ 주문 집행 에러:', error.message);
+        
+        // [V8.9.9.28 Robustness Fix] 알려진 시장 거부 사유(거래정지 등)는 500 에러를 던지는 대신 
+        // success: false를 포함한 200 응답을 주어 엔진이 스킵하고 다음 작업을 계속할 수 있게 함
+        return NextResponse.json({ 
+            success: false, 
+            error: error.message,
+            rejected: true, // 시장 사유에 의한 거부임을 명시
+            timestamp: new Date().toISOString()
+        });
     }
 }

@@ -600,20 +600,30 @@ if __name__ == "__main__":
                 # 종목은 뽑혔으나 모두 이미 보고된 경우 명단 출력
                 stock_names = [item['name'] for item in daily_reported_info]
                 names_str = ", ".join(stock_names)
-                deep_dive_report = f"📣 [안내] 이번 회차의 모든 top3 종목은 오늘 이미 상세 리포트가 생성되었습니다.\n\n✅ 오늘 보고된 종목: {names_str}"
+                dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app")
+                deep_dive_report = f"📣 [안내] 이번 회차의 모든 top3 종목은 오늘 이미 상세 리포트가 생성되었습니다.\n\n✅ 오늘 보고된 종목: {names_str}\n\n📊 [통합 리서치 리포트 보기]\n{dashboard_url}/research"
             
         except Exception as e:
             print(f"[Stage 3 Error] 리포트 생성 실패: {e}")
 
-    # 4. 텔레그램 전송 및 시뮬레이터 트리거
+    # 4. 데이터 저장, 엑셀 업데이트 및 텔레그램 전송
     if results:
         try:
-            # 1. 대시보드 데이터 저장 (기존 analyzer 로직 활용)
+            # [V8.9.9.33] 데이터 무결성 강화: 집계 전 모든 분석 데이터 강제 동기화
+            print("[Stage 4] 분석 데이터 최종 정제 및 동기화 중...")
             df, _ = analyzer.analyze_discussion_trend(results)
+            
+            # DataFrame 결과를 results 리스트의 각 항목에 수동으로 다시 매핑 (집계 전 필수)
+            for s in results:
+                if s['code'] in df['code'].values:
+                    row = df[df['code'] == s['code']].iloc[0]
+                    s['recent_posts_count'] = int(row.get('recent_posts_count', s.get('recent_posts_count', 0)))
+                    s['foreign_rate'] = float(row.get('foreign_rate', s.get('foreign_rate', 0)))
+            
+            # 대시보드 데이터 저장
             analyzer.save_data(df, "trending_integrated", start_time=now_kst)
             
-            # [V8.9.9.31 Strategic Fix] 5일/3일 누적 보드용 데이터 집계 로직 전면 개편
-            # 단순히 덮어쓰지 않고 기존 데이터를 로드하여 '막대 그래프'용 시계열을 생성합니다.
+            # [V8.9.9.33] 5일/3일 누적 보드용 데이터 집계 (데이터가 정제된 후 호출)
             os.makedirs('data', exist_ok=True)
             
             def aggregate_multi_day(days):
@@ -628,26 +638,26 @@ if __name__ == "__main__":
                 
                 new_aggregated = []
                 for s in results:
-                    # 어제의 기록 가져오기
                     old_item = old_data_map.get(s['code'], {})
                     
-                    # 주가 및 토론량 배열 관리 (오늘치를 끝에 추가)
+                    # 주가 및 토론량 배열 관리
                     spark_p = old_item.get('sparkline_price', [])
                     spark_n = old_item.get('sparkline_posts', [])
                     
-                    # [V8.9.9.31] 오늘치가 중복으로 들어가는 것 방지 (가장 최근 데이터가 오늘과 같으면 스킵)
-                    # 실제 주식 거래일 기준 정밀 판단이 필요하나, 일단 날짜 기반으로 임시 중복 방지
+                    # 오늘 데이터 추가
                     spark_p.append(s['current_price'])
-                    spark_n.append(s['recent_posts_count'])
+                    spark_n.append(s.get('recent_posts_count', 0))
                     
-                    # 최근 N일치만 유지 (Sliding Window)
                     s['sparkline_price'] = spark_p[-days:]
                     s['sparkline_posts'] = spark_n[-days:]
                     
-                    # 히스토리 기반 평균 계산
+                    # 평균 및 총합 계산 (스크린샷 오표기 해결)
                     if s['sparkline_posts']:
                         s['avg_posts'] = sum(s['sparkline_posts']) / len(s['sparkline_posts'])
                         s['total_posts'] = sum(s['sparkline_posts'])
+                    else:
+                        s['avg_posts'] = 0
+                        s['total_posts'] = 0
                     
                     new_aggregated.append(s)
                 
@@ -656,7 +666,46 @@ if __name__ == "__main__":
 
             aggregate_multi_day(5)
             aggregate_multi_day(3)
-            print(f"[Sync] 5일/3일 누적 보드 데이터 집계 및 동기화 완료 (추세 보존)")
+            
+            # [V8.9.9.33] 단일 엑셀 리포트 누적 업데이트 기능
+            def update_daily_excel_report(new_picks, report_text):
+                if not new_picks: return
+                
+                today_file = f"data/reports/research_daily_{now_kst.strftime('%Y%m%d')}.xlsx"
+                os.makedirs('data/reports', exist_ok=True)
+                
+                new_rows = []
+                for p in new_picks:
+                    new_rows.append({
+                        'DateTime': now_kst.strftime('%Y-%m-%d %H:%M'),
+                        'Stock': p['name'],
+                        'Code': p['code'],
+                        'Signal': p.get('signal', 'WATCH'),
+                        'Price': p.get('current_price', 0),
+                        'Sentiment': p.get('sentiment', 'Neutral'),
+                        'Summary': p.get('posts_summary', '')
+                    })
+                
+                new_df = pd.DataFrame(new_rows)
+                
+                if os.path.exists(today_file):
+                    try:
+                        existing_df = pd.read_excel(today_file)
+                        final_df = pd.concat([existing_df, new_df], ignore_index=True)
+                        final_df.to_excel(today_file, index=False)
+                    except:
+                        new_df.to_excel(today_file, index=False)
+                else:
+                    new_df.to_excel(today_file, index=False)
+                
+                print(f"[Excel] 리포트가 엑셀 파일에 업데이트되었습니다: {today_file}")
+
+            # 리포트가 있을 경우 엑셀 업데이트 호출 (Stage 3의 final_picks 활용)
+            if 'final_picks' in locals() and final_picks:
+                import pandas as pd
+                update_daily_excel_report(final_picks, deep_dive_report)
+
+            print(f"[Sync] 데이터 집계 및 엑셀 업데이트 완료")
             
             # 2. 텔레그램 발송 및 리포트 (정각 부근 또는 수동 실행 시에만)
             # [V8.9.9.22 Fix] 'repository_dispatch' 외에도 모든 스케줄링(Cron) 작업 포함

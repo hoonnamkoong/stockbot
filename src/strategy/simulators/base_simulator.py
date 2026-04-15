@@ -80,7 +80,7 @@ class BaseSimulator:
         }
         self.save_state()
 
-    def save_state(self):
+    def save_state(self, current_prices=None):
         """상태 및 실시간 분석 통계 영속성 저장"""
         try:
             current_nav = self.state['cash'] + self.state['invested']
@@ -94,7 +94,7 @@ class BaseSimulator:
                 self.state['normalized_stats'] = full_stats['normalized']
                 
                 # [V8.9.9.19] 계산된 수수료를 최상위 필드에 동기화 (대시보드 표시용)
-                stats = self.calculate_stats()
+                stats = self.calculate_stats(current_prices)
                 # 이미 누적된 total_fees가 있다면 0인 경우에만 덮어쓰거나, 더 큰 값을 유지하도록 함
                 calc_fees = stats.get('total_fees', 0)
                 if calc_fees > self.state.get('total_fees', 0):

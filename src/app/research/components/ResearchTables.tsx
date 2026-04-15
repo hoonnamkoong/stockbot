@@ -178,7 +178,7 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                     <Text size="sm" fw={600}>{(Number(s.avg_posts) || 0).toFixed(0)}개</Text>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} align="center" style={{ cursor: 'pointer' }}>
-                                    <Text size="sm" fw={600}>{s.total_posts?.toLocaleString()}개</Text>
+                                    <Text size="sm" fw={600}>{(s.total_posts || 0).toLocaleString()}개</Text>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
                                     <Group gap={4} align="flex-end" h={40} wrap="nowrap" justify="center">

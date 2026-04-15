@@ -413,7 +413,7 @@ function TradeContent() {
                                 {targetType === 'real' && (
                                     <Table.Td style={{ textAlign: 'center' }}>
                                         {h.roi && h.roi !== '-' ? (
-                                            <Badge color={h.roi.startsWith('+') ? 'red' : h.roi.startsWith('-') ? 'blue' : 'gray'} variant="light" size="xs">
+                                            <Badge color={h.roi?.startsWith('+') ? 'red' : h.roi?.startsWith('-') ? 'blue' : 'gray'} variant="light" size="xs">
                                                 {h.roi}
                                             </Badge>
                                         ) : (

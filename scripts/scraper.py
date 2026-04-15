@@ -776,12 +776,12 @@ if __name__ == "__main__":
             # [V8.9.9.22 Fix] 'repository_dispatch' 외에도 모든 스케줄링(Cron) 작업 포함
             # [V8.9.9.29 Fix] 'push' 이벤트는 알림 제외. 오직 정시 또는 수동 UI 실행 시에만.
             # [V8.9.9.40 FIX] 시작 시점의 분(start_minute)을 기준으로 알림 여부 판단 (지연 누락 방지)
-             github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
-             is_manual_ui = (github_event == 'workflow_dispatch')
-             is_near_the_hour = (start_minute < 5)
-             
-             # 매뉴얼 실행이거나 정시(0~5분)로 시작된 경우 알림
-             should_send_notification = is_manual_ui or is_near_the_hour
+            github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
+            is_manual_ui = (github_event == 'workflow_dispatch')
+            is_near_the_hour = (start_minute < 5)
+            
+            # 매뉴얼 실행이거나 정시(0~5분)로 시작된 경우 알림
+            should_send_notification = is_manual_ui or is_near_the_hour
              
             print(f"[Stage 4] 알림 조건 체크 - 이벤트: {github_event}, 현재분: {now_kst.minute}분 -> 발송여부: {should_send_notification}")
             

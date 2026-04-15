@@ -181,37 +181,44 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                     <Text size="sm" fw={600}>{s.total_posts?.toLocaleString()}개</Text>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
-                                    <Stack gap={2}>
-                                        <Box h={20}>
-                                            <Sparkline data={s.sparkline_price || []} color="#ff4d4f" />
-                                        </Box>
-                                        <Group gap={2} wrap="nowrap" justify="center">
-                                            {(s.sparkline_price || []).map((p: number, idx: number) => (
-                                                <Tooltip key={idx} label={`Day ${5-idx}: ${p?.toLocaleString()}원`}>
-                                                    <Badge 
-                                                        size="xs" 
-                                                        variant="filled" 
-                                                        color={idx === 0 ? "blue" : "gray"}
-                                                        styles={{ label: { fontSize: '9px', padding: '0 2px' } }}
-                                                    >
-                                                        {Math.floor((p||0)/1000)}k
-                                                    </Badge>
-                                                </Tooltip>
-                                            ))}
-                                        </Group>
-                                    </Stack>
+                                    <Group gap={4} align="flex-end" h={40} wrap="nowrap" justify="center">
+                                        {(s.sparkline_price || []).map((p: number, idx: number) => {
+                                            const maxP = Math.max(...(s.sparkline_price || []), 1);
+                                            const height = Math.max((p / maxP) * 25, 2);
+                                            return (
+                                                <Stack key={idx} gap={2} align="center">
+                                                    <Text size="8px" fw={700} c="dimmed" style={{ fontSize: '8px' }}>
+                                                        {p > 1000 ? `${(p/1000).toFixed(idx === (s.sparkline_price || []).length - 1 ? 1 : 0)}k` : p}
+                                                    </Text>
+                                                    <Box 
+                                                        bg="#ff4d4f" 
+                                                        w={10} 
+                                                        h={height} 
+                                                        style={{ borderRadius: '2px 2px 0 0', opacity: idx === (s.sparkline_price || []).length - 1 ? 1 : 0.5 }} 
+                                                    />
+                                                </Stack>
+                                            );
+                                        })}
+                                    </Group>
                                 </Table.Td>
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
-                                    <Stack gap={2}>
-                                        <Box h={20}>
-                                            <Sparkline data={s.sparkline_posts || []} color="#228be6" />
-                                        </Box>
-                                        <Group gap={2} wrap="nowrap" justify="center">
-                                            {(s.sparkline_posts || []).map((p: number, idx: number) => (
-                                                <Badge key={idx} size="xs" color="gray" variant="outline" styles={{ label: { fontSize: '8px' } }}>{p}</Badge>
-                                            ))}
-                                        </Group>
-                                    </Stack>
+                                    <Group gap={4} align="flex-end" h={40} wrap="nowrap" justify="center">
+                                        {(s.sparkline_posts || []).map((p: number, idx: number) => {
+                                            const maxN = Math.max(...(s.sparkline_posts || []), 5);
+                                            const height = Math.max((p / maxN) * 25, 2);
+                                            return (
+                                                <Stack key={idx} gap={2} align="center">
+                                                    <Text size="8px" fw={700} c="dimmed" style={{ fontSize: '8px' }}>{p}</Text>
+                                                    <Box 
+                                                        bg="#228be6" 
+                                                        w={10} 
+                                                        h={height} 
+                                                        style={{ borderRadius: '2px 2px 0 0', opacity: idx === (s.sparkline_posts || []).length - 1 ? 1 : 0.5 }} 
+                                                    />
+                                                </Stack>
+                                            );
+                                        })}
+                                    </Group>
                                 </Table.Td>
                             </Table.Tr>
                         ))}

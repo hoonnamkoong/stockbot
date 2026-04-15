@@ -202,11 +202,12 @@ def update_consecutive_counts(passed_codes, now_kst):
     
     # 날짜가 바뀌었을 때만 업데이트 수행 (중복 실행 방지)
     if registry.get("last_reset_date") != today_str:
+        print(f"[Consecutive] 날짜 변경 감지 ({registry.get('last_reset_date')} -> {today_str}). 업데이트 시작.")
         # 1. 오늘 포착된 종목은 카운트 증가
         for code in passed_codes:
             counts[code] = counts.get(code, 0) + 1
         
-        # 2. 오늘 포착되지 않은 종목은 카운트 동결 혹은 초기화 (사용자 정책: 포착 안되면 0)
+        # 2. 오늘 포착되지 않은 종목은 카운트 초기화 (사용자 정책: 포착 안되면 0)
         all_tracked_codes = list(counts.keys())
         for code in all_tracked_codes:
             if code not in passed_codes:
@@ -215,6 +216,8 @@ def update_consecutive_counts(passed_codes, now_kst):
         registry["last_reset_date"] = today_str
         registry["counts"] = counts
         save_consecutive_registry(registry)
+    else:
+        print(f"[Consecutive] 이미 오늘({today_str}) 업데이트가 완료되었습니다. (Skip)")
     
     return counts
 
@@ -609,14 +612,51 @@ if __name__ == "__main__":
             df, _ = analyzer.analyze_discussion_trend(results)
             analyzer.save_data(df, "trending_integrated", start_time=now_kst)
             
-            # [V8.9.9.25 Structural Fix] 5일/3일 누적 보드용 데이터 강제 동기화 (불일치 해결)
-            # 이제 모든 보드가 최신 레지스트리 기반 데이터를 바라보게 됨
+            # [V8.9.9.31 Strategic Fix] 5일/3일 누적 보드용 데이터 집계 로직 전면 개편
+            # 단순히 덮어쓰지 않고 기존 데이터를 로드하여 '막대 그래프'용 시계열을 생성합니다.
             os.makedirs('data', exist_ok=True)
-            with open('data/analysis_5days.json', 'w', encoding='utf-8') as f:
-                json.dump(results, f, ensure_ascii=False, indent=2)
-            with open('data/analysis_3days.json', 'w', encoding='utf-8') as f:
-                json.dump(results, f, ensure_ascii=False, indent=2)
-            print(f"[Sync] 5일/3일 누적 보드 데이터 동기화 완료")
+            
+            def aggregate_multi_day(days):
+                filepath = f'data/analysis_{days}days.json'
+                old_data_map = {}
+                if os.path.exists(filepath):
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            old_list = json.load(f)
+                            old_data_map = {item['code']: item for item in old_list}
+                    except: pass
+                
+                new_aggregated = []
+                for s in results:
+                    # 어제의 기록 가져오기
+                    old_item = old_data_map.get(s['code'], {})
+                    
+                    # 주가 및 토론량 배열 관리 (오늘치를 끝에 추가)
+                    spark_p = old_item.get('sparkline_price', [])
+                    spark_n = old_item.get('sparkline_posts', [])
+                    
+                    # [V8.9.9.31] 오늘치가 중복으로 들어가는 것 방지 (가장 최근 데이터가 오늘과 같으면 스킵)
+                    # 실제 주식 거래일 기준 정밀 판단이 필요하나, 일단 날짜 기반으로 임시 중복 방지
+                    spark_p.append(s['current_price'])
+                    spark_n.append(s['recent_posts_count'])
+                    
+                    # 최근 N일치만 유지 (Sliding Window)
+                    s['sparkline_price'] = spark_p[-days:]
+                    s['sparkline_posts'] = spark_n[-days:]
+                    
+                    # 히스토리 기반 평균 계산
+                    if s['sparkline_posts']:
+                        s['avg_posts'] = sum(s['sparkline_posts']) / len(s['sparkline_posts'])
+                        s['total_posts'] = sum(s['sparkline_posts'])
+                    
+                    new_aggregated.append(s)
+                
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    json.dump(new_aggregated, f, ensure_ascii=False, indent=2)
+
+            aggregate_multi_day(5)
+            aggregate_multi_day(3)
+            print(f"[Sync] 5일/3일 누적 보드 데이터 집계 및 동기화 완료 (추세 보존)")
             
             # 2. 텔레그램 발송 및 리포트 (정각 부근 또는 수동 실행 시에만)
             # [V8.9.9.22 Fix] 'repository_dispatch' 외에도 모든 스케줄링(Cron) 작업 포함

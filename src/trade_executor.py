@@ -120,15 +120,18 @@ def save_reservations(reservations: list) -> None:
         print(f"[TradeExecutor] 예약 목록 업데이트 완료 (잔여: {len(reservations)}건)")
 
 import csv
-def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[실전] KIS 체정 후 수동 기록"):
+def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[실전] KIS 체정 후 수동 기록", roi=None):
     filepath = os.path.join(_REPO_ROOT, 'data', 'trade_history_real.csv')
     file_exists = os.path.exists(filepath)
     now_kst = datetime.now() # KST 기준 (로컬 실행 시)
     total_amount = qty * price
+    # ROI 문자열 처리 (없으면 '-')
+    roi_str = f"{roi:+.2f}%" if roi is not None else "-"
+    
     with open(filepath, 'a', encoding='utf-8-sig', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "reason"])
+            writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "roi", "reason"])
         writer.writerow([
             now_kst.strftime('%Y-%m-%d %H:%M:%S'), 
             f"{name}({code})", 
@@ -136,21 +139,43 @@ def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[�
             f"{price:,.0f}", 
             qty, 
             f"{total_amount:,.0f}",
+            roi_str,
             reason
         ])
 
 def append_order_history(record: dict) -> None:
     history = _load_json_file(ORDER_HISTORY_FILE, [])
     if not isinstance(history, list): history = []
+    
+    # [V8.9.9.41 ROI Calculation] 매도 시 수익률 계산
+    roi = None
+    side = record.get('side', 'buy').lower()
+    if side == 'sell':
+        try:
+            portfolio_path = os.path.join(_REPO_ROOT, 'data', 'portfolio.json')
+            portfolio_data = _load_json_file(portfolio_path, {})
+            # output1에서 해당 종목 찾기
+            holdings = portfolio_data.get('output1', [])
+            for h in holdings:
+                if h.get('pdno') == record.get('code'):
+                    avg_price = float(h.get('pchs_avg_pric', 0))
+                    sell_price = float(record.get('price', 0))
+                    if avg_price > 0:
+                        roi = ((sell_price - avg_price) / avg_price) * 100
+                    break
+        except Exception as e:
+            print(f"[TradeExecutor] ROI 계산 실패: {e}")
+
     history.insert(0, record)
     _save_json_file(ORDER_HISTORY_FILE, history)
-    # CSV에도 동시 기록
+    # CSV에도 동시 기록 (ROI 포함)
     append_trade_history_csv(
-        side=record.get('side', 'buy'),
+        side=side,
         code=record.get('code', ''),
         qty=record.get('qty', 0),
         price=record.get('price', 0),
         name=record.get('name', 'Unknown'),
+        roi=roi,
         reason=record.get('reason', '[실전] KIS 체결 기록')
     )
 

@@ -22,7 +22,8 @@ async function getFileFromGithub() {
     });
     if (res.status === 404) return { sha: null, content: [] };
     const data = await res.json();
-    const content = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
+    const rawContent = Buffer.from(data.content, 'base64').toString('utf-8').trim();
+    const content = JSON.parse(rawContent);
     return { sha: data.sha, content };
 }
 

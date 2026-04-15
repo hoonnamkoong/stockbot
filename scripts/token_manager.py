@@ -32,11 +32,11 @@ def save_token_cache(token_data):
     
     with open(TOKEN_CACHE_PATH, 'w', encoding='utf-8') as f:
         json.dump(token_data, f, indent=2, ensure_ascii=False)
-    print(f"[TokenManager] ✅ 토큰 저장 완료: {TOKEN_CACHE_PATH}")
+    print(f"[TokenManager] * 토큰 저장 완료: {TOKEN_CACHE_PATH}")
 
 def issue_new_token():
     """한국투자증권 API를 통해 새로운 접근 토큰을 발급받습니다."""
-    print("[TokenManager] 🔑 KIS에 새 토큰 발급 요청 중...")
+    print("[TokenManager] * KIS에 새 토큰 발급 요청 중...")
     
     # 깃허브 액션 비밀 키 명칭과 일치시킴
     app_key = os.environ.get('KIS_APP_KEY')
@@ -90,7 +90,7 @@ def manage():
     cache = load_token_cache()
     
     if not force_refresh and is_token_valid(cache):
-        print("[TokenManager] ✨ 기존 토큰이 아직 유효합니다. (발급 스킵)")
+        print("[TokenManager] * 기존 토큰이 아직 유효합니다. (발급 스킵)")
         return True
     
     # 토큰 발급 시도
@@ -98,7 +98,7 @@ def manage():
     if new_token:
         save_token_cache(new_token)
         if force_refresh:
-            print("[TokenManager] 🚀 강제 갱신 완료. 작업을 종료합니다.")
+            print("[TokenManager] * 강제 갱신 완료. 작업을 종료합니다.")
             sys.exit(0) # 갱신 모드일 때는 여기서 종료
         return True
     

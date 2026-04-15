@@ -246,10 +246,29 @@ def main():
                 reason = f"Rejected by Broker: {exec_res.get('error')}"
                 print(f"  [Skip] 예약 {res_id} 거부됨 -> 취소 처리 ({reason})")
 
+            # [V8.9.9.31 Precision Fix] 실제 체결 정보 기록 보강 (Unknown 방지)
+            real_name = exec_res.get('name', res.get('name', 'Unknown'))
+            real_price = exec_res.get('price', price)
+            if real_price == 0: real_price = price # 폴백
+            
+            # [V8.9.9.31] 수익률(Yield) 계산 (매도 시에만)
+            profit_rate = None
+            if side == 'sell':
+                avg_buy_price = res.get('avg_buy_price', 0)
+                if avg_buy_price > 0:
+                    profit_rate = ((real_price - avg_buy_price) / avg_buy_price) * 100
+
             append_order_history({
-                'id': res_id, 'executed_at': now_kst.isoformat(),
-                'side': side, 'code': code, 'qty': qty, 'price': price,
-                'status': status, 'reason': reason
+                'id': res_id, 
+                'executed_at': now_kst.isoformat(),
+                'side': side, 
+                'code': code, 
+                'name': real_name,
+                'qty': qty, 
+                'price': real_price,
+                'yield': round(profit_rate, 2) if profit_rate is not None else None,
+                'status': status, 
+                'reason': reason
             })
             executed_count += 1
 

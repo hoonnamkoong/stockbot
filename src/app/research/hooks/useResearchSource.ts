@@ -87,7 +87,7 @@ export const useResearchSource = () => {
             const reportsData = data.reports || [];
             setReports([
                 ...reportsData.filter((r: any) => r.type === 'monthly'),
-                ...reportsData.filter((r: any) => r.type === 'daily').slice(0, 10)
+                ...reportsData.filter((r: any) => r.type === 'daily' || r.type === 'research').slice(0, 15)
             ]);
 
             // 4. 5일/3일 누적 데이터

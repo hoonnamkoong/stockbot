@@ -45,6 +45,5 @@ class OriginalSimulator(BaseSimulator):
 
         # [V8.9.9.17] 매매 결과와 관계없이 성과 지표 상시 업데이트 및 저장
         # candidates의 현재 가격 정보를 지표 계산에 반영하여 수익률 정체 해결
-        current_prices = {s['code']: float(s.get('price', s.get('현재가', 0))) for s in candidates}
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

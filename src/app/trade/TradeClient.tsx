@@ -389,6 +389,7 @@ function TradeContent() {
                             <Table.Th style={{ fontSize: '11px' }}>구분</Table.Th>
                             <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>체결가</Table.Th>
                             <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>수량</Table.Th>
+                            {targetType === 'real' && <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>ROI(%)</Table.Th>}
                             {targetType !== 'real' && <Table.Th style={{ fontSize: '11px' }}>판단 사유</Table.Th>}
                         </Table.Tr>
                     </Table.Thead>
@@ -409,6 +410,17 @@ function TradeContent() {
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.price}</Text></Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.qty}</Text></Table.Td>
+                                {targetType === 'real' && (
+                                    <Table.Td style={{ textAlign: 'center' }}>
+                                        {h.roi && h.roi !== '-' ? (
+                                            <Badge color={h.roi.startsWith('+') ? 'red' : h.roi.startsWith('-') ? 'blue' : 'gray'} variant="light" size="xs">
+                                                {h.roi}
+                                            </Badge>
+                                        ) : (
+                                            <Text size="xs" c="dimmed">-</Text>
+                                        )}
+                                    </Table.Td>
+                                )}
                                 {targetType !== 'real' && (
                                     <Table.Td>
                                         <Button variant="subtle" size="compact-xs" onClick={() => {

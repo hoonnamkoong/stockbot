@@ -88,19 +88,20 @@ class BaseSimulator:
                 self.state['peak_nav'] = current_nav
             
             # [V8.9.9.12] 저장 시점에 통계를 계산하여 포함 (Radar Chart 연동용)
+            # [V8.9.9.35 Fix] 저장 시점에 통계를 계산하여 포함 (수익률 동기화 필수)
             try:
-                full_stats = self.get_normalized_stats()
-                self.state['raw_stats'] = full_stats['raw']
+                # [팩트] analyzer.get_current_prices 및 results 기반의 current_prices 주입
+                stats = self.calculate_stats(current_prices)
+                full_stats = self.get_normalized_stats(current_prices)
+                
+                self.state['raw_stats'] = stats
                 self.state['normalized_stats'] = full_stats['normalized']
                 
-                # [V8.9.9.19] 계산된 수수료를 최상위 필드에 동기화 (대시보드 표시용)
-                stats = self.calculate_stats(current_prices)
-                # 이미 누적된 total_fees가 있다면 0인 경우에만 덮어쓰거나, 더 큰 값을 유지하도록 함
+                # [V8.9.9.19] 계산된 수수료 동기화
                 calc_fees = stats.get('total_fees', 0)
                 if calc_fees > self.state.get('total_fees', 0):
                     self.state['total_fees'] = calc_fees
             except Exception as e:
-                # 지표 계산 실패가 파일 저장 자체를 막지 않게 함
                 print(f"[Sim Warning] {self.name} 성과 지표 업데이트 건너뜀: {e}")
                 pass
 

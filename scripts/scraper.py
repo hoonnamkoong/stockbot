@@ -10,12 +10,11 @@ import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 
-# [V8.9.9.9] Gemini 2.5 Flash + 리포트 중복 방지 최적화 버전
-# [Stage 1] 수집 및 문턱 필터링 + 연속 일수 데이터 보존
-# [Stage 2] Gemini 2.5 Flash 일괄(Batch) 분석 (Parsing 보강)
-# [Stage 3] 2차 필터(Algo04V2) 및 Top 3 딥다이브 리포트
-# [Stage 4] 텔레그램 전송 및 시뮬레이터 트리거
-SCRAPER_VERSION = "8.9.9.11 Gemini 2.5 Flash Optimized (Notification Fix)"
+# [V8.9.9.42] 월별 통합 리서치 및 정시 알림 보장 버전
+# [Stage 1] 수집 및 문턱 필터링 + 시작 시각 고정(정시 알림 보장)
+# [Stage 3] 월별 통합 엑셀 리포트(ROI 제외) 누적 생성
+# [Stage 4] 텔레그램 전송 및 시뮬레이터 3종 주가 동기화
+SCRAPER_VERSION = "8.9.9.42 Monthly Aggregated (ROI Excluded)"
 
 # 경로 설정
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
@@ -437,8 +436,15 @@ def get_stock_details(code):
     return details
 
 if __name__ == "__main__":
-    load_env_manual()
+    # [V8.9.9.40] 분석 시작 시각 고정 (알림 및 파일명 기준)
     now_kst = get_current_kst_time()
+    today_str = now_kst.strftime('%Y%m%d')
+    start_minute = now_kst.minute
+    
+    print(f"[{now_kst.strftime('%Y-%m-%d %H:%M:%S')}] 🚀 StockBot Pipeline Start")
+    
+    # 1. 환경 변수 및 동기화 상태 로드
+    load_env_manual()
     threshold = get_threshold_by_time(now_kst.hour)
     
     # 0. 모듈 초기화
@@ -588,10 +594,69 @@ if __name__ == "__main__":
                 
                 deep_dive_report = advisor.generate_deep_dive_report(detail_picks)
                 
-                # [V8.9.9.25] 리포트 파일로 저장 (비어있는 링크 해결)
-                html_filename = save_html_report(deep_dive_report, now_kst)
-                if html_filename:
-                    print(f"[Stage 3] HTML 리포트 저장 완료: {html_filename}")
+                # [V8.9.9.42] 월별 통합 리서치 엑셀 누적 (수익률 정보 제외 사양 반영)
+                def update_monthly_research_excel(picks):
+                    month_str = now_kst.strftime('%Y-%m')
+                    report_dir = 'data/reports'
+                    os.makedirs(report_dir, exist_ok=True)
+                    target_file = f"{report_dir}/monthly_research_{month_str}.xlsx"
+                    
+                    new_rows = []
+                    for p in picks:
+                        new_rows.append({
+                            'DateTime': now_kst.strftime('%Y-%m-%d %H:%M'),
+                            'Stock': p['name'],
+                            'Code': p['code'],
+                            'Signal': p.get('signal', 'WATCH'),
+                            'CurrentPrice': p.get('current_price', 0),
+                            'Summary': p.get('posts_summary', '')
+                        })
+                    
+                    new_df = pd.DataFrame(new_rows)
+                    if os.path.exists(target_file):
+                        try:
+                            existing_df = pd.read_excel(target_file)
+                            pd.concat([existing_df, new_df], ignore_index=True).to_excel(target_file, index=False)
+                        except: new_df.to_excel(target_file, index=False)
+                    else:
+                        new_df.to_excel(target_file, index=False)
+                    return target_file
+
+                monthly_excel_path = update_monthly_research_excel(final_picks)
+                print(f"[Stage 3] 월별 통합 리서치 엑셀 업데이트 완료: {monthly_excel_path}")
+
+                # [V8.9.9.40] reports.json 관리 로직 개편 (월별 그룹화)
+                def update_reports_json(filename, month_str):
+                    json_path = 'data/reports.json'
+                    reports = []
+                    if os.path.exists(json_path):
+                        try:
+                            with open(json_path, 'r', encoding='utf-8') as f:
+                                reports = json.load(f)
+                        except: reports = []
+                    
+                    # 해당 월의 리서치 리포트가 이미 있는지 확인
+                    title = f"📊 {month_str.split('-')[1]}월 통합 분석 리포트"
+                    existing = next((r for r in reports if r.get('type') == 'research' and r.get('month') == month_str), None)
+                    
+                    if existing:
+                        existing['title'] = title
+                        existing['date'] = now_kst.strftime('%Y-%m-%d %H:%M')
+                        existing['filename'] = os.path.basename(filename)
+                    else:
+                        reports.insert(0, {
+                            "type": "research",
+                            "month": month_str,
+                            "title": title,
+                            "date": now_kst.strftime('%Y-%m-%d %H:%M'),
+                            "filename": os.path.basename(filename),
+                            "timestamp": time.time()
+                        })
+                    
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(reports[:50], f, indent=2, ensure_ascii=False) # 최근 50개 유지
+
+                update_reports_json(monthly_file, now_kst.strftime('%Y-%m'))
                 
                 # 리포트 결과 저장 및 상태 업데이트
                 prev_sync_state['daily_reported_info'].extend([{'code': p['code'], 'name': p['name']} for p in final_picks])
@@ -710,12 +775,13 @@ if __name__ == "__main__":
             # 2. 텔레그램 발송 및 리포트 (정각 부근 또는 수동 실행 시에만)
             # [V8.9.9.22 Fix] 'repository_dispatch' 외에도 모든 스케줄링(Cron) 작업 포함
             # [V8.9.9.29 Fix] 'push' 이벤트는 알림 제외. 오직 정시 또는 수동 UI 실행 시에만.
-            github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
-            is_manual_ui = (github_event == 'workflow_dispatch')
-            is_near_the_hour = (now_kst.minute < 5)
-            
-            # 매뉴얼 실행이거나 정시(0~5분)일 때만 알림
-            should_send_notification = is_manual_ui or is_near_the_hour
+            # [V8.9.9.40 FIX] 시작 시점의 분(start_minute)을 기준으로 알림 여부 판단 (지연 누락 방지)
+             github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
+             is_manual_ui = (github_event == 'workflow_dispatch')
+             is_near_the_hour = (start_minute < 5)
+             
+             # 매뉴얼 실행이거나 정시(0~5분)로 시작된 경우 알림
+             should_send_notification = is_manual_ui or is_near_the_hour
              
             print(f"[Stage 4] 알림 조건 체크 - 이벤트: {github_event}, 현재분: {now_kst.minute}분 -> 발송여부: {should_send_notification}")
             
@@ -742,10 +808,12 @@ if __name__ == "__main__":
             
             # 3. 시뮬레이터 3종 트리거 (장중에만 작동)
             if allow_buy:
-                print(f"[Stage 4] 시뮬레이션 3종 가동 (SIM1, SIM2, SIM3)")
-                sim1.run(results)
-                sim2.run(results)
-                sim3.run(results)
+                print(f"[Stage 4] 시뮬레이션 3종 가동 (SIM1, SIM2, SIM3) - 주급 정합성 동기화")
+                # [V8.9.9.40] 실시간 현재가 정보를 시뮬레이터에 강제 주입하여 수익률 갱신
+                current_prices = {s['code']: s.get('current_price', 0) for s in results if 'code' in s}
+                sim1.run(results, current_prices=current_prices)
+                sim2.run(results, current_prices=current_prices)
+                sim3.run(results, current_prices=current_prices)
                 
                 # [V8.9.9.16] 실거래 예약 주문(Reservation) 처리 엔진 가동
                 try:

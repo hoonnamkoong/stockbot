@@ -48,21 +48,24 @@ export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: Re
                 <Title order={4}>리서치 리포트</Title>
             </Group>
 
-            {reports.map((report, idx) => (
+            {/* [V8.9.9.42] 지시 사양: 월별 통합 분석 리포트 나열 로직 (수익률 제외) */}
+            {reports
+                .filter(r => r.type === 'research')
+                .slice(0, 12)
+                .map((report, idx) => (
                 <NavLink
                     key={idx}
                     label={report.title}
-                    description={report.date}
-                    leftSection={<IconReport size={16} stroke={1.5} />}
+                    description={`${report.date} 갱신됨 (엑셀 분석)`}
+                    leftSection={<IconFileSpreadsheet size={18} color="#228be6" stroke={1.5} />}
                     rightSection={<IconExternalLink size={14} />}
                     component="a"
-                    href={`https://github.com/${repoOwner}/${repoName}/blob/db-data/data/reports/${report.filename}`}
-                    target="_blank"
+                    href={`/api/download/report?filename=${report.filename}`}
                     variant="light"
-                    color={report.type === 'monthly' ? 'violet' : 'blue'}
+                    color="blue"
                     styles={{
-                        label: { fontWeight: 500 },
-                        root: { borderRadius: '8px' }
+                        label: { fontWeight: 600 },
+                        root: { borderRadius: '8px', marginBottom: '4px' }
                     } as any}
                 />
             ))}

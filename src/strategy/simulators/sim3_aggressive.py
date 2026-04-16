@@ -6,14 +6,6 @@ class AggressiveSimulator(BaseSimulator):
     [Sim 3] 공격적 추세추종형 (Aggressive - Scale-out & Momentum)
     - 3M 초기화 후 개시
     - Scale-out: +10% 수익 시 50% 분할 익절
-from .base_simulator import BaseSimulator
-from datetime import datetime
-
-class AggressiveSimulator(BaseSimulator):
-    """
-    [Sim 3] 공격적 추세추종형 (Aggressive - Scale-out & Momentum)
-    - 3M 초기화 후 개시
-    - Scale-out: +10% 수익 시 50% 분할 익절
     - Runner: 대량 매도 후 남은 물량은 전일 종가 대비 -5% 하락 시 전량 매도
     - Wide Stop: -7%
     """
@@ -55,9 +47,7 @@ class AggressiveSimulator(BaseSimulator):
 
             # (3) Runner: 절반 매도 후 남은 물량 처리 (전일 종가 대비 -5% 하락 시)
             if is_scaled:
-                # 전일 종가 정보가 후보 리스트에 있는지 확인 (보통 change_rate를 통해 현재가/전일종가 계산 가능)
-                # change_rate = (current - prev) / prev * 100 
-                # -> prev = current / (1 + change_rate/100)
+                # 전일 종가 정보가 후보 리스트에 있는지 확인
                 change_rate_raw = stock.get('change_rate', stock.get('등락률', 0)) if stock else 0
                 if isinstance(change_rate_raw, str):
                     change_rate = float(change_rate_raw.replace('%', '').replace('+', ''))

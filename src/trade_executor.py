@@ -143,10 +143,49 @@ def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[�
             reason
         ])
 
+    )
+
+
+# ─── 유틸리티: 종목명 자동 매칭 ─────────────────────────
+
+def _lookup_stock_name(code: str) -> str:
+    """코드를 기반으로 로컬 DB에서 종목명을 찾습니다."""
+    try:
+        stocks_db_path = os.path.join(_REPO_ROOT, 'data', 'all_stocks.json')
+        if os.path.exists(stocks_db_path):
+            with open(stocks_db_path, 'r', encoding='utf-8') as f:
+                stocks = json.load(f)
+                for s in stocks:
+                    if s.get('code') == code:
+                        return s.get('name', 'Unknown')
+    except Exception:
+        pass
+    return "Unknown"
+
+
 def append_order_history(record: dict) -> None:
     history = _load_json_file(ORDER_HISTORY_FILE, [])
     if not isinstance(history, list): history = []
     
+    # [V8.9.9.45 Robustness] 종목명 자동 복구 (Unknown 방지)
+    code = record.get('code', '')
+    name = record.get('name', 'Unknown')
+    if (not name or name == 'Unknown') and code:
+        record['name'] = _lookup_stock_name(code)
+    
+    # [V8.9.9.45 Robustness] 가격 보정 (0원 방지)
+    price = float(record.get('price', 0))
+    if price <= 0:
+        # 시장가로 주문된 경우 portfolio.json의 현재가(prpr)라도 가져오기 시도
+        try:
+            p_path = os.path.join(_REPO_ROOT, 'data', 'portfolio.json')
+            p_data = _load_json_file(p_path, {})
+            for h in p_data.get('output1', []):
+                if h.get('pdno') == code:
+                    record['price'] = float(h.get('prpr', 0))
+                    break
+        except: pass
+
     # [V8.9.9.41 ROI Calculation] 매도 시 수익률 계산
     roi = None
     side = record.get('side', 'buy').lower()

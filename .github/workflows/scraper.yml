@@ -1,6 +1,8 @@
 name: Stock Scraper Schedule
 
 on:
+  schedule:
+    - cron: '0 0-6 * * 1-5'  # KST 09:00 ~ 15:00
   repository_dispatch:
     types: [tasker_trigger]
   workflow_dispatch:

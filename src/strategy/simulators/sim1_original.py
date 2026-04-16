@@ -3,11 +3,6 @@ from .base_simulator import BaseSimulator
 class OriginalSimulator(BaseSimulator):
     """
     [Sim 1] 안정 지향형 (Original - Buzz Filter 기반)
-from .base_simulator import BaseSimulator
-
-class OriginalSimulator(BaseSimulator):
-    """
-    [Sim 1] 안정 지향형 (Original - Buzz Filter 기반)
     - 3M 초기화 후 개시
     - 1/N 동일 비중 (10개 슬롯)
     """

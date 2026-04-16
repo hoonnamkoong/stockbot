@@ -1,7 +1,7 @@
 {
   "initial_cash": 3000000,
-  "cash": 68369.74000000028,
-  "invested": 3016550.0,
+  "cash": 229893.35525000026,
+  "invested": 2862745.0,
   "portfolio": {
     "088800": {
       "name": "에이스테크",
@@ -9,14 +9,6 @@
       "avg_price": 5500.0,
       "entry_date": "2026-04-10",
       "peak_price": 5500.0,
-      "is_scaled_out": true
-    },
-    "010170": {
-      "name": "대한광통신",
-      "quantity": 8,
-      "avg_price": 17830.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 17830.0,
       "is_scaled_out": true
     },
     "050890": {
@@ -29,18 +21,10 @@
     },
     "011930": {
       "name": "신성이엔지",
-      "quantity": 77,
+      "quantity": 39,
       "avg_price": 3855.0,
       "entry_date": "2026-04-10",
       "peak_price": 3855.0,
-      "is_scaled_out": false
-    },
-    "069540": {
-      "name": "빛과전자",
-      "quantity": 29,
-      "avg_price": 5120.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 5120.0,
       "is_scaled_out": true
     },
     "010820": {
@@ -50,14 +34,6 @@
       "entry_date": "2026-04-10",
       "peak_price": 11380.0,
       "is_scaled_out": false
-    },
-    "215790": {
-      "name": "이노인스트루먼트",
-      "quantity": 49,
-      "avg_price": 3035.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 3035.0,
-      "is_scaled_out": true
     },
     "452300": {
       "name": "캡스톤파트너스",
@@ -91,14 +67,6 @@
       "peak_price": 228.0,
       "is_scaled_out": false
     },
-    "025860": {
-      "name": "남해화학",
-      "quantity": 30,
-      "avg_price": 9950.0,
-      "entry_date": "2026-04-14",
-      "peak_price": 9950.0,
-      "is_scaled_out": false
-    },
     "005930": {
       "name": "삼성전자",
       "quantity": 1,
@@ -106,9 +74,33 @@
       "entry_date": "2026-04-14",
       "peak_price": 208000.0,
       "is_scaled_out": false
+    },
+    "047040": {
+      "name": "대우건설",
+      "quantity": 10,
+      "avg_price": 27750.0,
+      "entry_date": "2026-04-16",
+      "peak_price": 27750.0,
+      "is_scaled_out": false
+    },
+    "017900": {
+      "name": "광전자",
+      "quantity": 12,
+      "avg_price": 12810.0,
+      "entry_date": "2026-04-16",
+      "peak_price": 12810.0,
+      "is_scaled_out": true
+    },
+    "388050": {
+      "name": "지투파워",
+      "quantity": 20,
+      "avg_price": 14990.0,
+      "entry_date": "2026-04-16",
+      "peak_price": 14990.0,
+      "is_scaled_out": false
     }
   },
-  "peak_nav": 3084995.7150000003,
+  "peak_nav": 3105354.1640000003,
   "history": [
     3000000
   ],
@@ -136,27 +128,77 @@
     {
       "date": "2026-04-14",
       "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
     }
   ],
-  "total_fees": 2358.24525,
+  "total_fees": 5139.63,
   "raw_stats": {
-    "cash": 68369.74000000028,
-    "total_asset": 3084919.74,
-    "profit_rate": 2.8306580000000072,
-    "holdings_count": 13,
+    "cash": 229893.35525000026,
+    "total_asset": 3231373.35525,
+    "profit_rate": 7.712445175,
+    "holdings_count": 12,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 0.0024627262731900788,
-    "turnover": 1.406815,
-    "frequency": 3.2,
-    "total_fees": 2358.24525,
-    "current_prices": {}
+    "mdd": 0.0,
+    "turnover": 1.6598866666666667,
+    "frequency": 2.7142857142857144,
+    "total_fees": 5139.63,
+    "current_prices": {
+      "388050": 14990,
+      "062970": 3560,
+      "088800": 6230,
+      "001440": 41250,
+      "018880": 4055,
+      "017900": 17780,
+      "270520": 228,
+      "009580": 2855,
+      "034020": 104200,
+      "008350": 2780,
+      "047040": 28500,
+      "050890": 18160,
+      "900300": 127,
+      "003280": 3270,
+      "100590": 10350,
+      "010820": 12200,
+      "005930": 211000,
+      "011930": 4120,
+      "006340": 6540,
+      "005880": 2665,
+      "452300": 4930
+    }
   },
   "normalized_stats": {
     "승률": 0.0,
     "수익팩터": 0.0,
-    "MDD": 99.98768636863404,
-    "거래빈도": 64.0,
-    "자본회전율": 7.034075
+    "MDD": 100.0,
+    "거래빈도": 54.28571428571429,
+    "자본회전율": 8.299433333333333
   }
 }

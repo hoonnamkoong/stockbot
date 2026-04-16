@@ -374,7 +374,8 @@ class StrategyAdvisor:
                         data = json.loads(response.text)
                         if isinstance(data, list) and len(data) > 0:
                             data = data[0]
-                        formatted = f"🔥 <b>{stock['name']}</b> [{data.get('decision', 'N/A')}]\n"
+                        rank_str = f" ({stock.get('rank')}위)" if stock.get('rank') else ""
+                        formatted = f"🔥 <b>{stock['name']}</b>{rank_str} [{data.get('decision', 'N/A')}]\n"
                         formatted += f"💡 <b>근거:</b> {data.get('reason', '')}\n"
                         formatted += f"⚠️ <b>리스크:</b> {data.get('risk', '없음')}\n"
                         formatted += f"✨ <b>핵심:</b> {', '.join(data.get('highlights', []))}\n"

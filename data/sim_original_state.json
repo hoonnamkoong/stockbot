@@ -1,113 +1,128 @@
 {
   "initial_cash": 3000000,
-  "cash": 152837.98975,
-  "invested": 2846735.0,
+  "cash": 2621813.30175,
+  "invested": 598840.0,
   "portfolio": {
-    "008350": {
-      "name": "남선알미늄",
-      "quantity": 136,
-      "avg_price": 2200.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 2200.0,
+    "388050": {
+      "name": "지투파워",
+      "quantity": 20,
+      "avg_price": 14990.0,
+      "entry_date": "2026-04-16",
+      "peak_price": 14990.0,
       "is_scaled_out": false
     },
-    "003280": {
-      "name": "흥아해운",
-      "quantity": 86,
-      "avg_price": 3455.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 3455.0,
-      "is_scaled_out": false
-    },
-    "047040": {
-      "name": "대우건설",
-      "quantity": 12,
-      "avg_price": 24750.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 24750.0,
-      "is_scaled_out": false
-    },
-    "005880": {
-      "name": "대한해운",
-      "quantity": 99,
-      "avg_price": 3010.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 3010.0,
-      "is_scaled_out": false
-    },
-    "011930": {
-      "name": "신성이엔지",
-      "quantity": 77,
-      "avg_price": 3860.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 3860.0,
-      "is_scaled_out": false
-    },
-    "017550": {
-      "name": "수산세보틱스",
-      "quantity": 98,
-      "avg_price": 3040.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 3040.0,
-      "is_scaled_out": false
-    },
-    "010820": {
-      "name": "퍼스텍",
-      "quantity": 26,
-      "avg_price": 11380.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 11380.0,
-      "is_scaled_out": false
-    },
-    "034220": {
-      "name": "LG디스플레이",
-      "quantity": 23,
-      "avg_price": 12740.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 12740.0,
-      "is_scaled_out": false
-    },
-    "005930": {
-      "name": "삼성전자",
-      "quantity": 1,
-      "avg_price": 208000.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 208000.0,
-      "is_scaled_out": false
-    },
-    "006360": {
-      "name": "GS건설",
-      "quantity": 7,
-      "avg_price": 37625.0,
-      "entry_date": "2026-04-10",
-      "peak_price": 37625.0,
+    "062970": {
+      "name": "한국첨단소재",
+      "quantity": 84,
+      "avg_price": 3560.0,
+      "entry_date": "2026-04-16",
+      "peak_price": 3560.0,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 3000000,
+  "peak_nav": 3293543.7995,
   "history": [
     3000000
   ],
-  "daily_trades": [],
+  "daily_trades": [
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    }
+  ],
   "raw_stats": {
-    "cash": 152837.98975,
-    "total_asset": 2999572.98975,
-    "profit_rate": -0.014233674999993914,
-    "holdings_count": 10,
-    "win_rate": 0,
-    "profit_factor": 1.0,
-    "mdd": 0.014233674999993914,
-    "turnover": 0.9489116666666667,
-    "frequency": 2.0,
-    "total_fees": 2846.735,
-    "current_prices": {}
+    "cash": 2621813.30175,
+    "total_asset": 3220653.30175,
+    "profit_rate": 7.355110058333336,
+    "holdings_count": 2,
+    "win_rate": 66.66666666666666,
+    "profit_factor": 2.9341855587735943,
+    "mdd": 2.2131327890968313,
+    "turnover": 2.153685,
+    "frequency": 3.142857142857143,
+    "total_fees": 11411.422999999999,
+    "current_prices": {
+      "388050": 14990,
+      "062970": 3560,
+      "088800": 6230,
+      "001440": 41250,
+      "018880": 4055,
+      "017900": 17780,
+      "270520": 228,
+      "009580": 2855,
+      "034020": 104200,
+      "008350": 2780,
+      "047040": 28500,
+      "050890": 18160,
+      "900300": 127,
+      "003280": 3270,
+      "100590": 10350,
+      "010820": 12200,
+      "005930": 211000,
+      "011930": 4120,
+      "006340": 6540,
+      "005880": 2665,
+      "452300": 4930
+    }
   },
   "normalized_stats": {
-    "승률": 0.0,
-    "수익팩터": 33.3,
-    "MDD": 99.92883162500003,
-    "거래빈도": 40.0,
-    "자본회전율": 4.744558333333334
+    "승률": 83.33333333333331,
+    "수익팩터": 97.70837910716068,
+    "MDD": 88.93433605451584,
+    "거래빈도": 62.857142857142854,
+    "자본회전율": 10.768424999999999
   },
-  "total_fees": 2846.735
+  "total_fees": 11411.422999999999
 }

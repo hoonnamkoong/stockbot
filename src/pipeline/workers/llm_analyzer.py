@@ -123,7 +123,8 @@ class LLMAnalyzerWorker(BaseWorker):
             # final_picks의 코드로 풀 데이터 조회
             detail_picks = []
             for p in final_picks:
-                full = next((c for c in all_candidates if c['code'] == p['code']), p)
+                full = next((c for c in all_candidates if c['code'] == p['code']), p).copy()
+                full['rank'] = p.get('rank')
                 detail_picks.append(full)
             return advisor.generate_deep_dive_report(detail_picks)
         except Exception as e:

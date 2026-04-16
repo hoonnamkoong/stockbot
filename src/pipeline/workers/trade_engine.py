@@ -90,7 +90,8 @@ class TradeEngineWorker(BaseWorker):
 
         # 4. 신규 보고 종목이 있으면 상태 업데이트 + 엑셀 기록
         if final_picks:
-            self.log(f"신규 보고 대상: {[f\"{p['name']}({p.get('rank','?')}위)\" for p in final_picks]}")
+            formatted_names = [f"{p['name']}({p.get('rank','?')}위)" for p in final_picks]
+            self.log(f"신규 보고 대상: {formatted_names}")
             sync_state.daily_reported_info.extend(
                 [{'code': p['code'], 'name': p['name'], 'rank': p.get('rank', 0)} for p in final_picks]
             )

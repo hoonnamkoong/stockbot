@@ -24,8 +24,12 @@ class AggressiveSimulator(BaseSimulator):
             p_item = self.state['portfolio'][code]
             stock = candidate_map.get(code)
             
-            # 현재가 확보 (candidates에 없으면 평단가 활용)
-            current_price = stock.get('price', stock.get('현재가', p_item['avg_price'])) if stock else p_item['avg_price']
+            # [Fix] current_prices dict 우선 참조 (trade_engine이 네이버에서 보강한 실제 현재가)
+            current_price = (current_prices or {}).get(code, 0)
+            if current_price == 0:
+                current_price = stock.get('price', stock.get('현재가', 0)) if stock else 0
+            if current_price == 0:
+                current_price = p_item['avg_price']  # 최후 폴백: 평단가 (0원 방어)
             if current_price <= 0: continue
             
             # 수익률 계산

@@ -19,10 +19,16 @@ class OriginalSimulator(BaseSimulator):
         
         for code in portfolio_codes:
             if code not in candidate_codes:
-                p_item = self.state['portfolio'][code]
-                stock = next((s for s in candidates if s['code'] == code), None)
-                current_price = stock.get('price', stock.get('현재가', 0)) if stock else 0
-                if current_price == 0: continue
+                # [Bug Fix] Buzz Filter 이탈 종목은 candidates에 없으므로
+                # current_prices dict에서 먼저 조회 (trade_engine이 네이버에서 보강한 값)
+                current_price = current_prices.get(code, 0) if current_prices else 0
+                # current_prices에도 없으면 candidates에서 재확인 (방어 코드)
+                if current_price == 0:
+                    stock = next((s for s in candidates if s['code'] == code), None)
+                    current_price = stock.get('price', stock.get('현재가', 0)) if stock else 0
+                if current_price == 0:
+                    print(f"   [안정] {code} 현재가 미확보, 청산 스킵")
+                    continue
                 
                 self.sell(code, current_price, reason="[안정] Buzz Filter 이탈")
 

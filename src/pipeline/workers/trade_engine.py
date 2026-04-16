@@ -98,14 +98,31 @@ class TradeEngineWorker(BaseWorker):
         """
         YAML Manifest의 active 시뮬레이터들을 실행합니다.
         실제 simulator.run(candidates, current_prices=dict) 시그니처 사용.
+        [Fix] 포트폴리오 보유 종목 중 오늘 Buzz Filter 이탈 종목의
+              현재가를 네이버에서 별도 조회하여 current_prices에 보강합니다.
         """
         try:
+            # 1. 오늘 candidates 기반으로 현재가 구성
             current_prices = {
                 s['code']: s.get('price', s.get('current_price', 0))
                 for s in candidates if s.get('code')
             }
             simulators = get_active_simulators()
             self.log(f"시뮬레이터 동기화 시작 ({len(simulators)}개 활성, {len(current_prices)}개 현재가)")
+
+            # 2. 포트폴리오 종목 중 현재가 미확보된 코드 수집
+            missing_codes = set()
+            for sim in simulators:
+                for code in sim.state.get('portfolio', {}).keys():
+                    if code not in current_prices or current_prices[code] == 0:
+                        missing_codes.add(code)
+
+            # 3. 미확보 종목 현재가를 네이버에서 조회하여 보강
+            if missing_codes:
+                self.log(f"  현재가 미확보 {len(missing_codes)}개 종목 네이버 보강 조회")
+                extra = self._fetch_portfolio_prices(list(missing_codes))
+                current_prices.update(extra)
+                self.log(f"  보강 결과: { {k: v for k, v in extra.items()} }")
 
             for sim in simulators:
                 try:
@@ -117,3 +134,34 @@ class TradeEngineWorker(BaseWorker):
             self.log("시뮬레이터 동기화 완료")
         except Exception as e:
             self.log_error(f"시뮬레이터 전체 실패: {e}")
+
+    def _fetch_portfolio_prices(self, codes: list) -> dict:
+        """
+        Buzz Filter 이탈 종목의 현재가를 네이버 금융에서 직접 조회합니다.
+        DataFetcherWorker._get_stock_details()와 동일한 URL을 사용합니다.
+        frgn.naver 페이지의 첫 번째 데이터 행(data_rows[0][1])이 오늘 종가입니다.
+        """
+        import re
+        import requests
+        from bs4 import BeautifulSoup
+
+        prices = {}
+        for code in codes:
+            try:
+                url = f"https://finance.naver.com/item/frgn.naver?code={code}"
+                res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                soup = BeautifulSoup(res.content, 'html.parser')
+                rows = soup.select('table.type2 tr')
+                data_rows = [
+                    r.select('td') for r in rows
+                    if len(r.select('td')) == 9
+                    and re.match(r'\d{4}', r.select('td')[0].get_text(strip=True))
+                ]
+                if data_rows:
+                    price_text = data_rows[0][1].get_text().replace(',', '').strip()
+                    prices[code] = int(price_text) if price_text.isdigit() else 0
+                    self.log(f"    {code}: {prices[code]:,}원")
+            except Exception as e:
+                self.log_error(f"    {code} 현재가 조회 실패: {e}")
+        return prices
+

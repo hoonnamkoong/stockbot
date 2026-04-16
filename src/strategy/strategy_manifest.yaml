@@ -1,0 +1,65 @@
+# ================================================================
+# StockBot V50 전략 & 시뮬레이터 등록부 (Strategy Manifest)
+# ================================================================
+# 이 파일이 전략 및 시뮬레이터의 유일한 등록 진입점입니다.
+#
+# [새 월별 전략 추가 방법]
+#   1. src/strategy/monthly/algo_05_v1.py 파일 생성
+#   2. 이 파일 strategies 항목에 한 줄 추가
+#   3. active_strategy 값 변경
+#   → scraper.py, engine.py 등 다른 파일은 수정 불필요
+#
+# [새 시뮬레이터 추가 방법]
+#   1. src/strategy/simulators/sim4_momentum.py 파일 생성
+#   2. 이 파일 simulators 항목에 한 줄 추가
+#   → 다른 파일 수정 불필요
+#
+# [시뮬레이터 임시 비활성화]
+#   해당 시뮬레이터의 active: false 로 변경
+#   → 코드 삭제 없이 즉시 비활성화 가능
+# ================================================================
+
+# 현재 활성 전략 키 (strategies 항목 중 하나와 일치해야 함)
+active_strategy: "2026-04"
+
+strategies:
+  "2026-04":
+    module: "src.strategy.monthly.algo_04_v2"
+    class: "Algo04V2"
+    description: "4월 어텐션 모멘텀 전략 V2"
+    author: "StockBot Team"
+    since: "2026-04-01"
+
+  # 5월 전략 추가 시 아래 주석 해제 + active_strategy 변경
+  # "2026-05":
+  #   module: "src.strategy.monthly.algo_05_v1"
+  #   class: "Algo05V1"
+  #   description: "5월 분산 모멘텀 전략 V1"
+  #   author: "StockBot Team"
+  #   since: "2026-05-01"
+
+simulators:
+  - id: "sim_original"
+    module: "src.strategy.simulators.sim1_original"
+    class: "OriginalSimulator"
+    description: "원본 전략 시뮬레이터 (+10% 익절 / -5% 손절)"
+    active: true
+
+  - id: "sim_conservative"
+    module: "src.strategy.simulators.sim2_conservative"
+    class: "ConservativeSimulator"
+    description: "보수적 시뮬레이터 (+5% 익절 / -3% 손절)"
+    active: true
+
+  - id: "sim_aggressive"
+    module: "src.strategy.simulators.sim3_aggressive"
+    class: "AggressiveSimulator"
+    description: "공격적 시뮬레이터 (+20% 익절 / -7% 손절)"
+    active: true
+
+  # 새 시뮬레이터 추가 예시:
+  # - id: "sim_momentum"
+  #   module: "src.strategy.simulators.sim4_momentum"
+  #   class: "MomentumSimulator"
+  #   description: "모멘텀 추종 시뮬레이터"
+  #   active: false  # 테스트 완료 후 true로 변경

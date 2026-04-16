@@ -441,9 +441,10 @@ function TradeContent() {
 
     function renderRealPortfolioSection() {
         const deposit = balance?.deposit ?? 0;
-        const holdings = balance?.holdings || [];
-        const totalEval = holdings.reduce((sum, h) => sum + ((h.price || 0) * (h.qty || 0)), 0);
-        const totalPL = holdings.reduce((sum, h) => sum + (h.pl_amount || 0), 0);
+        // [V8.9.9 Hotfix] 매도 완료되어 잔고가 0주인 종목은 포트폴리오(UI)에서 제외 필터링
+        const holdings = (balance?.holdings || []).filter((h: any) => Number(h.qty || h.quantity || 0) > 0);
+        const totalEval = holdings.reduce((sum: any, h: any) => sum + ((h.price || 0) * (h.qty || 0)), 0);
+        const totalPL = holdings.reduce((sum: any, h: any) => sum + (h.pl_amount || 0), 0);
 
         return (
             <Stack gap="md">

@@ -763,6 +763,26 @@ if __name__ == "__main__":
                         final_df = new_df
                     final_df.to_excel(monthly_file, index=False)
                     print(f"[Excel] 월별 통합 리포트 업데이트 완료: {monthly_file}")
+                    
+                    # [V8.9.9.47] UI 측 목록(reports.json) 강제 동기화
+                    import glob
+                    reports_list = []
+                    for f_path in sorted(glob.glob('data/reports/monthly_research_*.xlsx'), reverse=True):
+                        fname = os.path.basename(f_path)
+                        month_part = fname.replace('monthly_research_', '').replace('.xlsx', '')
+                        y, m = month_part.split('-')
+                        reports_list.append({
+                            "type": "research",
+                            "title": f"{y}년 {int(m)}월 분석 리포트",
+                            "date": now_kst.strftime('%Y-%m-%d'),
+                            "filename": fname,
+                            "timestamp": now_kst.timestamp()
+                        })
+                    with open('data/reports.json', 'w', encoding='utf-8') as rf:
+                        import json
+                        json.dump(reports_list, rf, ensure_ascii=False, indent=2)
+                    print("[Excel] reports.json (UI 리스트) 동기화 완료")
+                    
                 except Exception as e:
                     print(f"[Excel Error] 월별 통합 리포트 저장 실패: {e}")
 

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-const VERSION = 'v53-fix-build-error';
+const VERSION = 'V50.1';
 
 export async function GET() {
     return Response.json({

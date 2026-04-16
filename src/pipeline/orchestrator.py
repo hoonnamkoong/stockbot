@@ -63,6 +63,8 @@ def run_pipeline(ctx: PipelineContext) -> None:
             )
         else:
             deep_dive_report = ""
+        # [Bug 1 Fix] 신규 picks 없어도 reports.json 항상 재생성
+        storage.rebuild_reports_index(ctx.now_kst)
 
     # ── Stage 4: 텔레그램 발송 + 최종 저장 ───────────────────────
     ctx.log("▶ Stage 4: 리포트 발송 + 저장")

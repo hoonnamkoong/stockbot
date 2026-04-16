@@ -93,6 +93,14 @@ class DataFetcherWorker(BaseWorker):
         counts = self.storage.update_consecutive_counts(passed_codes, self.ctx.now_kst)
         for s in results_raw:
             s['consecutive_days'] = counts.get(s['code'], 1)
+            # [Bug 4 Fix] change_rate 계산: 등락률을 문자열로 생성
+            price = int(s.get('price', s.get('current_price', 0)))
+            prev_close = int(s.get('prev_close', 0))
+            if prev_close > 0 and price > 0:
+                rate = ((price - prev_close) / prev_close) * 100
+                s['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
+            elif 'change_rate' not in s:
+                s['change_rate'] = "0.00%"
 
         # 6. 상태 저장
         self.storage.save_sync_state(sync_state)

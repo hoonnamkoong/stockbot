@@ -516,7 +516,9 @@ function TradeContent() {
                         const holdings = Object.keys(portfolio).map(code => {
                             const p = portfolio[code];
                             const avgVal = p.avg_price || p.price || 0;
-                            const curVal = stats.current_prices?.[code] || avgVal; 
+                            // current_prices가 있으면 사용, 없으면 avg_price 유지 (||가 아닌 ?? 사용으로 0원 종목 처리)
+                            const curVal = stats.current_prices?.[code] ?? avgVal; 
+                            // 개별 종목 수익률: 전체 수익률(stats.profit_rate)로 폴백하지 않음
                             const pl = avgVal > 0 ? ((curVal - avgVal) / avgVal) * 100 : 0;
                             
                             return {
@@ -525,7 +527,7 @@ function TradeContent() {
                                 qty: p.quantity,
                                 avg_price: avgVal,
                                 current_price: curVal,
-                                pl_rate: pl || (stats.profit_rate || 0)
+                                pl_rate: pl
                             };
                         });
                         return (

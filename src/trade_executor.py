@@ -308,16 +308,24 @@ def main():
                 reason = f"Rejected by Broker: {exec_res.get('error')}"
                 print(f"  [Skip] 예약 {res_id} 거부됨 -> 취소 처리 ({reason})")
 
-            # [V8.9.9.31 Precision Fix] 실제 체결 정보 기록 보강 (Unknown 방지)
-            real_name = exec_res.get('name', res.get('name', 'Unknown'))
-            real_price = exec_res.get('price', price)
-            if real_price == 0: real_price = price # 폴백
-            
-            # [V8.9.9.31] 수익률(Yield) 계산 (매도 시에만)
+            # [V50.1 Bug5 Fix] 실제 체결 정보 기록 보강
+            # Vercel API 응답에서 name/price 우선 추출
+            real_name = exec_res.get('name', '') or res.get('name', '')
+            real_price = int(exec_res.get('price', 0) or exec_res.get('avg_price', 0) or price)
+            if real_price == 0:
+                real_price = price  # 예약 시 입력가로 폴백
+
+            # 종목명이 Unknown인 경우 all_stocks.json에서 보완
+            if not real_name or real_name == 'Unknown':
+                real_name = _lookup_stock_name(code)
+            if not real_name or real_name == 'Unknown':
+                real_name = res.get('name', f'종목({code})')
+
+            # [V8.9.9.31] 수익률(ROI) 계산 (매도 시에만)
             profit_rate = None
             if side == 'sell':
                 avg_buy_price = res.get('avg_buy_price', 0)
-                if avg_buy_price > 0:
+                if avg_buy_price > 0 and real_price > 0:
                     profit_rate = ((real_price - avg_buy_price) / avg_buy_price) * 100
 
             append_order_history({

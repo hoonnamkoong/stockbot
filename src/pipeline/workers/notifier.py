@@ -102,7 +102,18 @@ class NotifierWorker(BaseWorker):
             pass
 
     def _aggregate_multi_day(self, stocks: list) -> None:
-        """5일/3일 누적 보드 데이터를 집계합니다."""
+        """5일/3일 누적 보드 데이터를 집계합니다.
+        - consecutive_registry에서 연속일수 읽어서 정확하게 반영
+        - change_rate가 누락된 종목은 price/prev_close로 재계산
+        - 결과 파일은 db-data 브랜치에 보존 (코드 변경 시 초기화 방지)
+        """
+        # consecutive_registry 로드 (연속일수 정확성 확보)
+        try:
+            consecutive_counts = self.storage.load_consecutive_registry().get('counts', {})
+        except Exception as e:
+            self.log_error(f"consecutive_registry 로드 실패: {e}")
+            consecutive_counts = {}
+
         for days in [3, 5]:
             filepath = f"data/analysis_{days}days.json"
             old_map = {}
@@ -118,12 +129,30 @@ class NotifierWorker(BaseWorker):
             for s in stocks:
                 code = s.get('code', '')
                 old = old_map.get(code, {})
-                spark_p = old.get('sparkline_price', []) + [s.get('current_price', s.get('price', 0))]
+
+                # 가격 스파크라인 누적
+                price = s.get('current_price') or s.get('price', 0)
+                spark_p = old.get('sparkline_price', []) + [price]
                 spark_n = old.get('sparkline_posts', []) + [s.get('recent_posts_count', 0)]
                 s['sparkline_price'] = spark_p[-days:]
                 s['sparkline_posts'] = spark_n[-days:]
-                s['avg_posts'] = sum(s['sparkline_posts']) / len(s['sparkline_posts']) if s['sparkline_posts'] else 0
+                s['avg_posts'] = round(sum(s['sparkline_posts']) / len(s['sparkline_posts']), 1) if s['sparkline_posts'] else 0
                 s['total_posts'] = sum(s['sparkline_posts'])
+
+                # [Bug 2 Fix] consecutive_registry에서 연속일수 오버라이드
+                reg_days = consecutive_counts.get(code, 0)
+                s['consecutive_days'] = reg_days if reg_days > 0 else s.get('consecutive_days', 1)
+
+                # [Bug 2 Fix] change_rate 누락 시 재계산
+                if not s.get('change_rate'):
+                    p = int(s.get('price', s.get('current_price', 0)))
+                    pc = int(s.get('prev_close', 0))
+                    if p > 0 and pc > 0:
+                        rate = ((p - pc) / pc) * 100
+                        s['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
+                    else:
+                        s['change_rate'] = s.get('change_rate', '0.00%')
+
                 aggregated.append(s)
 
             try:

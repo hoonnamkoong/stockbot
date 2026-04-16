@@ -61,10 +61,12 @@ export default function ResearchClient() {
             <AppShell.Header>
                 <Group h="100%" px="md">
                     <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-                    <IconRobot size={isMobile ? 24 : 30} style={{ color: '#228be6' }} />
-                    <Title order={3} size={isMobile ? 'h5' : 'h3'}>
-                        StockBot {(versionInfo && typeof versionInfo !== 'string') ? versionInfo.version : 'v10.6-stable'}
-                    </Title>
+                    <div>
+                        <Title order={3} size={isMobile ? 'h5' : 'h3'} style={{ lineHeight: 1.2 }}>
+                            KOSPI / KOSDAQ StockBot
+                        </Title>
+                        <Text size="xs" c="dimmed">{(versionInfo && typeof versionInfo !== 'string') ? versionInfo.version : 'V50.1'}</Text>
+                    </div>
                     <Group ml="auto" gap={isMobile ? 4 : 'xs'}>
                         <Button
                             variant="light" color="blue" onClick={() => router.push('/trade')}

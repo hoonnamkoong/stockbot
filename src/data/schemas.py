@@ -45,6 +45,7 @@ class StockData(BaseModel):
     sentiment: str = "Neutral"
     top_keywords: list = []
     consecutive_days: int = 1
+    change_rate: str = ""       # "±X.XX%" 형식
     signal: Optional[str] = None
     current_price: int = 0  # price의 별칭 (호환성 유지)
     posts: list = []  # 상세 게시글 목록
@@ -101,8 +102,22 @@ class StockData(BaseModel):
 
     @classmethod
     def from_dict(cls, d: dict) -> 'StockData':
-        """기존 dict 기반 코드와의 호환성을 위한 팩토리 메서드"""
-        return cls(**{k: v for k, v in d.items() if k in cls.model_fields})
+        """기존 dict 기반 코드와의 호환성을 위한 팩토리 메서드.
+        - keywords → top_keywords 자동 매핑
+        - change_rate 문자열 보정 (숫자면 문자열로 변환)
+        """
+        # keywords 필드 호환 처리
+        data = dict(d)
+        if 'keywords' in data and 'top_keywords' not in data:
+            data['top_keywords'] = data.pop('keywords', [])
+        # change_rate 숫자→문자열 변환
+        if 'change_rate' in data and isinstance(data['change_rate'], (int, float)):
+            v = data['change_rate']
+            data['change_rate'] = f"+{v:.2f}%" if v >= 0 else f"{v:.2f}%"
+        # current_price / price 동기화
+        if 'current_price' not in data and 'price' in data:
+            data['current_price'] = data['price']
+        return cls(**{k: v for k, v in data.items() if k in cls.model_fields})
 
     def to_dict(self) -> dict:
         """기존 코드와의 호환성을 위한 dict 변환"""

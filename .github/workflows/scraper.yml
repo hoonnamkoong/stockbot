@@ -90,12 +90,15 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global init.defaultBranch db-data
 
-          # [V8.9.9.25 Structural Fix] 저장 대상 확장 (HTML 리포트 및 카운트 레지스트리 추가)
+          # [V50.1] 저장 대상: JSON, CSV, XLSX, 리포트 엑셀, 멀티데이 집계
           mkdir -p scraper_output/reports
           cp data/*.json scraper_output/ 2>/dev/null || true
           cp data/*.xlsx scraper_output/ 2>/dev/null || true
           cp data/*.csv scraper_output/ 2>/dev/null || true
           cp -r data/reports/* scraper_output/reports/ 2>/dev/null || true
+          # [Bug 2 Fix] analysis_3days.json, analysis_5days.json 명시적 보존
+          [ -f data/analysis_3days.json ] && cp data/analysis_3days.json scraper_output/ || true
+          [ -f data/analysis_5days.json ] && cp data/analysis_5days.json scraper_output/ || true
 
           # db-data 브랜치에서 기존 파일 복원 (이력 보존)
           git fetch origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet, will create"

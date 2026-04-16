@@ -709,8 +709,8 @@ if __name__ == "__main__":
                     spark_p = old_item.get('sparkline_price', [])
                     spark_n = old_item.get('sparkline_posts', [])
                     
-                    # 오늘 데이터 추가
-                    spark_p.append(s['current_price'])
+                    # 오늘 데이터 추가 (KeyError 방어)
+                    spark_p.append(s.get('current_price', 0))
                     spark_n.append(s.get('recent_posts_count', 0))
                     
                     s['sparkline_price'] = spark_p[-days:]
@@ -732,43 +732,44 @@ if __name__ == "__main__":
             aggregate_multi_day(5)
             aggregate_multi_day(3)
             
-            # [V8.9.9.33] 단일 엑셀 리포트 누적 업데이트 기능
-            def update_daily_excel_report(new_picks, report_text):
+            # [V8.9.9.46] 월별 통합 엑셀 리포트 누적 (수익률 제외 사양)
+            def update_monthly_research_excel(new_picks, report_text):
                 if not new_picks: return
                 
-                today_file = f"data/reports/research_daily_{now_kst.strftime('%Y%m%d')}.xlsx"
+                month_str = now_kst.strftime('%Y-%m')
+                monthly_file = f"data/reports/monthly_research_{month_str}.xlsx"
                 os.makedirs('data/reports', exist_ok=True)
                 
                 new_rows = []
                 for p in new_picks:
                     new_rows.append({
                         'DateTime': now_kst.strftime('%Y-%m-%d %H:%M'),
-                        'Stock': p['name'],
-                        'Code': p['code'],
+                        'Market': p.get('market', 'Unknown'),
+                        'Stock': p.get('name', 'Unknown'),
+                        'Code': p.get('code', 'Unknown'),
                         'Signal': p.get('signal', 'WATCH'),
-                        'Price': p.get('current_price', 0),
+                        'Current Price': p.get('current_price', 0),
                         'Sentiment': p.get('sentiment', 'Neutral'),
-                        'Summary': p.get('posts_summary', '')
+                        'Key Drivers': p.get('posts_summary', '')[:100]
                     })
                 
                 new_df = pd.DataFrame(new_rows)
                 
-                if os.path.exists(today_file):
-                    try:
-                        existing_df = pd.read_excel(today_file)
+                try:
+                    if os.path.exists(monthly_file):
+                        existing_df = pd.read_excel(monthly_file)
                         final_df = pd.concat([existing_df, new_df], ignore_index=True)
-                        final_df.to_excel(today_file, index=False)
-                    except:
-                        new_df.to_excel(today_file, index=False)
-                else:
-                    new_df.to_excel(today_file, index=False)
-                
-                print(f"[Excel] 리포트가 엑셀 파일에 업데이트되었습니다: {today_file}")
+                    else:
+                        final_df = new_df
+                    final_df.to_excel(monthly_file, index=False)
+                    print(f"[Excel] 월별 통합 리포트 업데이트 완료: {monthly_file}")
+                except Exception as e:
+                    print(f"[Excel Error] 월별 통합 리포트 저장 실패: {e}")
 
             # 리포트가 있을 경우 엑셀 업데이트 호출 (Stage 3의 final_picks 활용)
             if 'final_picks' in locals() and final_picks:
                 import pandas as pd
-                update_daily_excel_report(final_picks, deep_dive_report)
+                update_monthly_research_excel(final_picks, deep_dive_report)
 
             print(f"[Sync] 데이터 집계 및 엑셀 업데이트 완료")
             

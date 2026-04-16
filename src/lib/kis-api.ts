@@ -469,3 +469,86 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
             throw new Error(msg);
         }
     }
+
+/**
+ * [V50.1] KIS 당일/기간별 체결 내역 조회
+ * API: /uapi/domestic-stock/v1/trading/inquire-daily-ccld (TTTC8001R)
+ * 반환: 종목명, 체결가, 체결수량, 매수/매도 구분 포함
+ */
+export async function getRealTradeHistory(startDate?: string, endDate?: string): Promise<any[]> {
+    try {
+        const config = getKISConfig();
+        const token = await getAccessToken();
+
+        const fullAccount = (config.ACCOUNT_NO || '').replace(/[-\s]/g, '').trim();
+        const CANO = fullAccount.slice(0, 8);
+        const ACNT_PRDT_CD = fullAccount.slice(8, 10) || '01';
+
+        // 기본값: 오늘 ~ 30일 전
+        const today = new Date(Date.now() + 9 * 60 * 60 * 1000); // KST
+        const toDateStr = endDate || today.toISOString().slice(0, 10).replace(/-/g, '');
+        const from = new Date(today);
+        from.setDate(from.getDate() - 30);
+        const fromDateStr = startDate || from.toISOString().slice(0, 10).replace(/-/g, '');
+
+        const tr_id = config.IS_VIRTUAL ? 'VTTC8001R' : 'TTTC8001R';
+        console.log(`[KIS-API] [${tr_id}] 체결 내역 조회: ${fromDateStr} ~ ${toDateStr}`);
+
+        const res = await axios.get(
+            `${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-daily-ccld`,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'authorization': `Bearer ${token}`,
+                    'appkey': config.APP_KEY,
+                    'appsecret': config.APP_SECRET,
+                    'tr_id': tr_id,
+                    'custtype': 'P',
+                },
+                params: {
+                    CANO,
+                    ACNT_PRDT_CD,
+                    INQR_STRT_DT: fromDateStr,    // 조회 시작일 (YYYYMMDD)
+                    INQR_END_DT: toDateStr,        // 조회 종료일 (YYYYMMDD)
+                    SLL_BUY_DVSN_CD: '00',         // 00: 전체, 01: 매도, 02: 매수
+                    INQR_DVSN: '00',               // 00: 역순(최신→과거)
+                    PDNO: '',
+                    CCLD_DVSN: '01',               // 01: 체결만
+                    ORD_GNO_BRNO: '',
+                    ODNO: '',
+                    INQR_DVSN_3: '00',
+                    INQR_DVSN_1: '',
+                    CTX_AREA_FK100: '',
+                    CTX_AREA_NK100: '',
+                },
+                timeout: 10000,
+            }
+        );
+
+        if (res.data.rt_cd !== '0') {
+            console.error(`[KIS-API] 체결 내역 조회 실패: ${res.data.msg1}`);
+            return [];
+        }
+
+        const output1: any[] = res.data.output1 || [];
+        console.log(`[KIS-API] 체결 내역 ${output1.length}건 조회 완료`);
+
+        return output1.map((item: any) => ({
+            time: `${item.ord_dt?.slice(0,4)}-${item.ord_dt?.slice(4,6)}-${item.ord_dt?.slice(6,8)} ${item.ord_tmd?.slice(0,2)}:${item.ord_tmd?.slice(2,4)}:${item.ord_tmd?.slice(4,6)}`,
+            symbol:       `${item.prdt_name}(${item.pdno})`,   // 종목명(코드)
+            code:         item.pdno,
+            name:         item.prdt_name,
+            action:       item.sll_buy_dvsn_cd === '01' ? 'SELL' : 'BUY',
+            price:        item.avg_prvs || item.ccld_avg_unpr || '0',  // 체결평균가
+            qty:          item.tot_ccld_qty || '0',                     // 체결수량
+            amount:       item.tot_ccld_amt || '0',                     // 체결금액
+            roi:          item.evlu_pfls_rt || '-',                     // 평가손익률
+            type:         'real',
+        }));
+    } catch (e: any) {
+        const msg = e.response?.data?.msg1 || e.message;
+        console.error('[KIS-API] getRealTradeHistory Error:', msg);
+        return [];
+    }
+}
+

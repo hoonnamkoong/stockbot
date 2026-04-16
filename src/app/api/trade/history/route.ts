@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRealTradeHistory } from '@/lib/kis-api';
 
 /**
- * [V8.9.9] Trading History API (Remote DB Version)
- * Fetches CSV log files from GitHub Raw and returns them as structured JSON.
+ * [V50.1] Trading History API
+ * - 실거래(real): KIS inquire-daily-ccld API 직접 조회 (체결가/종목명 정확)
+ * - 시뮬레이터: GitHub db-data 브랜치 CSV 파싱 (기존 방식 유지)
  */
 
 export const dynamic = 'force-dynamic';
@@ -11,18 +13,29 @@ export async function GET(req: NextRequest) {
     try {
         const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
         
-        // 1. Files to search
-        const fileInfos = [
-            { type: 'real', name: 'trade_history_real.csv' },
-            { type: 'sim_original', name: 'trade_history_sim_original.csv' },
+        // 시뮬레이터 CSV 파일 목록
+        const simFiles = [
+            { type: 'sim_original',     name: 'trade_history_sim_original.csv' },
             { type: 'sim_conservative', name: 'trade_history_sim_conservative.csv' },
-            { type: 'sim_aggressive', name: 'trade_history_sim_aggressive.csv' },
-            { type: 'sim_conviction', name: 'trade_history_sim_conviction.csv' }
+            { type: 'sim_aggressive',   name: 'trade_history_sim_aggressive.csv' },
+            { type: 'sim_conviction',   name: 'trade_history_sim_conviction.csv' }
         ];
 
         let allHistory: any[] = [];
 
-        await Promise.all(fileInfos.map(async (fileInfo) => {
+        // 1. 실거래 내역: KIS API 직접 조회
+        // - CSV 파싱 방식의 구조적 한계(주문접수 응답에 체결가 없음)를 해결
+        // - KIS inquire-daily-ccld API는 실제 체결가, 종목명, 수량을 모두 반환
+        try {
+            const realHistory = await getRealTradeHistory();
+            allHistory.push(...realHistory);
+            console.log(`[HistoryAPI] KIS 실거래 체결 내역 ${realHistory.length}건 로드`);
+        } catch (e: any) {
+            console.error('[HistoryAPI] KIS 실거래 조회 실패, 건너뜀:', e.message);
+        }
+
+        // 2. 시뮬레이터 CSV 파싱 (기존 로직 유지)
+        await Promise.all(simFiles.map(async (fileInfo) => {
             try {
                 const cacheBuster = Date.now();
                 const res = await fetch(`${GITHUB_BASE}/${fileInfo.name}?t=${cacheBuster}`, { cache: 'no-store' });
@@ -31,38 +44,32 @@ export async function GET(req: NextRequest) {
                 const content = await res.text();
                 const lines = content.split('\n').filter(line => line.trim().length > 0);
                 
-                if (lines.length > 1) { // Header exists
-                    // CSV 파싱 정규식: 쉼표로 구분하되 따옴표 내부의 쉼표는 무시
-                    const csvRegex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g;
-                    const parseCSVLine = (text: string) => {
-                        const results = [];
-                        let match;
-                        while ((match = csvRegex.exec(text)) !== null) {
-                            results.push((match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2]) || '');
-                        }
-                        return results;
-                    };
+                if (lines.length > 1) {
+                    // 쉼표 분리 (따옴표 미포함 CSV 기준)
+                    const parseCSVLine = (text: string) =>
+                        text.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
 
-                    const headers = parseCSVLine(lines[0]).map(h => h.trim());
+                    const headers = parseCSVLine(lines[0]);
                     
                     for (let i = 1; i < lines.length; i++) {
-                        const values = parseCSVLine(lines[i]).map(v => v.trim());
-                        if (values.length < headers.length) continue;
+                        const values = parseCSVLine(lines[i]);
+                        if (values.length < 2) continue;
 
                         const entry: any = { type: fileInfo.type };
                         headers.forEach((h, idx) => {
-                            if (h === 'timestamp') entry.time = values[idx];
-                            else if (h === 'symbol') entry.symbol = values[idx];
-                            else if (h === 'action') entry.action = values[idx].toUpperCase();
-                            else if (h === 'price') entry.price = values[idx];
-                            else if (h === 'quantity') entry.qty = values[idx];
-                            else if (h === 'total_amount') entry.amount = values[idx];
-                            else if (h === 'roi') entry.roi = values[idx];
-                            else if (h === 'reason') entry.reason = values[idx];
+                            const v = values[idx] || '';
+                            if (h === 'timestamp') entry.time = v;
+                            else if (h === 'symbol') entry.symbol = v;
+                            else if (h === 'action') entry.action = v.toUpperCase();
+                            else if (h === 'price') entry.price = v;
+                            else if (h === 'quantity') entry.qty = v;
+                            else if (h === 'total_amount') entry.amount = v;
+                            else if (h === 'roi') entry.roi = v;
+                            else if (h === 'reason') entry.reason = v;
                         });
                         
                         if (!entry.amount && entry.price && entry.qty) {
-                            const p = parseInt(entry.price.replace(/,/g, ''));
+                            const p = parseInt((entry.price || '').replace(/,/g, ''));
                             const q = parseInt(entry.qty);
                             if (!isNaN(p) && !isNaN(q)) {
                                 entry.amount = (p * q).toLocaleString();
@@ -76,7 +83,7 @@ export async function GET(req: NextRequest) {
             }
         }));
 
-        // Sort by timestamp descending
+        // 3. 시간순 정렬 (최신 → 과거)
         allHistory.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
         return NextResponse.json({ 

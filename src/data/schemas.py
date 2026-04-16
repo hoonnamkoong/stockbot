@@ -180,7 +180,8 @@ class SyncState(BaseModel):
     last_update_date: str = ""
     stocks: dict = {}
     reported_codes: list = []
-    daily_reported_info: list = []   # [{'code': str, 'name': str}, ...]
+    daily_reported_info: list = []   # [{'code': str, 'name': str, 'rank': int}, ...]
+    daily_complete: bool = False     # 오늘 9개 추천 완성 여부
 
 
 class ReportEntry(BaseModel):

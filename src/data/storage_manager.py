@@ -177,6 +177,7 @@ class StorageManager:
             d = p.to_dict() if isinstance(p, StockData) else p
             new_rows.append({
                 'DateTime': now_kst.strftime('%Y-%m-%d %H:%M'),
+                'Rank': d.get('rank', '-'),           # 해당 배치 내 추천 순위 (1~3)
                 'Market': d.get('market', 'Unknown'),
                 'Stock': d.get('name', 'Unknown'),
                 'Code': d.get('code', 'Unknown'),

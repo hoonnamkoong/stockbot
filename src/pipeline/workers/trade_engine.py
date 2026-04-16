@@ -80,12 +80,19 @@ class TradeEngineWorker(BaseWorker):
                         break
 
         final_picks = new_picks[:3]
+        # 해당 배치 내 순위(rank) 추가: 1~3위
+        for i, p in enumerate(final_picks):
+            p['rank'] = i + 1
+
+        # 9개 완성 여부 감지
+        total_after = len(reported_codes) + len(final_picks)
+        sync_state.daily_complete = total_after >= 9
 
         # 4. 신규 보고 종목이 있으면 상태 업데이트 + 엑셀 기록
         if final_picks:
-            self.log(f"신규 보고 대상: {[p['name'] for p in final_picks]}")
+            self.log(f"신규 보고 대상: {[f\"{p['name']}({p.get('rank','?')}위)\" for p in final_picks]}")
             sync_state.daily_reported_info.extend(
-                [{'code': p['code'], 'name': p['name']} for p in final_picks]
+                [{'code': p['code'], 'name': p['name'], 'rank': p.get('rank', 0)} for p in final_picks]
             )
             self.storage.save_sync_state(sync_state)
 

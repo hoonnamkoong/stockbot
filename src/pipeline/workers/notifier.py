@@ -91,6 +91,19 @@ class NotifierWorker(BaseWorker):
         else:
             self.log("시뮬레이션 결과만 발송 완료")
 
+        # 9개 완성 시 순위 정렬 알림 발송
+        if getattr(sync_state, 'daily_complete', False):
+            try:
+                reported = sync_state.daily_reported_info
+                lines = ["📋 *오늘의 추천 종목 (9개 완성)*\n"]
+                for i, item in enumerate(reported[:9], 1):
+                    lines.append(f"  {i}위. {item.get('name', '?')}")
+                lines.append(f"\n📊 분석 리포트: https://stockbot-phi.vercel.app/research")
+                self.tg.send_message("\n".join(lines))
+                self.log("9개 완성 순위 알림 발송")
+            except Exception as e:
+                self.log_error(f"순위 알림 발송 실패: {e}")
+
     def _send_fallback_summary(self, all_stocks, final_picks, report, sync_state) -> None:
         """텔레그램 발송 실패 시 최소한의 정보만 발송."""
         try:

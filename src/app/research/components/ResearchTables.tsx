@@ -183,8 +183,12 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
                                     <Group gap={4} align="flex-end" h={40} wrap="nowrap" justify="center">
                                         {(s.sparkline_price || []).map((p: number, idx: number) => {
-                                            const maxP = Math.max(...(s.sparkline_price || []), 1);
-                                            const height = Math.max((p / maxP) * 25, 2);
+                                            const prices = s.sparkline_price || [];
+                                            // [Fix] 동적 min-max: 바닥을 min*0.998로 설정하여 작은 변동도 가시화
+                                            const minP = prices.length > 1 ? Math.min(...prices) * 0.998 : 0;
+                                            const maxP = Math.max(...prices, 1);
+                                            const range = maxP - minP || 1;
+                                            const height = Math.max(((p - minP) / range) * 25, 2);
                                             return (
                                                 <Stack key={idx} gap={2} align="center">
                                                     <Text size="8px" fw={700} c="dimmed" style={{ fontSize: '8px' }}>
@@ -204,8 +208,12 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
                                 <Table.Td onClick={() => onCellClick(s.code)} style={{ cursor: 'pointer' }}>
                                     <Group gap={4} align="flex-end" h={40} wrap="nowrap" justify="center">
                                         {(s.sparkline_posts || []).map((p: number, idx: number) => {
-                                            const maxN = Math.max(...(s.sparkline_posts || []), 5);
-                                            const height = Math.max((p / maxN) * 25, 2);
+                                            const posts = s.sparkline_posts || [];
+                                            // [Fix] 동적 min-max: 토론 바닥을 min*0.9로 설정 (0 기준 대비 변화량 강조)
+                                            const minN = posts.length > 1 ? Math.max(Math.min(...posts) * 0.9, 0) : 0;
+                                            const maxN = Math.max(...posts, 5);
+                                            const range = maxN - minN || 1;
+                                            const height = Math.max(((p - minN) / range) * 25, 2);
                                             return (
                                                 <Stack key={idx} gap={2} align="center">
                                                     <Text size="8px" fw={700} c="dimmed" style={{ fontSize: '8px' }}>{p}</Text>

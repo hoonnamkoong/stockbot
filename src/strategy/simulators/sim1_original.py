@@ -3,13 +3,18 @@ from .base_simulator import BaseSimulator
 class OriginalSimulator(BaseSimulator):
     """
     [Sim 1] 안정 지향형 (Original - Buzz Filter 기반)
+from .base_simulator import BaseSimulator
+
+class OriginalSimulator(BaseSimulator):
+    """
+    [Sim 1] 안정 지향형 (Original - Buzz Filter 기반)
     - 3M 초기화 후 개시
     - 1/N 동일 비중 (10개 슬롯)
     """
     def __init__(self, initial_cash=3000000):
         super().__init__("Original", initial_cash) # 파일명: sim_original_state.json
 
-    def run(self, candidates):
+    def run(self, candidates, current_prices=None):
         """
         [Standard] 통합 인터페이스
         """
@@ -43,7 +48,10 @@ class OriginalSimulator(BaseSimulator):
                 ai_summary = stock.get('posts_summary', 'Buzz 필터 통과')
                 self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason=f"[안정] {ai_summary}")
 
-        # [V8.9.9.17] 매매 결과와 관계없이 성과 지표 상시 업데이트 및 저장
-        # candidates의 현재 가격 정보를 지표 계산에 반영하여 수익률 정체 해결
+        # [V8.9.9.48 Hotfix] 매매 결과와 관계없이 성과 지표 상시 업데이트 및 저장
+        # TypeError: run() got an unexpected keyword argument 'current_prices' 에러 해결
+        if current_prices is None:
+            current_prices = {s['code']: s.get('price', s.get('현재가', 0)) for s in candidates}
+            
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

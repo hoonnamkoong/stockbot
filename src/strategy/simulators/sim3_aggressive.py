@@ -6,13 +6,21 @@ class AggressiveSimulator(BaseSimulator):
     [Sim 3] 공격적 추세추종형 (Aggressive - Scale-out & Momentum)
     - 3M 초기화 후 개시
     - Scale-out: +10% 수익 시 50% 분할 익절
+from .base_simulator import BaseSimulator
+from datetime import datetime
+
+class AggressiveSimulator(BaseSimulator):
+    """
+    [Sim 3] 공격적 추세추종형 (Aggressive - Scale-out & Momentum)
+    - 3M 초기화 후 개시
+    - Scale-out: +10% 수익 시 50% 분할 익절
     - Runner: 대량 매도 후 남은 물량은 전일 종가 대비 -5% 하락 시 전량 매도
     - Wide Stop: -7%
     """
     def __init__(self, initial_cash=3000000):
         super().__init__("Aggressive", initial_cash) # 파일명: sim_aggressive_state.json
 
-    def run(self, candidates):
+    def run(self, candidates, current_prices=None):
         """
         [Aggressive] 통합 인터페이스
         """
@@ -76,7 +84,8 @@ class AggressiveSimulator(BaseSimulator):
                 reason = stock.get('posts_summary', '[공격] 적극적 지향형 시그널')
                 self.buy(code, stock.get('name', stock.get('종목명', 'Unknown')), price, qty, reason=reason)
 
-        # [V8.9.9.17] 매매 결과와 관계없이 성과 지표 상시 업데이트 및 저장
-        current_prices = {c: s.get('price', s.get('현재가', 0)) for c, s in candidate_map.items()}
-        self.save_state(current_prices=current_prices)
-        return self.calculate_stats(current_prices=current_prices)
+        # [V8.9.9.48 Hotfix] 매매 결과와 관계없이 성과 지표 상시 업데이트 및 저장
+        if current_prices is None:
+            current_prices = {c: s.get('price', s.get('현재가', 0)) for c, s in candidate_map.items()}
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)

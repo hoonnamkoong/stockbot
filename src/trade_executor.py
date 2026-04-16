@@ -143,8 +143,6 @@ def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[�
             reason
         ])
 
-    )
-
 
 # ─── 유틸리티: 종목명 자동 매칭 ─────────────────────────
 

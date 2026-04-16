@@ -798,7 +798,7 @@ if __name__ == "__main__":
             # [V8.9.9.29 Fix] 'push' 이벤트는 알림 제외. 오직 정시 또는 수동 UI 실행 시에만.
             # [V8.9.9.40 FIX] 시작 시점의 분(start_minute)을 기준으로 알림 여부 판단 (지연 누락 방지)
             github_event = os.environ.get('GITHUB_EVENT_NAME', 'manual')
-            is_manual_ui = (github_event == 'workflow_dispatch')
+            is_manual_ui = (github_event in ['workflow_dispatch', 'repository_dispatch', 'manual'])
             is_near_the_hour = (start_minute < 5)
             
             # 매뉴얼 실행이거나 정시(0~5분)로 시작된 경우 알림

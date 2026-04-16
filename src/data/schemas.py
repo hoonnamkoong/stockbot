@@ -8,7 +8,7 @@
 """
 
 from pydantic import BaseModel, field_validator, model_validator
-from typing import Optional
+from typing import Optional, ClassVar
 from enum import Enum
 
 
@@ -153,8 +153,8 @@ class TradeRecord(BaseModel):
             'reason': self.reason
         }
 
-    # CSV 컬럼 순서 (헤더 생성 시 사용)
-    CSV_COLUMNS = ['timestamp', 'symbol', 'action', 'price', 'quantity', 'total_amount', 'roi', 'reason']
+    # CSV 컬럼 순서 (헤더 생성 시 사용) — ClassVar로 선언하여 Pydantic 필드에서 제외
+    CSV_COLUMNS: ClassVar[list] = ['timestamp', 'symbol', 'action', 'price', 'quantity', 'total_amount', 'roi', 'reason']
 
 
 class SyncState(BaseModel):

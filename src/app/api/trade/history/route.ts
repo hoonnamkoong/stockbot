@@ -24,7 +24,8 @@ export async function GET(req: NextRequest) {
 
         await Promise.all(fileInfos.map(async (fileInfo) => {
             try {
-                const res = await fetch(`${GITHUB_BASE}/${fileInfo.name}`, { cache: 'no-store' });
+                const cacheBuster = Date.now();
+                const res = await fetch(`${GITHUB_BASE}/${fileInfo.name}?t=${cacheBuster}`, { cache: 'no-store' });
                 if (!res.ok) return;
 
                 const content = await res.text();
@@ -56,6 +57,7 @@ export async function GET(req: NextRequest) {
                             else if (h === 'price') entry.price = values[idx];
                             else if (h === 'quantity') entry.qty = values[idx];
                             else if (h === 'total_amount') entry.amount = values[idx];
+                            else if (h === 'roi') entry.roi = values[idx];
                             else if (h === 'reason') entry.reason = values[idx];
                         });
                         

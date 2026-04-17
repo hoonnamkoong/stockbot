@@ -300,8 +300,8 @@ function TradeContent() {
                 <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 650 : 600 }}>
                     <Table.Thead>
                         <Table.Tr>
-                            {isReal && <Table.Th style={{ width: 40 }}></Table.Th>}
-                            <Table.Th style={{ width: 120, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>종목명</Table.Th>
+                            {isReal && <Table.Th style={{ width: 40, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2 }}></Table.Th>}
+                            <Table.Th style={{ width: 120, position: 'sticky', left: isReal ? 40 : 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>종목명</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>수량</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>평단가</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>현재가</Table.Th>
@@ -320,7 +320,7 @@ function TradeContent() {
                             return (
                                 <Table.Tr key={h.code} style={{ cursor: isReal ? 'pointer' : 'default' }}>
                                     {isReal && (
-                                        <Table.Td onClick={(e) => e.stopPropagation()}>
+                                        <Table.Td onClick={(e) => e.stopPropagation()} style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2 }}>
                                             <Checkbox 
                                                 checked={isSelected} 
                                                 onChange={(event) => {
@@ -337,7 +337,7 @@ function TradeContent() {
                                             setCode(h.code);
                                             showNotify('Info', `${h.name} 종목이 선택되었습니다.`, 'blue');
                                         }}
-                                        style={{ cursor: 'pointer', position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}
+                                        style={{ cursor: 'pointer', position: 'sticky', left: isReal ? 40 : 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}
                                     >
                                         <Text size="sm" fw={700} truncate maw={100} c="blue" style={{ textDecoration: 'underline', textUnderlineOffset: '2px' }}>{h.name}</Text>
                                         <Text size="xs" c="dimmed">{h.code}</Text>

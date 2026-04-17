@@ -55,11 +55,11 @@ def run_pipeline(ctx: PipelineContext) -> None:
         daily_info = sync_state.daily_reported_info
         if simulation_results and any(r.get('signal') in ['BUY', 'WATCH'] for r in simulation_results):
             names_str = ", ".join(item['name'] for item in daily_info)
-            dashboard_url = "https://stockbot-phi.vercel.app"
+            dashboard_url = "https://stockbot-phi.vercel.app/api/download/excel"
             deep_dive_report = (
                 f"[안내] 이번 회차의 모든 종목은 오늘 이미 보고되었습니다.\n"
                 f"오늘 보고 종목: {names_str}\n\n"
-                f"{dashboard_url}/research"
+                f"리포트 다운로드: {dashboard_url}"
             )
         else:
             deep_dive_report = ""

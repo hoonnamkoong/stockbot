@@ -57,7 +57,7 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                         <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>외인비중</Table.Th>
                         <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>전일종가</Table.Th>
                         <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>전일외인</Table.Th>
-                        <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>Keywords</Table.Th>
+                        <SortButton label="기관(순)" sortKey="inst_net_buy" />
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -113,8 +113,8 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 <Text size="xs" c="dimmed">{s.prev_foreign_rate}%</Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="10px" c="dimmed" lineClamp={1}>
-                                    {Array.isArray(s.top_keywords) ? s.top_keywords.join(', ') : s.top_keywords}
+                                <Text size="xs" c={s.inst_net_buy && s.inst_net_buy > 0 ? 'red' : s.inst_net_buy && s.inst_net_buy < 0 ? 'blue' : 'gray'}>
+                                    {s.inst_net_buy !== undefined ? (s.inst_net_buy > 0 ? `+${s.inst_net_buy.toLocaleString()}` : s.inst_net_buy.toLocaleString()) : '-'}
                                 </Text>
                             </Table.Td>
                         </Table.Tr>

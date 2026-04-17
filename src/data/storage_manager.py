@@ -184,7 +184,7 @@ class StorageManager:
                 'Signal': d.get('signal', 'WATCH'),
                 'Current Price': d.get('price', d.get('current_price', 0)),
                 'Sentiment': d.get('sentiment', 'Neutral'),
-                'Key Drivers': str(d.get('posts_summary', ''))[:150],
+                'Key Drivers': d.get('deep_dive_text', str(d.get('posts_summary', '')))[:2000],
             })
 
         new_df = pd.DataFrame(new_rows)

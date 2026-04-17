@@ -18,6 +18,7 @@ class AggressiveSimulator(BaseSimulator):
         """
         candidate_map = {s['code']: s for s in candidates}
         portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
 
         # 1. 청산 로직 (Scale-out / Stop / Runner)
         for code in portfolio_codes:
@@ -38,6 +39,7 @@ class AggressiveSimulator(BaseSimulator):
             # (1) Wide Stop: -7%
             if profit_rate <= -7.0:
                 self.sell(code, current_price, reason=f"[공격] 와이드 스탑 (-7% 도달: {profit_rate:.1f}%)")
+                sold_today.add(code)
                 continue
 
             # (2) Scale-out: +10% 시 50% 분할 익절
@@ -45,8 +47,9 @@ class AggressiveSimulator(BaseSimulator):
             if not is_scaled and profit_rate >= 10.0:
                 qty_to_sell = p_item['quantity'] // 2
                 if qty_to_sell > 0:
-                    self.sell(code, current_price, quantity=qty_to_sell, reason=f"[공격] 분할 익절 (+10% 돌파: {profit_rate:.1f}%)")
-                    # 분할 매도 후 플래그는 BaseSimulator.sell에서 설정함
+                    sold_ok = self.sell(code, current_price, quantity=qty_to_sell, reason=f"[공격] 분할 익절 (+10% 돌파: {profit_rate:.1f}%)")
+                    # 분할 매도의 경우는 당일 전량 매도가 아닐 수 있으므로 예외 케이스이나, 당일 재매수는 막기 위해 추가
+                    sold_today.add(code)
                 continue
 
             # (3) Runner: 절반 매도 후 남은 물량 처리 (전일 종가 대비 -5% 하락 시)
@@ -62,13 +65,14 @@ class AggressiveSimulator(BaseSimulator):
                 # 전일 종가 대비 -5% 하락한 음봉 발생 시 전량 청산
                 if current_price < prev_close * 0.95:
                     self.sell(code, current_price, reason=f"[공격] 추세 꺾임 (전일비 -5% 하락)")
+                    sold_today.add(code)
                     continue
 
         # 2. 진입 로직 (10% 비중)
         target_amount = self.initial_cash / 10
         for stock in candidates[:10]:
             code = stock['code']
-            if code in self.state['portfolio']: continue
+            if code in self.state['portfolio'] or code in sold_today: continue
             
             price = float(stock.get('price', stock.get('현재가', 0)))
             if price <= 0: continue

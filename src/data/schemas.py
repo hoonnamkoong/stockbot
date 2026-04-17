@@ -39,6 +39,7 @@ class StockData(BaseModel):
     recent_posts_count: int = 0
     foreign_rate: float = 0.0
     foreign_change: float = 0.0
+    inst_net_buy: int = 0
     prev_close: int = 0
     prev_foreign_rate: float = 0.0
     posts_summary: str = "분석 대기중"

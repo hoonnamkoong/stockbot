@@ -379,10 +379,13 @@ class StrategyAdvisor:
                         formatted += f"💡 <b>근거:</b> {data.get('reason', '')}\n"
                         formatted += f"⚠️ <b>리스크:</b> {data.get('risk', '없음')}\n"
                         formatted += f"✨ <b>핵심:</b> {', '.join(data.get('highlights', []))}\n"
+                        stock['deep_dive_text'] = formatted
                         reports.append(formatted)
                     except:
+                        stock['deep_dive_text'] = response.text.strip()
                         reports.append(response.text.strip())
             except:
+                stock['deep_dive_text'] = f"⚠️ {stock['name']} 심층 분석 실패"
                 reports.append(f"⚠️ {stock['name']} 심층 분석 실패")
 
         header = f"🚀 **[Strategic Deep-Dive]** 최종 선정 {len(reports)}개 종목\n"

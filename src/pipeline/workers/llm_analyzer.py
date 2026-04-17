@@ -126,7 +126,12 @@ class LLMAnalyzerWorker(BaseWorker):
                 full = next((c for c in all_candidates if c['code'] == p['code']), p).copy()
                 full['rank'] = p.get('rank')
                 detail_picks.append(full)
-            return advisor.generate_deep_dive_report(detail_picks)
+            report_str = advisor.generate_deep_dive_report(detail_picks)
+            for p in final_picks:
+                dp = next((c for c in detail_picks if c['code'] == p['code']), None)
+                if dp and 'deep_dive_text' in dp:
+                    p['deep_dive_text'] = dp['deep_dive_text']
+            return report_str
         except Exception as e:
             self.log_error(f"딥다이브 리포트 생성 실패: {e}")
             return ""

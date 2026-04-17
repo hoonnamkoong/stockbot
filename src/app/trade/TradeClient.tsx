@@ -301,7 +301,7 @@ function TradeContent() {
                     <Table.Thead>
                         <Table.Tr>
                             {isReal && <Table.Th style={{ width: 40 }}></Table.Th>}
-                            <Table.Th style={{ width: 120 }}>종목명</Table.Th>
+                            <Table.Th style={{ width: 120, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>종목명</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>수량</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>평단가</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>현재가</Table.Th>
@@ -335,11 +335,9 @@ function TradeContent() {
                                     <Table.Td 
                                         onClick={() => {
                                             setCode(h.code);
-                                            // [Quick Fix] 종목 선택 시 수량을 기본 1로, 가격을 현재가 부근으로 유도할 수 있으나 
-                                            // 여기서는 사용자 요청대로 종목 입력창 활성화에 집중
                                             showNotify('Info', `${h.name} 종목이 선택되었습니다.`, 'blue');
                                         }}
-                                        style={{ cursor: 'pointer' }}
+                                        style={{ cursor: 'pointer', position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}
                                     >
                                         <Text size="sm" fw={700} truncate maw={100} c="blue" style={{ textDecoration: 'underline', textUnderlineOffset: '2px' }}>{h.name}</Text>
                                         <Text size="xs" c="dimmed">{h.code}</Text>
@@ -385,7 +383,7 @@ function TradeContent() {
                     <Table.Thead>
                         <Table.Tr>
                             <Table.Th style={{ fontSize: '11px' }}>일시</Table.Th>
-                            <Table.Th style={{ fontSize: '11px' }}>종목</Table.Th>
+                            <Table.Th style={{ fontSize: '11px', position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>종목</Table.Th>
                             <Table.Th style={{ fontSize: '11px' }}>구분</Table.Th>
                             <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>체결가</Table.Th>
                             <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>수량</Table.Th>
@@ -400,7 +398,7 @@ function TradeContent() {
                                     <Text size="xs" c="dimmed" style={{ fontSize: '10px' }}>{h.time.split(' ')[0].slice(5)}</Text>
                                     <Text size="xs" fw={500} style={{ fontSize: '10px' }}>{h.time.split(' ')[1]}</Text>
                                 </Table.Td>
-                                <Table.Td>
+                                <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>
                                     <Text size="xs" fw={700}>{h.symbol.split('(')[0]}</Text>
                                 </Table.Td>
                                 <Table.Td>

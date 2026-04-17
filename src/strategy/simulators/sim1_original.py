@@ -16,6 +16,7 @@ class OriginalSimulator(BaseSimulator):
         # 1. 청산 로직 (Buzz Filter 이탈 시)
         candidate_codes = [s['code'] for s in candidates]
         portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
         
         for code in portfolio_codes:
             if code not in candidate_codes:
@@ -31,6 +32,7 @@ class OriginalSimulator(BaseSimulator):
                     continue
                 
                 self.sell(code, current_price, reason="[안정] Buzz Filter 이탈")
+                sold_today.add(code)
 
         # 2. 진입 로직
         if not candidates: return
@@ -38,7 +40,7 @@ class OriginalSimulator(BaseSimulator):
         target_amount = self.initial_cash / 10 # 종목당 10% 비중
         for stock in candidates[:10]:
             code = stock['code']
-            if code in self.state['portfolio']: continue
+            if code in self.state['portfolio'] or code in sold_today: continue
             
             price = float(stock.get('price', stock.get('현재가', 0)))
             if price <= 0: continue

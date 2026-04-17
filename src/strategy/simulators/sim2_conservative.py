@@ -19,6 +19,7 @@ class ConservativeSimulator(BaseSimulator):
         candidate_map = {s['code']: s for s in candidates}
         portfolio_codes = list(self.state['portfolio'].keys())
         today = datetime.now()
+        sold_today = set()
 
         # 1. 청산 및 트래킹 로직
         for code in portfolio_codes:
@@ -46,12 +47,14 @@ class ConservativeSimulator(BaseSimulator):
             # (1) Hard Stop: -3%
             if profit_rate <= -3.0:
                 self.sell(code, current_price, reason=f"[보수] 하드 스탑 (-3% 도달: {profit_rate:.1f}%)")
+                sold_today.add(code)
                 continue
 
             # (2) Trailing Stop: 수익 5% 돌파 후 고점 대비 -2% 하락
             if profit_rate >= 5.0 or peak_price > p_item['avg_price'] * 1.05:
                 if drop_from_peak >= 2.0:
                     self.sell(code, current_price, reason=f"[보수] 트레일링 스탑 (고점대비 -2% 하락: {drop_from_peak:.1f}%)")
+                    sold_today.add(code)
                     continue
 
             # (3) Time Cut: T+3 (진입일 포함 4영업일째 종가)
@@ -60,6 +63,7 @@ class ConservativeSimulator(BaseSimulator):
                 diff_days = (today - entry_date).days
                 if diff_days >= 3:
                     self.sell(code, current_price, reason=f"[보수] 타임 컷 (보유 {diff_days}일 경과)")
+                    sold_today.add(code)
                     continue
             except: pass
 
@@ -67,7 +71,7 @@ class ConservativeSimulator(BaseSimulator):
         target_amount = self.initial_cash / 10
         for stock in candidates[:10]:
             code = stock['code']
-            if code in self.state['portfolio']: continue
+            if code in self.state['portfolio'] or code in sold_today: continue
             
             price = float(stock.get('price', stock.get('현재가', 0)))
             if price <= 0: continue

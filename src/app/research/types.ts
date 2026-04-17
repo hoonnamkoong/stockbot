@@ -10,6 +10,7 @@ export interface Stock {
     foreign_rate: number;
     prev_foreign_rate: number;
     foreign_change_rate: number;
+    inst_net_buy?: number;
     posts_summary: string;
     sentiment: string;
     top_keywords: string[];

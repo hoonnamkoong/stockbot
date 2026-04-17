@@ -137,6 +137,7 @@ class DataFetcherWorker(BaseWorker):
                 details['foreign_rate'] = float(data_rows[0][8].get_text().replace('%', '').replace(',', '').strip())
                 prev_rate = float(data_rows[1][8].get_text().replace('%', '').replace(',', '').strip())
                 details['foreign_change'] = round(details['foreign_rate'] - prev_rate, 3)
+                details['inst_net_buy'] = int((data_rows[0][5].get_text().replace(',', '').replace('+', '').strip()) or 0)
                 details['foreign_net_buy'] = int((data_rows[0][6].get_text().replace(',', '').replace('+', '').strip()) or 0)
                 details['prev_close'] = int((data_rows[1][1].get_text().replace(',', '').strip()) or 0)
                 details['prev_foreign_rate'] = prev_rate

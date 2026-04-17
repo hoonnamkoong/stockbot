@@ -96,10 +96,17 @@ export default function StrategyRadarChart() {
 
   return (
     <Card shadow="sm" padding="lg" radius="md" withBorder>
-      <Group mb="md">
+      <Group mb="xs">
         <IconDna size={24} color="#228be6" />
         <Text fw={700}>전략 DNA 분석 (Radar Chart)</Text>
       </Group>
+      <Text size="xs" c="dimmed" mb="md">
+        • <b>승률</b>: 총 매매 중 익절로 마감한 비율 (성공 확률)<br/>
+        • <b>수익팩터</b>: 총 수익금을 총 손실금으로 나눈 값 (1 초과 시 손실보다 수익이 큼)<br/>
+        • <b>MDD (최대 낙폭)</b>: 포트폴리오 고점 대비 최대 하락률 (숫자가 낮을수록 방어력이 우수)<br/>
+        • <b>거래빈도</b>: 평균적인 일일 매매 횟수<br/>
+        • <b>자본회전율</b>: 자본 대비 거래량 (숫자가 클수록 자금 활용도가 높음)
+      </Text>
 
       <div style={{ width: '100%', height: 350 }}>
         <ResponsiveContainer>

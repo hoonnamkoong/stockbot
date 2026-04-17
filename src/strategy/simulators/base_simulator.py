@@ -239,18 +239,31 @@ class BaseSimulator:
         
         if logs:
             trades = []
-            temp_buy = {}
+            temp_avg = {}
             total_volume = 0
             for l in logs:
                 c = l.get('code', '')
-                amt = l.get('amount', l.get('price', 0) * l.get('quantity', 0))
+                q = l.get('quantity', 0)
+                p = l.get('price', 0)
+                amt = l.get('amount', p * q)
                 total_volume += amt
                 action = l.get('action', 'BUY')
-                if action == "BUY": 
-                    temp_buy.setdefault(c, []).append(l)
-                elif action == "SELL" and c in temp_buy and temp_buy[c]:
-                    b = temp_buy[c].pop(0)
-                    trades.append(amt - b.get('amount', b.get('price', 0) * b.get('quantity', 0)))
+                
+                if action == "BUY":
+                    if c not in temp_avg:
+                        temp_avg[c] = {'qty': q, 'avg_price': p}
+                    else:
+                        old_q = temp_avg[c]['qty']
+                        old_p = temp_avg[c]['avg_price']
+                        new_q = old_q + q
+                        new_p = ((old_q * old_p) + (p * q)) / new_q if new_q > 0 else p
+                        temp_avg[c] = {'qty': new_q, 'avg_price': new_p}
+                elif action == "SELL":
+                    if c in temp_avg and temp_avg[c]['qty'] > 0:
+                        buy_p = temp_avg[c]['avg_price']
+                        pl = (p - buy_p) * q
+                        trades.append(pl)
+                        temp_avg[c]['qty'] = max(0, temp_avg[c]['qty'] - q)
             
             if trades:
                 win_rate = (len([t for t in trades if t > 0]) / len(trades) * 100)
@@ -277,7 +290,9 @@ class BaseSimulator:
             
         mdd = 0
         peak = self.state.get('peak_nav', current_nav)
-        if current_nav > peak: peak = current_nav
+        if current_nav > peak:
+            peak = current_nav
+            self.state['peak_nav'] = peak
         mdd = (peak - current_nav) / peak * 100 if peak > 0 else 0
         
         return {
@@ -298,10 +313,10 @@ class BaseSimulator:
         """[V8.9.9.12] 5대 지표 분석 결과 정규화 (Radar Chart용)"""
         raw = self.calculate_stats(current_prices)
         norm = {
-            "승률": min(100, raw['win_rate'] * 1.25),
-            "수익팩터": min(100, raw['profit_factor'] * 33.3),
-            "MDD": max(0, 100 - raw['mdd'] * 5),
-            "거래빈도": min(100, raw['frequency'] * 20),
-            "자본회전율": min(100, raw['turnover'] * 5)
+            "승률": min(100, max(0, raw['win_rate'])),
+            "수익팩터": min(100, raw['profit_factor'] * 20),
+            "MDD": max(0, 100 - raw['mdd'] * 3), 
+            "거래빈도": min(100, raw['frequency'] * 5), 
+            "자본회전율": min(100, raw['turnover'] * 2)
         }
         return {"raw": raw, "normalized": norm, "portfolio": self.state['portfolio']}

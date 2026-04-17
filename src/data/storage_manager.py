@@ -260,26 +260,61 @@ class StorageManager:
 
     def update_consecutive_counts(self, passed_codes: list[str], now_kst: datetime) -> dict:
         """
-        하루 단위로 연속 카운트를 갱신합니다.
-        오늘 포착된 종목은 +1, 포착되지 않은 종목은 0으로 초기화합니다.
+        [수정됨] 개별 종목별 마지막 포착일(last_seen_date)을 기록하여,
+        당일 중 나중에 포착되더라도 연속일수가 0으로 증발하지 않도록 보호합니다.
         """
         registry = self.load_consecutive_registry()
         today_str = now_kst.strftime('%Y%m%d')
         counts = registry.get("counts", {})
+        last_seen = registry.get("last_seen_date", {})
+        
+        updated = False
+        
+        for code in passed_codes:
+            seen_date = last_seen.get(code, "")
+            
+            if seen_date != today_str:
+                if seen_date:
+                    try:
+                        from datetime import datetime
+                        last_d = datetime.strptime(seen_date, "%Y%m%d")
+                        now_d = datetime.strptime(today_str, "%Y%m%d")
+                        diff = (now_d - last_d).days
+                        
+                        # 주말 및 공휴일 감안 (최대 4일 이내 재포착 시 연속으로 인정)
+                        if diff <= 4:
+                            counts[code] = counts.get(code, 0) + 1
+                        else:
+                            counts[code] = 1
+                    except Exception:
+                        counts[code] = 1
+                else:
+                    counts[code] = 1
+                
+                last_seen[code] = today_str
+                updated = True
 
-        if registry.get("last_reset_date") != today_str:
-            print(f"[Storage] 연속 카운트 갱신: {registry.get('last_reset_date')} → {today_str}")
-            for code in passed_codes:
-                counts[code] = counts.get(code, 0) + 1
-            for code in list(counts.keys()):
-                if code not in passed_codes:
-                    counts[code] = 0
-            registry["last_reset_date"] = today_str
+        # 최근 5일 이상 장기간 미포착된 데이터 삭제 처리 (가비지 컬렉터)
+        keys_to_del = []
+        for code, ldate in last_seen.items():
+            if ldate != today_str:
+                try:
+                    from datetime import datetime
+                    diff = (datetime.strptime(today_str, "%Y%m%d") - datetime.strptime(ldate, "%Y%m%d")).days
+                    if diff > 5: keys_to_del.append(code)
+                except Exception:
+                    keys_to_del.append(code)
+                
+        for k in keys_to_del:
+            counts.pop(k, None)
+            last_seen.pop(k, None)
+            updated = True
+            
+        if updated:
             registry["counts"] = counts
+            registry["last_seen_date"] = last_seen
             self.save_consecutive_registry(registry)
-        else:
-            print(f"[Storage] 연속 카운트 이미 갱신됨 (Skip)")
-
+            
         return counts
 
     # ================================================================

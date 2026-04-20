@@ -181,8 +181,12 @@ class SyncState(BaseModel):
     last_update_date: str = ""
     stocks: dict = {}
     reported_codes: list = []
-    daily_reported_info: list = []   # [{'code': str, 'name': str, 'rank': int}, ...]
-    daily_complete: bool = False     # 오늘 9개 추천 완성 여부
+    daily_reported_info: list = []     # 당일 전체 통합 리스트
+    morning_reported_info: list = []   # 오전 세션(12시 이전) 보고 종목
+    afternoon_reported_info: list = [] # 오후 세션(12시 이후) 보고 종목
+    morning_complete: bool = False     # 오전 9개 완료 여부
+    afternoon_complete: bool = False   # 오후 9개 완료 여부
+    daily_complete: bool = False       # [Legacy] 전체 완료 여부 (호환성 유지)
 
 
 class ReportEntry(BaseModel):

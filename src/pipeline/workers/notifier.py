@@ -92,15 +92,23 @@ class NotifierWorker(BaseWorker):
             self.log("시뮬레이션 결과만 발송 완료")
 
         # 9개 완성 시 순위 정렬 알림 발송
-        if getattr(sync_state, 'daily_complete', False):
+        is_morning = self.ctx.now_kst.hour < 12
+        session_complete = sync_state.morning_complete if is_morning else sync_state.afternoon_complete
+        
+        if session_complete:
             try:
-                reported = sync_state.daily_reported_info
-                lines = ["📋 *오늘의 추천 종목 (9개 완성)*\n"]
+                # 해당 세션의 리스트 가져오기
+                reported = sync_state.morning_reported_info if is_morning else sync_state.afternoon_reported_info
+                session_name = "오전" if is_morning else "오후"
+                
+                lines = [f"📋 *오늘의 추천 종목 ({session_name} {len(reported)}개 완성)*\n"]
+                # 랭크 순서대로 상위 9개 출력
                 for i, item in enumerate(reported[:9], 1):
                     lines.append(f"  {i}위. {item.get('name', '?')}")
+                
                 lines.append(f"\n📊 분석 리포트: https://stockbot-phi.vercel.app/research")
                 self.tg.send_message("\n".join(lines))
-                self.log("9개 완성 순위 알림 발송")
+                self.log(f"{session_name} 9개 완성 순위 알림 발송")
             except Exception as e:
                 self.log_error(f"순위 알림 발송 실패: {e}")
 

@@ -121,12 +121,8 @@ class StorageManager:
                         }
                     return SyncState(last_update_date=today_str), yesterday_data
 
-                state = SyncState(**{
-                    'last_update_date': raw.get('last_update_date', today_str),
-                    'stocks': raw.get('stocks', {}),
-                    'reported_codes': raw.get('reported_codes', []),
-                    'daily_reported_info': raw.get('daily_reported_info', []),
-                })
+                # [마이그레이션 대응] 신규 필드가 추가된 SyncState로 안전하게 로드
+                state = SyncState(**raw)
                 return state, yesterday_data
             except Exception as e:
                 print(f"[Storage] sync_state 로드 실패, 초기화: {e}")

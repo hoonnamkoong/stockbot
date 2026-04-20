@@ -64,9 +64,13 @@ class TradeEngineWorker(BaseWorker):
         for c in candidates:
             c['signal'] = signal_map.get(c['code'], 'WATCH')
 
-        # 3. 중복 방지: 오늘 이미 보고된 종목 제외 (하루 최대 9개)
-        daily_reported_info = sync_state.daily_reported_info
-        reported_codes = [item['code'] for item in daily_reported_info]
+        # 3. 중복 방지: 세션별(오전/오후) 최대 9개
+        hour = self.ctx.now_kst.hour
+        is_morning = hour < 12
+        session_name = "오전" if is_morning else "오후"
+        
+        session_info = sync_state.morning_reported_info if is_morning else sync_state.afternoon_reported_info
+        reported_codes = [item['code'] for item in session_info]
         new_picks = []
 
         if len(reported_codes) < 9:
@@ -84,17 +88,31 @@ class TradeEngineWorker(BaseWorker):
         for i, p in enumerate(final_picks):
             p['rank'] = i + 1
 
-        # 9개 완성 여부 감지
+        # 세션별 완료 여부 업데이트
         total_after = len(reported_codes) + len(final_picks)
+        if is_morning:
+            sync_state.morning_complete = total_after >= 9
+        else:
+            sync_state.afternoon_complete = total_after >= 9
+        
+        # 전체 완료 여부 (호환성)
         sync_state.daily_complete = total_after >= 9
 
         # 4. 신규 보고 종목이 있으면 상태 업데이트 + 엑셀 기록
         if final_picks:
             formatted_names = [f"{p['name']}({p.get('rank','?')}위)" for p in final_picks]
-            self.log(f"신규 보고 대상: {formatted_names}")
-            sync_state.daily_reported_info.extend(
-                [{'code': p['code'], 'name': p['name'], 'rank': p.get('rank', 0)} for p in final_picks]
-            )
+            self.log(f"[{session_name} 세션] 신규 보고 대상: {formatted_names}")
+            
+            new_items = [{'code': p['code'], 'name': p['name'], 'rank': p.get('rank', 0)} for p in final_picks]
+            
+            if is_morning:
+                sync_state.morning_reported_info.extend(new_items)
+            else:
+                sync_state.afternoon_reported_info.extend(new_items)
+            
+            # 통합 리스트도 업데이트
+            sync_state.daily_reported_info.extend(new_items)
+            
             self.storage.save_sync_state(sync_state)
 
         # 5. 시뮬레이터 3종 실행 (Registry에서 자동 로드)

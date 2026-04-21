@@ -346,23 +346,44 @@ class StrategyAdvisor:
             news_data = "최근 수급 유입 및 시장 관심도 증가" # TODO: 통합 뉴스 검색 엔진 연동 예정
             dart_data = dart_res.get('reason', '특이 공시 없음')
             
-            # [V8.6.1 Brevity Policy]
+            # [V50.6 Advanced Analysis Prompt]
+            # 수급 데이터(외인/기관) 및 연속 등록일 반영, 사업 요약 및 목표가 산출 추가
+            foreign_change = stock.get('foreign_change', 0)
+            inst_buy = stock.get('inst_net_buy', 0)
+            consecutive = stock.get('consecutive_days', 1)
+            price = stock.get('price', stock.get('current_price', 0))
+
             prompt = f"""
             시니어 퀀트 애널리스트로서 아래 종목에 대한 '초간결 딥다이브 리포트'를 작성하세요.
             
             종목: {stock['name']} ({stock['code']})
-            AI 요약: {stock.get('posts_summary')}
-            DART 공시/뉴스: {dart_data} / {news_data}
+            현재가: {price}원
+            AI 1차 요약: {stock.get('posts_summary')}
+            
+            [핵심 분석 데이터]
+            - 외인 수급 변화: {foreign_change:+.2f}%p
+            - 기관 순매수량: {inst_buy:+,}주
+            - 연속 리서치 등록일: {consecutive}일차
+            - DART 공시/뉴스: {dart_data} / {news_data}
             
             [리포트 작성 규칙]
-            1. 이 종목이 왜 Top 5에 선정되었는지(수급/재료 등 배경)와 향후 예상을 반드시 포함하세요.
-            2. 'reason' 항목은 텔레그램에서 읽기 좋게 3~6줄 길이가 되도록 구체적으로 작성하세요.
-            3. 오직 아래 JSON 배열 형식으로만 답변하세요:
+            1. 'business_summary': 이 기업의 핵심 사업(무엇을 해서 돈을 버는가)을 한 문장으로 명쾌하게 요약하세요.
+            2. 'decision': 투자 강도를 세분화하여 선택하세요. (STRONG BUY, BUY, SPECULATIVE BUY, WATCH, REJECT)
+            3. 'target_price': 위 데이터와 재료를 바탕으로 AI가 추정하는 단기 목표가를 제시하세요 (숫자만).
+            4. 'expected_return': 현재가 대비 목표가의 기대 수익률을 %로 계산하세요.
+            5. 'target_price_basis': 해당 목표가를 설정한 구체적인 논거(저항선, 재료의 크기, 수급 등)를 한 문장으로 설명하세요.
+            6. 'reason': 수급(외인/기관)과 재료, 연속 등록일의 의미를 연결하여 3~5줄로 설득력 있게 작성하세요.
+            
+            오직 아래 JSON 배열 형식으로만 답변하세요:
             [
               {{
-                "decision": "BUY|WATCH|REJECT",
-                "reason": "Top 5 선정 배경 및 향후 예상 (3~6줄 분량)",
-                "risk": "종토방/공시 리스크 (없으면 없음)",
+                "business_summary": "핵심 사업 내용 요약",
+                "decision": "STRONG BUY|BUY|SPECULATIVE BUY|WATCH|REJECT",
+                "target_price": 0,
+                "expected_return": "0%",
+                "target_price_basis": "목표가 산출 논거",
+                "reason": "데이터 기반 선정 배경 및 향후 예상",
+                "risk": "주의해야 할 리스크 (없으면 없음)",
                 "highlights": ["키워드1", "키워드2"]
               }}
             ]
@@ -374,9 +395,18 @@ class StrategyAdvisor:
                         data = json.loads(response.text)
                         if isinstance(data, list) and len(data) > 0:
                             data = data[0]
+                        
                         rank_str = f" ({stock.get('rank')}위)" if stock.get('rank') else ""
-                        formatted = f"🔥 <b>{stock['name']}</b>{rank_str} [{data.get('decision', 'N/A')}]\n"
+                        decision = data.get('decision', 'WATCH')
+                        
+                        # 권고 강도별 시각화
+                        decision_emoji = "🚀" if "STRONG" in decision else "⭐" if "BUY" in decision else "⚠️" if "SPEC" in decision else "👀"
+                        
+                        formatted = f"{decision_emoji} <b>{stock['name']}</b>{rank_str} [{decision}]\n"
+                        formatted += f"🏢 <b>주요 사업:</b> {data.get('business_summary', '정보 없음')}\n"
                         formatted += f"💡 <b>근거:</b> {data.get('reason', '')}\n"
+                        formatted += f"🎯 <b>목표가:</b> {data.get('target_price', 0):,}원 (<b>{data.get('expected_return', '0%')}</b> 수익 기대)\n"
+                        formatted += f"📝 <b>산출 근거:</b> {data.get('target_price_basis', '분석 데이터 기반')}\n"
                         formatted += f"⚠️ <b>리스크:</b> {data.get('risk', '없음')}\n"
                         formatted += f"✨ <b>핵심:</b> {', '.join(data.get('highlights', []))}\n"
                         stock['deep_dive_text'] = formatted

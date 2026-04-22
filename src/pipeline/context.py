@@ -79,25 +79,22 @@ class PipelineContext:
     def should_notify(self) -> bool:
         """
         텔레그램 발송 조건을 판단합니다.
-        - workflow_dispatch: 항상 발송
-        - 자동화/스케줄(schedule, repository_dispatch):
-          - 15, 30, 45분 부근(예: 15~20분, 30~35분)에 켜진 경우 정각이 아니므로 발송 생략
-          - 0~5분(정각 부근)이거나, 그 외 애매한 시간(수동 실행으로 간주)일 경우 발송
+        - push 이벤트: 발송하지 않음
+        - 태스커/수동/스케줄 공통:
+          - 15, 30, 45분 부근(여유 2분)에 시작된 경우 자동 스케줄로 간주하여 발송 생략
+          - 0~2분(정각 부근)이거나, 그 외 애매한 시간에 켜지면 수동 개입으로 간주하여 발송
         """
-        if self.github_event == 'workflow_dispatch':
-            return True
+        if self.github_event == 'push':
+            return False
             
-        if self.github_event in ('schedule', 'repository_dispatch'):
-            minute = self.start_minute
-            # 태스커 호출 후 GitHub 딜레이 감안 (최대 5분)
-            # 15분, 30분, 45분 단위의 스케줄 실행인지 판별
-            if (15 <= minute <= 20) or (30 <= minute <= 35) or (45 <= minute <= 50):
-                return False
-            
-            # 정각(0~5분)이거나, 15분 단위가 아닌 완전히 애매한 시간의 수동 실행은 발송
-            return True
-            
-        return False
+        minute = self.start_minute
+        
+        # 15분, 30분, 45분 단위의 스케줄 실행인지 판별 (시작 시간 기준 여유 2분)
+        if (15 <= minute <= 17) or (30 <= minute <= 32) or (45 <= minute <= 47):
+            return False
+        
+        # 정각(0~2분 부근)이거나, 그 외의 완전히 애매한 시간은 수동 실행으로 간주하여 발송
+        return True
 
     def is_market_hours(self) -> bool:
         """장중 시간대(09:00~15:50)에 해당하는지 확인합니다."""

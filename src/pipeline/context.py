@@ -79,14 +79,23 @@ class PipelineContext:
     def should_notify(self) -> bool:
         """
         텔레그램 발송 조건을 판단합니다.
-        - 수동 트리거(repository_dispatch, workflow_dispatch): 항상 발송
-        - 정시 스케줄(schedule): 0~5분 내에만 발송 (시작 시점의 분 기준)
-        - push 이벤트: 발송하지 않음
+        - workflow_dispatch: 항상 발송
+        - 자동화/스케줄(schedule, repository_dispatch):
+          - 15, 30, 45분 부근(시작 시간 기준 여유 2분)에 켜진 경우 정각이 아니므로 발송 생략
+          - 0~2분(정각 부근)이거나, 그 외 애매한 시간(수동 실행으로 간주)일 경우 발송
         """
-        if self.github_event in ('repository_dispatch', 'workflow_dispatch'):
+        if self.github_event == 'workflow_dispatch':
             return True
-        if self.github_event == 'schedule' and 0 <= self.start_minute <= 5:
+            
+        if self.github_event in ('schedule', 'repository_dispatch'):
+            minute = self.start_minute
+            # 15분, 30분, 45분 단위의 스케줄 실행인지 판별 (여유시간 2분)
+            if (15 <= minute <= 17) or (30 <= minute <= 32) or (45 <= minute <= 47):
+                return False
+            
+            # 정각(0~2분)이거나, 15분 단위가 아닌 애매한 시간의 수동 실행은 발송
             return True
+            
         return False
 
     def is_market_hours(self) -> bool:

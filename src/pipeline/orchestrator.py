@@ -45,24 +45,28 @@ def run_pipeline(ctx: PipelineContext) -> None:
     final_picks, simulation_results = trade_worker.run(stocks, sync_state)
 
     # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
-    if final_picks:
-        ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 ({len(final_picks)}개 종목)")
-        deep_dive_report = analyzer_worker.generate_deep_dive(final_picks, candidates)
-        # 월별 리서치 엑셀에도 기록
-        storage.update_monthly_excel(final_picks, ctx.now_kst)
-    else:
-        # 오늘 이미 보고된 종목들만 있는 경우
-        daily_info = sync_state.daily_reported_info
-        if simulation_results and any(r.get('signal') in ['BUY', 'WATCH'] for r in simulation_results):
-            names_str = ", ".join(item['name'] for item in daily_info)
-            dashboard_url = "https://stockbot-phi.vercel.app/api/download/excel"
-            deep_dive_report = (
-                f"[안내] 이번 회차의 모든 종목은 오늘 이미 보고되었습니다.\n"
-                f"오늘 보고 종목: {names_str}\n\n"
-                f"리포트 다운로드: {dashboard_url}"
-            )
+    deep_dive_report = ""
+    if ctx.should_notify():
+        if final_picks:
+            ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 ({len(final_picks)}개 종목)")
+            deep_dive_report = analyzer_worker.generate_deep_dive(final_picks, candidates)
+            # 월별 리서치 엑셀에도 기록
+            storage.update_monthly_excel(final_picks, ctx.now_kst)
         else:
-            deep_dive_report = ""
+            # 오늘 이미 보고된 종목들만 있는 경우
+            daily_info = sync_state.daily_reported_info
+            if simulation_results and any(r.get('signal') in ['BUY', 'WATCH'] for r in simulation_results):
+                names_str = ", ".join(item['name'] for item in daily_info)
+                dashboard_url = "https://stockbot-phi.vercel.app/api/download/excel"
+                deep_dive_report = (
+                    f"[안내] 이번 회차의 모든 종목은 오늘 이미 보고되었습니다.\n"
+                    f"오늘 보고 종목: {names_str}\n\n"
+                    f"리포트 다운로드: {dashboard_url}"
+                )
+    else:
+        ctx.log("▶ Stage 3.5: 정각 발송 타이밍 아님 (딥다이브 생성 생략)")
+
+    if not final_picks:
         # [Bug 1 Fix] 신규 picks 없어도 reports.json 항상 재생성
         storage.rebuild_reports_index(ctx.now_kst)
 

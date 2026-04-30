@@ -49,10 +49,13 @@ def normalize_columns(df):
         '당일 게시글수': 'recent_posts_count',
         '게시글수': 'recent_posts_count', # Legacy
         '현재_외국인비중': 'foreign_rate',
-        '외인소진율': 'foreign_rate', # Legacy
+        '외인소진율': 'foreign_rate', 
         '어제_종가': 'prev_close',
         '어제_외국인비중': 'prev_foreign_rate',
-        '연속_등록': 'is_last_captured'
+        '연속_등록': 'is_last_captured',
+        '거래량': 'volume',
+        'Top_Keyword': 'top_keywords',
+        '게시물_요약': 'posts_summary'
     }
     return df.rename(columns=col_map)
 

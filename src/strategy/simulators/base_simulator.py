@@ -53,9 +53,16 @@ class BaseSimulator:
                 # 추가로 portfolio 키가 정상적으로 존재하는지 확인
                 if 'cash' in data and data['cash'] >= 0 and 'portfolio' in data:
                     self.state = data
-                    # 혹시 예전 데이터라 initial_cash가 없으면 추가
-                    if 'initial_cash' not in self.state:
-                        self.state['initial_cash'] = self.initial_cash
+                    # [V2] 신규 필드 마이그레이션 및 기본값 보정
+                    if 'initial_cash' not in self.state: self.state['initial_cash'] = self.initial_cash
+                    if 'market_index_healthy' not in self.state: self.state['market_index_healthy'] = True
+                    if 'peak_nav' not in self.state: self.state['peak_nav'] = data.get('cash', self.initial_cash)
+                    if 'total_fees' not in self.state: self.state['total_fees'] = 0
+                    
+                    # 포트폴리오 내 신규 필드 보정
+                    for code, item in self.state['portfolio'].items():
+                        if 'peak_price' not in item:
+                            item['peak_price'] = item.get('avg_price', 0)
                 else:
                     print(f"[System] {self.name} 상태 데이터 오류 감지. 초기화 진행.")
                     self.reset_state()
@@ -74,9 +81,10 @@ class BaseSimulator:
             "invested": 0,
             "portfolio": {},
             "peak_nav": self.initial_cash,
-            "total_fees": 0, # [V8.9.9.12] 누적 수수료+제세금
+            "total_fees": 0, 
             "history": [self.initial_cash],
-            "daily_trades": []
+            "daily_trades": [],
+            "market_index_healthy": True # [V2] 시장 지수 상태
         }
         self.save_state()
 
@@ -208,12 +216,36 @@ class BaseSimulator:
         self.save_state()
         return True
 
-    def update_peak_price(self, code, current_price):
-        """[Sim 2용] 고점 갱신 로직"""
-        if code in self.state['portfolio']:
-            if current_price > self.state['portfolio'][code].get('peak_price', 0):
-                self.state['portfolio'][code]['peak_price'] = current_price
-                self.save_state()
+    def update_peak_prices(self, current_prices):
+        """[V2] 모든 보유 종목의 고점(Peak)을 실시간 업데이트"""
+        updated = False
+        for code, p_item in self.state['portfolio'].items():
+            curr_p = current_prices.get(code, 0)
+            if curr_p > p_item.get('peak_price', 0):
+                p_item['peak_price'] = curr_p
+                updated = True
+        if updated:
+            self.save_state()
+
+    def check_trailing_stop(self, code, current_price, activation_pct=5.0, callback_pct=3.0):
+        """
+        [V2] 수익률이 activation_pct 이상 도달 후 고점 대비 callback_pct 하락 시 매도 신호
+        """
+        if code not in self.state['portfolio']: return False
+        p_item = self.state['portfolio'][code]
+        
+        avg_p = p_item.get('avg_price', 0)
+        peak_p = p_item.get('peak_price', avg_p)
+        if avg_p <= 0: return False
+        
+        profit_rate = (current_price - avg_p) / avg_p * 100
+        drop_from_peak = (peak_p - current_price) / peak_p * 100 if peak_p > 0 else 0
+        
+        # 수익이 한번이라도 5%를 찍었고, 고점에서 3% 빠지면 익절 실행
+        if profit_rate >= activation_pct or peak_p > (avg_p * (1 + activation_pct/100)):
+            if drop_from_peak >= callback_pct:
+                return True
+        return False
 
     def calculate_stats(self, current_prices=None):
         """성과 지표 정밀 산출"""

@@ -497,9 +497,9 @@ function TradeContent() {
     function renderSimulationTripod() {
         if (!geminiBalance) return null;
         const simConfigs = [
-            { id: 'sim1', key: 'sim1', label: '안정 지향형', color: 'blue', type: 'sim_original' },
-            { id: 'sim2', key: 'sim2', label: '보수적 방어형', color: 'violet', type: 'sim_conservative' },
-            { id: 'sim3', key: 'sim3', label: '공격적 추세추종형', color: 'red', type: 'sim_aggressive' }
+            { id: 'sim1', key: 'sim1', label: '심리 폭발형 (Psych-Explosion)', color: 'blue', type: 'sim_psych' },
+            { id: 'sim2', key: 'sim2', label: '섹터 전이형 (Sector-Spillover)', color: 'violet', type: 'sim_spillover' },
+            { id: 'sim3', key: 'sim3', label: '스마트 리스크형 (Smart-Risk)', color: 'red', type: 'sim_risk' }
         ];
         return (
             <Stack gap="xl">

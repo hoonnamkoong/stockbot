@@ -29,7 +29,7 @@ class BaseSimulator:
     [Strategy DNA Engine] 모든 시뮬레이터의 부모 클래스.
     - V8.6.2: 상태 영속성(JSON), 실시간 NAV 산출, 3M 초기화
     """
-    def __init__(self, name, initial_cash=3000000):
+    def __init__(self, name, initial_cash=5000000):
         self.name = name
         self.initial_cash = initial_cash
         self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data')
@@ -73,8 +73,8 @@ class BaseSimulator:
             self.reset_state()
 
     def reset_state(self):
-        """[V8.6.2 Hotfix] 3,000,000원 클린 시작"""
-        print(f"[Sim] {self.name} 상태를 3,000,000원으로 초기화합니다.")
+        """[V8.6.2 Hotfix] 5,000,000원 클린 시작"""
+        print(f"[Sim] {self.name} 상태를 5,000,000원으로 초기화합니다.")
         self.state = {
             "initial_cash": self.initial_cash,
             "cash": self.initial_cash,

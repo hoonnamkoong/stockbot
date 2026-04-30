@@ -6,7 +6,7 @@ class PsychDivergenceSimulator(BaseSimulator):
     - 뉴스/게시글 빈도(Buzz)와 가격 변동 간의 괴리 포착
     - 원리: 대중의 관심은 폭증했으나 가격은 아직 정체일 때 매집
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=5000000):
         super().__init__("Psych", initial_cash)
 
     def run(self, candidates, current_prices=None):

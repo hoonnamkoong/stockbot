@@ -5,7 +5,7 @@ class SmartRiskSimulator(BaseSimulator):
     [Sim 3] 스마트 리스크형 (Smart-Risk)
     - 추세 확인된 종목만 진입, 엄격한 손절로 방어
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=5000000):
         super().__init__("Risk", initial_cash)
 
     def run(self, candidates, current_prices=None):

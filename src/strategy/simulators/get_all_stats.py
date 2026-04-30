@@ -53,9 +53,9 @@ def run_all_simulators(data_list):
     """
     # 3M 초기화가 보장된 인스턴스 생성
     simulators = {
-        "sim1_Psych": PsychDivergenceSimulator(initial_cash=3000000),
-        "sim2_Spillover": SectorSpilloverSimulator(initial_cash=3000000),
-        "sim3_Risk": SmartRiskSimulator(initial_cash=3000000)
+        "sim1_Psych": PsychDivergenceSimulator(initial_cash=5000000),
+        "sim2_Spillover": SectorSpilloverSimulator(initial_cash=5000000),
+        "sim3_Risk": SmartRiskSimulator(initial_cash=5000000)
     }
     
     results = {}

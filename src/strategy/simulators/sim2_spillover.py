@@ -12,7 +12,7 @@ class SectorSpilloverSimulator(BaseSimulator):
         "AI/소프트웨어": {"leaders": ["035420", "035720"], "followers": ["041190", "259960"]}
     }
 
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=5000000):
         super().__init__("Spillover", initial_cash)
 
     def _get_dynamic_sectors(self, candidates):

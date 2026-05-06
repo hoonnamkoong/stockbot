@@ -171,7 +171,7 @@ class GeminiAgent:
         
         # [V8.9.9.6] 데이터 경량화 및 정합성 보전 (Body 일부 포함하여 분석 품질 향상)
         # 종목 수가 많을 경우 10개씩 그룹화하여 API 호출
-        GROUP_SIZE = GroupSize = 10
+        GROUP_SIZE = 10
         all_results = {}
         
         for i in range(0, len(batch_data), GROUP_SIZE):
@@ -218,7 +218,6 @@ class GeminiAgent:
                 )
                 if response and response.text:
                     raw_text = response.text.strip()
-                    print(f"DEBUG(Batch): {raw_text}")
                     if raw_text.startswith("```"):
                         raw_text = re.sub(r"^(?:```[a-z]*\n)|(?:```$)", "", raw_text, flags=re.MULTILINE).strip()
                     parsed = json.loads(raw_text)
@@ -232,15 +231,13 @@ class GeminiAgent:
                                 if 'code' in item:
                                     all_results[item['code']] = item
                                 else:
-                                    # {"005930": {...}} 형태가 리스트에 들어있는 경우
                                     for k, v in item.items():
                                         all_results[k] = v
                     elif isinstance(parsed, dict):
                         all_results.update(parsed)
             except Exception as e:
-                print(f"[GeminiAgent] Group Batch 분석 오류 ({i//GROUP_SIZE + 1}번 그룹): {e}")
+                print(f"[GeminiAgent] Group Batch 분석 오류: {e}")
 
-        # 분석 실패한 종목들에 대한 기본값 처리
         final_results = {}
         for s in batch_data:
             code = s.get('code')
@@ -249,7 +246,6 @@ class GeminiAgent:
         return final_results
 
     def analyze_bulk_sentiment(self, bulk_data):
-        """기존 벌크 감성 분석 로직 유지 (모델 동적 적용)"""
         if not self.batch_model: return {}
         try:
             processed_bulk = []
@@ -280,7 +276,6 @@ class StrategyAdvisor:
         self.gemini = GeminiAgent()
 
     def generate_report(self, candidates, allow_buy=True):
-        """[V8.4.7] 개장일 중심 리포트 생성 로직 (Legacy)"""
         all_results = self.engine.execute_simulation(candidates, allow_buy=allow_buy)
         market_context = f"{len(candidates)}개 종목 Buzz 필터 통과. 시장 주도 섹터 및 모멘텀 분석."
         gemini_guide = self.gemini.generate_trading_guide(market_context, candidates)
@@ -292,26 +287,15 @@ class StrategyAdvisor:
         return f"{gemini_guide}\n{summary}", all_results
 
     def analyze_batch_discovery(self, batch_data):
-        """
-        [V8.5.5] StrategyAdvisor용 일괄 분석 인터페이스
-        batch_data: [{\"name\": \"삼성전자\", \"posts\": [...]}, ...]
-        """
         return self.gemini.analyze_batch_discovery(batch_data)
 
     def analyze_initial_discovery(self, stock_name, posts):
-        """
-        [Legacy / Fallback] 1차 통과 종목 전용 최적화 분석 (개별 호출)
-        """
         if not self.gemini.batch_model: return {"sentiment_score": 0, "summary": "AI 분석 불가", "keywords": []}
-        
-        # 대표글 본문/제목 결합 (용량 제한)
         text_content = "\n".join([f"[{p.get('title')}] {str(p.get('body', ''))[:200]}" for p in posts])
-        
         prompt = f"""
         종목명: {stock_name}
         최근 토론방 게시글:
         {text_content}
-
         [V8.6.0 노이즈 배제 및 팩트 추출 규칙]
         - '가즈아', '상한가', '세력' 등 단순 선동 문구는 무시한다.
         - 게시글의 팩트(재료, 수급)에 집중하여 다음 형식의 JSON으로만 답변하세요:
@@ -322,103 +306,155 @@ class StrategyAdvisor:
         }}
         """
         try:
-            response = self.gemini._call_gemini_safe(
-                prompt, 
-                model_type='batch',
-                generation_config={"response_mime_type": "application/json"}
-            )
+            response = self.gemini._call_gemini_safe(prompt, model_type='batch', generation_config={"response_mime_type": "application/json"})
             if response and response.text:
                 return json.loads(response.text)
         except: pass
         return {"sentiment_score": 0, "summary": "분석 오류", "keywords": []}
 
-    def generate_deep_dive_report(self, final_candidates):
+    def select_sell_candidate(self, holdings: list) -> dict:
         """
-        [V8.5.3] 3차 통과 종목(최종 5선) 심층 리포트 생성
-        - DART 공시 체크, 뉴스 교차 검증, 최종 매수 의견 포함
+        [V50.7] 보유 종목 중 매도가 필요한 1종목을 AI가 선정합니다.
         """
-        if not final_candidates: return "⚠️ 최종 분석 대상 종목이 없습니다."
+        if not holdings:
+            return None
+            
+        def _parse_rate(val):
+            if val is None: return 0.0
+            try:
+                return float(str(val).replace('%', '').replace(',', '').strip())
+            except (ValueError, TypeError):
+                return 0.0
+
+        # 수익률 낮은 순으로 정렬 후 1종목 선정하여 AI 판단
+        sorted_holdings = sorted(holdings, key=lambda x: _parse_rate(x.get('profit_rate', 0)))
+        candidate = sorted_holdings[0]
+
+        prompt = f"""
+        당신은 전문 트레이더입니다. 아래 보유 종목을 분석하여 현재 시장 상황에서 '매도'가 적절한지 판단하세요.
+        
+        [보유 종목 데이터]
+        {json.dumps(candidate, ensure_ascii=False)}
+        
+        [선정 기준]
+        1. 수익률이 지나치게 높거나 낮은 종목 (익절/손절)
+        2. 최근 주가 흐름이 둔화되거나 꺾인 종목
+        
+        오직 아래 JSON 형식으로만 답변하세요:
+        {{
+            "code": "종목코드",
+            "name": "종목명",
+            "reason": "매도 추천 사유 (한 문장)"
+        }}
+        """
+        try:
+            response = self.gemini._call_gemini_safe(prompt, model_type='batch', generation_config={"response_mime_type": "application/json"})
+            if response and response.text:
+                data = json.loads(response.text)
+                target = next((h for h in holdings if h['code'] == data.get('code')), None)
+                if target:
+                    target['sell_reason'] = data.get('reason', '수익/손실 관리 필요')
+                    return target
+        except:
+            pass
+        return None
+
+    def generate_deep_dive_report(self, final_candidates, sell_candidate=None):
+        """
+        [V8.5.4] 3차 통과 종목 심층 리포트 생성 (유저 요청 양식 반영)
+        - 구성: 종목명/추천순위, 사업요약, 추천근거, 목표가, 리스크
+        """
+        if not final_candidates and not sell_candidate:
+            return "⚠️ 분석 대상 종목이 없습니다."
         
         reports = []
-        for stock in final_candidates:
-            # [Step 1] 실시간 데이터 취득 (Engine 연동)
+        
+        # 1. 스크래퍼 기반 추천 종목 (최대 2개)
+        for stock in final_candidates[:2]:
             dart_res = self.engine.fetch_dart_data(stock['code'])
-            news_data = "최근 수급 유입 및 시장 관심도 증가" # TODO: 통합 뉴스 검색 엔진 연동 예정
             dart_data = dart_res.get('reason', '특이 공시 없음')
             
-            # [V50.6 Advanced Analysis Prompt]
-            # 수급 데이터(외인/기관) 및 연속 등록일 반영, 사업 요약 및 목표가 산출 추가
-            foreign_change = stock.get('foreign_change', 0)
-            inst_buy = stock.get('inst_net_buy', 0)
-            consecutive = stock.get('consecutive_days', 1)
-            price = stock.get('price', stock.get('current_price', 0))
-
             prompt = f"""
-            시니어 퀀트 애널리스트로서 아래 종목에 대한 '초간결 딥다이브 리포트'를 작성하세요.
+            시니어 애널리스트로서 아래 종목의 '상세 리포트'를 작성하세요.
             
             종목: {stock['name']} ({stock['code']})
-            현재가: {price}원
-            AI 1차 요약: {stock.get('posts_summary')}
+            현재가: {stock.get('price', stock.get('current_price', 0))}원
+            순위: {stock.get('rank', 'N/A')}위
             
-            [핵심 분석 데이터]
-            - 외인 수급 변화: {foreign_change:+.2f}%p
-            - 기관 순매수량: {inst_buy:+,}주
-            - 연속 리서치 등록일: {consecutive}일차
-            - DART 공시/뉴스: {dart_data} / {news_data}
+            [분석 데이터]
+            - 외인 변화: {stock.get('foreign_change', 0):+.2f}%p
+            - 토론 요약: {stock.get('posts_summary')}
+            - 공시: {dart_data}
             
             [리포트 작성 규칙]
-            1. 'business_summary': 이 기업의 핵심 사업(무엇을 해서 돈을 버는가)을 한 문장으로 명쾌하게 요약하세요.
-            2. 'decision': 투자 강도를 세분화하여 선택하세요. (STRONG BUY, BUY, SPECULATIVE BUY, WATCH, REJECT)
-            3. 'target_price': 위 데이터와 재료를 바탕으로 AI가 추정하는 단기 목표가를 제시하세요 (숫자만).
-            4. 'expected_return': 현재가 대비 목표가의 기대 수익률을 %로 계산하세요.
-            5. 'target_price_basis': 해당 목표가를 설정한 구체적인 논거(저항선, 재료의 크기, 수급 등)를 한 문장으로 설명하세요.
-            6. 'reason': 수급(외인/기관)과 재료, 연속 등록일의 의미를 연결하여 3~5줄로 설득력 있게 작성하세요.
+            1. 'rank_and_recommendation': "[{stock.get('rank')}위] 매수 추천" 또는 "강력 매수" 등의 등급 제시.
+            2. 'business_summary': 기업의 주요 사업 내용을 1~2문장으로 요약.
+            3. 'rationale': 게시글 증가 이유, 뉴스, 수급, 섹터 동향을 종합 분석하여 3~5줄로 기술.
+            4. 'target_price': 현재가 -> 목표가 형식으로 제시 (예: 50,000원 -> 65,000원).
+            5. 'risk': 주의해야 할 리스크 요소 기술.
             
-            오직 아래 JSON 배열 형식으로만 답변하세요:
-            [
-              {{
-                "business_summary": "핵심 사업 내용 요약",
-                "decision": "STRONG BUY|BUY|SPECULATIVE BUY|WATCH|REJECT",
-                "target_price": 0,
-                "expected_return": "0%",
-                "target_price_basis": "목표가 산출 논거",
-                "reason": "데이터 기반 선정 배경 및 향후 예상",
-                "risk": "주의해야 할 리스크 (없으면 없음)",
-                "highlights": ["키워드1", "키워드2"]
-              }}
-            ]
+            오직 아래 JSON 형식으로만 답변하세요:
+            {{
+              "rank_and_recommendation": "순위 및 추천등급",
+              "business_summary": "주요 사업 요약",
+              "rationale": "종합 분석 추천 근거",
+              "target_price_flow": "현재가 -> 목표가",
+              "risk": "리스크 요인"
+            }}
             """
             try:
                 response = self.gemini._call_gemini_safe(prompt, model_type='report', generation_config={"response_mime_type": "application/json"})
                 if response and response.text:
-                    try:
-                        data = json.loads(response.text)
-                        if isinstance(data, list) and len(data) > 0:
-                            data = data[0]
-                        
-                        rank_str = f" ({stock.get('rank')}위)" if stock.get('rank') else ""
-                        decision = data.get('decision', 'WATCH')
-                        
-                        # 권고 강도별 시각화
-                        decision_emoji = "🚀" if "STRONG" in decision else "⭐" if "BUY" in decision else "⚠️" if "SPEC" in decision else "👀"
-                        
-                        formatted = f"{decision_emoji} <b>{stock['name']}</b>{rank_str} [{decision}]\n"
-                        formatted += f"🏢 <b>주요 사업:</b> {data.get('business_summary', '정보 없음')}\n"
-                        formatted += f"💡 <b>근거:</b> {data.get('reason', '')}\n"
-                        formatted += f"🎯 <b>목표가:</b> {data.get('target_price', 0):,}원 (<b>{data.get('expected_return', '0%')}</b> 수익 기대)\n"
-                        formatted += f"📝 <b>산출 근거:</b> {data.get('target_price_basis', '분석 데이터 기반')}\n"
-                        formatted += f"⚠️ <b>리스크:</b> {data.get('risk', '없음')}\n"
-                        formatted += f"✨ <b>핵심:</b> {', '.join(data.get('highlights', []))}\n"
-                        stock['deep_dive_text'] = formatted
-                        reports.append(formatted)
-                    except:
-                        stock['deep_dive_text'] = response.text.strip()
-                        reports.append(response.text.strip())
+                    data = json.loads(response.text)
+                    formatted = f"📌 <b>{stock['name']}</b> ({data.get('rank_and_recommendation')})\n"
+                    formatted += f"🏢 <b>사업 요약:</b> {data.get('business_summary')}\n"
+                    formatted += f"💡 <b>추천 근거:</b> {data.get('rationale')}\n"
+                    formatted += f"🎯 <b>목표가:</b> {data.get('target_price_flow')}\n"
+                    formatted += f"⚠️ <b>리스크:</b> {data.get('risk')}\n"
+                    reports.append(formatted)
             except:
-                stock['deep_dive_text'] = f"⚠️ {stock['name']} 심층 분석 실패"
-                reports.append(f"⚠️ {stock['name']} 심층 분석 실패")
+                reports.append(f"⚠️ {stock['name']} 상세 분석 실패")
 
-        header = f"🚀 **[Strategic Deep-Dive]** 최종 선정 {len(reports)}개 종목\n"
+        # 2. 실전 계좌 매도 추천 종목 (1개)
+        if sell_candidate:
+            prompt = f"""
+            보유 종목 중 매도가 필요한 아래 종목의 '매도 리포트'를 작성하세요.
+            
+            종목: {sell_candidate['name']} ({sell_candidate['code']})
+            현재가: {sell_candidate['current_price']}원
+            수익률: {sell_candidate['profit_rate']}%
+            매도 선정 사유: {sell_candidate.get('sell_reason')}
+            
+            위 정보를 바탕으로 아래 항목을 작성하세요:
+            1. 'recommendation': "매도 추천" 또는 "비중 축소"
+            2. 'business_summary': 주요 사업 요약
+            3. 'rationale': 왜 지금 팔아야 하는지 기술적/심리적 근거 분석
+            4. 'target_price_flow': 현재가 -> 손절/익절 목표가
+            5. 'risk': 보유 시 발생할 수 있는 추가 하방 리스크
+            
+            JSON 형식:
+            {{
+              "recommendation": "매도/비중축소",
+              "business_summary": "사업 요약",
+              "rationale": "매도 근거",
+              "target_price_flow": "현재가 -> 탈출가",
+              "risk": "보유 리스크"
+            }}
+            """
+            try:
+                response = self.gemini._call_gemini_safe(prompt, model_type='report', generation_config={"response_mime_type": "application/json"})
+                if response and response.text:
+                    data = json.loads(response.text)
+                    formatted = f"📉 <b>{sell_candidate['name']}</b> (실전계좌 {data.get('recommendation')})\n"
+                    formatted += f"🏢 <b>사업 요약:</b> {data.get('business_summary')}\n"
+                    formatted += f"💡 <b>매도 근거:</b> {data.get('rationale')}\n"
+                    formatted += f"🎯 <b>목표가:</b> {data.get('target_price_flow')}\n"
+                    formatted += f"⚠️ <b>리스크:</b> {data.get('risk')}\n"
+                    reports.append(formatted)
+            except:
+                pass
+
+        header = f"🚀 **[Strategic Deep-Dive]** 상세 리포트\n"
         header += f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
         
         return header + "\n\n---\n\n".join(reports)

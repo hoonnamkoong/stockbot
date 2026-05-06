@@ -62,9 +62,9 @@ class StorageManager:
                     else:
                         with open(local_path, 'w', encoding='utf-8') as f:
                             f.write(content.decode('utf-8'))
-                print(f"[Storage] ✅ Synced: {filename}")
+                print(f"[Storage] [OK] Synced: {filename}")
             except Exception as e:
-                print(f"[Storage] ⚠️ Sync skipped: {filename} ({e})")
+                print(f"[Storage] [Skip] Sync skipped: {filename} ({e})")
 
     def get_sync_files_list(self, now_kst: datetime) -> list[str]:
         """
@@ -77,6 +77,9 @@ class StorageManager:
             'sim_original_state.json',
             'sim_conservative_state.json',
             'sim_aggressive_state.json',
+            'sim_psych_state.json',
+            'sim_spillover_state.json',
+            'sim_risk_state.json',
             'trade_history_sim_original.csv',
             'trade_history_sim_conservative.csv',
             'trade_history_sim_aggressive.csv',

@@ -25,6 +25,11 @@ def run_pipeline(ctx: PipelineContext) -> None:
     ctx.log(f"StockBot Pipeline V{PipelineContext.VERSION} 시작")
     ctx.log("=" * 50)
 
+    # ── 휴장일 체크 ──────────────────────────────────────────
+    if not ctx.is_trading_day():
+        ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 파이프라인을 종료합니다.")
+        return
+
     # ── Stage 1: 데이터 수집 및 1차 필터링 ───────────────────────
     ctx.log("▶ Stage 1: 데이터 수집")
     stocks = DataFetcherWorker(ctx, storage).run()
@@ -42,16 +47,18 @@ def run_pipeline(ctx: PipelineContext) -> None:
     ctx.log("▶ Stage 3: 전략 판단 + 시뮬레이터")
     sync_state, _ = storage.load_sync_state(ctx.today_str)
     trade_worker = TradeEngineWorker(ctx, storage)
-    final_picks, simulation_results = trade_worker.run(stocks, sync_state)
+    final_picks, simulation_results, sell_candidate = trade_worker.run(stocks, sync_state)
 
     # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
     deep_dive_report = ""
     if ctx.should_notify():
-        if final_picks:
-            ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 ({len(final_picks)}개 종목)")
-            deep_dive_report = analyzer_worker.generate_deep_dive(final_picks, candidates)
+        # [User V50.8] 상세 리포트 대상: 추천 상위 2개 + 매도 후보 1개
+        if final_picks or sell_candidate:
+            ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 (추천:{len(final_picks[:2])}개, 매도:{1 if sell_candidate else 0}개)")
+            deep_dive_report = analyzer_worker.generate_deep_dive(final_picks[:2], candidates, sell_candidate=sell_candidate)
             # 월별 리서치 엑셀에도 기록
-            storage.update_monthly_excel(final_picks, ctx.now_kst)
+            if final_picks:
+                storage.update_monthly_excel(final_picks[:2], ctx.now_kst)
         else:
             # 오늘 이미 보고된 종목들만 있는 경우
             daily_info = sync_state.daily_reported_info

@@ -112,21 +112,26 @@ class LLMAnalyzerWorker(BaseWorker):
         self.log("규칙 기반 Fallback 완료")
         return candidates
 
-    def generate_deep_dive(self, final_picks: list[dict], all_candidates: list[dict]) -> str:
+    def generate_deep_dive(self, final_picks: list[dict], all_candidates: list[dict], sell_candidate: dict = None) -> str:
         """딥다이브 리포트 생성. 실패 시 빈 문자열 반환."""
-        if not final_picks:
+        if not final_picks and not sell_candidate:
             return ""
         try:
             time.sleep(2)
             from src.strategy.advisor import StrategyAdvisor
             advisor = StrategyAdvisor()
-            # final_picks의 코드로 풀 데이터 조회
+            
+            # 1. 추천 종목 풀 데이터 구성
             detail_picks = []
             for p in final_picks:
                 full = next((c for c in all_candidates if c['code'] == p['code']), p).copy()
                 full['rank'] = p.get('rank')
                 detail_picks.append(full)
-            report_str = advisor.generate_deep_dive_report(detail_picks)
+                
+            # 2. 리포트 생성 (추천 2개 + 매도 1개)
+            report_str = advisor.generate_deep_dive_report(detail_picks, sell_candidate=sell_candidate)
+            
+            # 3. 상세 텍스트 백필 (기존 로직 유지)
             for p in final_picks:
                 dp = next((c for c in detail_picks if c['code'] == p['code']), None)
                 if dp and 'deep_dive_text' in dp:

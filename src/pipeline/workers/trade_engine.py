@@ -29,17 +29,15 @@ class TradeEngineWorker(BaseWorker):
         self,
         stocks: list[StockData],
         sync_state: SyncState,
-    ) -> tuple[list, list]:
+    ) -> tuple[list, list, dict]:
         """
         전략 판단과 딥다이브 대상 선정을 수행합니다.
-
+        
         Returns:
-            (final_picks, simulation_results)
-            - final_picks: 이번 턴에 새로 보고할 종목 dict 목록 (최대 3개)
-            - simulation_results: 전략 판단 결과 전체
+            (final_picks, simulation_results, sell_candidate)
         """
         if not stocks:
-            return [], []
+            return [], [], None
 
         # dict 목록으로 변환 (기존 코드 호환)
         candidates = [s.to_dict() for s in stocks]
@@ -64,62 +62,82 @@ class TradeEngineWorker(BaseWorker):
         for c in candidates:
             c['signal'] = signal_map.get(c['code'], 'WATCH')
 
-        # 3. 중복 방지: 세션별(오전/오후) 최대 9개
-        hour = self.ctx.now_kst.hour
-        is_morning = hour < 12
-        session_name = "오전" if is_morning else "오후"
-        
-        session_info = sync_state.morning_reported_info if is_morning else sync_state.afternoon_reported_info
-        reported_codes = [item['code'] for item in session_info]
+        # 3. 중복 방지: 당일 이미 딥다이브가 나간 종목 제외
+        deep_dived = sync_state.daily_deep_dive_codes
         new_picks = []
 
-        if len(reported_codes) < 9:
-            for r in simulation_results:
-                if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in reported_codes:
-                    # candidates에서 풀 데이터 가져오기
-                    full = next((c for c in candidates if c['code'] == r['code']), r)
-                    full['signal'] = r.get('signal', 'WATCH')
-                    new_picks.append(full)
-                    if len(reported_codes) + len(new_picks) >= 9:
-                        break
+        # BUY/WATCH 시그널 중 오늘 딥다이브 안 나간 것 상위 2개 추출
+        for r in simulation_results:
+            if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in deep_dived:
+                # candidates에서 풀 데이터 가져오기
+                full = next((c for c in candidates if c['code'] == r['code']), r).copy()
+                full['signal'] = r.get('signal', 'WATCH')
+                new_picks.append(full)
+                if len(new_picks) >= 2:
+                    break
 
-        final_picks = new_picks[:3]
-        # 해당 배치 내 순위(rank) 추가: 1~3위
+        final_picks = new_picks[:2]
+        # 해당 배치 내 순위(rank) 추가: 1~2위
         for i, p in enumerate(final_picks):
             p['rank'] = i + 1
 
-        # 4. 신규 보고 종목 상태 기록 - 정각 텔레그램 타이밍에만 수행
-        # 정각이 아닐 때 기록하면 다음 정각 발송 시 이미 소진된 것처럼 보이는 버그 방지
-        if final_picks and self.ctx.should_notify():
-            formatted_names = [f"{p['name']}({p.get('rank','?')}위)" for p in final_picks]
-            self.log(f"[{session_name} 세션] 신규 보고 대상 상태 기록: {formatted_names}")
+        # 4. 실전 계좌 매도 후보 선정 (정각 텔레그램 타이밍에만)
+        sell_candidate = None
+        if self.ctx.should_notify():
+            try:
+                from src.strategy.advisor import StrategyAdvisor
+                from src.trade.balance import get_balance
+                advisor = StrategyAdvisor()
+                balance = get_balance()
+                if not balance.get('error'):
+                    holdings = balance.get('holdings', [])
+                    # 보유 종목 중 오늘 딥다이브 안 나간 것만 대상으로 선정
+                    potential_sells = [h for h in holdings if h['code'] not in deep_dived]
+                    sell_candidate = advisor.select_sell_candidate(potential_sells)
+                    if sell_candidate:
+                        self.log(f"매도 추천 후보 선정: {sell_candidate['name']}")
+            except Exception as e:
+                self.log_error(f"매도 후보 선정 실패: {e}")
+
+        # 5. 신규 보고 종목 상태 기록 - 정각 텔레그램 타이밍에만 수행
+        hour = self.ctx.now_kst.hour
+        is_morning = hour < 12
+        session_name = "오전" if is_morning else "오후"
+
+        if (final_picks or sell_candidate) and self.ctx.should_notify():
+            self.log(f"[{session_name} 세션] 신규 보고 대상 상태 기록 (Deep-Dive)")
             
+            # 딥다이브 중복 방지 리스트에 추가
+            for p in final_picks:
+                if p['code'] not in sync_state.daily_deep_dive_codes:
+                    sync_state.daily_deep_dive_codes.append(p['code'])
+            if sell_candidate and sell_candidate['code'] not in sync_state.daily_deep_dive_codes:
+                sync_state.daily_deep_dive_codes.append(sell_candidate['code'])
+            
+            # 세션별 일반 보고 리스트에도 추가 (기존 대시보드 호환)
             new_items = [{'code': p['code'], 'name': p['name'], 'rank': p.get('rank', 0)} for p in final_picks]
-            
             if is_morning:
                 sync_state.morning_reported_info.extend(new_items)
             else:
                 sync_state.afternoon_reported_info.extend(new_items)
             
-            # 통합 리스트도 업데이트
             sync_state.daily_reported_info.extend(new_items)
 
-            # 세션별 완료 여부 업데이트 (상태 기록과 동시에)
-            total_after = len(reported_codes) + len(final_picks)
+            # 세션 완료 여부 (9개 기준)
+            total_session = len(sync_state.morning_reported_info if is_morning else sync_state.afternoon_reported_info)
             if is_morning:
-                sync_state.morning_complete = total_after >= 9
+                sync_state.morning_complete = total_session >= 9
             else:
-                sync_state.afternoon_complete = total_after >= 9
-            sync_state.daily_complete = total_after >= 9
-
+                sync_state.afternoon_complete = total_session >= 9
+            
             self.storage.save_sync_state(sync_state)
-        elif final_picks:
-            self.log(f"[{session_name} 세션] 정각 아님 - 종목 상태 기록 생략 ({len(final_picks)}개 후보 존재)")
+        elif final_picks or sell_candidate:
+            self.log(f"[{session_name} 세션] 정각 아님 - 종목 상태 기록 생략")
 
-        # 5. 시뮬레이터 3종 실행 (Registry에서 자동 로드)
+        # 6. 시뮬레이터 3종 실행 (Registry에서 자동 로드)
         self._run_simulators(candidates)
 
-        return final_picks, simulation_results
+        return final_picks, simulation_results, sell_candidate
 
     def _run_simulators(self, candidates: list[dict]) -> None:
         """

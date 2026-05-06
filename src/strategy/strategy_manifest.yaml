@@ -39,22 +39,22 @@ strategies:
   #   since: "2026-05-01"
 
 simulators:
-  - id: "sim_original"
-    module: "src.strategy.simulators.sim1_original"
-    class: "OriginalSimulator"
-    description: "원본 전략 시뮬레이터 (+10% 익절 / -5% 손절)"
+  - id: "sim_psych"
+    module: "src.strategy.simulators.sim1_psych"
+    class: "PsychDivergenceSimulator"
+    description: "심리 폭발형 시뮬레이터 (Buzz & 가격 이격 분석)"
     active: true
 
-  - id: "sim_conservative"
-    module: "src.strategy.simulators.sim2_conservative"
-    class: "ConservativeSimulator"
-    description: "보수적 시뮬레이터 (+5% 익절 / -3% 손절)"
+  - id: "sim_spillover"
+    module: "src.strategy.simulators.sim2_spillover"
+    class: "SectorSpilloverSimulator"
+    description: "섹터 전이형 시뮬레이터 (대장주 추종 & 순환매)"
     active: true
 
-  - id: "sim_aggressive"
-    module: "src.strategy.simulators.sim3_aggressive"
-    class: "AggressiveSimulator"
-    description: "공격적 시뮬레이터 (+20% 익절 / -7% 손절)"
+  - id: "sim_risk"
+    module: "src.strategy.simulators.sim3_risk"
+    class: "SmartRiskSimulator"
+    description: "스마트 리스크형 시뮬레이터 (추세 추종 & 트레일링 스탑)"
     active: true
 
   # 새 시뮬레이터 추가 예시:

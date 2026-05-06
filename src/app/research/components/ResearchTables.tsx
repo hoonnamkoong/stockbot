@@ -91,7 +91,26 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 <Badge size="md" color="blue" radius="sm" style={{ flexShrink: 0, minWidth: '40px' }}>{s.recent_posts_count}</Badge>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Badge size="xs" color={s.sentiment === 'Pos' ? 'red' : s.sentiment === 'Neg' ? 'blue' : 'gray'} style={{ flexShrink: 0, minWidth: '60px' }}>
+                                <Badge 
+                                    size="xs" 
+                                    color={
+                                        (() => {
+                                            const sent = s.sentiment;
+                                            if (!sent) return 'gray';
+                                            if (sent === 'Pos' || (typeof sent === 'string' && sent.includes('긍정'))) return 'red';
+                                            if (sent === 'Neg' || (typeof sent === 'string' && sent.includes('부정'))) return 'blue';
+                                            
+                                            // 수치형 점수 처리 (프롬프트 규칙: -10 ~ 10)
+                                            const score = parseFloat(String(sent));
+                                            if (!isNaN(score)) {
+                                                if (score >= 3) return 'red';
+                                                if (score <= -3) return 'blue';
+                                            }
+                                            return 'gray';
+                                        })()
+                                    } 
+                                    style={{ flexShrink: 0, minWidth: '60px' }}
+                                >
                                     {s.sentiment || 'Neutral'}
                                 </Badge>
                             </Table.Td>

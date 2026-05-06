@@ -17,6 +17,12 @@ import sys
 # 루트 경로를 Python 경로에 추가 (기존 방식 유지)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# [V8.9.9.5 Hotfix] Windows cp949 인코딩 에러 방지 (Emoji 출력 지원)
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 from src.pipeline.context import PipelineContext
 from src.pipeline.orchestrator import run_pipeline
 

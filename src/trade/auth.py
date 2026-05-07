@@ -102,6 +102,11 @@ def get_access_token(force_refresh=False):
                     if expires_at_str:
                         expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
                         # 만료 시간까지 2시간 이상 여유가 있는 경우에만 재사용 (안전 마진)
+                        
+                        if expires_at.tzinfo is None:
+                            from datetime import timezone, timedelta
+                            expires_at = expires_at.replace(tzinfo=timezone(timedelta(hours=9)))
+                            
                         time_left = (expires_at - now).total_seconds()
                         
                         if time_left > 7200: # 2시간
@@ -112,6 +117,10 @@ def get_access_token(force_refresh=False):
                     elif issued_at_str:
                         # 하위 호환성: 만료 정보가 없으면 발행 시간 기준 23시간 이내인지 확인
                         issued_at = datetime.fromisoformat(issued_at_str.replace('Z', '+00:00'))
+                        if issued_at.tzinfo is None:
+                            from datetime import timezone, timedelta
+                            issued_at = issued_at.replace(tzinfo=timezone(timedelta(hours=9)))
+                            
                         if (now - issued_at).total_seconds() < 82800: # 23시간
                             print(f"[Auth] 발행 기준 유효 토큰 재사용 중 ({issued_at_str})")
                             return access_token

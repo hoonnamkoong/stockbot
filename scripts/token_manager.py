@@ -5,6 +5,11 @@ import time
 import sys
 from datetime import datetime, timedelta
 
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 # KIS 토큰 관리 전담 모듈 (V8.9.9.39)
 # [Role] GitHub Action이 실행될 때 가장 먼저 구동되어 토큰의 유효성을 보장함.
 # [Policy] Vercel은 이 파일을 읽기만 하며, 직접 발급하지 않음.
@@ -12,7 +17,8 @@ from datetime import datetime, timedelta
 TOKEN_CACHE_PATH = 'data/kis_token_cache.json'
 
 def get_current_kst_time():
-    return datetime.utcnow() + timedelta(hours=9)
+    from datetime import timezone
+    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=9)))
 
 def load_token_cache():
     if os.path.exists(TOKEN_CACHE_PATH):
@@ -74,10 +80,18 @@ def is_token_valid(cache):
     
     # 만료 시간 체크 (여유 있게 2시간 전부터 만료로 간주)
     try:
-        expires_at = datetime.fromisoformat(cache.get('expires_at'))
+        expires_at_str = cache.get('expires_at', '').replace('Z', '+00:00')
+        expires_at = datetime.fromisoformat(expires_at_str)
+        
+        # If naive, assume it's KST (which was the old behavior)
+        if expires_at.tzinfo is None:
+            from datetime import timezone
+            expires_at = expires_at.replace(tzinfo=timezone(timedelta(hours=9)))
+            
         if get_current_kst_time() + timedelta(hours=2) < expires_at:
             return True
-    except:
+    except Exception as e:
+        print(f"[TokenManager] 검증 오류: {e}")
         pass
     return False
 

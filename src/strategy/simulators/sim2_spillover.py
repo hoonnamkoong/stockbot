@@ -19,12 +19,15 @@ class SectorSpilloverSimulator(BaseSimulator):
         """[V2] 동적 테마 그룹화 (키워드 기반)"""
         themes = {}
         for stock in candidates:
-            # 키워드 필드 확인
-            keywords = stock.get('top_keywords', '')
+            # [V50.2] 키워드 필드 확인 및 타입 호환 처리
+            keywords = stock.get('top_keywords', [])
             if not keywords or keywords == "Backup": continue
             
-            # 첫 번째 키워드를 대표 테마로 설정
-            primary_theme = keywords.split(',')[0].strip()
+            # 리스트와 문자열 모두 대응
+            if isinstance(keywords, list):
+                primary_theme = keywords[0].strip()
+            else:
+                primary_theme = str(keywords).split(',')[0].strip()
             if primary_theme not in themes:
                 themes[primary_theme] = []
             themes[primary_theme].append(stock)

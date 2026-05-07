@@ -48,10 +48,10 @@ class PsychDivergenceSimulator(BaseSimulator):
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
             
-            # [V2] 유동성 필터: 거래대금 10억 미만 제외 (단위: 원)
+            # [V50.2] 유동성 필터: 거래대금 10억 미만 제외 (amount 필드 사용)
             price = float(stock.get('price', 0))
-            volume = float(stock.get('volume', 0))
-            if (price * volume) < 1_000_000_000: continue
+            amount = float(stock.get('amount', 0))
+            if amount < 1_000_000_000: continue
 
             avg_buzz = stock.get('avg_posts', 1)
             if avg_buzz <= 0: avg_buzz = 1

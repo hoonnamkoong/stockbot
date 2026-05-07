@@ -55,10 +55,10 @@ class SmartRiskSimulator(BaseSimulator):
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
             
-            # [V2] 유동성 필터 (10억 이상)
+            # [V50.2] 유동성 필터 (10억 이상, amount 필드 사용)
             price = float(stock.get('price', 0))
-            volume = float(stock.get('volume', 0))
-            if (price * volume) < 1_000_000_000: continue
+            amount = float(stock.get('amount', 0))
+            if amount < 1_000_000_000: continue
 
             period_change = stock.get('period_change_rate', 0)
             daily_change = stock.get('change_rate', stock.get('daily_change_rate', 0))

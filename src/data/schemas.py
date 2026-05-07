@@ -49,9 +49,11 @@ class StockData(BaseModel):
     change_rate: str = ""       # "±X.XX%" 형식
     signal: Optional[str] = None
     current_price: int = 0  # price의 별칭 (호환성 유지)
+    volume: int = 0         # [V50.2] 당일 거래량
+    amount: int = 0         # [V50.2] 당일 거래대금 (원 단위)
     posts: list = []  # 상세 게시글 목록
 
-    @field_validator('price', 'prev_close', 'current_price', mode='before')
+    @field_validator('price', 'prev_close', 'current_price', 'volume', 'amount', mode='before')
     @classmethod
     def parse_int_field(cls, v):
         """'50,000원', '5만' 같은 문자열을 정수로 자동 정제합니다."""

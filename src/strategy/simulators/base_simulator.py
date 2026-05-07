@@ -43,34 +43,45 @@ class BaseSimulator:
         self.load_state()
 
     def load_state(self):
-        """[V8.6.2 Hotfix] 상태 로드 및 마이그레이션 안전장치 (버그 수정)"""
+        """[V8.9.9.18] 상태 로드 및 보호 로직 보강"""
         if os.path.exists(self.state_file):
             try:
                 with open(self.state_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                    content = f.read().strip()
+                    if not content:
+                        raise ValueError("File is empty")
+                    data = json.loads(content)
                 
-                # 수정: cash가 0 이상(>=)인지 확인 (풀매수 시 현금 0원 허용)
-                # 추가로 portfolio 키가 정상적으로 존재하는지 확인
-                if 'cash' in data and data['cash'] >= 0 and 'portfolio' in data:
+                # 필수 필드 존재 여부 확인
+                if 'cash' in data and 'portfolio' in data:
                     self.state = data
-                    # [V2] 신규 필드 마이그레이션 및 기본값 보정
-                    if 'initial_cash' not in self.state: self.state['initial_cash'] = self.initial_cash
-                    if 'market_index_healthy' not in self.state: self.state['market_index_healthy'] = True
-                    if 'peak_nav' not in self.state: self.state['peak_nav'] = data.get('cash', self.initial_cash)
-                    if 'total_fees' not in self.state: self.state['total_fees'] = 0
+                    # 신규 필드 마이그레이션
+                    self.state.setdefault('initial_cash', self.initial_cash)
+                    self.state.setdefault('market_index_healthy', True)
+                    self.state.setdefault('peak_nav', data.get('cash', self.initial_cash))
+                    self.state.setdefault('total_fees', 0)
+                    self.state.setdefault('daily_trades', [])
+                    self.state.setdefault('history', [self.initial_cash])
                     
-                    # 포트폴리오 내 신규 필드 보정
+                    # 포트폴리오 내 고점 데이터 보정
                     for code, item in self.state['portfolio'].items():
-                        if 'peak_price' not in item:
-                            item['peak_price'] = item.get('avg_price', 0)
+                        item.setdefault('peak_price', item.get('avg_price', 0))
+                    
+                    print(f"[Sim] {self.name} 상태 로드 성공 (잔고: {self.state['cash']:,}원)")
                 else:
-                    print(f"[System] {self.name} 상태 데이터 오류 감지. 초기화 진행.")
-                    self.reset_state()
+                    # 필드가 부족한 경우 부분 복구 시도 (초기화 대신 최대한 유지)
+                    print(f"[Warning] {self.name} 필수 필드 누락. 데이터 보정 시도.")
+                    self.state = data
+                    self.state.setdefault('cash', self.initial_cash)
+                    self.state.setdefault('portfolio', {})
             except Exception as e:
-                print(f"[System] {self.name} 상태 로드 실패 ({e}). 초기화 진행.")
+                print(f"[Critical] {self.name} 상태 파일 손상 ({e}). 백업을 확인하세요.")
+                # 파일이 깨진 경우 즉시 초기화하지 않고 일단 멈추거나 기본값 설정
                 self.reset_state()
         else:
+            print(f"[Info] {self.name} 신규 시뮬레이터 시작 (기존 파일 없음)")
             self.reset_state()
+
 
     def reset_state(self):
         """[V8.6.2 Hotfix] 5,000,000원 클린 시작"""

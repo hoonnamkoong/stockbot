@@ -499,6 +499,12 @@ def get_top_trending_stocks(market_type='KOSPI'):
                 current_price = int(price_str) if price_str.isdigit() else 0
                 change_rate = cols[4].get_text(strip=True).strip()
                 
+                # [V50.2] 거래량(volume) 및 거래대금(amount) 추출
+                volume_str = cols[5].get_text(strip=True).replace(',', '')
+                volume = int(volume_str) if volume_str.isdigit() else 0
+                amount_str = cols[6].get_text(strip=True).replace(',', '')
+                amount = int(amount_str) * 1_000_000 if amount_str.isdigit() else 0 # 단위: 백만
+                
                 prev_close = 0
                 try:
                     rate_float = float(change_rate.replace('%', ''))
@@ -512,6 +518,8 @@ def get_top_trending_stocks(market_type='KOSPI'):
                     'price': current_price,
                     'prev_close': prev_close,
                     'change_rate': change_rate,
+                    'volume': volume,
+                    'amount': amount,
                     'source': 'volume'
                 })
         return data[:20]
@@ -556,12 +564,20 @@ def get_top_rising_stocks(market_type='KOSPI'):
                 current_price = int(price_str) if price_str.isdigit() else 0
                 change_rate = cols[4].get_text(strip=True).strip()
                 
+                # [V50.2] 거래량(volume) 및 거래대금(amount) 추출
+                volume_str = cols[5].get_text(strip=True).replace(',', '')
+                volume = int(volume_str) if volume_str.isdigit() else 0
+                amount_str = cols[6].get_text(strip=True).replace(',', '')
+                amount = int(amount_str) * 1_000_000 if amount_str.isdigit() else 0 # 단위: 백만
+                
                 data.append({
                     'market': market_type,
                     'code': code,
                     'name': name,
                     'price': current_price,
                     'change_rate': change_rate,
+                    'volume': volume,
+                    'amount': amount,
                     'source': 'rising'
                 })
         return data[:20]

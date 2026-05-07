@@ -85,41 +85,37 @@ jobs:
       - name: Deploy Data to db-data branch
         if: success()
         run: |
-          # [V8.9.9.16] git 글로벌 설정 먼저 수행
+          # [V8.9.9.17] Git 설정 및 안정적 동기화
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git config --global init.defaultBranch db-data
-
-          # [V50.1] 저장 대상: JSON, CSV, XLSX, 리포트 엑셀, 멀티데이 집계
-          mkdir -p scraper_output/reports
-          cp data/*.json scraper_output/ 2>/dev/null || true
-          cp data/*.xlsx scraper_output/ 2>/dev/null || true
-          cp data/*.csv scraper_output/ 2>/dev/null || true
-          cp -r data/reports/* scraper_output/reports/ 2>/dev/null || true
-          # [Bug 2 Fix] analysis_3days.json, analysis_5days.json 명시적 보존
-          [ -f data/analysis_3days.json ] && cp data/analysis_3days.json scraper_output/ || true
-          [ -f data/analysis_5days.json ] && cp data/analysis_5days.json scraper_output/ || true
-
-          # db-data 브랜치에서 기존 파일 복원 (이력 보존)
-          git fetch origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet, will create"
-
-          mkdir -p deploy_staging/data/reports
-
-          if git show-ref --verify refs/heads/db-data 2>/dev/null; then
-            git checkout db-data -- data/ 2>/dev/null && cp -r data/* deploy_staging/data/ || true
+          
+          # 별도 디렉토리에 db-data 브랜치 체크아웃
+          git clone --branch db-data https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {
+            mkdir db_data_repo
+            cd db_data_repo
+            git init
+            git checkout -b db-data
+            cd ..
+          }
+          
+          # 최신 데이터 업데이트
+          mkdir -p db_data_repo/data/reports
+          cp -r data/*.json db_data_repo/data/ 2>/dev/null || true
+          cp -r data/*.csv db_data_repo/data/ 2>/dev/null || true
+          cp -r data/*.xlsx db_data_repo/data/ 2>/dev/null || true
+          cp -r data/reports/* db_data_repo/data/reports/ 2>/dev/null || true
+          
+          # [V50.2 Security] Secret Scanning 방지를 위해 .env 파일 및 기타 민감 파일 삭제
+          find db_data_repo -name ".env*" -delete
+          find db_data_repo -name "*.bak*" -delete
+          
+          # 변경사항 반영
+          cd db_data_repo
+          git add .
+          if ! git diff --cached --quiet; then
+            git commit -m "[V8.9.9.17] Automated Data Update: $(date +'%Y-%m-%d %H:%M KST')"
+            git push origin db-data
+          else
+            echo "No changes to commit"
           fi
 
-          # [핵심] 보관된 스크래퍼 출력물로 덮어쓰기 (최신 상태 우선)
-          cp scraper_output/*.json deploy_staging/data/ 2>/dev/null || true
-          cp scraper_output/*.xlsx deploy_staging/data/ 2>/dev/null || true
-          cp scraper_output/*.csv deploy_staging/data/ 2>/dev/null || true
-          cp -r scraper_output/reports/* deploy_staging/data/reports/ 2>/dev/null || true
-
-          # 📦 deploy_staging을 새 git 저장소로 만들어 db-data로 push
-          cd deploy_staging
-          git init
-          git checkout -b db-data
-          git add .
-          git commit -m "[V8.9.9.16] Data Sync: $(date +'%Y-%m-%d %H:%M KST')" || echo "No changes to commit"
-          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-          git push -f origin db-data

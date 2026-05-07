@@ -34,14 +34,17 @@ def run_pipeline(ctx: PipelineContext) -> None:
     ctx.log("▶ Stage 1: 데이터 수집")
     stocks = DataFetcherWorker(ctx, storage).run()
 
-    if not stocks:
-        ctx.log("수집된 종목 없음. 파이프라인 종료")
-        return
-
     # ── Stage 2: AI 분석 ──────────────────────────────────────────
     ctx.log("▶ Stage 2: AI 분석")
     analyzer_worker = LLMAnalyzerWorker(ctx, storage)
-    stocks, candidates = analyzer_worker.run(stocks)
+    
+    if not stocks:
+        ctx.log("신규 수집 종목 없음 (Buzz 임계값 미달). 기존 포트폴리오 관리 모드로 진입합니다.")
+        # [V50.2] 신규 종목이 없어도 Stage 3(시뮬레이터)를 실행하기 위해 빈 리스트로 계속 진행
+        stocks = []
+        candidates = []
+    else:
+        stocks, candidates = analyzer_worker.run(stocks)
 
     # ── Stage 3: 전략 판단 + 시뮬레이터 동기화 ───────────────────
     ctx.log("▶ Stage 3: 전략 판단 + 시뮬레이터")

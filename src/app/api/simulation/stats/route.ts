@@ -17,7 +17,8 @@ export async function GET() {
         
         await Promise.all(types.map(async (type) => {
             try {
-                const res = await fetch(`${GITHUB_BASE}/${type.file}`, { cache: 'no-store' });
+                const cacheBuster = Date.now();
+                const res = await fetch(`${GITHUB_BASE}/${type.file}?t=${cacheBuster}`, { cache: 'no-store' });
                 if (!res.ok) throw new Error(`Fetch failed for ${type.file}`);
                 
                 const state = await res.json();

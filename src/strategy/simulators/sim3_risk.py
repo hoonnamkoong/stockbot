@@ -65,8 +65,8 @@ class SmartRiskSimulator(BaseSimulator):
             if isinstance(daily_change, str):
                 daily_change = float(daily_change.replace('%', '').replace('+', ''))
             
-            # 5일 누적 수익 3% 이상 & 당일 양봉 시에만 진입
-            if period_change > 3.0 and daily_change > 0:
+            # [V50.2] 5일 누적 수익 3% 이상 또는 2일 이상 연속 포착 & 당일 양봉 시에만 진입
+            if (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2) and daily_change > 0:
                 if price <= 0: continue
                 qty = int(target_amount / price)
                 if qty > 0:

@@ -75,7 +75,7 @@ class StrategyEngine:
                 decision = self.strategy.analyze_target(
                     stock_data=stock,
                     dart_data=dart_info,
-                    llm_decision="BUY", # 3차 통과 가정
+                    llm_decision={"decision": "APPROVED", "telegram_narrative": "Sandbox Simulation"},
                     current_cash=balance['cash']
                 )
                 

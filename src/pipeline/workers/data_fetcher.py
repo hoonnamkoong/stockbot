@@ -153,6 +153,9 @@ class DataFetcherWorker(BaseWorker):
                     except:
                         pass
                 details['sparkline_price'] = sparkline[::-1]
+        except Exception as e:
+            print(f"   [DataFetcher] 외인비중 수집 실패 {code}: {e}")
+
         # [V60.0] 체결강도 및 호가잔량 추출을 위해 메인 페이지 추가 파싱
         try:
             main_url = f"https://finance.naver.com/item/main.naver?code={code}"

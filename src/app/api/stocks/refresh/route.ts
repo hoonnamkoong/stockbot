@@ -8,6 +8,14 @@ export async function POST() {
     try {
         // 매월 1일 자동 갱신용 트리거 엔드포인트
         // update_stock_master.py를 실행하여 KRX 전체 종목을 갱신함
+        // [V60.0 Fix] Vercel 환경 대응
+        if (process.env.VERCEL) {
+            return NextResponse.json({ 
+                success: false, 
+                message: "Vercel 서버리스 환경에서는 직접 파일 시스템 쓰기가 제한됩니다. GitHub Actions를 통해 데이터 갱신을 수행하십시오." 
+            }, { status: 403 });
+        }
+
         const { execFile } = require('child_process');
         const { promisify } = require('util');
         const execFileAsync = promisify(execFile);

@@ -32,19 +32,24 @@ class SmartRiskSimulator(BaseSimulator):
 
             profit_rate = (current_price - p_item['avg_price']) / p_item['avg_price'] * 100
             
-            # 5일 이평선 계산 (sparkline 활용)
+            # [V60.0 Consensus] ATR 기반 가변 이탈가 적용
             sparkline = stock.get('sparkline_price', []) if stock else []
-            ma_val = sum(sparkline[-5:]) / len(sparkline[-5:]) if len(sparkline) >= 3 else p_item['avg_price']
+            atr = self.calculate_atr(sparkline)
+            has_ma = len(sparkline) >= 3
+            ma_val = sum(sparkline[-5:]) / len(sparkline[-5:]) if has_ma else p_item['avg_price']
 
             # 기본 익절/손절/이탈
+            # ATR이 클수록(변동성이 클수록) 이탈 허용 범위를 넓힘
+            exit_threshold = ma_val - (atr * 0.5) if atr > 0 else ma_val * 0.98
+
             if profit_rate >= 10.0:
-                self.sell(code, current_price, reason=f"[리스크/V2] 목표 수익 달성 (+{profit_rate:.1f}%)")
+                self.sell(code, current_price, reason=f"[리스크/공합] 목표 수익 달성 (+{profit_rate:.1f}%)")
                 sold_today.add(code)
             elif profit_rate <= -5.0:
-                self.sell(code, current_price, reason=f"[리스크/V2] 손절 (-5%)")
+                self.sell(code, current_price, reason=f"[리스크/공합] 손절 (-5%)")
                 sold_today.add(code)
-            elif current_price < ma_val * 0.98:
-                self.sell(code, current_price, reason=f"[리스크/V2] 추세 이탈 감지 (MA 하회)")
+            elif current_price < exit_threshold:
+                self.sell(code, current_price, reason=f"[리스크/공합] Consensus 추세 이탈 (ATR 하회)")
                 sold_today.add(code)
 
         # 2. 진입 로직 (시장 지수 + 유동성 + 추세)
@@ -65,13 +70,16 @@ class SmartRiskSimulator(BaseSimulator):
             if isinstance(daily_change, str):
                 daily_change = float(daily_change.replace('%', '').replace('+', ''))
             
-            # [V50.2] 5일 누적 수익 3% 이상 또는 2일 이상 연속 포착 & 당일 양봉 시에만 진입
-            if (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2) and daily_change > 0:
+            # [V60.0 Consensus] 추세 + 수급(체결강도 110% 이상) 확인
+            is_trending = (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2)
+            is_strong = daily_change > 0 and self.validate_tick_power(stock, 110.0)
+
+            if is_trending and is_strong:
                 if price <= 0: continue
                 qty = int(target_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty, 
-                             reason=f"[리스크/V2] 추세 추종 (5일 누적 {period_change:.1f}%)")
+                             reason=f"[리스크/공합] Consensus 진입 (추세 {period_change:.1f}%, 체결강도 {stock.get('tick_power')}%)")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

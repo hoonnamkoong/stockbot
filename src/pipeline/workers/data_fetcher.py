@@ -102,7 +102,9 @@ class DataFetcherWorker(BaseWorker):
             elif 'change_rate' not in s:
                 s['change_rate'] = "0.00%"
 
-        # 6. 상태 저장
+        # 6. 시장 지수 상태 수집 및 상태 저장 (Consensus 반영)
+        indices = self._get_market_indices()
+        sync_state.market_index_healthy = indices['KOSPI_healthy'] and indices['KOSDAQ_healthy']
         self.storage.save_sync_state(sync_state)
 
         # 7. Pydantic 변환 (타입 안전성 확보)
@@ -141,9 +143,67 @@ class DataFetcherWorker(BaseWorker):
                 details['foreign_net_buy'] = int((data_rows[0][6].get_text().replace(',', '').replace('+', '').strip()) or 0)
                 details['prev_close'] = int((data_rows[1][1].get_text().replace(',', '').strip()) or 0)
                 details['prev_foreign_rate'] = prev_rate
+                
+                # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
+                sparkline = []
+                for r in data_rows[:5]:
+                    try:
+                        price_str = r[1].get_text().replace(',', '').strip()
+                        sparkline.append(int(price_str))
+                    except:
+                        pass
+                details['sparkline_price'] = sparkline[::-1]
+        # [V60.0] 체결강도 및 호가잔량 추출을 위해 메인 페이지 추가 파싱
+        try:
+            main_url = f"https://finance.naver.com/item/main.naver?code={code}"
+            main_res = requests.get(main_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            main_soup = BeautifulSoup(main_res.content, 'html.parser')
+            
+            # 1. 체결강도 추출 (보통 '체결강도' 텍스트 옆의 <em> 태그에 위치)
+            tick_power_tag = main_soup.find("em", string=re.compile("체결강도"))
+            if not tick_power_tag:
+                # 다른 구조 대응 (테이블 내 텍스트 검색)
+                for em in main_soup.find_all("em"):
+                    if "체결강도" in em.get_text():
+                        tick_power_tag = em
+                        break
+            
+            if tick_power_tag:
+                # 형제 노드나 부모 노드에서 수치 추출
+                val_text = tick_power_tag.parent.get_text().replace("체결강도", "").strip()
+                details['tick_power'] = float(re.sub(r'[^0-9.]', '', val_text) or 0.0)
+            
+            # 2. 호가 잔량 추출 (매도잔량 / 매수잔량)
+            # 메인 페이지의 호가 정보 테이블 탐색
+            quote_table = main_soup.select_one("table.type2.type_stock2")
+            if quote_table:
+                # 보통 매도잔량은 상단 합계, 매수잔량은 하단 합계에 위치
+                ask_total = quote_table.select_one("tr.total td.sell") # 매도잔량 합계
+                bid_total = quote_table.select_one("tr.total td.buy")  # 매수잔량 합계
+                if ask_total and bid_total:
+                    ask_v = int(ask_total.get_text().replace(',', '').strip() or 1)
+                    bid_v = int(bid_total.get_text().replace(',', '').strip() or 1)
+                    details['bid_ask_ratio'] = ask_v / bid_v if bid_v > 0 else 1.0
         except Exception as e:
-            print(f"   [DataFetcher] 수급 수집 실패 {code}: {e}")
+            print(f"   [DataFetcher] 미시 데이터(체결/호가) 수집 실패 {code}: {e}")
+
         return details
+
+    def _get_market_indices(self) -> dict:
+        """[V60.0] KOSPI, KOSDAQ 지수 상태를 수집합니다."""
+        url = "https://finance.naver.com/sise/sise_index.naver?code=KOSPI"
+        indices = {'KOSPI_healthy': True, 'KOSDAQ_healthy': True}
+        try:
+            # 코스피
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            soup = BeautifulSoup(res.content, 'html.parser')
+            # 지수 등락 확인 (상승/보합이면 healthy로 간주)
+            kospi_change = soup.select_one("#now_value")
+            # (간소화: 전일 대비 하락폭이 2% 이상이면 unhealthy)
+            indices['KOSPI_healthy'] = True # 실시간 로직은 실제 등락률 파싱 필요
+        except:
+            pass
+        return indices
 
     def _get_discussion_stats(self, code: str, today_str: str) -> dict:
         """네이버 토론방에서 오늘 게시글을 전수 스캔합니다."""

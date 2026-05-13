@@ -62,13 +62,18 @@ class PsychDivergenceSimulator(BaseSimulator):
             if isinstance(change_rate, str):
                 change_rate = float(change_rate.replace('%', '').replace('+', ''))
             
-            # [공격적 진입] 관심 폭발 + 가격 정체
-            if (buzz_ratio >= 2.2 or buzz_count >= 750) and change_rate < 3.0:
+            # [공격적 진입] 관심 폭발 + 가격 정체 + 체결 강도 확인 (Consensus)
+            # 수급의 힘(체결강도 120% 이상)이 확인된 종목만 진입하여 허수 신호 제거
+            is_valid_buzz = ((buzz_ratio >= 2.2 and buzz_count >= 30) or buzz_count >= 500)
+            is_price_stable = (-3.0 <= change_rate < 3.0)
+            is_strong_demand = self.validate_tick_power(stock, threshold=120.0)
+
+            if is_valid_buzz and is_price_stable and is_strong_demand:
                 if price <= 0: continue
                 qty = int(target_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty, 
-                             reason=f"[심리/공격] V2 진입 (Buzz {buzz_count}개, {buzz_ratio:.1f}배)")
+                             reason=f"[심리/공합] Consensus 진입 (Buzz {buzz_count}개, 체결강도 {stock.get('tick_power')}%)")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

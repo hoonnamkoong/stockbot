@@ -52,6 +52,9 @@ class StockData(BaseModel):
     volume: int = 0         # [V50.2] 당일 거래량
     amount: int = 0         # [V50.2] 당일 거래대금 (원 단위)
     posts: list = []  # 상세 게시글 목록
+    sparkline_price: list = []  # [V50.3] 최근 N일 종가 (과거->최신순)
+    tick_power: float = 0.0     # [V60.0] 체결강도 (%)
+    bid_ask_ratio: float = 1.0  # [V60.0] 매도호가잔량 / 매수호가잔량 비
 
     @field_validator('price', 'prev_close', 'current_price', 'volume', 'amount', mode='before')
     @classmethod
@@ -181,6 +184,7 @@ class SyncState(BaseModel):
     sync_state.json의 스키마입니다.
     """
     last_update_date: str = ""        # 상태 파일이 마지막으로 업데이트된 날짜 (YYYY-MM-DD)
+    market_index_healthy: bool = True # [V60.0] 시장 지수 건강 상태
     stocks: dict = {}                 # [Legacy] 종목별 연속일수 등 보관
     reported_codes: list = []         # [Legacy] 전체 기간 중 보고된 적 있는 종목 코드 리스트
     daily_reported_info: list = []    # 당일 텔레그램으로 보고된 전체 종목 리스트 (rank 포함)

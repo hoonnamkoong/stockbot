@@ -18,6 +18,8 @@ export interface Stock {
     consecutive_days: number;
     latest_post: string;
     price_history?: number[];
+    tick_power?: number;     // [V60.0] 체결강도
+    bid_ask_ratio?: number;  // [V60.0] 호가잔량비
 }
 
 export interface FiveDayStock {

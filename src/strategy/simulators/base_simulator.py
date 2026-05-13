@@ -97,6 +97,20 @@ class BaseSimulator:
             "daily_trades": [],
             "market_index_healthy": True # [V2] 시장 지수 상태
         }
+        
+        # [Fix] 상태 초기화 시 기존 로그 및 CSV 파일도 함께 삭제하여 히스토리 불일치 해결
+        if os.path.exists(self.log_file):
+            try:
+                os.remove(self.log_file)
+            except Exception as e:
+                print(f"[Warning] {self.name} 로그 파일 삭제 실패: {e}")
+                
+        if os.path.exists(self.csv_file):
+            try:
+                os.remove(self.csv_file)
+            except Exception as e:
+                print(f"[Warning] {self.name} CSV 파일 삭제 실패: {e}")
+                
         self.save_state()
 
     def save_state(self, current_prices=None):
@@ -237,6 +251,24 @@ class BaseSimulator:
                 updated = True
         if updated:
             self.save_state()
+
+    def calculate_atr(self, sparkline_price: list, period: int = 5) -> float:
+        """[V60.1 Patch] 변동성(ATR) 계산 및 하한값(Fallback) 설정"""
+        if len(sparkline_price) < 2:
+            return 1.0 # 최소 변동폭 1원 설정 (나누기 0 방지)
+        
+        diffs = []
+        for i in range(1, len(sparkline_price)):
+            diffs.append(abs(sparkline_price[i] - sparkline_price[i-1]))
+        
+        if not diffs: return 1.0
+        atr = sum(diffs[-period:]) / len(diffs[-period:])
+        return max(atr, 1.0) # ATR이 0이 되지 않도록 보장
+
+    def validate_tick_power(self, stock_data: dict, threshold: float = 120.0) -> bool:
+        """[V60.0] 수급의 힘(체결강도)이 임계치를 넘는지 확인합니다."""
+        tp = float(stock_data.get('tick_power', 0.0))
+        return tp >= threshold
 
     def check_trailing_stop(self, code, current_price, activation_pct=5.0, callback_pct=3.0):
         """

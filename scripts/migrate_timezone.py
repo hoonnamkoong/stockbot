@@ -5,7 +5,7 @@ import os
 def migrate_csv():
     owner = "hoonnamkoong"
     repo = "stockbot"
-    token = "***REMOVED***"
+    token = os.environ.get("GITHUB_PAT")
     branch = "db-data"
     files = [
         "data/trade_history_sim_original.csv",

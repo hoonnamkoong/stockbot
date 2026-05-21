@@ -4,7 +4,7 @@ import os
 def trigger_scraper():
     owner = "hoonnamkoong"
     repo = "stockbot"
-    token = "***REMOVED***"
+    token = os.environ.get("GITHUB_PAT")
     event_type = "tasker_trigger"
     
     url = f"https://api.github.com/repos/{owner}/{repo}/dispatches"

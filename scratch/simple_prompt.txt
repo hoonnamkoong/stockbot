@@ -1,0 +1,271 @@
+아래 3가지 주식 전략 코드를 분석하고 평가해줘.
+
+[전략 1: Psych]
+from .base_simulator import BaseSimulator
+
+class PsychDivergenceSimulator(BaseSimulator):
+    """
+    [Sim 1] 심리 괴리형 (Psych-Divergence)
+    - 뉴스/게시글 빈도(Buzz)와 가격 변동 간의 괴리 포착
+    - 원리: 대중의 관심은 폭증했으나 가격은 아직 정체일 때 매집
+    """
+    def __init__(self, initial_cash=5000000):
+        super().__init__("Psych", initial_cash)
+
+    def run(self, candidates, current_prices=None):
+        current_prices = current_prices or {}
+        candidate_map = {s['code']: s for s in candidates}
+        portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
+
+        # 고점 갱신 (트레일링 스탑용)
+        self.update_peak_prices(current_prices)
+
+        # 1. 청산 로직 (공격적 홀딩 + 트레일링 스탑)
+        for code in portfolio_codes:
+            p_item = self.state['portfolio'][code]
+            current_price = current_prices.get(code, 0)
+            avg_price = p_item.get('avg_price', 0)
+            if avg_price <= 0: continue
+            profit_rate = (current_price - avg_price) / avg_price * 100
+            
+            # [V2] 트레일링 스탑 체크 (5% 수익 후 3% 하락 시)
+            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
+                self.sell(code, current_price, reason=f"[심리/공격] 트레일링 스탑 익절 (고점 대비 하락)")
+                sold_today.add(code)
+                continue
+
+            # 기본 익절/손절
+            if profit_rate >= 15.0:
+                self.sell(code, current_price, reason=f"[심리/공격] 목표 폭발 수익 달성 (+{profit_rate:.1f}%)")
+                sold_today.add(code)
+            elif profit_rate <= -7.0:
+                self.sell(code, current_price, reason=f"[심리/공격] 손절 (-7%)")
+                sold_today.add(code)
+
+        # 2. 진입 로직 (시장 지수 + 유동성 + 심리 괴리)
+        if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+
+        target_amount = self.initial_cash / 10
+        for stock in candidates:
+            code = stock['code']
+            if code in self.state['portfolio'] or code in sold_today: continue
+            
+            # [V50.2] 유동성 필터: 거래대금 10억 미만 제외 (amount 필드 사용)
+            price = float(stock.get('price', 0))
+            amount = float(stock.get('amount', 0))
+            if amount < 1_000_000_000: continue
+
+            avg_buzz = stock.get('avg_posts', 1)
+            if avg_buzz <= 0: avg_buzz = 1
+            buzz_count = stock.get('recent_posts_count', 0)
+            buzz_ratio = buzz_count / avg_buzz
+            
+            change_rate = stock.get('change_rate', stock.get('daily_change_rate', 0))
+            if isinstance(change_rate, str):
+                change_rate = float(change_rate.replace('%', '').replace('+', ''))
+            
+            # [공격적 진입] 관심 폭발 + 가격 정체 (하락폭 제한)
+            # 하한선(-3.0%)을 두어, 뉴스/관심도는 높지만 주가가 폭락 중인 '떨어지는 칼날' 매수 방지
+            # avg_posts 누락 시 buzz_ratio가 비정상적으로 높아지는 것 방지하기 위해 buzz_count 최소 요건(30 이상) 추가
+            if ((buzz_ratio >= 2.2 and buzz_count >= 30) or buzz_count >= 500) and (-3.0 <= change_rate < 3.0):
+                if price <= 0: continue
+                qty = int(target_amount / price)
+                if qty > 0:
+                    self.buy(code, stock['name'], price, qty, 
+                             reason=f"[심리/공격] V2 진입 (Buzz {buzz_count}개, {buzz_ratio:.1f}배)")
+
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)
+
+
+[전략 2: Spillover]
+from .base_simulator import BaseSimulator
+
+class SectorSpilloverSimulator(BaseSimulator):
+    """
+    [Sim 2] 섹터 전이형 (Sector-Spillover)
+    - 대장주 급등 후 아우(관련주)의 순환매 포착
+    """
+    SECTOR_MAP = {
+        "반도체": {"leaders": ["005930", "000660"], "followers": ["041510", "005290", "067310"]},
+        "이차전지": {"leaders": ["006400", "373220"], "followers": ["066970", "247540", "091990"]},
+        "자동차": {"leaders": ["005380", "000270"], "followers": ["012330", "010120"]},
+        "AI/소프트웨어": {"leaders": ["035420", "035720"], "followers": ["041190", "259960"]}
+    }
+
+    def __init__(self, initial_cash=5000000):
+        super().__init__("Spillover", initial_cash)
+
+    def _get_dynamic_sectors(self, candidates):
+        """[V2] 동적 테마 그룹화 (키워드 기반)"""
+        themes = {}
+        for stock in candidates:
+            # [V50.2] 키워드 필드 확인 및 타입 호환 처리
+            keywords = stock.get('top_keywords', [])
+            if not keywords or keywords == "Backup": continue
+            
+            # 리스트와 문자열 모두 대응
+            if isinstance(keywords, list):
+                primary_theme = keywords[0].strip()
+            else:
+                primary_theme = str(keywords).split(',')[0].strip()
+            if primary_theme not in themes:
+                themes[primary_theme] = []
+            themes[primary_theme].append(stock)
+        return themes
+
+    def run(self, candidates, current_prices=None):
+        current_prices = current_prices or {}
+        candidate_map = {s['code']: s for s in candidates}
+        portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
+
+        # 고점 갱신
+        self.update_peak_prices(current_prices)
+
+        # 1. 청산 로직 (트레일링 스탑)
+        for code in portfolio_codes:
+            current_price = current_prices.get(code, 0)
+            if current_price <= 0: continue
+            
+            # [V2] 트레일링 스탑 체크
+            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
+                self.sell(code, current_price, reason="[전이/V2] 트레일링 스탑 익절")
+                sold_today.add(code)
+                continue
+
+            # [Fix] 하드 스탑로스(손절) 로직 추가 (기존에는 수익 전환 전 하락 시 평생 물려있음)
+            p_item = self.state['portfolio'][code]
+            avg_price = p_item.get('avg_price', 0)
+            if avg_price > 0:
+                profit_rate = (current_price - avg_price) / avg_price * 100
+                if profit_rate <= -7.0:
+                    self.sell(code, current_price, reason=f"[전이/V2] 하드 손절 (-7%)")
+                    sold_today.add(code)
+
+        # 2. 진입 로직 (동적 섹터 전이)
+        if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+        
+        target_amount = self.initial_cash / 10
+        dynamic_themes = self._get_dynamic_sectors(candidates)
+
+        for theme, stocks in dynamic_themes.items():
+            if len(stocks) < 2: continue # 아우가 없는 외로운 대장은 패스
+            
+            # 리더 선정 (당일 등락률 가장 높은 종목)
+            def get_chg(s):
+                v = s.get('change_rate', s.get('daily_change_rate', 0))
+                if isinstance(v, str): v = float(v.replace('%','').replace('+',''))
+                return v
+
+            sorted_stocks = sorted(stocks, key=get_chg, reverse=True)
+            leader = sorted_stocks[0]
+            leader_change = get_chg(leader)
+            
+            if leader_change >= 3.0: # 대장주가 3% 이상 뿜어줄 때
+                for follower in sorted_stocks[1:]:
+                    f_code = follower['code']
+                    if f_code in self.state['portfolio'] or f_code in sold_today: continue
+                    
+                    # [Fix] 유동성 필터: 거래대금 10억 미만 아우주 제외
+                    amount = float(follower.get('amount', 0))
+                    if amount < 1_000_000_000: continue
+
+                    f_change = get_chg(follower)
+                    
+                    # [V2] 갭 보정: 대장주의 60% 이하이면서 음수가 아닌 경우(0% 이상) 진입 (폭락주 제외)
+                    if 0.0 <= f_change < (leader_change * 0.6) or (0.0 <= f_change < 3.0):
+                        price = float(follower.get('price', 0))
+                        if price <= 0: continue
+                        qty = int(target_amount / price)
+                        if qty > 0:
+                            self.buy(f_code, follower['name'], price, qty, 
+                                     reason=f"[전이/V2] '{theme}' 테마 동적 포착 (Leader: {leader['name']} +{leader_change}%)")
+
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)
+
+
+[전략 3: Risk]
+from .base_simulator import BaseSimulator
+
+class SmartRiskSimulator(BaseSimulator):
+    """
+    [Sim 3] 스마트 리스크형 (Smart-Risk)
+    - 추세 확인된 종목만 진입, 엄격한 손절로 방어
+    """
+    def __init__(self, initial_cash=5000000):
+        super().__init__("Risk", initial_cash)
+
+    def run(self, candidates, current_prices=None):
+        current_prices = current_prices or {}
+        candidate_map = {s['code']: s for s in candidates}
+        portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
+
+        # 고점 갱신
+        self.update_peak_prices(current_prices)
+
+        # 1. 청산 로직 (트레일링 스탑 + 지표 이탈)
+        for code in portfolio_codes:
+            p_item = self.state['portfolio'][code]
+            stock = candidate_map.get(code)
+            current_price = current_prices.get(code, 0)
+            if current_price <= 0: continue
+            
+            # [V2] 트레일링 스탑 (5% 수익 후 3% 하락 시)
+            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
+                self.sell(code, current_price, reason="[리스크/V2] 트레일링 스탑 익절")
+                sold_today.add(code)
+                continue
+
+            profit_rate = (current_price - p_item['avg_price']) / p_item['avg_price'] * 100
+            
+            # 5일 이평선 계산 (sparkline 활용)
+            sparkline = stock.get('sparkline_price', []) if stock else []
+            has_ma = len(sparkline) >= 3
+            ma_val = sum(sparkline[-5:]) / len(sparkline[-5:]) if has_ma else p_item['avg_price']
+
+            # 기본 익절/손절/이탈
+            if profit_rate >= 10.0:
+                self.sell(code, current_price, reason=f"[리스크/V2] 목표 수익 달성 (+{profit_rate:.1f}%)")
+                sold_today.add(code)
+            elif profit_rate <= -5.0:
+                self.sell(code, current_price, reason=f"[리스크/V2] 손절 (-5%)")
+                sold_today.add(code)
+            elif has_ma and current_price < ma_val * 0.98:
+                self.sell(code, current_price, reason=f"[리스크/V2] 추세 이탈 감지 (MA 하회)")
+                sold_today.add(code)
+
+        # 2. 진입 로직 (시장 지수 + 유동성 + 추세)
+        if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+
+        target_amount = self.initial_cash / 10
+        for stock in candidates:
+            code = stock['code']
+            if code in self.state['portfolio'] or code in sold_today: continue
+            
+            # [V50.2] 유동성 필터 (10억 이상, amount 필드 사용)
+            price = float(stock.get('price', 0))
+            amount = float(stock.get('amount', 0))
+            if amount < 1_000_000_000: continue
+
+            period_change = stock.get('period_change_rate', 0)
+            daily_change = stock.get('change_rate', stock.get('daily_change_rate', 0))
+            if isinstance(daily_change, str):
+                daily_change = float(daily_change.replace('%', '').replace('+', ''))
+            
+            # [V50.2] 5일 누적 수익 3% 이상 또는 2일 이상 연속 포착 & 당일 양봉 시에만 진입
+            if (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2) and daily_change > 0:
+                if price <= 0: continue
+                qty = int(target_amount / price)
+                if qty > 0:
+                    self.buy(code, stock['name'], price, qty, 
+                             reason=f"[리스크/V2] 추세 추종 (5일 누적 {period_change:.1f}%)")
+
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)
+
+
+위 코드들의 (1) 컨셉의 타당성, (2) 리스크 관리 수준, (3) 개선 제안을 요약해줘.

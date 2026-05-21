@@ -20,13 +20,14 @@ class Algo04V2(BaseStrategy):
             p_change = float(str(stock_data.get('change_rate', 0.0)).replace('%', ''))
         except: p_change = 0.0
             
-        post_count = int(stock_data.get('post_count', 0))
-        positive_rate = float(stock_data.get('positive_rate', 0.0))
-        foreign_rate_diff = float(stock_data.get('foreign_rate_diff', 0.0))
+        # Pydantic Schema V50 호환 키 적용
+        post_count = int(stock_data.get('recent_posts_count', 0))
+        sentiment = stock_data.get('sentiment', 'Neutral')
+        foreign_rate_diff = float(stock_data.get('foreign_change', 0.0))
         current_price = float(stock_data.get('price', 0))
 
         cond1 = post_count >= 100
-        cond2 = positive_rate >= 60.0
+        cond2 = sentiment == 'Positive'  # 과거 positive_rate 60.0 이상을 Positive로 대체
         cond3 = foreign_rate_diff > 0.0
         cond4 = 5.0 < p_change < 20.0
 
@@ -71,7 +72,7 @@ class Algo04V2(BaseStrategy):
         """
         current_price = float(stock_data.get('price', 0))
         avg_price = float(holding_data.get('average_buy_price', 0))
-        current_post_count = int(stock_data.get('post_count', 0))
+        current_post_count = int(stock_data.get('recent_posts_count', 0))
         
         if avg_price <= 0: return {"action": "HOLD", "reason": "기준가 없음"}
         

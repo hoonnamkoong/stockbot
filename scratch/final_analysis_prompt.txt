@@ -1,0 +1,903 @@
+너는 주식 퀀트 전략 분석가이자 시니어 파이썬 개발자야. 다음 주식 매매 시뮬레이션 시스템의 코드를 분석하고 종합적인 평가와 개선책을 제안해줘.
+
+### 1. 시스템 개요
+본 프로젝트는 3가지 시뮬레이션 트랙을 운영 중입니다.
+- **Track 1 (Psych)**: 심리 괴리형. 뉴스/게시글 빈도(Buzz)와 가격 변동 간의 괴리 포착.
+- **Track 2 (Spillover)**: 섹터 전이형. 대장주 급등 후 테마 내 아우주의 순환매 포착.
+- **Track 3 (Risk)**: 스마트 리스크형. 추세 확인된 종목만 진입, 엄격한 손절 및 이동평균선 이탈 방어.
+
+### 2. 코드 컨텍스트
+
+#### [BaseSimulator.py]
+(여기에 공통 로직인 BaseSimulator 코드가 들어갑니다.)
+```python
+import json
+import csv
+import os
+import datetime
+import math
+from datetime import timedelta, timezone
+
+
+def get_kst_now():
+    # [V8.9.9.21] 시스템 환경과 무관하게 한국 표준시(UTC+9) 강제 적용
+    return datetime.datetime.now(timezone(timedelta(hours=9)))
+
+
+class TradeLog:
+    """
+    [V8.5.0] 단일 매매 기록 데이터 구조
+    """
+    def __init__(self, symbol, side, price, qty, reason):
+        self.timestamp = get_kst_now().strftime('%Y-%m-%d %H:%M:%S')
+        self.symbol = symbol
+        self.side = side # BUY or SELL
+        self.price = price
+        self.qty = qty
+        self.reason = reason
+
+
+class BaseSimulator:
+    """
+    [Strategy DNA Engine] 모든 시뮬레이터의 부모 클래스.
+    - V8.6.2: 상태 영속성(JSON), 실시간 NAV 산출, 3M 초기화
+    """
+    def __init__(self, name, initial_cash=5000000):
+        self.name = name
+        self.initial_cash = initial_cash
+        self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data')
+        os.makedirs(self.data_dir, exist_ok=True)
+        
+        # 상태 및 로그 파일 경로
+        self.state_file = os.path.join(self.data_dir, f"sim_{name.lower()}_state.json")
+        self.log_file = os.path.join(self.data_dir, f"sim_{name.lower()}_log.json")
+        self.csv_file = os.path.join(self.data_dir, f"trade_history_sim_{name.lower()}.csv")
+        
+        self.load_state()
+
+    def load_state(self):
+        """[V8.9.9.18] 상태 로드 및 보호 로직 보강"""
+        if os.path.exists(self.state_file):
+            try:
+                with open(self.state_file, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if not content:
+                        raise ValueError("File is empty")
+                    data = json.loads(content)
+                
+                # 필수 필드 존재 여부 확인
+                if 'cash' in data and 'portfolio' in data:
+                    self.state = data
+                    # 신규 필드 마이그레이션
+                    self.state.setdefault('initial_cash', self.initial_cash)
+                    self.state.setdefault('market_index_healthy', True)
+                    self.state.setdefault('peak_nav', data.get('cash', self.initial_cash))
+                    self.state.setdefault('total_fees', 0)
+                    self.state.setdefault('daily_trades', [])
+                    self.state.setdefault('history', [self.initial_cash])
+                    
+                    # 포트폴리오 내 고점 데이터 보정
+                    for code, item in self.state['portfolio'].items():
+                        item.setdefault('peak_price', item.get('avg_price', 0))
+                    
+                    print(f"[Sim] {self.name} 상태 로드 성공 (잔고: {self.state['cash']:,}원)")
+                else:
+                    # 필드가 부족한 경우 부분 복구 시도 (초기화 대신 최대한 유지)
+                    print(f"[Warning] {self.name} 필수 필드 누락. 데이터 보정 시도.")
+                    self.state = data
+                    self.state.setdefault('cash', self.initial_cash)
+                    self.state.setdefault('portfolio', {})
+            except Exception as e:
+                print(f"[Critical] {self.name} 상태 파일 손상 ({e}). 백업을 확인하세요.")
+                # 파일이 깨진 경우 즉시 초기화하지 않고 일단 멈추거나 기본값 설정
+                self.reset_state()
+        else:
+            print(f"[Info] {self.name} 신규 시뮬레이터 시작 (기존 파일 없음)")
+            self.reset_state()
+
+
+    def reset_state(self):
+        """[V8.6.2 Hotfix] 5,000,000원 클린 시작"""
+        print(f"[Sim] {self.name} 상태를 5,000,000원으로 초기화합니다.")
+        self.state = {
+            "initial_cash": self.initial_cash,
+            "cash": self.initial_cash,
+            "invested": 0,
+            "portfolio": {},
+            "peak_nav": self.initial_cash,
+            "total_fees": 0, 
+            "history": [self.initial_cash],
+            "daily_trades": [],
+            "market_index_healthy": True # [V2] 시장 지수 상태
+        }
+        
+        # [Fix] 상태 초기화 시 기존 로그 및 CSV 파일도 함께 삭제하여 히스토리 불일치 해결
+        if os.path.exists(self.log_file):
+            try:
+                os.remove(self.log_file)
+            except Exception as e:
+                print(f"[Warning] {self.name} 로그 파일 삭제 실패: {e}")
+                
+        if os.path.exists(self.csv_file):
+            try:
+                os.remove(self.csv_file)
+            except Exception as e:
+                print(f"[Warning] {self.name} CSV 파일 삭제 실패: {e}")
+                
+        self.save_state()
+
+    def save_state(self, current_prices=None):
+        """상태 및 실시간 분석 통계 영속성 저장"""
+        try:
+            current_nav = self.state['cash'] + self.state['invested']
+            if current_nav > self.state.get('peak_nav', 0):
+                self.state['peak_nav'] = current_nav
+            
+            # [V8.9.9.12] 저장 시점에 통계를 계산하여 포함 (Radar Chart 연동용)
+            # [V8.9.9.35 Fix] 저장 시점에 통계를 계산하여 포함 (수익률 동기화 필수)
+            try:
+                # [팩트] analyzer.get_current_prices 및 results 기반의 current_prices 주입
+                stats = self.calculate_stats(current_prices)
+                full_stats = self.get_normalized_stats(current_prices)
+                
+                self.state['raw_stats'] = stats
+                self.state['normalized_stats'] = full_stats['normalized']
+                
+                # [V8.9.9.19] 계산된 수수료 동기화
+                calc_fees = stats.get('total_fees', 0)
+                if calc_fees > self.state.get('total_fees', 0):
+                    self.state['total_fees'] = calc_fees
+            except Exception as e:
+                print(f"[Sim Warning] {self.name} 성과 지표 업데이트 건너뜀: {e}")
+                pass
+
+        except Exception as e:
+            print(f"[Sim Critical] {self.name} 상태 필드 접근 오류: {e}")
+
+        # 어떠한 경우에도 파일은 최대한 저장 시도
+        try:
+            with open(self.state_file, 'w', encoding='utf-8') as f:
+                json.dump(self.state, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[Sim Critical] {self.name} 파일 쓰기 실패: {e}")
+
+    def log_trade(self, action, code, name, quantity, price, reason):
+        """매매 이력 기록 (JSON & CSV)"""
+        log_entry = {
+            "timestamp": get_kst_now().strftime('%Y-%m-%d %H:%M:%S'),
+            "action": action,
+            "code": code,
+            "name": name,
+            "quantity": quantity,
+            "price": price,
+            "amount": quantity * price,
+            "reason": reason
+        }
+        # JSON Log
+        logs = []
+        if os.path.exists(self.log_file):
+            try:
+                with open(self.log_file, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+            except: pass
+        logs.append(log_entry)
+        with open(self.log_file, 'w', encoding='utf-8') as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+
+        # CSV Log
+        file_exists = os.path.exists(self.csv_file)
+        with open(self.csv_file, 'a', encoding='utf-8-sig', newline='') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "reason"])
+            writer.writerow([
+                log_entry['timestamp'], f"{name}({code})", action, 
+                int(price), quantity, int(quantity * price), reason
+            ])
+
+    def buy(self, code, name, price, quantity, reason=""):
+        """매수 로직: 포트폴리오 즉시 업데이트 및 저장"""
+        cost = quantity * price
+        fee = cost * 0.00015
+        total_cost = cost + fee
+        if self.state['cash'] < total_cost: return False
+        self.state['cash'] -= total_cost
+        self.state['invested'] += cost
+        self.state['total_fees'] = self.state.get('total_fees', 0) + fee # 수수료 누적
+        if code in self.state['portfolio']:
+            old_item = self.state['portfolio'][code]
+            old_q = old_item['quantity']
+            old_p = old_item.get('avg_price', old_item.get('price', 0))
+            new_q = old_q + quantity
+            new_p = ((old_q * old_p) + cost) / new_q
+            self.state['portfolio'][code]['quantity'] = new_q
+            self.state['portfolio'][code]['avg_price'] = new_p
+            # 평균 단가가 바뀌어도 고점은 초기화하지 않거나 유지 (전략에 따라 다름)
+            if price > self.state['portfolio'][code].get('peak_price', 0):
+                self.state['portfolio'][code]['peak_price'] = price
+        else:
+            self.state['portfolio'][code] = {
+                "name": name, 
+                "quantity": quantity, 
+                "avg_price": price, 
+                "entry_date": get_kst_now().strftime('%Y-%m-%d'),
+                "peak_price": price,
+                "is_scaled_out": False  # [Sim 3용] 분할 매수/매도 여부
+            }
+        self.log_trade("BUY", code, name, quantity, price, reason)
+        self.save_state()
+        return True
+
+    def sell(self, code, price, quantity=None, reason=""):
+        """매도 로직: 포트폴리오 즉시 업데이트 및 저장"""
+        if code not in self.state['portfolio']: return False
+        p_item = self.state['portfolio'][code]
+        q_to_sell = quantity if quantity is not None else p_item['quantity']
+        q_to_sell = min(q_to_sell, p_item['quantity'])
+        gross = q_to_sell * price
+        fee = gross * 0.00015
+        tax = gross * 0.0018
+        net = gross - fee - tax
+        self.state['total_fees'] = self.state.get('total_fees', 0) + (fee + tax) # 수수료+세금 누적
+        avg_price = p_item.get('avg_price', 0)
+        is_win = net > (q_to_sell * avg_price)
+        self.state['cash'] += net
+        self.state['invested'] -= (q_to_sell * avg_price)
+        today_str = get_kst_now().strftime('%Y-%m-%d')
+        self.state.setdefault('daily_trades', []).append({"date": today_str, "is_win": is_win})
+        if q_to_sell >= p_item['quantity']:
+            del self.state['portfolio'][code]
+        else:
+            self.state['portfolio'][code]['quantity'] -= q_to_sell
+            self.state['portfolio'][code]['is_scaled_out'] = True # 일부 매도 발생 시 플래그 설정
+        self.log_trade("SELL", code, p_item['name'], q_to_sell, price, reason)
+        self.save_state()
+        return True
+
+    def update_peak_prices(self, current_prices):
+        """[V2] 모든 보유 종목의 고점(Peak)을 실시간 업데이트"""
+        updated = False
+        for code, p_item in self.state['portfolio'].items():
+            curr_p = current_prices.get(code, 0)
+            if curr_p > p_item.get('peak_price', 0):
+                p_item['peak_price'] = curr_p
+                updated = True
+        if updated:
+            self.save_state()
+
+    def check_trailing_stop(self, code, current_price, activation_pct=5.0, callback_pct=3.0):
+        """
+        [V2] 수익률이 activation_pct 이상 도달 후 고점 대비 callback_pct 하락 시 매도 신호
+        """
+        if code not in self.state['portfolio']: return False
+        p_item = self.state['portfolio'][code]
+        
+        avg_p = p_item.get('avg_price', 0)
+        peak_p = p_item.get('peak_price', avg_p)
+        if avg_p <= 0: return False
+        
+        profit_rate = (current_price - avg_p) / avg_p * 100
+        drop_from_peak = (peak_p - current_price) / peak_p * 100 if peak_p > 0 else 0
+        
+        # 수익이 한번이라도 5%를 찍었고, 고점에서 3% 빠지면 익절 실행
+        if profit_rate >= activation_pct or peak_p > (avg_p * (1 + activation_pct/100)):
+            if drop_from_peak >= callback_pct:
+                return True
+        return False
+
+    def calculate_stats(self, current_prices=None):
+        """성과 지표 정밀 산출"""
+        current_prices = current_prices or {}
+        eval_invested = 0
+        for code, item in self.state['portfolio'].items():
+            cur_p = current_prices.get(code, item.get('avg_price', item.get('price', 0)))
+            eval_invested += (item['quantity'] * cur_p)
+        current_nav = self.state['cash'] + eval_invested
+        
+        logs = []
+        if os.path.exists(self.log_file):
+            try:
+                with open(self.log_file, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+            except: pass
+        
+        win_rate = 0
+        pf = 1.0
+        turnover = 0
+        freq = 0
+        total_fees = self.state.get('total_fees', 0)
+        
+        if logs:
+            trades = []
+            temp_avg = {}
+            total_volume = 0
+            for l in logs:
+                c = l.get('code', '')
+                q = l.get('quantity', 0)
+                p = l.get('price', 0)
+                amt = l.get('amount', p * q)
+                total_volume += amt
+                action = l.get('action', 'BUY')
+                
+                if action == "BUY":
+                    if c not in temp_avg:
+                        temp_avg[c] = {'qty': q, 'avg_price': p}
+                    else:
+                        old_q = temp_avg[c]['qty']
+                        old_p = temp_avg[c]['avg_price']
+                        new_q = old_q + q
+                        new_p = ((old_q * old_p) + (p * q)) / new_q if new_q > 0 else p
+                        temp_avg[c] = {'qty': new_q, 'avg_price': new_p}
+                elif action == "SELL":
+                    if c in temp_avg and temp_avg[c]['qty'] > 0:
+                        buy_p = temp_avg[c]['avg_price']
+                        pl = (p - buy_p) * q
+                        trades.append(pl)
+                        temp_avg[c]['qty'] = max(0, temp_avg[c]['qty'] - q)
+            
+            if trades:
+                win_rate = (len([t for t in trades if t > 0]) / len(trades) * 100)
+                gp = sum([t for t in trades if t > 0])
+                gl = abs(sum([t for t in trades if t < 0]))
+                pf = gp / gl if gl > 0 else (gp if gp > 0 else 1.0)
+            
+            # 자본 회전율: 총 거래대금 / 초기자본
+            turnover = total_volume / self.initial_cash if self.initial_cash > 0 else 0
+            
+            # 거래 빈도: 시작일로부터 현재까지 하루 평균 거래 횟수
+            try:
+                # [V8.9.9.14] 로그가 있을 때만 시간 파싱
+                if len(logs) > 0:
+                    start_date = datetime.datetime.strptime(logs[0]['timestamp'], '%Y-%m-%d %H:%M:%S')
+                    days = (datetime.datetime.now() - start_date).days + 1
+                    freq = len(logs) / days
+            except: freq = len(logs)
+ 
+            # [V8.9.9.14] 수수료 소급 계산 (state에 수수료가 0인 경우 로그 기반 추정)
+            if total_fees == 0 and total_volume > 0:
+                # 평균 거래 수수료+세금 약 0.1%(매수 0.015, 매도 0.2) -> 평균 0.1% 적용
+                total_fees = total_volume * 0.001 
+            
+        mdd = 0
+        peak = self.state.get('peak_nav', current_nav)
+        if current_nav > peak:
+            peak = current_nav
+            self.state['peak_nav'] = peak
+        mdd = (peak - current_nav) / peak * 100 if peak > 0 else 0
+        
+        return {
+            "cash": self.state['cash'],
+            "total_asset": current_nav,
+            "profit_rate": ((current_nav - self.initial_cash) / self.initial_cash) * 100 if self.initial_cash > 0 else 0,
+            "holdings_count": len(self.state['portfolio']),
+            "win_rate": win_rate,
+            "profit_factor": pf,
+            "mdd": mdd,
+            "turnover": turnover,
+            "frequency": freq,
+            "total_fees": total_fees,
+            "current_prices": current_prices
+        }
+
+    def get_normalized_stats(self, current_prices=None):
+        """[V8.9.9.12] 5대 지표 분석 결과 정규화 (Radar Chart용)"""
+        raw = self.calculate_stats(current_prices)
+        norm = {
+            "승률": min(100, max(0, raw['win_rate'])),
+            "수익팩터": min(100, raw['profit_factor'] * 20),
+            "MDD": max(0, 100 - raw['mdd'] * 3), 
+            "거래빈도": min(100, raw['frequency'] * 5), 
+            "자본회전율": min(100, raw['turnover'] * 2)
+        }
+        return {"raw": raw, "normalized": norm, "portfolio": self.state['portfolio']}
+
+```
+
+#### [Sim 1: Psych]
+```python
+from .base_simulator import BaseSimulator
+
+class PsychDivergenceSimulator(BaseSimulator):
+    """
+    [Sim 1] 심리 괴리형 (Psych-Divergence)
+    - 뉴스/게시글 빈도(Buzz)와 가격 변동 간의 괴리 포착
+    - 원리: 대중의 관심은 폭증했으나 가격은 아직 정체일 때 매집
+    """
+    def __init__(self, initial_cash=5000000):
+        super().__init__("Psych", initial_cash)
+
+    def run(self, candidates, current_prices=None):
+        current_prices = current_prices or {}
+        candidate_map = {s['code']: s for s in candidates}
+        portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
+
+        # 고점 갱신 (트레일링 스탑용)
+        self.update_peak_prices(current_prices)
+
+        # 1. 청산 로직 (공격적 홀딩 + 트레일링 스탑)
+        for code in portfolio_codes:
+            p_item = self.state['portfolio'][code]
+            current_price = current_prices.get(code, 0)
+            avg_price = p_item.get('avg_price', 0)
+            if avg_price <= 0: continue
+            profit_rate = (current_price - avg_price) / avg_price * 100
+            
+            # [V2] 트레일링 스탑 체크 (5% 수익 후 3% 하락 시)
+            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
+                self.sell(code, current_price, reason=f"[심리/공격] 트레일링 스탑 익절 (고점 대비 하락)")
+                sold_today.add(code)
+                continue
+
+            # 기본 익절/손절
+            if profit_rate >= 15.0:
+                self.sell(code, current_price, reason=f"[심리/공격] 목표 폭발 수익 달성 (+{profit_rate:.1f}%)")
+                sold_today.add(code)
+            elif profit_rate <= -7.0:
+                self.sell(code, current_price, reason=f"[심리/공격] 손절 (-7%)")
+                sold_today.add(code)
+
+        # 2. 진입 로직 (시장 지수 + 유동성 + 심리 괴리)
+        if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+
+        target_amount = self.initial_cash / 10
+        for stock in candidates:
+            code = stock['code']
+            if code in self.state['portfolio'] or code in sold_today: continue
+            
+            # [V50.2] 유동성 필터: 거래대금 10억 미만 제외 (amount 필드 사용)
+            price = float(stock.get('price', 0))
+            amount = float(stock.get('amount', 0))
+            if amount < 1_000_000_000: continue
+
+            avg_buzz = stock.get('avg_posts', 1)
+            if avg_buzz <= 0: avg_buzz = 1
+            buzz_count = stock.get('recent_posts_count', 0)
+            buzz_ratio = buzz_count / avg_buzz
+            
+            change_rate = stock.get('change_rate', stock.get('daily_change_rate', 0))
+            if isinstance(change_rate, str):
+                change_rate = float(change_rate.replace('%', '').replace('+', ''))
+            
+            # [공격적 진입] 관심 폭발 + 가격 정체 (하락폭 제한)
+            # 하한선(-3.0%)을 두어, 뉴스/관심도는 높지만 주가가 폭락 중인 '떨어지는 칼날' 매수 방지
+            # avg_posts 누락 시 buzz_ratio가 비정상적으로 높아지는 것 방지하기 위해 buzz_count 최소 요건(30 이상) 추가
+            if ((buzz_ratio >= 2.2 and buzz_count >= 30) or buzz_count >= 500) and (-3.0 <= change_rate < 3.0):
+                if price <= 0: continue
+                qty = int(target_amount / price)
+                if qty > 0:
+                    self.buy(code, stock['name'], price, qty, 
+                             reason=f"[심리/공격] V2 진입 (Buzz {buzz_count}개, {buzz_ratio:.1f}배)")
+
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)
+
+```
+
+#### [Sim 2: Spillover]
+```python
+from .base_simulator import BaseSimulator
+
+class SectorSpilloverSimulator(BaseSimulator):
+    """
+    [Sim 2] 섹터 전이형 (Sector-Spillover)
+    - 대장주 급등 후 아우(관련주)의 순환매 포착
+    """
+    SECTOR_MAP = {
+        "반도체": {"leaders": ["005930", "000660"], "followers": ["041510", "005290", "067310"]},
+        "이차전지": {"leaders": ["006400", "373220"], "followers": ["066970", "247540", "091990"]},
+        "자동차": {"leaders": ["005380", "000270"], "followers": ["012330", "010120"]},
+        "AI/소프트웨어": {"leaders": ["035420", "035720"], "followers": ["041190", "259960"]}
+    }
+
+    def __init__(self, initial_cash=5000000):
+        super().__init__("Spillover", initial_cash)
+
+    def _get_dynamic_sectors(self, candidates):
+        """[V2] 동적 테마 그룹화 (키워드 기반)"""
+        themes = {}
+        for stock in candidates:
+            # [V50.2] 키워드 필드 확인 및 타입 호환 처리
+            keywords = stock.get('top_keywords', [])
+            if not keywords or keywords == "Backup": continue
+            
+            # 리스트와 문자열 모두 대응
+            if isinstance(keywords, list):
+                primary_theme = keywords[0].strip()
+            else:
+                primary_theme = str(keywords).split(',')[0].strip()
+            if primary_theme not in themes:
+                themes[primary_theme] = []
+            themes[primary_theme].append(stock)
+        return themes
+
+    def run(self, candidates, current_prices=None):
+        current_prices = current_prices or {}
+        candidate_map = {s['code']: s for s in candidates}
+        portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
+
+        # 고점 갱신
+        self.update_peak_prices(current_prices)
+
+        # 1. 청산 로직 (트레일링 스탑)
+        for code in portfolio_codes:
+            current_price = current_prices.get(code, 0)
+            if current_price <= 0: continue
+            
+            # [V2] 트레일링 스탑 체크
+            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
+                self.sell(code, current_price, reason="[전이/V2] 트레일링 스탑 익절")
+                sold_today.add(code)
+                continue
+
+            # [Fix] 하드 스탑로스(손절) 로직 추가 (기존에는 수익 전환 전 하락 시 평생 물려있음)
+            p_item = self.state['portfolio'][code]
+            avg_price = p_item.get('avg_price', 0)
+            if avg_price > 0:
+                profit_rate = (current_price - avg_price) / avg_price * 100
+                if profit_rate <= -7.0:
+                    self.sell(code, current_price, reason=f"[전이/V2] 하드 손절 (-7%)")
+                    sold_today.add(code)
+
+        # 2. 진입 로직 (동적 섹터 전이)
+        if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+        
+        target_amount = self.initial_cash / 10
+        dynamic_themes = self._get_dynamic_sectors(candidates)
+
+        for theme, stocks in dynamic_themes.items():
+            if len(stocks) < 2: continue # 아우가 없는 외로운 대장은 패스
+            
+            # 리더 선정 (당일 등락률 가장 높은 종목)
+            def get_chg(s):
+                v = s.get('change_rate', s.get('daily_change_rate', 0))
+                if isinstance(v, str): v = float(v.replace('%','').replace('+',''))
+                return v
+
+            sorted_stocks = sorted(stocks, key=get_chg, reverse=True)
+            leader = sorted_stocks[0]
+            leader_change = get_chg(leader)
+            
+            if leader_change >= 3.0: # 대장주가 3% 이상 뿜어줄 때
+                for follower in sorted_stocks[1:]:
+                    f_code = follower['code']
+                    if f_code in self.state['portfolio'] or f_code in sold_today: continue
+                    
+                    # [Fix] 유동성 필터: 거래대금 10억 미만 아우주 제외
+                    amount = float(follower.get('amount', 0))
+                    if amount < 1_000_000_000: continue
+
+                    f_change = get_chg(follower)
+                    
+                    # [V2] 갭 보정: 대장주의 60% 이하이면서 음수가 아닌 경우(0% 이상) 진입 (폭락주 제외)
+                    if 0.0 <= f_change < (leader_change * 0.6) or (0.0 <= f_change < 3.0):
+                        price = float(follower.get('price', 0))
+                        if price <= 0: continue
+                        qty = int(target_amount / price)
+                        if qty > 0:
+                            self.buy(f_code, follower['name'], price, qty, 
+                                     reason=f"[전이/V2] '{theme}' 테마 동적 포착 (Leader: {leader['name']} +{leader_change}%)")
+
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)
+
+```
+
+#### [Sim 3: Risk]
+```python
+from .base_simulator import BaseSimulator
+
+class SmartRiskSimulator(BaseSimulator):
+    """
+    [Sim 3] 스마트 리스크형 (Smart-Risk)
+    - 추세 확인된 종목만 진입, 엄격한 손절로 방어
+    """
+    def __init__(self, initial_cash=5000000):
+        super().__init__("Risk", initial_cash)
+
+    def run(self, candidates, current_prices=None):
+        current_prices = current_prices or {}
+        candidate_map = {s['code']: s for s in candidates}
+        portfolio_codes = list(self.state['portfolio'].keys())
+        sold_today = set()
+
+        # 고점 갱신
+        self.update_peak_prices(current_prices)
+
+        # 1. 청산 로직 (트레일링 스탑 + 지표 이탈)
+        for code in portfolio_codes:
+            p_item = self.state['portfolio'][code]
+            stock = candidate_map.get(code)
+            current_price = current_prices.get(code, 0)
+            if current_price <= 0: continue
+            
+            # [V2] 트레일링 스탑 (5% 수익 후 3% 하락 시)
+            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
+                self.sell(code, current_price, reason="[리스크/V2] 트레일링 스탑 익절")
+                sold_today.add(code)
+                continue
+
+            profit_rate = (current_price - p_item['avg_price']) / p_item['avg_price'] * 100
+            
+            # 5일 이평선 계산 (sparkline 활용)
+            sparkline = stock.get('sparkline_price', []) if stock else []
+            has_ma = len(sparkline) >= 3
+            ma_val = sum(sparkline[-5:]) / len(sparkline[-5:]) if has_ma else p_item['avg_price']
+
+            # 기본 익절/손절/이탈
+            if profit_rate >= 10.0:
+                self.sell(code, current_price, reason=f"[리스크/V2] 목표 수익 달성 (+{profit_rate:.1f}%)")
+                sold_today.add(code)
+            elif profit_rate <= -5.0:
+                self.sell(code, current_price, reason=f"[리스크/V2] 손절 (-5%)")
+                sold_today.add(code)
+            elif has_ma and current_price < ma_val * 0.98:
+                self.sell(code, current_price, reason=f"[리스크/V2] 추세 이탈 감지 (MA 하회)")
+                sold_today.add(code)
+
+        # 2. 진입 로직 (시장 지수 + 유동성 + 추세)
+        if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+
+        target_amount = self.initial_cash / 10
+        for stock in candidates:
+            code = stock['code']
+            if code in self.state['portfolio'] or code in sold_today: continue
+            
+            # [V50.2] 유동성 필터 (10억 이상, amount 필드 사용)
+            price = float(stock.get('price', 0))
+            amount = float(stock.get('amount', 0))
+            if amount < 1_000_000_000: continue
+
+            period_change = stock.get('period_change_rate', 0)
+            daily_change = stock.get('change_rate', stock.get('daily_change_rate', 0))
+            if isinstance(daily_change, str):
+                daily_change = float(daily_change.replace('%', '').replace('+', ''))
+            
+            # [V50.2] 5일 누적 수익 3% 이상 또는 2일 이상 연속 포착 & 당일 양봉 시에만 진입
+            if (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2) and daily_change > 0:
+                if price <= 0: continue
+                qty = int(target_amount / price)
+                if qty > 0:
+                    self.buy(code, stock['name'], price, qty, 
+                             reason=f"[리스크/V2] 추세 추종 (5일 누적 {period_change:.1f}%)")
+
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)
+
+```
+
+#### [DataFetcher.py (Scraper)]
+```python
+"""
+[V50] Stage 1 Worker: 데이터 수집기 (DataFetcherWorker)
+=======================================================
+네이버 금융 토론방을 스캔하여 오늘의 이상급등 종목을 수집합니다.
+수집 결과를 Pydantic StockData 객체로 변환하여 타입 안전성을 보장합니다.
+
+기존 scraper.py의 Stage 1 로직을 이 클래스로 이전했습니다.
+"""
+
+import re
+import requests
+import os
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from src.pipeline.context import PipelineContext
+from src.pipeline.workers.base_worker import BaseWorker
+from src.data.schemas import StockData
+from src.data.storage_manager import StorageManager
+from src.strategy import analyzer
+
+
+class DataFetcherWorker(BaseWorker):
+    """
+    Stage 1: 네이버 금융 데이터 수집 및 1차 필터링.
+    문턱값(threshold)을 넘은 종목만 다음 Stage로 전달합니다.
+    """
+
+    def __init__(self, ctx: PipelineContext, storage: StorageManager):
+        super().__init__(ctx)
+        self.storage = storage
+
+    def run(self) -> list[StockData]:
+        """
+        전체 수집 파이프라인을 실행합니다.
+        Returns:
+            1차 필터를 통과한 StockData 목록
+        """
+        self.log(f"수집 시작 (임계값: {self.ctx.threshold})")
+
+        # 1. GitHub에서 이전 상태 동기화
+        sync_files = self.storage.get_sync_files_list(self.ctx.now_kst)
+        self.storage.sync_from_github(sync_files)
+
+        # 2. 상태 로드
+        sync_state, _ = self.storage.load_sync_state(self.ctx.today_str)
+
+        # 3. 후보 종목 수집 (KOSPI + KOSDAQ)
+        try:
+            candidates = (
+                analyzer.get_top_trending_stocks('KOSPI') +
+                analyzer.get_top_trending_stocks('KOSDAQ')
+            )
+        except Exception as e:
+            self.log_error(f"후보 종목 수집 실패: {e}")
+            return []
+
+        self.log(f"후보 종목 {len(candidates)}개 분석 시작")
+
+        # 4. 병렬 수집 및 1차 필터링
+        results_raw = []
+        today_display = self.ctx.today_display
+
+        def process_one(s: dict) -> tuple:
+            try:
+                d = self._get_stock_details(s['code'])
+                s.update(d)
+                stats = self._get_discussion_stats(s['code'], today_display)
+                count = stats['recent_posts_count']
+
+                if count >= self.ctx.threshold:
+                    s['recent_posts_count'] = count
+                    posts = sorted(stats['new_posts'], key=lambda x: x['likes'], reverse=True)[:5]
+                    for p in posts:
+                        p['body'] = self._get_post_body(s['code'], p['nid'])
+                    s['posts'] = posts
+                    return s, stats['updated_state'], True
+                return None, stats['updated_state'], False
+            except Exception as e:
+                print(f"   [DataFetcher] {s.get('name', '?')} 스킵: {e}")
+                return None, None, False
+
+        with ThreadPoolExecutor(max_workers=self.ctx.threshold) as executor:
+            futures = list(executor.map(process_one, candidates))
+
+        for res, updated_state, passed in futures:
+            if updated_state:
+                sync_state.stocks.update(updated_state)
+            if passed and res:
+                results_raw.append(res)
+
+        # 5. 연속 카운트 갱신
+        passed_codes = [s['code'] for s in results_raw]
+        counts = self.storage.update_consecutive_counts(passed_codes, self.ctx.now_kst)
+        for s in results_raw:
+            s['consecutive_days'] = counts.get(s['code'], 1)
+            # [Bug 4 Fix] change_rate 계산: 등락률을 문자열로 생성
+            price = int(s.get('price', s.get('current_price', 0)))
+            prev_close = int(s.get('prev_close', 0))
+            if prev_close > 0 and price > 0:
+                rate = ((price - prev_close) / prev_close) * 100
+                s['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
+            elif 'change_rate' not in s:
+                s['change_rate'] = "0.00%"
+
+        # 6. 상태 저장
+        self.storage.save_sync_state(sync_state)
+
+        # 7. Pydantic 변환 (타입 안전성 확보)
+        results: list[StockData] = []
+        for s in results_raw:
+            try:
+                results.append(StockData.from_dict(s))
+            except Exception as e:
+                print(f"   [DataFetcher] Pydantic 변환 실패 {s.get('code')}: {e}")
+
+        self.log(f"수집 완료: {len(results)}개 종목 통과")
+        return results
+
+    # ── 내부 수집 메서드들 (기존 scraper.py에서 이전) ──────────────
+
+    def _get_stock_details(self, code: str) -> dict:
+        """네이버 외인비중 페이지에서 수급 데이터를 수집합니다."""
+        details = {
+            'foreign_rate': 0.0, 'foreign_change': 0.0,
+            'foreign_net_buy': 0, 'prev_close': 0, 'prev_foreign_rate': 0.0
+        }
+        url = f"https://finance.naver.com/item/frgn.naver?code={code}"
+        try:
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            soup = BeautifulSoup(res.content, 'html.parser')
+            rows = soup.select('table.type2 tr')
+            data_rows = [
+                r.select('td') for r in rows
+                if len(r.select('td')) == 9 and re.match(r'\d{4}', r.select('td')[0].get_text(strip=True))
+            ]
+            if len(data_rows) >= 2:
+                details['foreign_rate'] = float(data_rows[0][8].get_text().replace('%', '').replace(',', '').strip())
+                prev_rate = float(data_rows[1][8].get_text().replace('%', '').replace(',', '').strip())
+                details['foreign_change'] = round(details['foreign_rate'] - prev_rate, 3)
+                details['inst_net_buy'] = int((data_rows[0][5].get_text().replace(',', '').replace('+', '').strip()) or 0)
+                details['foreign_net_buy'] = int((data_rows[0][6].get_text().replace(',', '').replace('+', '').strip()) or 0)
+                details['prev_close'] = int((data_rows[1][1].get_text().replace(',', '').strip()) or 0)
+                details['prev_foreign_rate'] = prev_rate
+                
+                # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
+                sparkline = []
+                for r in data_rows[:5]:
+                    try:
+                        price_str = r[1].get_text().replace(',', '').strip()
+                        sparkline.append(int(price_str))
+                    except:
+                        pass
+                details['sparkline_price'] = sparkline[::-1]
+        except Exception as e:
+            print(f"   [DataFetcher] 수급 수집 실패 {code}: {e}")
+        return details
+
+    def _get_discussion_stats(self, code: str, today_str: str) -> dict:
+        """네이버 토론방에서 오늘 게시글을 전수 스캔합니다."""
+        session = requests.Session()
+        session.headers.update({'User-Agent': 'Mozilla/5.0'})
+        unique_nids = set()
+        new_posts = []
+        max_pages, chunk_size = 40, 8
+
+        def fetch_page(p_idx):
+            url = f"https://finance.naver.com/item/board.naver?code={code}&page={p_idx}"
+            try:
+                res = session.get(url, timeout=5)
+                soup = BeautifulSoup(res.content, 'html.parser')
+                posts, stop = [], False
+                for row in soup.select('table.type2 tr'):
+                    cols = row.select('td')
+                    if len(cols) < 5: continue
+                    if today_str not in cols[0].get_text(strip=True):
+                        stop = True; break
+                    tag = row.select_one('td.title a')
+                    if not tag: continue
+                    nid = re.search(r'nid=(\d+)', tag['href'])
+                    if not nid: continue
+                    try: likes = int(cols[4].get_text(strip=True))
+                    except: likes = 0
+                    posts.append({'nid': nid.group(1), 'title': tag.get_text(strip=True), 'likes': likes})
+                return posts, stop
+            except:
+                return [], False
+
+        for start_p in range(1, max_pages + 1, chunk_size):
+            chunk = range(start_p, min(start_p + chunk_size, max_pages + 1))
+            with ThreadPoolExecutor(max_workers=chunk_size) as ex:
+                chunk_res = sorted(
+                    [(ex.submit(fetch_page, p), p) for p in chunk],
+                    key=lambda x: x[1]
+                )
+                stop_all = False
+                for future, _ in chunk_res:
+                    posts, stop = future.result()
+                    for p in posts:
+                        if p['nid'] not in unique_nids:
+                            unique_nids.add(p['nid'])
+                            new_posts.append(p)
+                    if stop: stop_all = True
+                if stop_all: break
+
+        latest_nid = new_posts[0]['nid'] if new_posts else None
+        return {
+            'recent_posts_count': len(unique_nids),
+            'new_posts': new_posts,
+            'updated_state': {'cumulative_count': len(unique_nids), 'last_nid': latest_nid}
+        }
+
+    def _get_post_body(self, code: str, nid: str) -> str:
+        """게시글 본문을 수집합니다."""
+        url = f"https://finance.naver.com/item/board_read.naver?code={code}&nid={nid}"
+        try:
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            soup = BeautifulSoup(res.content, 'html.parser')
+            body = soup.select_one('#body')
+            if body: return body.get_text(strip=True)
+        except:
+            pass
+        return ""
+
+```
+
+### 3. 요청 사항
+- **컨셉 평가**: 각 전략의 이론적 유효성과 현실적인 시장 적용 가능성.
+- **코드 및 로직 평가**: 현재 구현된 조건식들의 적절성, 데이터 예외 처리, 리스크 관리 로직의 정밀도.
+- **개선책 제안**: 수익률 제고 또는 리스크 방어를 위한 구체적인 로직 개선안.
+- **종합 의견**: 이 시스템이 실전 매매에 의미가 있을지, 어떤 부분을 더 보완해야 할지.
+
+한국어로 답변해줘.

@@ -30,8 +30,9 @@ def get_market_health():
         
         if diff_tag: return True
         return False # 파란색(하락)이거나 보합이면 보수적으로 False
-    except:
-        return True # 오류 시에는 기본적으로 매매 허용
+    except Exception as e:
+        print(f"[Warning] 시장 건전성 조회 실패 (기본값 True 적용): {e}")
+        return True
 
 def get_current_price(code):
     """네이버 금융에서 실시간 현재가 추출"""
@@ -43,7 +44,8 @@ def get_current_price(code):
         price_tag = soup.select_one('.no_today .blind')
         if price_tag:
             return int(price_tag.text.replace(',', ''))
-    except: pass
+    except Exception as e:
+        print(f"[Warning] 현재가 조회 실패 ({code}): {e}")
     return None
 
 def run_all_simulators(data_list):

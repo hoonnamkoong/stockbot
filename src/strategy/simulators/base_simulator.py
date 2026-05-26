@@ -29,6 +29,10 @@ class BaseSimulator:
     [Strategy DNA Engine] 모든 시뮬레이터의 부모 클래스.
     - V8.6.2: 상태 영속성(JSON), 실시간 NAV 산출, 3M 초기화
     """
+    BUY_FEE_RATE = 0.00015   # 매수 수수료율
+    SELL_FEE_RATE = 0.00015  # 매도 수수료율
+    SELL_TAX_RATE = 0.0018   # 증권거래세율
+
     def __init__(self, name, initial_cash=5000000):
         self.name = name
         self.initial_cash = initial_cash
@@ -122,21 +126,20 @@ class BaseSimulator:
             
             # [V8.9.9.12] 저장 시점에 통계를 계산하여 포함 (Radar Chart 연동용)
             # [V8.9.9.35 Fix] 저장 시점에 통계를 계산하여 포함 (수익률 동기화 필수)
-            try:
-                # [팩트] analyzer.get_current_prices 및 results 기반의 current_prices 주입
-                stats = self.calculate_stats(current_prices)
-                full_stats = self.get_normalized_stats(current_prices)
-                
-                self.state['raw_stats'] = stats
-                self.state['normalized_stats'] = full_stats['normalized']
-                
-                # [V8.9.9.19] 계산된 수수료 동기화
-                calc_fees = stats.get('total_fees', 0)
-                if calc_fees > self.state.get('total_fees', 0):
-                    self.state['total_fees'] = calc_fees
-            except Exception as e:
-                print(f"[Sim Warning] {self.name} 성과 지표 업데이트 건너뜀: {e}")
-                pass
+            # [Fix] current_prices가 제공된 경우(run() 종료 시)에만 통계 갱신 — buy/sell 중복 파싱 제거
+            if current_prices is not None:
+                try:
+                    stats = self.calculate_stats(current_prices)
+                    full_stats = self.get_normalized_stats(current_prices)
+                    
+                    self.state['raw_stats'] = stats
+                    self.state['normalized_stats'] = full_stats['normalized']
+                    
+                    calc_fees = stats.get('total_fees', 0)
+                    if calc_fees > self.state.get('total_fees', 0):
+                        self.state['total_fees'] = calc_fees
+                except Exception as e:
+                    print(f"[Sim Warning] {self.name} 성과 지표 업데이트 건너뜀: {e}")
 
         except Exception as e:
             print(f"[Sim Critical] {self.name} 상태 필드 접근 오류: {e}")
@@ -149,43 +152,22 @@ class BaseSimulator:
             print(f"[Sim Critical] {self.name} 파일 쓰기 실패: {e}")
 
     def log_trade(self, action, code, name, quantity, price, reason):
-        """매매 이력 기록 (JSON & CSV)"""
-        log_entry = {
-            "timestamp": get_kst_now().strftime('%Y-%m-%d %H:%M:%S'),
-            "action": action,
-            "code": code,
-            "name": name,
-            "quantity": quantity,
-            "price": price,
-            "amount": quantity * price,
-            "reason": reason
-        }
-        # JSON Log
-        logs = []
-        if os.path.exists(self.log_file):
-            try:
-                with open(self.log_file, 'r', encoding='utf-8') as f:
-                    logs = json.load(f)
-            except: pass
-        logs.append(log_entry)
-        with open(self.log_file, 'w', encoding='utf-8') as f:
-            json.dump(logs, f, ensure_ascii=False, indent=2)
-
-        # CSV Log
+        """매매 이력 기록 (CSV append only — JSON 이중 기록 제거로 I/O 최적화)"""
+        timestamp = get_kst_now().strftime('%Y-%m-%d %H:%M:%S')
         file_exists = os.path.exists(self.csv_file)
         with open(self.csv_file, 'a', encoding='utf-8-sig', newline='') as f:
             writer = csv.writer(f)
             if not file_exists:
                 writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "reason"])
             writer.writerow([
-                log_entry['timestamp'], f"{name}({code})", action, 
+                timestamp, f"{name}({code})", action,
                 int(price), quantity, int(quantity * price), reason
             ])
 
     def buy(self, code, name, price, quantity, reason=""):
         """매수 로직: 포트폴리오 즉시 업데이트 및 저장"""
         cost = quantity * price
-        fee = cost * 0.00015
+        fee = cost * self.BUY_FEE_RATE
         total_cost = cost + fee
         if self.state['cash'] < total_cost: return False
         self.state['cash'] -= total_cost
@@ -222,14 +204,14 @@ class BaseSimulator:
         q_to_sell = quantity if quantity is not None else p_item['quantity']
         q_to_sell = min(q_to_sell, p_item['quantity'])
         gross = q_to_sell * price
-        fee = gross * 0.00015
-        tax = gross * 0.0018
+        fee = gross * self.SELL_FEE_RATE
+        tax = gross * self.SELL_TAX_RATE
         net = gross - fee - tax
-        self.state['total_fees'] = self.state.get('total_fees', 0) + (fee + tax) # 수수료+세금 누적
+        self.state['total_fees'] = self.state.get('total_fees', 0) + (fee + tax)
         avg_price = p_item.get('avg_price', 0)
         is_win = net > (q_to_sell * avg_price)
         self.state['cash'] += net
-        self.state['invested'] -= (q_to_sell * avg_price)
+        self.state['invested'] = max(0, self.state['invested'] - (q_to_sell * avg_price))
         today_str = get_kst_now().strftime('%Y-%m-%d')
         self.state.setdefault('daily_trades', []).append({"date": today_str, "is_win": is_win})
         if q_to_sell >= p_item['quantity']:
@@ -290,6 +272,38 @@ class BaseSimulator:
                 return True
         return False
 
+    def _load_trade_logs(self):
+        """CSV에서 매매 기록을 파싱합니다 (JSON 이중 기록 제거 후 CSV가 유일한 소스)."""
+        logs = []
+        # [호환성] 기존 JSON 로그가 있으면 우선 사용 (마이그레이션 기간)
+        if os.path.exists(self.log_file):
+            try:
+                with open(self.log_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if data:
+                    return data
+            except Exception:
+                pass
+        # CSV에서 파싱
+        if os.path.exists(self.csv_file):
+            try:
+                with open(self.csv_file, 'r', encoding='utf-8-sig') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        symbol = row.get('symbol', '')
+                        code = symbol.split('(')[-1].rstrip(')') if '(' in symbol else symbol
+                        logs.append({
+                            'code': code,
+                            'action': row.get('action', 'BUY'),
+                            'price': float(row.get('price', '0').replace(',', '')),
+                            'quantity': int(row.get('quantity', 0)),
+                            'amount': float(row.get('total_amount', '0').replace(',', '')),
+                            'timestamp': row.get('timestamp', '')
+                        })
+            except Exception as e:
+                print(f"[Sim Warning] {self.name} CSV 파싱 실패: {e}")
+        return logs
+
     def calculate_stats(self, current_prices=None):
         """성과 지표 정밀 산출"""
         current_prices = current_prices or {}
@@ -299,12 +313,7 @@ class BaseSimulator:
             eval_invested += (item['quantity'] * cur_p)
         current_nav = self.state['cash'] + eval_invested
         
-        logs = []
-        if os.path.exists(self.log_file):
-            try:
-                with open(self.log_file, 'r', encoding='utf-8') as f:
-                    logs = json.load(f)
-            except: pass
+        logs = self._load_trade_logs()
         
         win_rate = 0
         pf = 1.0
@@ -351,12 +360,14 @@ class BaseSimulator:
             
             # 거래 빈도: 시작일로부터 현재까지 하루 평균 거래 횟수
             try:
-                # [V8.9.9.14] 로그가 있을 때만 시간 파싱
                 if len(logs) > 0:
                     start_date = datetime.datetime.strptime(logs[0]['timestamp'], '%Y-%m-%d %H:%M:%S')
-                    days = (datetime.datetime.now() - start_date).days + 1
+                    now_kst = get_kst_now().replace(tzinfo=None)
+                    days = (now_kst - start_date).days + 1
                     freq = len(logs) / days
-            except: freq = len(logs)
+            except Exception as e:
+                print(f"[Sim Warning] {self.name} 거래빈도 계산 실패: {e}")
+                freq = len(logs)
  
             # [V8.9.9.14] 수수료 소급 계산 (state에 수수료가 0인 경우 로그 기반 추정)
             if total_fees == 0 and total_volume > 0:

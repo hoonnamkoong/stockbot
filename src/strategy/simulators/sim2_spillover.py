@@ -1,5 +1,14 @@
 from .base_simulator import BaseSimulator
 
+
+def _parse_change_rate(stock):
+    """등락률 추출 (문자열/숫자 모두 호환)"""
+    val = stock.get('change_rate', stock.get('daily_change_rate', 0))
+    if isinstance(val, str):
+        val = float(val.replace('%', '').replace('+', ''))
+    return float(val)
+
+
 class SectorSpilloverSimulator(BaseSimulator):
     """
     [Sim 2] 섹터 전이형 (Sector-Spillover)
@@ -73,13 +82,13 @@ class SectorSpilloverSimulator(BaseSimulator):
             
             # [V60.0 Consensus] 리더 선정 정교화 (등락률 * 거래대금 가중치)
             def get_rs_score(s):
-                chg = get_chg(s)
+                chg = _parse_change_rate(s)
                 amt = float(s.get('amount', 0)) / 1_000_000_000 # 10억 단위
                 return chg * (amt ** 0.5) # 거래대금이 클수록 대장주 가중치
 
             sorted_stocks = sorted(stocks, key=get_rs_score, reverse=True)
             leader = sorted_stocks[0]
-            leader_change = get_chg(leader)
+            leader_change = _parse_change_rate(leader)
             leader_tp = float(leader.get('tick_power', 100))
             
             if leader_change >= 3.0: # 대장주가 3% 이상 뿜어줄 때
@@ -93,7 +102,7 @@ class SectorSpilloverSimulator(BaseSimulator):
 
                     # [V60.0 Consensus] 호가창 전이 및 수급 확인
                     # 대장주의 수급(체결강도)이 강하고, 아우주의 매도호가 잔량이 줄어드는(bid_ask_ratio < 1.0) 시점
-                    f_change = get_chg(follower)
+                    f_change = _parse_change_rate(follower)
                     f_bar = float(follower.get('bid_ask_ratio', 1.0))
                     
                     is_leader_strong = leader_change >= 3.0 and leader_tp >= 110.0

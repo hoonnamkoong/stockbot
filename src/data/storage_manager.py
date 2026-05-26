@@ -71,22 +71,15 @@ class StorageManager:
         동기화해야 할 파일 목록을 동적으로 생성합니다.
         2026-01부터 현재 달까지의 모든 월별 엑셀 파일을 포함합니다.
         """
+        # [Fix] 시뮬레이터 추가 시 동기화 누락 방지를 위한 자동 생성
+        SIM_NAMES = ['original', 'conservative', 'aggressive', 'conviction', 'psych', 'spillover', 'risk']
         base_files = [
             'sync_state.json',
             'consecutive_registry.json',
-            'sim_original_state.json',
-            'sim_conservative_state.json',
-            'sim_aggressive_state.json',
-            'sim_psych_state.json',
-            'sim_spillover_state.json',
-            'sim_risk_state.json',
-            'trade_history_sim_original.csv',
-            'trade_history_sim_conservative.csv',
-            'trade_history_sim_aggressive.csv',
-            'trade_history_sim_conviction.csv',
-            'trade_history_sim_psych.csv',
-            'trade_history_sim_spillover.csv',
-            'trade_history_sim_risk.csv',
+        ]
+        base_files += [f'sim_{n}_state.json' for n in SIM_NAMES]
+        base_files += [f'trade_history_sim_{n}.csv' for n in SIM_NAMES]
+        base_files += [
             'trade_history_real.csv',
             'reservations.json',
         ]

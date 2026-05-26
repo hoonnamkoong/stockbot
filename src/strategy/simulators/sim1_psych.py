@@ -73,7 +73,7 @@ class PsychDivergenceSimulator(BaseSimulator):
                 qty = int(target_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty, 
-                             reason=f"[심리/공합] Consensus 진입 (Buzz {buzz_count}개, 체결강도 {stock.get('tick_power')}%)")
+                             reason=f"[심리/공격] Consensus 진입 (Buzz {buzz_count}개, 체결강도 {stock.get('tick_power')}%)")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

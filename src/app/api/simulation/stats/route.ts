@@ -39,7 +39,7 @@ export async function GET() {
                 }
 
                 const totalAsset = (state.cash || 0) + portfolioValue;
-                const initialCash = state.initial_cash || 3000000;
+                const initialCash = state.initial_cash || 5000000;
                 const profit = totalAsset - initialCash;
                 const returnRate = (profit / initialCash) * 100;
 

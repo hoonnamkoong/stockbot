@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * [V8.9.9] 시뮬레이터 통합 통계 API (Remote DB Version)
  * GitHub Raw URL에서 시뮬레이터 상태를 가져와 통합 통계를 산출합니다.

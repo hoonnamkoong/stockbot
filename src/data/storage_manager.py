@@ -84,6 +84,9 @@ class StorageManager:
             'trade_history_sim_conservative.csv',
             'trade_history_sim_aggressive.csv',
             'trade_history_sim_conviction.csv',
+            'trade_history_sim_psych.csv',
+            'trade_history_sim_spillover.csv',
+            'trade_history_sim_risk.csv',
             'trade_history_real.csv',
             'reservations.json',
         ]

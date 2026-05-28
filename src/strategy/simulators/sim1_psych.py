@@ -32,12 +32,20 @@ class PsychDivergenceSimulator(BaseSimulator):
                 sold_today.add(code)
                 continue
 
-            # 기본 익절/손절
-            if profit_rate >= 15.0:
-                self.sell(code, current_price, reason=f"[심리/공격] 목표 폭발 수익 달성 (+{profit_rate:.1f}%)")
+            # [V60.0] ATR 기반 동적 익절/손절 (기존 고정 15% / -7% 폐기)
+            sparkline = stock.get('sparkline_price', []) if stock else []
+            atr = self.calculate_atr(sparkline) if sparkline else 1.0
+            
+            # 동적 목표가 (TP) = 진입가 + 2 * ATR
+            # 동적 손절가 (SL) = 진입가 - 1 * ATR
+            tp_price = avg_price + (atr * 2.0)
+            sl_price = avg_price - atr
+
+            if current_price >= tp_price:
+                self.sell(code, current_price, reason=f"[심리/공격] 동적 목표가 달성 (ATR 기반 익절)")
                 sold_today.add(code)
-            elif profit_rate <= -7.0:
-                self.sell(code, current_price, reason=f"[심리/공격] 손절 (-7%)")
+            elif current_price <= sl_price:
+                self.sell(code, current_price, reason=f"[심리/공격] 동적 손절가 이탈 (ATR 기반 손절)")
                 sold_today.add(code)
 
         # 2. 진입 로직 (시장 지수 + 유동성 + 심리 괴리)
@@ -62,18 +70,23 @@ class PsychDivergenceSimulator(BaseSimulator):
             if isinstance(change_rate, str):
                 change_rate = float(change_rate.replace('%', '').replace('+', ''))
             
+            # [V60.0] ADX 킬스위치 (ADX < 20 이면 진입 차단)
+            sparkline = stock.get('sparkline_price', [])
+            adx_approx = self.calculate_adx(sparkline) if sparkline else 0.0
+
             # [공격적 진입] 관심 폭발 + 가격 정체 + 체결 강도 확인 (Consensus)
             # 수급의 힘(체결강도 120% 이상)이 확인된 종목만 진입하여 허수 신호 제거
             is_valid_buzz = ((buzz_ratio >= 2.2 and buzz_count >= 30) or buzz_count >= 500)
             is_price_stable = (-3.0 <= change_rate < 3.0)
             is_strong_demand = self.validate_tick_power(stock, threshold=120.0)
+            is_trending = adx_approx >= 15.0 # 킬스위치 완화
 
-            if is_valid_buzz and is_price_stable and is_strong_demand:
+            if is_valid_buzz and is_price_stable and is_strong_demand and is_trending:
                 if price <= 0: continue
                 qty = int(target_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty, 
-                             reason=f"[심리/공격] Consensus 진입 (Buzz {buzz_count}개, 체결강도 {stock.get('tick_power')}%)")
+                             reason=f"[심리/공격] Consensus 진입 (Buzz {buzz_count}개, ADX {adx_approx:.1f})")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

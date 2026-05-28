@@ -1,46 +1,14 @@
 from .base_simulator import BaseSimulator
-
-
-def _parse_change_rate(stock):
-    """등락률 추출 (문자열/숫자 모두 호환)"""
-    val = stock.get('change_rate', stock.get('daily_change_rate', 0))
-    if isinstance(val, str):
-        val = float(val.replace('%', '').replace('+', ''))
-    return float(val)
-
+from datetime import datetime
 
 class SectorSpilloverSimulator(BaseSimulator):
     """
-    [Sim 2] 섹터 전이형 (Sector-Spillover)
-    - 대장주 급등 후 아우(관련주)의 순환매 포착
+    [Sim 2] MFHS2 (다중 필터 하이브리드 수급 동승 전략)
+    - 과거 섹터 전이형에서 변경됨.
+    - 기관/외국인 수급과 감정 발산(Divergence) 지표를 융합하여 선도 진입.
     """
-    SECTOR_MAP = {
-        "반도체": {"leaders": ["005930", "000660"], "followers": ["041510", "005290", "067310"]},
-        "이차전지": {"leaders": ["006400", "373220"], "followers": ["066970", "247540", "091990"]},
-        "자동차": {"leaders": ["005380", "000270"], "followers": ["012330", "010120"]},
-        "AI/소프트웨어": {"leaders": ["035420", "035720"], "followers": ["041190", "259960"]}
-    }
-
     def __init__(self, initial_cash=5000000):
         super().__init__("Spillover", initial_cash)
-
-    def _get_dynamic_sectors(self, candidates):
-        """[V2] 동적 테마 그룹화 (키워드 기반)"""
-        themes = {}
-        for stock in candidates:
-            # [V50.2] 키워드 필드 확인 및 타입 호환 처리
-            keywords = stock.get('top_keywords', [])
-            if not keywords or keywords == "Backup": continue
-            
-            # 리스트와 문자열 모두 대응
-            if isinstance(keywords, list):
-                primary_theme = keywords[0].strip()
-            else:
-                primary_theme = str(keywords).split(',')[0].strip()
-            if primary_theme not in themes:
-                themes[primary_theme] = []
-            themes[primary_theme].append(stock)
-        return themes
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
@@ -50,71 +18,74 @@ class SectorSpilloverSimulator(BaseSimulator):
 
         # 고점 갱신
         self.update_peak_prices(current_prices)
+        
+        now = datetime.now()
+        current_month = now.month
+        current_day = now.day
 
-        # 1. 청산 로직 (트레일링 스탑)
+        # 1. 청산 로직 (외인 수급 역전 및 5월 말 캘린더 청산)
         for code in portfolio_codes:
             current_price = current_prices.get(code, 0)
             if current_price <= 0: continue
             
-            # [V2] 트레일링 스탑 체크
-            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
-                self.sell(code, current_price, reason="[전이/V2] 트레일링 스탑 익절")
+            p_item = self.state['portfolio'][code]
+            stock = candidate_map.get(code, {})
+            
+            # (A) 5월 말 달력 기반 강제 청산 (Sell in May)
+            if current_month == 5 and current_day >= 25:
+                self.sell(code, current_price, reason="[MFHS2] 5월말 계절성 캘린더 청산 (Sell in May)")
+                sold_today.add(code)
+                continue
+                
+            # (B) 외인 수급 역전(-EMA 근사치) 파악
+            f_change = stock.get('foreign_change', 0)
+            if isinstance(f_change, str):
+                try:
+                    f_change = float(f_change.replace('%', '').replace('+', '').strip())
+                except:
+                    f_change = 0.0
+            
+            if f_change <= -0.5: # 외인 지분 0.5% 이상 대량 이탈 시
+                self.sell(code, current_price, reason="[MFHS2] 외인 대량 이탈 감지 (수급 역전)")
                 sold_today.add(code)
                 continue
 
-            # [Fix] 하드 스탑로스(손절) 로직 추가 (기존에는 수익 전환 전 하락 시 평생 물려있음)
-            p_item = self.state['portfolio'][code]
+            # (C) 트레일링 스탑
+            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
+                self.sell(code, current_price, reason="[MFHS2] 트레일링 스탑 익절")
+                sold_today.add(code)
+                continue
+
+            # (D) 하드 손절
             avg_price = p_item.get('avg_price', 0)
             if avg_price > 0:
                 profit_rate = (current_price - avg_price) / avg_price * 100
                 if profit_rate <= -7.0:
-                    self.sell(code, current_price, reason=f"[전이/V2] 하드 손절 (-7%)")
+                    self.sell(code, current_price, reason="[MFHS2] 하드 손절 (-7%)")
                     sold_today.add(code)
 
-        # 2. 진입 로직 (동적 섹터 전이)
+        # 2. 진입 로직 (MFHS2 통합 스코어링 기반 진입)
         if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
         
         target_amount = self.initial_cash / 10
-        dynamic_themes = self._get_dynamic_sectors(candidates)
 
-        for theme, stocks in dynamic_themes.items():
-            if len(stocks) < 2: continue # 아우가 없는 외로운 대장은 패스
+        for stock in candidates:
+            code = stock['code']
+            if code in self.state['portfolio'] or code in sold_today: continue
             
-            # [V60.0 Consensus] 리더 선정 정교화 (등락률 * 거래대금 가중치)
-            def get_rs_score(s):
-                chg = _parse_change_rate(s)
-                amt = float(s.get('amount', 0)) / 1_000_000_000 # 10억 단위
-                return chg * (amt ** 0.5) # 거래대금이 클수록 대장주 가중치
+            price = float(stock.get('price', 0))
+            amount = float(stock.get('amount', 0))
+            if amount < 1_000_000_000 or price <= 0: continue # 거래대금 10억 미만 패스
 
-            sorted_stocks = sorted(stocks, key=get_rs_score, reverse=True)
-            leader = sorted_stocks[0]
-            leader_change = _parse_change_rate(leader)
-            leader_tp = float(leader.get('tick_power', 100))
-            
-            if leader_change >= 3.0: # 대장주가 3% 이상 뿜어줄 때
-                for follower in sorted_stocks[1:]:
-                    f_code = follower['code']
-                    if f_code in self.state['portfolio'] or f_code in sold_today: continue
-                    
-                    # [Fix] 유동성 필터: 거래대금 10억 미만 아우주 제외
-                    amount = float(follower.get('amount', 0))
-                    if amount < 1_000_000_000: continue
+            # MFHS2 통합 스코어 계산 (BaseSimulator 메서드 호출)
+            score = self.calculate_mfhs2_score(stock, current_month)
 
-                    # [V60.0 Consensus] 호가창 전이 및 수급 확인
-                    # 대장주의 수급(체결강도)이 강하고, 아우주의 매도호가 잔량이 줄어드는(bid_ask_ratio < 1.0) 시점
-                    f_change = _parse_change_rate(follower)
-                    f_bar = float(follower.get('bid_ask_ratio', 1.0))
-                    
-                    is_leader_strong = leader_change >= 3.0 and leader_tp >= 110.0
-                    is_follower_ready = f_bar < 1.0 or self.validate_tick_power(follower, 110.0)
-
-                    if is_leader_strong and is_follower_ready and (0.0 <= f_change < leader_change * 0.6):
-                        price = float(follower.get('price', 0))
-                        if price <= 0: continue
-                        qty = int(target_amount / price)
-                        if qty > 0:
-                            self.buy(f_code, follower['name'], price, qty, 
-                                     reason=f"[전이/V2] '{theme}' 테마 동적 포착 (Leader: {leader['name']} +{leader_change}%)")
+            # 진입 결정: 40점 이상이면 매수
+            if score >= 40:
+                qty = int(target_amount / price)
+                if qty > 0:
+                    self.buy(code, stock['name'], price, qty, 
+                             reason=f"[MFHS2] 다중 필터 수급 동승 (Score: {score}/100)")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

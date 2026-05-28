@@ -31,15 +31,6 @@ class PipelineContext:
         # 시간대별 게시글 수 임계값
         self.threshold: int = self._calc_threshold()
 
-        # 공휴일 목록 (2026년 기준)
-        self._holidays_2026 = [
-            "01-01", "02-16", "02-17", "02-18", "03-01", "03-02",
-            "05-01",  # 근로자의 날 (주식시장 휴장)
-            "05-05", "05-22", "06-06", "08-15",
-            "09-24", "09-25", "09-26", "10-03", "10-09",
-            "12-25", "12-31"
-        ]
-
     @classmethod
     def from_env(cls) -> 'PipelineContext':
         """환경변수를 로드하고 컨텍스트를 생성합니다."""
@@ -70,11 +61,47 @@ class PipelineContext:
         return 130
 
     def is_trading_day(self) -> bool:
-        """오늘이 거래일인지 확인합니다 (주말 및 공휴일 제외)."""
+        """오늘이 거래일인지 확인합니다 (네이버 증권 스크래핑 및 holidays 패키지 활용)."""
         if self.now_kst.weekday() >= 5:
             return False
-        if self.now_kst.strftime('%m-%d') in self._holidays_2026:
-            return False
+            
+        try:
+            import holidays
+            if self.now_kst.strftime('%Y-%m-%d') in holidays.KR():
+                self.log(f"[공휴일] 달력상 법정 공휴일입니다: {self.now_kst.strftime('%Y-%m-%d')}")
+                return False
+        except Exception as e:
+            self.log(f"[경고] holidays 패키지 확인 실패: {e}")
+            pass
+            
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+            import re
+            
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            res = requests.get('https://finance.naver.com/', headers=headers, timeout=5)
+            res.encoding = 'euc-kr'
+            soup = BeautifulSoup(res.text, 'html.parser')
+            time_el = soup.select_one('span#time')
+            
+            if time_el:
+                time_text = time_el.text.strip()
+                if '휴장' in time_text:
+                    self.log(f"[네이버 증권] 현재 휴장 상태 확인됨: {time_text}")
+                    return False
+                
+                match = re.search(r'(\d{4}\.\d{2}\.\d{2})', time_text)
+                if match:
+                    naver_date = match.group(1)
+                    if naver_date != self.today_display:
+                        self.log(f"[네이버 증권] 영업일 기준({naver_date})이 오늘({self.today_display})과 다름 (휴장일 간주)")
+                        return False
+        except Exception as e:
+            self.log(f"[경고] 네이버 증권 휴장일 파싱 실패: {e}")
+            # 스크래핑 실패 시 임시 공휴일일 수도 있으나 기본적으로 평일이므로 True 반환
+            pass
+            
         return True
 
     def should_notify(self) -> bool:

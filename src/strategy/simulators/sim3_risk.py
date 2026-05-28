@@ -52,11 +52,21 @@ class SmartRiskSimulator(BaseSimulator):
                 self.sell(code, current_price, reason=f"[리스크/공합] Consensus 추세 이탈 (ATR 하회)")
                 sold_today.add(code)
 
-        # 2. 진입 로직 (시장 지수 + 유동성 + 추세)
+        # 2. 진입 로직 (시장 지수 + 유동성 + 추세/횡보 레짐 스위칭)
         if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+
+        # [V60.0] 일일 매매 횟수 상한(5회) 체크
+        from datetime import datetime
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        if self.state.get('last_buy_date') != today_str:
+            self.state['last_buy_date'] = today_str
+            self.state['daily_buys_count'] = 0
 
         target_amount = self.initial_cash / 10
         for stock in candidates:
+            if self.state.get('daily_buys_count', 0) >= 5:
+                break # 최대 5종목 진입 완료
+                
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
             
@@ -70,16 +80,33 @@ class SmartRiskSimulator(BaseSimulator):
             if isinstance(daily_change, str):
                 daily_change = float(daily_change.replace('%', '').replace('+', ''))
             
-            # [V60.0 Consensus] 추세 + 수급(체결강도 110% 이상) 확인
-            is_trending = (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2)
-            is_strong = daily_change > 0 and self.validate_tick_power(stock, 110.0)
+            # [V60.0 Consensus] ADX 기반 레짐 스위칭
+            sparkline = stock.get('sparkline_price', [])
+            adx_approx = self.calculate_adx(sparkline) if sparkline else 0.0
+            
+            is_strong = self.validate_tick_power(stock, 110.0)
+            
+            buy_reason = ""
+            
+            if adx_approx >= 15.0:
+                # 추세장 (Trend): 기존 돌파 매매
+                is_trending = (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2)
+                if is_trending and is_strong and daily_change > 0:
+                    buy_reason = f"[리스크/추세] 돌파 진입 (ADX {adx_approx:.1f}, 체결강도 {stock.get('tick_power')}%)"
+            else:
+                # 횡보장 (Range): RSI 과매도 회귀 매매 (낙폭과대 반등)
+                if len(sparkline) >= 3:
+                    ma_val = sum(sparkline[-3:]) / 3
+                    # 3일 평균가보다 낮게 떨어져있으면서 오늘 체결강도가 강하게(반등) 들어오는 놈
+                    if price < ma_val * 0.98 and is_strong and daily_change > 0:
+                        buy_reason = f"[리스크/횡보] 낙폭 반등 진입 (ADX {adx_approx:.1f}, MA이격)"
 
-            if is_trending and is_strong:
+            if buy_reason:
                 if price <= 0: continue
                 qty = int(target_amount / price)
                 if qty > 0:
-                    self.buy(code, stock['name'], price, qty, 
-                             reason=f"[리스크/공합] Consensus 진입 (추세 {period_change:.1f}%, 체결강도 {stock.get('tick_power')}%)")
+                    if self.buy(code, stock['name'], price, qty, reason=buy_reason):
+                        self.state['daily_buys_count'] += 1
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

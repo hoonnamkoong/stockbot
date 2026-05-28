@@ -307,6 +307,7 @@ function TradeContent() {
                             <Table.Th style={{ textAlign: 'right' }}>현재가</Table.Th>
                             <Table.Th style={{ textAlign: 'right' }}>체결금액</Table.Th>
                             <Table.Th style={{ textAlign: 'center' }}>수익률(%)</Table.Th>
+                            <Table.Th style={{ textAlign: 'right' }}>손익(원)</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -315,6 +316,7 @@ function TradeContent() {
                             const currentPrice = h.current_price || h.price || 0; 
                             const plRate = h.pl_rate ?? 0;
                             const amount = (h.qty || h.quantity || 0) * avgPrice;
+                            const plAmount = h.pl_amount ?? Math.round((currentPrice - avgPrice) * (h.qty || h.quantity || 0));
                             const isSelected = selectedCodes.includes(h.code);
 
                             return (
@@ -358,6 +360,11 @@ function TradeContent() {
                                         <Badge color={plRate >= 0 ? 'red' : 'blue'} variant="filled" size="sm" style={{ width: 65 }}>
                                             {plRate >= 0 ? '+' : ''}{plRate.toFixed(2)}%
                                         </Badge>
+                                    </Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>
+                                        <Text size="sm" fw={700} c={plAmount >= 0 ? 'red' : 'blue'}>
+                                            {plAmount >= 0 ? '+' : ''}{Math.round(plAmount).toLocaleString()}
+                                        </Text>
                                     </Table.Td>
                                 </Table.Tr>
                             );

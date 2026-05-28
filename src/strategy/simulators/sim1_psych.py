@@ -77,7 +77,7 @@ class PsychDivergenceSimulator(BaseSimulator):
             # [공격적 진입] 관심 폭발 + 가격 정체 + 체결 강도 확인 (Consensus)
             # 수급의 힘(체결강도 120% 이상)이 확인된 종목만 진입하여 허수 신호 제거
             is_valid_buzz = ((buzz_ratio >= 2.2 and buzz_count >= 30) or buzz_count >= 500)
-            is_price_stable = (-3.0 <= change_rate < 3.0)
+            is_price_stable = (-5.0 <= change_rate <= 7.0) # 기존 -3.0 ~ 3.0에서 완화 (급등주도 수용)
             is_strong_demand = self.validate_tick_power(stock, threshold=120.0)
             is_trending = adx_approx >= 15.0 # 킬스위치 완화
 

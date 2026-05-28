@@ -56,6 +56,18 @@ class DataFetcherWorker(BaseWorker):
 
         self.log(f"후보 종목 {len(candidates)}개 분석 시작")
 
+        # [V61.0] KIS API 토큰 사전 발급 (체결강도 조회용)
+        try:
+            from src.trade.auth import get_access_token, get_base_url
+            import os
+            self.kis_token = get_access_token()
+            self.kis_base_url = get_base_url()
+            self.kis_app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
+            self.kis_app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
+        except Exception as e:
+            self.log_error(f"KIS API 초기화 실패: {e}")
+            self.kis_token = None
+
         # 4. 병렬 수집 및 1차 필터링
         results_raw = []
         today_display = self.ctx.today_display
@@ -162,19 +174,28 @@ class DataFetcherWorker(BaseWorker):
             main_res = requests.get(main_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
             main_soup = BeautifulSoup(main_res.content, 'html.parser')
             
-            # 1. 체결강도 추출 (보통 '체결강도' 텍스트 옆의 <em> 태그에 위치)
-            tick_power_tag = main_soup.find("em", string=re.compile("체결강도"))
-            if not tick_power_tag:
-                # 다른 구조 대응 (테이블 내 텍스트 검색)
-                for em in main_soup.find_all("em"):
-                    if "체결강도" in em.get_text():
-                        tick_power_tag = em
-                        break
-            
-            if tick_power_tag:
-                # 형제 노드나 부모 노드에서 수치 추출
-                val_text = tick_power_tag.parent.get_text().replace("체결강도", "").strip()
-                details['tick_power'] = float(re.sub(r'[^0-9.]', '', val_text) or 0.0)
+            # 1. 체결강도 추출 (KIS API 활용, 네이버 제공 중단에 따른 대응)
+            details['tick_power'] = 0.0
+            if getattr(self, 'kis_token', None) and getattr(self, 'kis_app_key', None):
+                try:
+                    url = f"{self.kis_base_url}/uapi/domestic-stock/v1/quotations/inquire-price"
+                    headers = {
+                        "Content-Type": "application/json; charset=utf-8",
+                        "authorization": f"Bearer {self.kis_token}",
+                        "appkey": self.kis_app_key,
+                        "appsecret": self.kis_app_secret,
+                        "tr_id": "FHKST01010100"
+                    }
+                    params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code}
+                    # 잦은 호출 방지를 위해 timeout 짧게 설정
+                    r = requests.get(url, headers=headers, params=params, timeout=3)
+                    if r.status_code == 200:
+                        out = r.json().get('output', {})
+                        tp_str = out.get('tday_rltv') # 당일 체결강도 필드
+                        if tp_str:
+                            details['tick_power'] = float(tp_str)
+                except Exception as e:
+                    pass
             
             # 2. 호가 잔량 추출 (매도잔량 / 매수잔량)
             # 메인 페이지의 호가 정보 테이블 탐색

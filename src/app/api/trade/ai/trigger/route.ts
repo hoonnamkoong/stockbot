@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import path from 'path';
 
 export const dynamic = 'force-dynamic'; // No caching
 
@@ -11,6 +10,19 @@ export async function GET(request: Request) {
         const REPO_OWNER = 'hoonnamkoong';
         const REPO_NAME = 'stockbot';
         const WORKFLOW_FILE = 'sentinel_v.yml';
+
+        // Parse search params for secret
+        const urlStr = request.url || '';
+        const parsedUrl = urlStr.startsWith('http') ? new URL(urlStr) : new URL(urlStr, 'http://localhost');
+        const { searchParams } = parsedUrl;
+
+        // Security check for unauthorized execution
+        const CRON_SECRET = process.env.CRON_SECRET;
+        const secretParam = searchParams.get('secret');
+        if (!CRON_SECRET || secretParam !== CRON_SECRET) {
+            console.error('[AI Trader] Unauthorized access attempt (Invalid or missing secret)');
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
 
         if (!GITHUB_PAT) {
             throw new Error('Missing GITHUB_PAT env var');

@@ -34,6 +34,14 @@ export async function GET(request: Request) {
             console.log(`[Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST (Day: ${dayOfWeek})`);
         }
 
+        // Security check for unauthorized execution
+        const CRON_SECRET = process.env.CRON_SECRET;
+        const secretParam = searchParams.get('secret');
+        if (!CRON_SECRET || secretParam !== CRON_SECRET) {
+            console.error('[Cron] Unauthorized access attempt (Invalid or missing secret)');
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
         // 0. Check if market is open (Mon-Fri only)
         if (dayOfWeek === 0 || dayOfWeek === 6) {
             const dayName = dayOfWeek === 0 ? 'Sunday' : 'Saturday';

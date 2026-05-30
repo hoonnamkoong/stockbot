@@ -7,7 +7,7 @@ class SectorSpilloverSimulator(BaseSimulator):
     - 과거 섹터 전이형에서 변경됨.
     - 기관/외국인 수급과 감정 발산(Divergence) 지표를 융합하여 선도 진입.
     """
-    def __init__(self, initial_cash=5000000):
+    def __init__(self, initial_cash=3000000):
         super().__init__("Spillover", initial_cash)
 
     def run(self, candidates, current_prices=None):

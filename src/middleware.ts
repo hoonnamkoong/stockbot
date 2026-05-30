@@ -1,10 +1,9 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { withAuth } from "next-auth/middleware";
 
-// Temporary Bypass for Vercel Build Debugging
-// The import "next-auth/middleware" is failing on Vercel (Next.js 16 detection issue?)
-export function middleware(request: NextRequest) {
-    return NextResponse.next();
-}
+export default withAuth({
+    pages: {
+        signIn: '/login',
+    },
+});
 
-export const config = { matcher: ["/trade", "/trade/:path*", "/research", "/research/:path*"] }
+export const config = { matcher: ["/trade", "/trade/:path*", "/research", "/research/:path*"] };

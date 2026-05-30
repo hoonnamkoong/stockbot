@@ -6,15 +6,28 @@ const handler = NextAuth({
         CredentialsProvider({
             name: 'Admin Access',
             credentials: {
-                password: { label: "Password", type: "password" }
+                password: { label: "Password", type: "password" },
+                deviceId: { label: "Device ID", type: "text" }
             },
             async authorize(credentials) {
                 const adminPassword = process.env.ADMIN_PASSWORD;
-                // Simple string comparison
-                if (credentials?.password && credentials.password === adminPassword) {
-                    return { id: "1", name: "Admin" };
+                const trustedDevices = process.env.TRUSTED_DEVICES || '';
+
+                // 1. Password Check
+                if (!credentials?.password || credentials.password !== adminPassword) {
+                    throw new Error("Invalid password");
                 }
-                return null; // Login failed
+
+                // 2. Trusted Device Check
+                if (!trustedDevices) {
+                    throw new Error("Security Error: TRUSTED_DEVICES not configured on server");
+                }
+
+                if (!credentials?.deviceId || !trustedDevices.includes(credentials.deviceId)) {
+                    throw new Error("Device Not Allowed. Please add Device ID to TRUSTED_DEVICES env var.");
+                }
+
+                return { id: "1", name: "Admin" };
             }
         })
     ],

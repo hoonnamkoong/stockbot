@@ -156,6 +156,16 @@ class StorageManager:
     # [월별 리서치 엑셀] 누적 업데이트
     # ================================================================
 
+    def _load_market_regime(self) -> tuple:
+        """Sim7 리베로 state에서 현재 시장 국면과 bull_score를 읽는다. 없으면 ('-', None)."""
+        path = os.path.join(self.DATA_DIR, "sim_libero_state.json")
+        try:
+            with open(path, "r", encoding="utf-8-sig") as f:
+                d = json.load(f)
+            return d.get("current_regime", "-"), d.get("bull_score")
+        except Exception:
+            return "-", None
+
     def update_monthly_excel(self, picks: list, now_kst: datetime) -> Optional[str]:
         """
         월별 통합 리서치 엑셀에 신규 row를 추가합니다.
@@ -167,9 +177,13 @@ class StorageManager:
         month_str = now_kst.strftime('%Y-%m')
         filepath = os.path.join(self.REPORTS_DIR, f"monthly_research_{month_str}.xlsx")
 
+        # Sim7 리베로의 시장 국면 판단을 함께 기록
+        regime, bull_score = self._load_market_regime()
+
         new_rows = []
         for p in picks:
             d = p.to_dict() if isinstance(p, StockData) else p
+            sparkline = d.get('sparkline_price', []) or []
             new_rows.append({
                 'DateTime': now_kst.strftime('%Y-%m-%d %H:%M'),
                 'Rank': d.get('rank', '-'),           # 해당 배치 내 추천 순위 (1~3)
@@ -177,7 +191,20 @@ class StorageManager:
                 'Stock': d.get('name', 'Unknown'),
                 'Code': d.get('code', 'Unknown'),
                 'Signal': d.get('signal', 'WATCH'),
+                'Market Regime': regime,              # [Sim7] BULL/SIDEWAYS/BEAR
+                'Bull Score': bull_score,             # [Sim7] 0~100 방향성 점수
                 'Current Price': d.get('price', d.get('current_price', 0)),
+                # ── [백테스트용] 시뮬레이터 입력 필드 (향후 재현/백테스트 가능하도록 보존) ──
+                'Change Rate': d.get('change_rate', ''),
+                'Volume': d.get('volume', 0),
+                'Amount': d.get('amount', 0),                 # 거래대금(원)
+                'Tick Power': d.get('tick_power', 0),         # 체결강도(%)
+                'Foreign Rate': d.get('foreign_rate', 0),
+                'Foreign Change': d.get('foreign_change', 0),
+                'Posts Count': d.get('recent_posts_count', 0),
+                'Consecutive Days': d.get('consecutive_days', 1),
+                'Bid Ask Ratio': d.get('bid_ask_ratio', 1.0),
+                'Sparkline': ','.join(str(x) for x in sparkline),  # 최근 종가 시퀀스
                 'Sentiment': d.get('sentiment', 'Neutral'),
                 'Key Drivers': d.get('deep_dive_text', str(d.get('posts_summary', '')))[:2000],
             })

@@ -6,7 +6,7 @@ class PsychDivergenceSimulator(BaseSimulator):
     - 뉴스/게시글 빈도(Buzz)와 가격 변동 간의 괴리 포착
     - 원리: 대중의 관심은 폭증했으나 가격은 아직 정체일 때 매집
     """
-    def __init__(self, initial_cash=5000000):
+    def __init__(self, initial_cash=3000000):
         super().__init__("Psych", initial_cash)
 
     def run(self, candidates, current_prices=None):
@@ -21,7 +21,9 @@ class PsychDivergenceSimulator(BaseSimulator):
         # 1. 청산 로직 (공격적 홀딩 + 트레일링 스탑)
         for code in portfolio_codes:
             p_item = self.state['portfolio'][code]
+            stock = candidate_map.get(code)
             current_price = current_prices.get(code, 0)
+            if current_price <= 0: continue
             avg_price = p_item.get('avg_price', 0)
             if avg_price <= 0: continue
             profit_rate = (current_price - avg_price) / avg_price * 100

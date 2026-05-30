@@ -32,6 +32,7 @@ class BaseSimulator:
     BUY_FEE_RATE = 0.00015   # 매수 수수료율
     SELL_FEE_RATE = 0.00015  # 매도 수수료율
     SELL_TAX_RATE = 0.0018   # 증권거래세율
+    IS_ANALYZER = False      # True면 매매하지 않는 분석기(리베로). reset 시 자본 부여 제외
 
     def __init__(self, name, initial_cash=5000000):
         self.name = name
@@ -50,7 +51,7 @@ class BaseSimulator:
         """[V8.9.9.18] 상태 로드 및 보호 로직 보강"""
         if os.path.exists(self.state_file):
             try:
-                with open(self.state_file, 'r', encoding='utf-8') as f:
+                with open(self.state_file, 'r', encoding='utf-8-sig') as f:
                     content = f.read().strip()
                     if not content:
                         raise ValueError("File is empty")
@@ -89,7 +90,7 @@ class BaseSimulator:
 
     def reset_state(self):
         """[V8.6.2 Hotfix] 5,000,000원 클린 시작"""
-        print(f"[Sim] {self.name} 상태를 5,000,000원으로 초기화합니다.")
+        print(f"[Sim] {self.name} 상태를 {self.initial_cash:,}원으로 초기화합니다.")
         self.state = {
             "initial_cash": self.initial_cash,
             "cash": self.initial_cash,
@@ -276,6 +277,26 @@ class BaseSimulator:
             
         er = direction / volatility
         return er * 100.0
+
+    def calc_period_change(self, sparkline_price: list) -> float:
+        """[Sim4/6] 기간 변동률(%). 프로덕션 후보에 period_change_rate가 없어 sparkline 종가로 계산."""
+        if not sparkline_price or len(sparkline_price) < 2:
+            return 0.0
+        start = sparkline_price[0]
+        end = sparkline_price[-1]
+        if start <= 0:
+            return 0.0
+        return (end - start) / start * 100.0
+
+    def parse_change_rate(self, stock_data: dict) -> float:
+        """당일 등락률을 실수로 정제. change_rate는 '±X.XX%' 문자열로 저장됨."""
+        cr = stock_data.get('change_rate', stock_data.get('daily_change_rate', 0))
+        if isinstance(cr, str):
+            try:
+                return float(cr.replace('%', '').replace('+', '').strip())
+            except ValueError:
+                return 0.0
+        return float(cr or 0)
 
     def calculate_mfhs2_score(self, stock_data: dict, current_month: int) -> int:
         """

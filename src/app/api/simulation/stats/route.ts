@@ -12,7 +12,10 @@ export async function GET() {
         const types = [
             { id: 'sim1', file: 'sim_psych_state.json' },
             { id: 'sim2', file: 'sim_spillover_state.json' },
-            { id: 'sim3', file: 'sim_risk_state.json' }
+            { id: 'sim3', file: 'sim_risk_state.json' },
+            { id: 'sim4', file: 'sim_bull_state.json' },
+            { id: 'sim5', file: 'sim_sideways_state.json' },
+            { id: 'sim6', file: 'sim_bear_state.json' }
         ];
 
         const results: any = {};
@@ -39,7 +42,7 @@ export async function GET() {
                 }
 
                 const totalAsset = (state.cash || 0) + portfolioValue;
-                const initialCash = state.initial_cash || 5000000;
+                const initialCash = state.initial_cash || 3000000;
                 const profit = totalAsset - initialCash;
                 const returnRate = (profit / initialCash) * 100;
 
@@ -59,6 +62,27 @@ export async function GET() {
                 results[type.id] = { raw: {}, portfolio: {} };
             }
         }));
+
+        // Sim7 리베로: 매매하지 않는 시장 국면 분석기 → 통계가 아닌 국면 정보를 별도 첨부
+        try {
+            const res = await fetch(`${GITHUB_BASE}/sim_libero_state.json?t=${Date.now()}`, { cache: 'no-store' });
+            if (res.ok) {
+                const s = await res.json();
+                results.libero = {
+                    current_regime: s.current_regime ?? null,
+                    bull_score: s.bull_score ?? null,
+                    regime_confidence: s.regime_confidence ?? null,
+                    recommended_sims: s.recommended_sims ?? [],
+                    metrics: s.metrics ?? {},
+                    last_run: s.last_run ?? null,
+                };
+            } else {
+                results.libero = null;
+            }
+        } catch (err) {
+            console.error('[StatsAPI] Error processing libero:', err);
+            results.libero = null;
+        }
 
         results["last_updated"] = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
         return NextResponse.json(results);

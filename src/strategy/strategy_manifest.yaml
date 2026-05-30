@@ -57,6 +57,30 @@ simulators:
     description: "스마트 리스크형 시뮬레이터 (추세 추종 & 트레일링 스탑)"
     active: true
 
+  - id: "sim4_bull"
+    module: "src.strategy.simulators.sim4_bull_momentum"
+    class: "BullMomentumSimulator"
+    description: "상승장 주도주 탑승형 - 모멘텀 + 불타기 + 고정익절 없이 트레일링 라이딩"
+    active: true
+
+  - id: "sim5_sideways"
+    module: "src.strategy.simulators.sim5_sideways_swing"
+    class: "SidewaysSwingSimulator"
+    description: "추세 눌림목형 - 상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절 (구 횡보스윙)"
+    active: true
+
+  - id: "sim6_bear"
+    module: "src.strategy.simulators.sim6_bear_hedge"
+    class: "BearHedgeSimulator"
+    description: "하락장 줍줍형 - 극단적 현금보유 + 데드캣 반등 2.5% 빠른 익절"
+    active: true
+
+  - id: "sim7_libero"
+    module: "src.strategy.simulators.sim7_libero"
+    class: "LiberoSimulator"
+    description: "리베로 - 시장 국면(BULL/SIDEWAYS/BEAR) 감지 + 전략 추천 (매매 없음)"
+    active: true
+
   # 새 시뮬레이터 추가 예시:
   # - id: "sim_momentum"
   #   module: "src.strategy.simulators.sim4_momentum"

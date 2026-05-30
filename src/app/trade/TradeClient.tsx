@@ -504,14 +504,17 @@ function TradeContent() {
     function renderSimulationTripod() {
         if (!geminiBalance) return null;
         const simConfigs = [
-            { id: 'sim1', key: 'sim1', label: '심리 폭발형 (Psych-Explosion)', color: 'blue', type: 'sim_psych' },
-            { id: 'sim2', key: 'sim2', label: '섹터 전이형 (Sector-Spillover)', color: 'violet', type: 'sim_spillover' },
-            { id: 'sim3', key: 'sim3', label: '스마트 리스크형 (Smart-Risk)', color: 'red', type: 'sim_risk' }
+            { id: 'sim1', key: 'sim1', label: '심리 괴리형 (Sim 1)',     color: 'blue',   type: 'sim_psych' },
+            { id: 'sim2', key: 'sim2', label: '수급 동승형 (Sim 2)',     color: 'violet', type: 'sim_spillover' },
+            { id: 'sim3', key: 'sim3', label: '스마트 리스크형 (Sim 3)', color: 'red',    type: 'sim_risk' },
+            { id: 'sim4', key: 'sim4', label: '상승 모멘텀형 (Sim 4)',   color: 'green',  type: 'sim_bull' },
+            { id: 'sim5', key: 'sim5', label: '추세 눌림목형 (Sim 5)',   color: 'orange', type: 'sim_sideways' },
+            { id: 'sim6', key: 'sim6', label: '하락 줍줍형 (Sim 6)',     color: 'cyan',   type: 'sim_bear' },
         ];
         return (
             <Stack gap="xl">
                 <Group justify="space-between">
-                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>3-Track 지능형 시뮬레이션</Title>
+                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>6-Track 지능형 시뮬레이션</Title>
                     <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
                 </Group>
                 <Stack gap="xl">

@@ -4,14 +4,13 @@
 - JSON 결과를 output/extraction_results/ 에 저장
 """
 import sys, json, os, urllib.request
-from pathlib import Path
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
-ROOT = r"C:\Users\Hoon_DT\Desktop\본초서적md"
+ROOT = r"C:\Users\Hoon_DT\Desktop\본초서적\_md"
 OUTPUT_DIR = r"C:\Users\Hoon_DT\gemini\stock\output\extraction_results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -49,10 +48,12 @@ def ask_ollama(text):
 def extract_all():
     """모든 MD 파일 처리"""
     all_files = []
-    for f in sorted(os.listdir(ROOT)):
-        if f.lower().endswith(".md"):
-            path = os.path.join(ROOT, f)
-            all_files.append((f, path))
+    # 재귀적으로 모든 서브디렉토리의 MD 파일 찾기
+    for root, dirs, files in os.walk(ROOT):
+        for f in sorted(files):
+            if f.lower().endswith(".md"):
+                path = os.path.join(root, f)
+                all_files.append((f, path))
 
     print(f"전체 파일: {len(all_files)}개")
     for i, (fname, path) in enumerate(all_files, 1):
@@ -62,8 +63,8 @@ def extract_all():
             drugs, diseases = ask_ollama(text)
 
             result = {"drugs": drugs, "diseases": diseases}
-            stem = os.path.splitext(fname)[0]
-            out_path = os.path.join(OUTPUT_DIR, f"{stem}.json")
+            # 순번을 파일명으로 사용 (충돌 방지, 간단함)
+            out_path = os.path.join(OUTPUT_DIR, f"{i:02d}.json")
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
 

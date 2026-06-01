@@ -62,6 +62,8 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                         <SortButton label="기관추정" sortKey="orgn_fake_ntby_qty" />
                         <SortButton label="ROE%" sortKey="roe" />
                         <SortButton label="부채%" sortKey="debt_ratio" />
+                        <SortButton label="PER" sortKey="per" />
+                        <SortButton label="PBR" sortKey="pbr" />
                         <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>투자의견</Table.Th>
                         <SortButton label="목표가" sortKey="target_price" />
                         <Table.Th style={{ fontSize: '11px', textAlign: 'center', minWidth: '180px' }}>컨센서스</Table.Th>
@@ -164,18 +166,28 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Text size="xs" c={(s.per ?? 0) > 0 && (s.per ?? 0) < 15 ? 'teal' : (s.per ?? 0) > 50 ? 'red' : 'gray'}>
+                                    {s.per ? `${s.per.toFixed(1)}x` : '-'}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Text size="xs" c={(s.pbr ?? 0) < 1 ? 'teal' : (s.pbr ?? 0) > 5 ? 'red' : 'gray'}>
+                                    {s.pbr ? `${s.pbr.toFixed(2)}x` : '-'}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Badge size="xs" color={s.invest_opinion?.includes('매수') ? 'red' : s.invest_opinion?.includes('매도') ? 'blue' : 'gray'} variant="light">
                                     {s.invest_opinion || '-'}
                                 </Badge>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" fw={700} c="violet">
+                                <Text size="xs" c="dimmed">
                                     {s.target_price ? s.target_price.toLocaleString() : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Tooltip label={s.consensus_summary || '-'} multiline w={250} withArrow position="top">
-                                    <Text size="11px" lineClamp={1} c="dimmed">{s.consensus_summary || '-'}</Text>
+                                    <Text size="xs" lineClamp={1} c="dimmed">{s.consensus_summary || '-'}</Text>
                                 </Tooltip>
                             </Table.Td>
                         </Table.Tr>

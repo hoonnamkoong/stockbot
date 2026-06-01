@@ -232,6 +232,14 @@ class StorageManager:
                 'Consensus Buy': d.get('consensus_buy_count', 0),
                 'Consensus Avg Target': d.get('consensus_avg_target', 0),
                 'Consensus Summary': d.get('consensus_summary', ''),
+                # ── 밸류에이션/52주 (inquire-price 확장) ────────
+                'PER': d.get('per', 0),
+                'PBR': d.get('pbr', 0),
+                'EPS': d.get('eps', 0),
+                'BPS': d.get('bps', 0),
+                'W52 High': d.get('w52_hgpr', 0),
+                'W52 Low': d.get('w52_lwpr', 0),
+                'Mkt Cap(억)': d.get('mkt_cap', 0),
                 # ── 리포트 텍스트 ──────────────────────────────
                 'Key Drivers': d.get('deep_dive_text', str(d.get('posts_summary', '')))[:2000],
             })

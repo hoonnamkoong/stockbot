@@ -373,26 +373,54 @@ class StrategyAdvisor:
         for stock in final_candidates[:2]:
             dart_res = self.engine.fetch_dart_data(stock['code'])
             dart_data = dart_res.get('reason', '특이 공시 없음')
-            
+
+            # KIS 데이터 섹션 구성 (있는 필드만 포함 — 토큰 낭비 방지)
+            kis_lines = []
+            per = stock.get('per', 0) or 0
+            pbr = stock.get('pbr', 0) or 0
+            eps = stock.get('eps', 0) or 0
+            if per or pbr:
+                kis_lines.append(f"PER {per}x / PBR {pbr}x / EPS {eps:,}원")
+            roe = stock.get('roe', 0) or 0
+            debt = stock.get('debt_ratio', 0) or 0
+            if roe or debt:
+                kis_lines.append(f"ROE {roe:.1f}% / 부채비율 {debt:.0f}%")
+            frgn_est = stock.get('frgn_fake_ntby_qty', 0) or 0
+            orgn_est = stock.get('orgn_fake_ntby_qty', 0) or 0
+            if frgn_est or orgn_est:
+                kis_lines.append(f"외인추정 {frgn_est:+,}주 / 기관추정 {orgn_est:+,}주")
+            op = stock.get('invest_opinion', '') or ''
+            tp = stock.get('target_price', 0) or 0
+            if op or tp:
+                div = stock.get('opinion_divergence', 0) or 0
+                kis_lines.append(f"증권사의견 {op or '-'} / 목표가 {tp:,}원 (괴리율 {div:+.1f}%)")
+            w52h = stock.get('w52_hgpr', 0) or 0
+            w52l = stock.get('w52_lwpr', 0) or 0
+            cur = stock.get('price', stock.get('current_price', 0)) or 0
+            if w52h and w52l and cur:
+                pos = round((cur - w52l) / (w52h - w52l) * 100) if w52h != w52l else 50
+                kis_lines.append(f"52주 고가 {w52h:,}원 / 저가 {w52l:,}원 (현재가 위치 {pos}%)")
+            kis_section = "\n".join([f"- {l}" for l in kis_lines])
+
             prompt = f"""
             시니어 애널리스트로서 아래 종목의 '상세 리포트'를 작성하세요.
-            
+
             종목: {stock['name']} ({stock['code']})
-            현재가: {stock.get('price', stock.get('current_price', 0))}원
-            순위: {stock.get('rank', 'N/A')}위
-            
-            [분석 데이터]
-            - 외인 변화: {stock.get('foreign_change', 0):+.2f}%p
+            현재가: {cur:,}원  |  순위: {stock.get('rank', 'N/A')}위
+
+            [수급/수치 데이터]
+            - 외인변화: {stock.get('foreign_change', 0):+.2f}%p
+{kis_section}
             - 토론 요약: {stock.get('posts_summary')}
             - 공시: {dart_data}
-            
+
             [리포트 작성 규칙]
-            1. 'rank_and_recommendation': "[{stock.get('rank')}위] 매수 추천" 또는 "강력 매수" 등의 등급 제시.
-            2. 'business_summary': 기업의 주요 사업 내용을 1~2문장으로 요약.
-            3. 'rationale': 게시글 증가 이유, 뉴스, 수급, 섹터 동향을 종합 분석하여 3~5줄로 기술.
-            4. 'target_price': 현재가 -> 목표가 형식으로 제시 (예: 50,000원 -> 65,000원).
-            5. 'risk': 주의해야 할 리스크 요소 기술.
-            
+            1. 'rank_and_recommendation': "[{stock.get('rank')}위] 매수 추천" 또는 "강력 매수" 등 등급 제시.
+            2. 'business_summary': 기업 주요 사업 1~2문장 요약.
+            3. 'rationale': 수급·밸류에이션·섹터 동향 종합 분석 3~5줄 (위 수치 데이터 반드시 활용).
+            4. 'target_price_flow': 증권사 목표가가 있으면 반드시 활용, 없으면 기술적 분석 기반 제시.
+            5. 'risk': 리스크 요소 기술.
+
             오직 아래 JSON 형식으로만 답변하세요:
             {{
               "rank_and_recommendation": "순위 및 추천등급",

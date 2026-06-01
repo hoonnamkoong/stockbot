@@ -69,6 +69,14 @@ class StockData(BaseModel):
     consensus_buy_count: int = 0  # 증권사 매수의견 수
     consensus_avg_target: int = 0 # 증권사 평균 목표가
     consensus_summary: str = ""   # 컨센서스 요약 문자열
+    # ── inquire-price 확장 필드 (추가 호출 없이 동일 응답에서 파싱) ──
+    per: float = 0.0              # PER (주가수익비율)
+    pbr: float = 0.0              # PBR (주가순자산비율)
+    eps: int = 0                  # EPS (주당순이익, 원)
+    bps: int = 0                  # BPS (주당순자산, 원)
+    w52_hgpr: int = 0             # 52주 최고가
+    w52_lwpr: int = 0             # 52주 최저가
+    mkt_cap: int = 0              # 시가총액 (억원)
 
     @field_validator('price', 'prev_close', 'current_price', 'volume', 'amount', mode='before')
     @classmethod

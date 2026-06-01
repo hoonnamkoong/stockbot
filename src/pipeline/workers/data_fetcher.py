@@ -200,9 +200,32 @@ class DataFetcherWorker(BaseWorker):
                     r = requests.get(url, headers=headers, params=params, timeout=3)
                     if r.status_code == 200:
                         out = r.json().get('output', {})
-                        tp_str = out.get('tday_rltv') # 당일 체결강도 필드
-                        if tp_str:
-                            details['tick_power'] = float(tp_str)
+                        # 체결강도
+                        if out.get('tday_rltv'):
+                            details['tick_power'] = float(out['tday_rltv'])
+                        # 기존 Naver 데이터 KIS로 보강 (더 정확)
+                        if out.get('stck_prpr'):
+                            details['price'] = int(out['stck_prpr'])
+                            details['current_price'] = int(out['stck_prpr'])
+                        if out.get('prdy_ctrt'):
+                            rate = float(out['prdy_ctrt'])
+                            details['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
+                        if out.get('hts_frgn_ehrt'):
+                            details['foreign_rate'] = float(out['hts_frgn_ehrt'])
+                        if out.get('stck_sdpr'):
+                            details['prev_close'] = int(out['stck_sdpr'])
+                        # 신규 밸류에이션/52주 필드 (추가 API 호출 없이 동일 응답에서 파싱)
+                        for _f in ('per', 'pbr'):
+                            if out.get(_f):
+                                try: details[_f] = float(out[_f])
+                                except (ValueError, TypeError): pass
+                        for _f in ('eps', 'bps', 'w52_hgpr', 'w52_lwpr'):
+                            if out.get(_f):
+                                try: details[_f] = int(float(out[_f]))
+                                except (ValueError, TypeError): pass
+                        if out.get('hts_avls'):
+                            try: details['mkt_cap'] = int(out['hts_avls'])
+                            except (ValueError, TypeError): pass
                 except Exception as e:
                     pass
             

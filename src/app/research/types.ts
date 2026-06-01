@@ -29,6 +29,14 @@ export interface Stock {
     target_price?: number;          // HTS 목표가
     opinion_divergence?: number;    // 목표가 괴리율 (%)
     consensus_summary?: string;     // 증권사 컨센서스 요약
+    // inquire-price 확장 필드
+    per?: number;
+    pbr?: number;
+    eps?: number;
+    bps?: number;
+    w52_hgpr?: number;
+    w52_lwpr?: number;
+    mkt_cap?: number;
 }
 
 export interface FiveDayStock {

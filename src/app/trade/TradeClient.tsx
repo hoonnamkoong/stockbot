@@ -540,7 +540,7 @@ function TradeContent() {
                         });
                         return (
                             <Group key={sim.id} gap="md" align="stretch" style={{ flexWrap: 'nowrap' }}>
-                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)`, flex: 1 }}>
+                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)`, flex: 1, minHeight: 260 }}>
                                     <Group justify="space-between" mb="xs">
                                         <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
                                         <Badge color={sim.color}>{sim.id.toUpperCase()}</Badge>
@@ -568,7 +568,7 @@ function TradeContent() {
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
                                     {renderPortfolioTable(holdings)}
                                 </Paper>
-                                <Paper p="md" withBorder radius="md" bg="gray.0" style={{ flex: 1 }}>
+                                <Paper p="md" withBorder radius="md" bg="gray.0" style={{ flex: 1, minHeight: 260 }}>
                                     <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{sim.label} 기록</Text>
                                     {renderHistoryTable(sim.type)}
                                 </Paper>

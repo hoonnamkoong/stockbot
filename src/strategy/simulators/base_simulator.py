@@ -2,7 +2,6 @@ import json
 import csv
 import os
 import datetime
-import math
 from datetime import timedelta, timezone
 
 
@@ -250,15 +249,12 @@ class BaseSimulator:
 
     def validate_tick_power(self, stock_data: dict, threshold: float = 120.0) -> bool:
         """[V60.0] 수급의 힘(체결강도)이 임계치를 넘는지 확인합니다.
-        스크래핑 실패로 0.0일 경우, 당일 거래대금(amount) 300억 이상을 우회 조건으로 사용합니다.
+        KIS API 실패로 0.0인 경우, 데이터 없음 ≠ 수급 나쁨이므로 조건 스킵(통과).
         """
         tp = float(stock_data.get('tick_power', 0.0))
-        if tp > 0.0:
-            return tp >= threshold
-        
-        # 크롤링 실패로 0.0인 경우, 당일 거래대금 300억 이상이면 강한 수급으로 인정
-        amount = float(stock_data.get('amount', 0.0))
-        return amount >= 30_000_000_000
+        if tp == 0.0:
+            return True  # KIS 실패 시 데이터 없음으로 간주, 조건 면제
+        return tp >= threshold
 
     def calculate_adx(self, sparkline_price: list) -> float:
         """

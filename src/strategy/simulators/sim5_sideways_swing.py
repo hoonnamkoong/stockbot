@@ -73,35 +73,62 @@ class SidewaysSwingSimulator(BaseSimulator):
             return self.calculate_stats(current_prices)
 
         target_amount = self.initial_cash / 10
+        fail_log = []
         for stock in candidates:
             if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
             code = stock['code']
+            name = stock.get('name', code)
             if code in self.state['portfolio'] or code in sold_today: continue
 
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))
-            if price <= 0 or amount < 1_000_000_000: continue  # 10억 유동성
+            if price <= 0:
+                fail_log.append(f"{name}:price=0")
+                continue
+            if amount < 1_000_000_000:
+                fail_log.append(f"{name}:amount={amount/1e8:.0f}억<10억")
+                continue
 
             sparkline = stock.get('sparkline_price', [])
-            if len(sparkline) < 3: continue
+            if len(sparkline) < 3:
+                fail_log.append(f"{name}:sparkline={len(sparkline)}<3")
+                continue
             adx = self.calculate_adx(sparkline)
             period_change = self.calc_period_change(sparkline)
             daily_change = self.parse_change_rate(stock)
+            tick_power = float(stock.get('tick_power', 0.0))
 
-            # 눌림목 계산: 최근 5일 고점 대비 현재가 조정 비율
-            recent_high = max(sparkline[-5:]) if len(sparkline) >= 5 else max(sparkline)
+            # [Fix] 고점은 과거 종가 기준(sparkline[:-1])으로 계산
+            # sparkline[-1]은 당일 or 전일 종가 ≈ price이므로 제외해야
+            # "현재가 = 5일 고점" 오판(pullback=0%) 방지
+            hist = sparkline[:-1] if len(sparkline) > 1 else sparkline
+            recent_high = max(hist[-4:]) if len(hist) >= 4 else (max(hist) if hist else price)
             pullback_pct = (recent_high - price) / recent_high * 100 if recent_high > 0 else 0
 
-            # 추세(ADX>=20) + 기간 우상향 + 최근 고점 대비 1.5~8% 눌림 + 당일 반등
-            # [Fix] price<=MA5 조건 폐기 — Buzz 유니버스에서 상승 종목은 항상 MA5 위에 있어 진입 0건
-            if (adx >= 20.0 and period_change > 0
-                    and 1.5 <= pullback_pct <= 8.0
-                    and daily_change > 0
-                    and self.validate_tick_power(stock, threshold=100.0)):
-                qty = int(target_amount / price)
-                if qty > 0:
-                    self.buy(code, stock['name'], price, qty,
-                             reason=f"[눌림목] 추세 눌림 저가매수 (ADX {adx:.1f}, 눌림 {pullback_pct:.1f}%)")
+            c_adx = adx >= 20.0
+            c_period = period_change > 0
+            c_pullback = 1.5 <= pullback_pct <= 10.0
+            c_daily = daily_change > 0
+            c_tick = self.validate_tick_power(stock, threshold=100.0)
+
+            # [Debug] 조건별 탈락 사유 기록
+            if not (c_adx and c_period and c_pullback and c_daily and c_tick):
+                reasons = []
+                if not c_adx: reasons.append(f"ADX={adx:.0f}<20")
+                if not c_period: reasons.append(f"period={period_change:.1f}%")
+                if not c_pullback: reasons.append(f"pullback={pullback_pct:.1f}%(1.5~8%벗어남)")
+                if not c_daily: reasons.append(f"daily={daily_change:.1f}%")
+                if not c_tick: reasons.append(f"tick={tick_power:.0f}(amount={amount/1e8:.0f}억)")
+                fail_log.append(f"{name}:{','.join(reasons)}")
+                continue
+
+            qty = int(target_amount / price)
+            if qty > 0:
+                self.buy(code, stock['name'], price, qty,
+                         reason=f"[눌림목] 추세 눌림 저가매수 (ADX {adx:.1f}, 눌림 {pullback_pct:.1f}%)")
+
+        if fail_log:
+            print(f"[Sim5 진입 탈락] {len(fail_log)}개: " + " | ".join(fail_log[:10]))
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

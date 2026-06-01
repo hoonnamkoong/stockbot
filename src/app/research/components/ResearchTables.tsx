@@ -146,48 +146,48 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={(s.frgn_fake_ntby_qty ?? 0) > 0 ? 'red' : (s.frgn_fake_ntby_qty ?? 0) < 0 ? 'blue' : 'gray'}>
+                                <Text size="sm" c={(s.frgn_fake_ntby_qty ?? 0) > 0 ? 'red' : (s.frgn_fake_ntby_qty ?? 0) < 0 ? 'blue' : 'gray'}>
                                     {s.frgn_fake_ntby_qty != null ? ((s.frgn_fake_ntby_qty > 0 ? '+' : '') + s.frgn_fake_ntby_qty.toLocaleString()) : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={(s.orgn_fake_ntby_qty ?? 0) > 0 ? 'red' : (s.orgn_fake_ntby_qty ?? 0) < 0 ? 'blue' : 'gray'}>
+                                <Text size="sm" c={(s.orgn_fake_ntby_qty ?? 0) > 0 ? 'red' : (s.orgn_fake_ntby_qty ?? 0) < 0 ? 'blue' : 'gray'}>
                                     {s.orgn_fake_ntby_qty != null ? ((s.orgn_fake_ntby_qty > 0 ? '+' : '') + s.orgn_fake_ntby_qty.toLocaleString()) : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={(s.roe ?? 0) > 0 ? 'teal' : 'gray'}>
+                                <Text size="sm" c={(s.roe ?? 0) > 0 ? 'teal' : 'gray'}>
                                     {s.roe != null && s.roe !== 0 ? `${s.roe.toFixed(1)}%` : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={(s.debt_ratio ?? 0) > 200 ? 'red' : 'gray'}>
+                                <Text size="sm" c={(s.debt_ratio ?? 0) > 200 ? 'red' : 'gray'}>
                                     {s.debt_ratio != null && s.debt_ratio !== 0 ? `${s.debt_ratio.toFixed(0)}%` : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={(s.per ?? 0) > 0 && (s.per ?? 0) < 15 ? 'teal' : (s.per ?? 0) > 50 ? 'red' : 'gray'}>
+                                <Text size="sm" c={(s.per ?? 0) > 0 && (s.per ?? 0) < 15 ? 'teal' : (s.per ?? 0) > 50 ? 'red' : 'gray'}>
                                     {s.per ? `${s.per.toFixed(1)}x` : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={(s.pbr ?? 0) < 1 ? 'teal' : (s.pbr ?? 0) > 5 ? 'red' : 'gray'}>
+                                <Text size="sm" c={(s.pbr ?? 0) < 1 ? 'teal' : (s.pbr ?? 0) > 5 ? 'red' : 'gray'}>
                                     {s.pbr ? `${s.pbr.toFixed(2)}x` : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Badge size="xs" color={s.invest_opinion?.includes('매수') ? 'red' : s.invest_opinion?.includes('매도') ? 'blue' : 'gray'} variant="light">
+                                <Badge size="sm" color={s.invest_opinion?.includes('매수') ? 'red' : s.invest_opinion?.includes('매도') ? 'blue' : 'gray'} variant="light">
                                     {s.invest_opinion || '-'}
                                 </Badge>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c="dimmed">
+                                <Text size="sm" c="dimmed">
                                     {s.target_price ? s.target_price.toLocaleString() : '-'}
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Tooltip label={s.consensus_summary || '-'} multiline w={250} withArrow position="top">
-                                    <Text size="xs" lineClamp={1} c="dimmed">{s.consensus_summary || '-'}</Text>
+                                    <Text size="sm" lineClamp={1} c="dimmed">{s.consensus_summary || '-'}</Text>
                                 </Tooltip>
                             </Table.Td>
                         </Table.Tr>

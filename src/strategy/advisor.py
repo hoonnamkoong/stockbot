@@ -443,45 +443,6 @@ class StrategyAdvisor:
             except:
                 reports.append(f"⚠️ {stock['name']} 상세 분석 실패")
 
-        # 2. 실전 계좌 매도 추천 종목 (1개)
-        if sell_candidate:
-            prompt = f"""
-            보유 종목 중 매도가 필요한 아래 종목의 '매도 리포트'를 작성하세요.
-            
-            종목: {sell_candidate['name']} ({sell_candidate['code']})
-            현재가: {sell_candidate['current_price']}원
-            수익률: {sell_candidate['profit_rate']}%
-            매도 선정 사유: {sell_candidate.get('sell_reason')}
-            
-            위 정보를 바탕으로 아래 항목을 작성하세요:
-            1. 'recommendation': "매도 추천" 또는 "비중 축소"
-            2. 'business_summary': 주요 사업 요약
-            3. 'rationale': 왜 지금 팔아야 하는지 기술적/심리적 근거 분석
-            4. 'target_price_flow': 현재가 -> 손절/익절 목표가
-            5. 'risk': 보유 시 발생할 수 있는 추가 하방 리스크
-            
-            JSON 형식:
-            {{
-              "recommendation": "매도/비중축소",
-              "business_summary": "사업 요약",
-              "rationale": "매도 근거",
-              "target_price_flow": "현재가 -> 탈출가",
-              "risk": "보유 리스크"
-            }}
-            """
-            try:
-                response = self.gemini._call_gemini_safe(prompt, model_type='report', generation_config={"response_mime_type": "application/json"})
-                if response and response.text:
-                    data = json.loads(response.text)
-                    formatted = f"📉 <b>{sell_candidate['name']}</b> (실전계좌 {data.get('recommendation')})\n"
-                    formatted += f"🏢 <b>사업 요약:</b> {data.get('business_summary')}\n"
-                    formatted += f"💡 <b>매도 근거:</b> {data.get('rationale')}\n"
-                    formatted += f"🎯 <b>목표가:</b> {data.get('target_price_flow')}\n"
-                    formatted += f"⚠️ <b>리스크:</b> {data.get('risk')}\n"
-                    reports.append(formatted)
-            except:
-                pass
-
         header = f"🚀 **[Strategic Deep-Dive]** 상세 리포트\n"
         header += f"📅 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
         

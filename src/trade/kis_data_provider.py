@@ -257,6 +257,56 @@ class KISDataProvider:
         return result
 
     # ──────────────────────────────────────────────────
+    # 6. 종목 뉴스 타이틀
+    # ──────────────────────────────────────────────────
+    def get_news_titles(self, code: str, limit: int = 7) -> list[str]:
+        """
+        KIS 뉴스 타이틀 API로 종목 관련 최근 뉴스 제목 반환.
+        출처(news_ofer_entp_code)별 1건만 선택해 동일 이벤트 중복 방지.
+        TR ID: FHKST01011800
+        """
+        key = f"news_{code}"
+        cached = self._get_cached(key, 1800)  # 30분 캐시
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/news-title",
+            "FHKST01011800",
+            {
+                "FID_NEWS_OFER_ENTP_CODE": "",
+                "FID_COND_MRKT_CLS_CODE": "",
+                "FID_INPUT_ISCD": code,
+                "FID_TITL_CNTT": "",
+                "FID_INPUT_DATE_1": "",
+                "FID_INPUT_HOUR_1": "",
+                "FID_RANK_SORT_CLS_CODE": "",
+                "FID_INPUT_SRNO": "",
+            },
+        )
+        rows = body.get("output", [])
+        if not rows:
+            self._set_cache(key, [])
+            return []
+
+        if not isinstance(rows, list):
+            rows = [rows]
+
+        seen_sources: set = set()
+        titles: list[str] = []
+        for r in rows:
+            src = r.get("news_ofer_entp_code", "")
+            title = r.get("hts_pbnt_titl_cntt", "").strip()
+            if title and src not in seen_sources:
+                seen_sources.add(src)
+                titles.append(title)
+            if len(titles) >= limit:
+                break
+
+        self._set_cache(key, titles)
+        return titles
+
+    # ──────────────────────────────────────────────────
     # 배치 enrichment (DataFetcher에서 호출)
     # ──────────────────────────────────────────────────
     def enrich_batch(self, candidates: list[dict]) -> list[dict]:

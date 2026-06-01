@@ -31,7 +31,7 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
             onClick={() => onSort(sortKey)}
         >
             <Group gap={4} wrap="nowrap" justify="center">
-                <Text size="xs" fw={800}>{label}</Text>
+                <Text size="sm" fw={800}>{label}</Text>
                 {sortConfig.key === sortKey ? (
                     sortConfig.direction === 'asc' ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />
                 ) : <IconSelector size={12} />}
@@ -81,7 +81,7 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 <Badge size="xs" variant="outline" color={s.market === 'KOSPI' ? 'blue' : 'cyan'}>{s.market}</Badge>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c="dimmed">{s.code}</Text>
+                                <Text size="sm" c="dimmed">{s.code}</Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Text size="sm" fw={800}>{s.current_price?.toLocaleString()}</Text>
@@ -92,7 +92,7 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 </Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={parseRate(s.foreign_change_rate) > 0 ? 'red' : parseRate(s.foreign_change_rate) < 0 ? 'blue' : 'gray'}>
+                                <Text size="sm" c={parseRate(s.foreign_change_rate) > 0 ? 'red' : parseRate(s.foreign_change_rate) < 0 ? 'blue' : 'gray'}>
                                     {parseRate(s.foreign_change_rate) > 0 ? '+' : ''}{parseRate(s.foreign_change_rate)}
                                 </Text>
                             </Table.Td>
@@ -128,20 +128,20 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Tooltip label={s.posts_summary} multiline w={300} withArrow position="top">
-                                    <Text size="11px" fw={500} lineClamp={2}>{s.posts_summary}</Text>
+                                    <Text size="sm" fw={500} lineClamp={2}>{s.posts_summary}</Text>
                                 </Tooltip>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" fw={700}>{s.foreign_rate}%</Text>
+                                <Text size="sm" fw={700}>{s.foreign_rate}%</Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c="dimmed">{s.prev_close?.toLocaleString()}</Text>
+                                <Text size="sm" c="dimmed">{s.prev_close?.toLocaleString()}</Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c="dimmed">{s.prev_foreign_rate}%</Text>
+                                <Text size="sm" c="dimmed">{s.prev_foreign_rate}%</Text>
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
-                                <Text size="xs" c={s.inst_net_buy && s.inst_net_buy > 0 ? 'red' : s.inst_net_buy && s.inst_net_buy < 0 ? 'blue' : 'gray'}>
+                                <Text size="sm" c={s.inst_net_buy && s.inst_net_buy > 0 ? 'red' : s.inst_net_buy && s.inst_net_buy < 0 ? 'blue' : 'gray'}>
                                     {s.inst_net_buy !== undefined ? (s.inst_net_buy > 0 ? `+${s.inst_net_buy.toLocaleString()}` : s.inst_net_buy.toLocaleString()) : '-'}
                                 </Text>
                             </Table.Td>
@@ -212,7 +212,7 @@ export const TrendTable = ({ data, sortConfig, onSort, onCellClick, title, title
         <Box>
             <Group mb="xs">
                 <Badge color={titleColor} variant="filled">{title}</Badge>
-                <Text size="xs" c="dimmed">{data.length} stocks</Text>
+                <Text size="sm" c="dimmed">{data.length} stocks</Text>
             </Group>
             <ScrollArea h="calc(100vh - 200px)" offsetScrollbars>
                 <Table highlightOnHover verticalSpacing="xs">

@@ -37,6 +37,13 @@ class DataFetcherWorker(BaseWorker):
         """
         self.log(f"수집 시작 (임계값: {self.ctx.threshold})")
 
+        # 업종 PER/PBR 기준값 초기화 (no-op, 하드코딩 테이블)
+        try:
+            from src.data.sector_cache import SectorCache
+            SectorCache().ensure_fresh()
+        except Exception as e:
+            self.log_error(f"업종 캐시 초기화 실패 (계속 진행): {e}")
+
         # 1. GitHub에서 이전 상태 동기화
         sync_files = self.storage.get_sync_files_list(self.ctx.now_kst)
         self.storage.sync_from_github(sync_files)
@@ -226,6 +233,15 @@ class DataFetcherWorker(BaseWorker):
                         if out.get('hts_avls'):
                             try: details['mkt_cap'] = int(out['hts_avls'])
                             except (ValueError, TypeError): pass
+                        # 거래대금/거래량: KIS가 네이버보다 정확 (원 단위)
+                        if out.get('acml_tr_pbmn'):
+                            try: details['amount'] = int(out['acml_tr_pbmn'])
+                            except (ValueError, TypeError): pass
+                        if out.get('acml_vol'):
+                            try: details['volume'] = int(out['acml_vol'])
+                            except (ValueError, TypeError): pass
+                        if out.get('bstp_kor_isnm'):
+                            details['sector_name'] = out['bstp_kor_isnm'].strip()
                 except Exception as e:
                     pass
             

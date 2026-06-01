@@ -38,18 +38,19 @@ class SidewaysSwingSimulator(BaseSimulator):
             profit_rate = (current_price - avg_price) / avg_price * 100
 
             sparkline = stock.get('sparkline_price', []) if stock else []
-            ma5 = sum(sparkline[-5:]) / len(sparkline[-5:]) if sparkline else avg_price
 
-            # 익절: +4% (백테스트상 +3%보다 우수 — 타이트 청산이 승자를 조기 절단)
+            # 익절: +4%
             if profit_rate >= 4.0:
                 self.sell(code, current_price, reason=f"[눌림목] 목표 익절 (+{profit_rate:.1f}%)")
                 sold_today.add(code)
                 continue
-            # 눌림 회복 익절: 5일선 위로 복귀(반등 목표 달성)
-            if current_price >= ma5 * 1.02:
-                self.sell(code, current_price, reason="[눌림목] 반등 회복 익절 (MA5 상회)")
-                sold_today.add(code)
-                continue
+            # 눌림 회복 익절: 최근 고점 근접 시 (진입가 대비 +2% 이상이면서 sparkline 신고가 돌파)
+            if sparkline:
+                recent_high = max(sparkline[-5:]) if len(sparkline) >= 5 else max(sparkline)
+                if current_price >= recent_high * 0.99:
+                    self.sell(code, current_price, reason="[눌림목] 반등 회복 익절 (고점 근접)")
+                    sold_today.add(code)
+                    continue
             # 타임 스탑: 7일(≈5영업일) 경과 시 손익 무관 청산
             entry_str = p_item.get('entry_date')
             if entry_str:
@@ -82,19 +83,25 @@ class SidewaysSwingSimulator(BaseSimulator):
             if price <= 0 or amount < 1_000_000_000: continue  # 10억 유동성
 
             sparkline = stock.get('sparkline_price', [])
-            if len(sparkline) < 5: continue
+            if len(sparkline) < 3: continue
             adx = self.calculate_adx(sparkline)
-            ma5 = sum(sparkline[-5:]) / 5
             period_change = self.calc_period_change(sparkline)
             daily_change = self.parse_change_rate(stock)
 
-            # 추세(ADX>=20) + 기간 우상향(period>0) 속에서, MA5 이하로 눌렸다가 당일 반등
-            if (adx >= 20.0 and period_change > 0 and price <= ma5 and daily_change > 0
-                    and self.validate_tick_power(stock, threshold=120.0)):
+            # 눌림목 계산: 최근 5일 고점 대비 현재가 조정 비율
+            recent_high = max(sparkline[-5:]) if len(sparkline) >= 5 else max(sparkline)
+            pullback_pct = (recent_high - price) / recent_high * 100 if recent_high > 0 else 0
+
+            # 추세(ADX>=20) + 기간 우상향 + 최근 고점 대비 1.5~8% 눌림 + 당일 반등
+            # [Fix] price<=MA5 조건 폐기 — Buzz 유니버스에서 상승 종목은 항상 MA5 위에 있어 진입 0건
+            if (adx >= 20.0 and period_change > 0
+                    and 1.5 <= pullback_pct <= 8.0
+                    and daily_change > 0
+                    and self.validate_tick_power(stock, threshold=100.0)):
                 qty = int(target_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty,
-                             reason=f"[눌림목] 추세 눌림 저가매수 (ADX {adx:.1f}, 기간 {period_change:.1f}%)")
+                             reason=f"[눌림목] 추세 눌림 저가매수 (ADX {adx:.1f}, 눌림 {pullback_pct:.1f}%)")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

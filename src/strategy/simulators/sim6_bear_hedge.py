@@ -62,13 +62,18 @@ class BearHedgeSimulator(BaseSimulator):
             foreign_change = float(stock.get('foreign_change', 0) or 0)
             adx = self.calculate_adx(sparkline) if sparkline else 0.0
 
+            # 재무 퀄리티 필터: ROE 음수(적자) 종목, 부채비율 200% 초과 제외
+            roe = float(stock.get('roe', 0) or 0)
+            debt_ratio = float(stock.get('debt_ratio', 0) or 0)
+            is_quality = (roe >= 0) and (debt_ratio == 0 or debt_ratio <= 200)
+
             if (period_change <= -7.0 and 0 < daily_change <= 7.0
-                    and foreign_change >= 0 and adx >= 15.0):
+                    and foreign_change >= 0 and adx >= 15.0 and is_quality):
                 invest_amount = min(max_position, self.state['cash'] * 0.5)
                 qty = int(invest_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty,
-                             reason=f"[하락줍줍] 데드캣 반등 (기간 {period_change:.1f}%, 외인 {foreign_change})")
+                             reason=f"[하락줍줍] 데드캣 반등 (기간 {period_change:.1f}%, ROE {roe:.1f}%, 부채 {debt_ratio:.0f}%)")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

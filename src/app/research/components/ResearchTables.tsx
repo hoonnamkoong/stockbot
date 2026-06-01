@@ -58,6 +58,13 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                         <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>전일종가</Table.Th>
                         <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>전일외인</Table.Th>
                         <SortButton label="기관(순)" sortKey="inst_net_buy" />
+                        <SortButton label="외인추정" sortKey="frgn_fake_ntby_qty" />
+                        <SortButton label="기관추정" sortKey="orgn_fake_ntby_qty" />
+                        <SortButton label="ROE%" sortKey="roe" />
+                        <SortButton label="부채%" sortKey="debt_ratio" />
+                        <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>투자의견</Table.Th>
+                        <SortButton label="목표가" sortKey="target_price" />
+                        <Table.Th style={{ fontSize: '11px', textAlign: 'center', minWidth: '180px' }}>컨센서스</Table.Th>
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -135,6 +142,41 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 <Text size="xs" c={s.inst_net_buy && s.inst_net_buy > 0 ? 'red' : s.inst_net_buy && s.inst_net_buy < 0 ? 'blue' : 'gray'}>
                                     {s.inst_net_buy !== undefined ? (s.inst_net_buy > 0 ? `+${s.inst_net_buy.toLocaleString()}` : s.inst_net_buy.toLocaleString()) : '-'}
                                 </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Text size="xs" c={(s.frgn_fake_ntby_qty ?? 0) > 0 ? 'red' : (s.frgn_fake_ntby_qty ?? 0) < 0 ? 'blue' : 'gray'}>
+                                    {s.frgn_fake_ntby_qty != null ? ((s.frgn_fake_ntby_qty > 0 ? '+' : '') + s.frgn_fake_ntby_qty.toLocaleString()) : '-'}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Text size="xs" c={(s.orgn_fake_ntby_qty ?? 0) > 0 ? 'red' : (s.orgn_fake_ntby_qty ?? 0) < 0 ? 'blue' : 'gray'}>
+                                    {s.orgn_fake_ntby_qty != null ? ((s.orgn_fake_ntby_qty > 0 ? '+' : '') + s.orgn_fake_ntby_qty.toLocaleString()) : '-'}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Text size="xs" c={(s.roe ?? 0) > 0 ? 'teal' : 'gray'}>
+                                    {s.roe != null && s.roe !== 0 ? `${s.roe.toFixed(1)}%` : '-'}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Text size="xs" c={(s.debt_ratio ?? 0) > 200 ? 'red' : 'gray'}>
+                                    {s.debt_ratio != null && s.debt_ratio !== 0 ? `${s.debt_ratio.toFixed(0)}%` : '-'}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Badge size="xs" color={s.invest_opinion?.includes('매수') ? 'red' : s.invest_opinion?.includes('매도') ? 'blue' : 'gray'} variant="light">
+                                    {s.invest_opinion || '-'}
+                                </Badge>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Text size="xs" fw={700} c="violet">
+                                    {s.target_price ? s.target_price.toLocaleString() : '-'}
+                                </Text>
+                            </Table.Td>
+                            <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
+                                <Tooltip label={s.consensus_summary || '-'} multiline w={250} withArrow position="top">
+                                    <Text size="11px" lineClamp={1} c="dimmed">{s.consensus_summary || '-'}</Text>
+                                </Tooltip>
                             </Table.Td>
                         </Table.Tr>
                     ))}

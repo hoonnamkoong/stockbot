@@ -1,0 +1,317 @@
+"""
+KIS API 데이터 공급자 (KISDataProvider)
+================================================
+시뮬레이터 고도화를 위한 KIS API 전담 캐시 레이어.
+- 5분 캐시(실시간 지표) / 1일 캐시(투자의견) / 7일 캐시(재무비율)
+- 모든 API 실패 시 빈 dict 반환 → 기존 시뮬레이터 로직 영향 없음
+"""
+
+import os
+import time
+import requests
+from typing import Optional
+
+
+class KISDataProvider:
+    # TTL 상수 (초)
+    TTL_REALTIME = 300       # 5분 — 투자자 추세, 외인기관 가집계
+    TTL_DAILY = 86400        # 1일 — 투자의견, 증권사별 의견
+    TTL_FINANCIAL = 604800   # 7일 — 재무비율 (분기 업데이트)
+
+    def __init__(self):
+        self._cache: dict[str, tuple[float, dict]] = {}  # key → (ts, data)
+        self._token: Optional[str] = None
+        self._base_url: Optional[str] = None
+        self._app_key: Optional[str] = None
+        self._app_secret: Optional[str] = None
+        self._init_auth()
+
+    def _init_auth(self):
+        try:
+            from src.trade.auth import get_access_token, get_base_url
+            self._token = get_access_token()
+            self._base_url = get_base_url()
+            self._app_key = os.environ.get("KIS_APP_KEY", "").strip()
+            self._app_secret = os.environ.get("KIS_APP_SECRET", "").strip()
+        except Exception as e:
+            print(f"[KISDataProvider] 인증 초기화 실패: {e}")
+
+    def _headers(self, tr_id: str) -> dict:
+        return {
+            "Content-Type": "application/json; charset=utf-8",
+            "authorization": f"Bearer {self._token}",
+            "appkey": self._app_key,
+            "appsecret": self._app_secret,
+            "tr_id": tr_id,
+        }
+
+    def _get_cached(self, key: str, ttl: float) -> Optional[dict]:
+        if key in self._cache:
+            ts, data = self._cache[key]
+            if time.time() - ts < ttl:
+                return data
+        return None
+
+    def _set_cache(self, key: str, data: dict):
+        self._cache[key] = (time.time(), data)
+
+    def _get(self, url: str, tr_id: str, params: dict, timeout: int = 5) -> dict:
+        if not self._token or not self._base_url:
+            return {}
+        try:
+            r = requests.get(
+                f"{self._base_url}{url}",
+                headers=self._headers(tr_id),
+                params=params,
+                timeout=timeout,
+            )
+            if r.status_code == 200:
+                body = r.json()
+                if body.get("rt_cd") == "0":
+                    return body
+        except Exception:
+            pass
+        return {}
+
+    # ──────────────────────────────────────────────────
+    # 1. 투자자 추세 추정 (외인/기관 추정 순매수)
+    # ──────────────────────────────────────────────────
+    def get_investor_trend_estimate(self, code: str) -> dict:
+        """
+        실시간 장중 외인/기관 추정 순매수 수량 반환.
+        반환 키: frgn_fake_ntby_qty, orgn_fake_ntby_qty, sum_fake_ntby_qty
+        """
+        key = f"investor_trend_{code}"
+        cached = self._get_cached(key, self.TTL_REALTIME)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/investor-trend-estimate",
+            "HHPTJ04160200",
+            {"MKSC_SHRN_ISCD": code},
+        )
+        rows = body.get("output", [])
+        if not rows:
+            result = {"frgn_fake_ntby_qty": 0, "orgn_fake_ntby_qty": 0, "sum_fake_ntby_qty": 0}
+            self._set_cache(key, result)
+            return result
+
+        # 최신 row(index 0)
+        row = rows[0] if isinstance(rows, list) else rows
+        result = {
+            "frgn_fake_ntby_qty": self._to_int(row.get("frgn_fake_ntby_qty", 0)),
+            "orgn_fake_ntby_qty": self._to_int(row.get("orgn_fake_ntby_qty", 0)),
+            "sum_fake_ntby_qty":  self._to_int(row.get("sum_fake_ntby_qty", 0)),
+        }
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 2. 재무 수익성비율 (ROE 등)
+    # ──────────────────────────────────────────────────
+    def get_finance_profit_ratio(self, code: str) -> dict:
+        """
+        최근 결산 기준 ROE, 순이익률 반환.
+        반환 키: roe, net_profit_rate
+        """
+        key = f"profit_ratio_{code}"
+        cached = self._get_cached(key, self.TTL_FINANCIAL)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/finance/profit-ratio",
+            "FHKST66430400",
+            {"FID_INPUT_ISCD": code, "FID_DIV_CLS_CODE": "0", "FID_COND_MRKT_DIV_CODE": "J"},
+        )
+        rows = body.get("output", [])
+        if not rows:
+            result = {"roe": 0.0, "net_profit_rate": 0.0}
+            self._set_cache(key, result)
+            return result
+
+        row = rows[0] if isinstance(rows, list) else rows
+        result = {
+            "roe": self._to_float(row.get("self_cptl_ntin_inrt", 0)),   # 자기자본 순이익률 = ROE
+            "net_profit_rate": self._to_float(row.get("sale_ntin_rate", 0)),
+        }
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 3. 재무 안정성비율 (부채비율 등)
+    # ──────────────────────────────────────────────────
+    def get_finance_stability_ratio(self, code: str) -> dict:
+        """
+        최근 결산 기준 부채비율, 유동비율 반환.
+        반환 키: debt_ratio, current_ratio
+        """
+        key = f"stability_ratio_{code}"
+        cached = self._get_cached(key, self.TTL_FINANCIAL)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/finance/stability-ratio",
+            "FHKST66430600",
+            {"FID_INPUT_ISCD": code, "FID_DIV_CLS_CODE": "0", "FID_COND_MRKT_DIV_CODE": "J"},
+        )
+        rows = body.get("output", [])
+        if not rows:
+            result = {"debt_ratio": 999.0, "current_ratio": 0.0}
+            self._set_cache(key, result)
+            return result
+
+        row = rows[0] if isinstance(rows, list) else rows
+        result = {
+            "debt_ratio": self._to_float(row.get("lblt_rate", 999)),
+            "current_ratio": self._to_float(row.get("crnt_rate", 0)),
+        }
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 4. 종목 투자의견 + 목표가
+    # ──────────────────────────────────────────────────
+    def get_invest_opinion(self, code: str) -> dict:
+        """
+        최신 애널리스트 투자의견, HTS 목표가, 목표가 괴리율 반환.
+        반환 키: invest_opinion, target_price, opinion_divergence
+        """
+        key = f"invest_opinion_{code}"
+        cached = self._get_cached(key, self.TTL_DAILY)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/invest-opinion",
+            "FHKST663300C0",
+            {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16633", "FID_INPUT_ISCD": code},
+        )
+        rows = body.get("output", [])
+        if not rows:
+            result = {"invest_opinion": "", "target_price": 0, "opinion_divergence": 0.0}
+            self._set_cache(key, result)
+            return result
+
+        row = rows[0] if isinstance(rows, list) else rows
+        result = {
+            "invest_opinion": row.get("invt_opnn", ""),
+            "target_price":   self._to_int(row.get("hts_goal_prc", 0)),
+            "opinion_divergence": self._to_float(row.get("dprt", 0)),
+        }
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 5. 증권사별 투자의견 요약
+    # ──────────────────────────────────────────────────
+    def get_invest_opbysec(self, code: str) -> dict:
+        """
+        증권사별 투자의견을 집계하여 컨센서스 요약 반환.
+        반환 키: consensus_buy_count, consensus_avg_target, consensus_summary
+        """
+        key = f"opbysec_{code}"
+        cached = self._get_cached(key, self.TTL_DAILY)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/invest-opbysec",
+            "FHKST663400C0",
+            {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16634", "FID_INPUT_ISCD": code},
+        )
+        rows = body.get("output", [])
+        if not rows:
+            result = {"consensus_buy_count": 0, "consensus_avg_target": 0, "consensus_summary": ""}
+            self._set_cache(key, result)
+            return result
+
+        if not isinstance(rows, list):
+            rows = [rows]
+
+        buy_count = 0
+        targets = []
+        firms = []
+        for row in rows:
+            opnn = row.get("invt_opnn", "")
+            tp = self._to_int(row.get("hts_goal_prc", 0))
+            firm = row.get("hts_kor_isnm", "")
+            if opnn in ("매수", "강력매수", "BUY", "Strong Buy"):
+                buy_count += 1
+            if tp > 0:
+                targets.append(tp)
+            if firm:
+                firms.append(firm)
+
+        avg_target = int(sum(targets) / len(targets)) if targets else 0
+        summary = f"매수의견 {buy_count}/{len(rows)}개사, 평균목표가 {avg_target:,}원" if avg_target else ""
+
+        result = {
+            "consensus_buy_count": buy_count,
+            "consensus_avg_target": avg_target,
+            "consensus_summary": summary,
+        }
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 배치 enrichment (DataFetcher에서 호출)
+    # ──────────────────────────────────────────────────
+    def enrich_batch(self, candidates: list[dict]) -> list[dict]:
+        """
+        candidates 목록 전체에 KIS 데이터를 병합하여 반환.
+        API 실패 시 원본 데이터 그대로 유지 (graceful degradation).
+        """
+        if not self._token:
+            return candidates
+
+        for stock in candidates:
+            code = stock.get("code", "")
+            if not code:
+                continue
+            try:
+                trend = self.get_investor_trend_estimate(code)
+                stock.update(trend)
+            except Exception:
+                pass
+            try:
+                profit = self.get_finance_profit_ratio(code)
+                stock.update(profit)
+            except Exception:
+                pass
+            try:
+                stability = self.get_finance_stability_ratio(code)
+                stock.update(stability)
+            except Exception:
+                pass
+            try:
+                opinion = self.get_invest_opinion(code)
+                stock.update(opinion)
+            except Exception:
+                pass
+            try:
+                opbysec = self.get_invest_opbysec(code)
+                stock.update(opbysec)
+            except Exception:
+                pass
+
+        return candidates
+
+    # ──────────────────────────────────────────────────
+    # 유틸
+    # ──────────────────────────────────────────────────
+    @staticmethod
+    def _to_int(v) -> int:
+        try:
+            return int(str(v).replace(",", "").strip())
+        except Exception:
+            return 0
+
+    @staticmethod
+    def _to_float(v) -> float:
+        try:
+            return float(str(v).replace(",", "").strip())
+        except Exception:
+            return 0.0

@@ -59,14 +59,19 @@ class BullMomentumSimulator(BaseSimulator):
                 avg_price = p_item.get('avg_price', 0)
                 if avg_price <= 0: continue
                 profit_rate = (current_price - avg_price) / avg_price * 100
-                if profit_rate >= 5.0 and not p_item.get('pyramided', False):
+                # 불타기 추가 조건: 기관 OR 외인 추정 순매수 양수여야 허수 신호 제거
+                _s = candidate_map.get(code, {})
+                orgn_support = _s.get('orgn_fake_ntby_qty', 0)
+                frgn_support = _s.get('frgn_fake_ntby_qty', 0)
+                has_inst_support = (orgn_support > 0 or frgn_support > 0)
+                if profit_rate >= 5.0 and not p_item.get('pyramided', False) and has_inst_support:
                     add_qty = int(p_item['quantity'] * 0.5)
                     cost = add_qty * current_price
                     if add_qty > 0 and cost <= self.state['cash'] * 0.15:
                         if self.buy(code, p_item['name'], current_price, add_qty,
-                                    reason="[상승모멘텀] 불타기 50% 추가매수"):
+                                    reason=f"[상승모멘텀] 불타기 50% (기관{orgn_support:+,}/외인{frgn_support:+,})"):
                             self.state['portfolio'][code]['pyramided'] = True
-                            self.save_state()
+                            self.save_state(current_prices)
 
         # 3. 진입 (고유동성 + 강한 기간 모멘텀 + 당일 상승 + ADX + 체결강도)
         if not self.state.get('market_index_healthy', True):
@@ -89,12 +94,16 @@ class BullMomentumSimulator(BaseSimulator):
             period_change = self.calc_period_change(sparkline)
             daily_change = self.parse_change_rate(stock)
 
+            orgn = stock.get('orgn_fake_ntby_qty', 0)
+            frgn = stock.get('frgn_fake_ntby_qty', 0)
+            has_inst = (orgn > 0 or frgn > 0)
             if (period_change >= 5.0 and daily_change > 0 and adx >= 20.0
-                    and self.validate_tick_power(stock, threshold=120.0)):
+                    and self.validate_tick_power(stock, threshold=120.0)
+                    and has_inst):
                 qty = int(target_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty,
-                             reason=f"[상승모멘텀] 주도주 탑승 (기간 {period_change:.1f}%, ADX {adx:.1f})")
+                             reason=f"[상승모멘텀] 주도주 탑승 (기간 {period_change:.1f}%, ADX {adx:.1f}, 기관{orgn:+,}/외인{frgn:+,})")
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

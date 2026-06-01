@@ -18,8 +18,17 @@ export interface Stock {
     consecutive_days: number;
     latest_post: string;
     price_history?: number[];
-    tick_power?: number;     // [V60.0] 체결강도
-    bid_ask_ratio?: number;  // [V60.0] 호가잔량비
+    tick_power?: number;
+    bid_ask_ratio?: number;
+    // KIS API 보강 필드
+    frgn_fake_ntby_qty?: number;   // 외국인 추정 순매수
+    orgn_fake_ntby_qty?: number;   // 기관 추정 순매수
+    roe?: number;                   // ROE (%)
+    debt_ratio?: number;            // 부채비율 (%)
+    invest_opinion?: string;        // 투자의견
+    target_price?: number;          // HTS 목표가
+    opinion_divergence?: number;    // 목표가 괴리율 (%)
+    consensus_summary?: string;     // 증권사 컨센서스 요약
 }
 
 export interface FiveDayStock {

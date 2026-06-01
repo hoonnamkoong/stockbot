@@ -21,11 +21,14 @@ class ConservativeSimulator(BaseSimulator):
         today = datetime.now()
         sold_today = set()
 
+        # 고점 갱신 (청산 루프 전에 일괄 처리)
+        self.update_peak_prices(current_prices or {})
+
         # 1. 청산 및 트래킹 로직
         for code in portfolio_codes:
             p_item = self.state['portfolio'][code]
             stock = candidate_map.get(code)
-            
+
             # [Fix] current_prices dict 우선 참조 (trade_engine이 네이버에서 보강한 실제 현재가)
             current_price = (current_prices or {}).get(code, 0)
             if current_price == 0:
@@ -33,9 +36,6 @@ class ConservativeSimulator(BaseSimulator):
             if current_price == 0:
                 current_price = p_item['avg_price']  # 최후 폴백: 평단가 (0원 방어)
             if current_price <= 0: continue
-            
-            # 고점 갱신
-            self.update_peak_price(code, current_price)
             
             # 수익률 계산
             profit_rate = (current_price - p_item['avg_price']) / p_item['avg_price'] * 100

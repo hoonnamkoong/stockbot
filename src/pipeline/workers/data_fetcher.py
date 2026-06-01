@@ -119,6 +119,15 @@ class DataFetcherWorker(BaseWorker):
         sync_state.market_index_healthy = indices['KOSPI_healthy'] and indices['KOSDAQ_healthy']
         self.storage.save_sync_state(sync_state)
 
+        # 6-1. KIS API 보강 데이터 추가 (외인/기관 추정, 재무비율, 투자의견)
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            kis_provider = KISDataProvider()
+            results_raw = kis_provider.enrich_batch(results_raw)
+            self.log(f"KIS 데이터 보강 완료 ({len(results_raw)}개 종목)")
+        except Exception as e:
+            self.log_error(f"KIS 데이터 보강 실패 (기존 데이터로 계속): {e}")
+
         # 7. Pydantic 변환 (타입 안전성 확보)
         results: list[StockData] = []
         for s in results_raw:

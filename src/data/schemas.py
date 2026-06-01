@@ -55,6 +55,20 @@ class StockData(BaseModel):
     sparkline_price: list = []  # [V50.3] 최근 N일 종가 (과거->최신순)
     tick_power: float = 0.0     # [V60.0] 체결강도 (%)
     bid_ask_ratio: float = 1.0  # [V60.0] 매도호가잔량 / 매수호가잔량 비
+    # ── KIS API 보강 필드 ──────────────────────────────
+    frgn_fake_ntby_qty: int = 0   # 외국인 추정 순매수 (가집계)
+    orgn_fake_ntby_qty: int = 0   # 기관 추정 순매수 (가집계)
+    sum_fake_ntby_qty: int = 0    # 외인+기관 합산 추정 순매수
+    roe: float = 0.0              # ROE 자기자본 순이익률 (%)
+    net_profit_rate: float = 0.0  # 매출액 순이익률 (%)
+    debt_ratio: float = 0.0       # 부채비율 (%)
+    current_ratio: float = 0.0    # 유동비율 (%)
+    invest_opinion: str = ""      # 투자의견 (매수/중립/매도)
+    target_price: int = 0         # HTS 목표가 (원)
+    opinion_divergence: float = 0.0  # 목표가 괴리율 (%)
+    consensus_buy_count: int = 0  # 증권사 매수의견 수
+    consensus_avg_target: int = 0 # 증권사 평균 목표가
+    consensus_summary: str = ""   # 컨센서스 요약 문자열
 
     @field_validator('price', 'prev_close', 'current_price', 'volume', 'amount', mode='before')
     @classmethod

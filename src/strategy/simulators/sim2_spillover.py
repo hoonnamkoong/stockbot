@@ -77,8 +77,8 @@ class SectorSpilloverSimulator(BaseSimulator):
             amount = float(stock.get('amount', 0))
             if amount < 1_000_000_000 or price <= 0: continue # 거래대금 10억 미만 패스
 
-            # MFHS2 통합 스코어 계산 (BaseSimulator 메서드 호출)
-            score = self.calculate_mfhs2_score(stock, current_month)
+            # MFHS2 통합 스코어 계산 (KIS 데이터 우선, 폴백은 base 메서드)
+            score = self._mfhs2_score_kis(stock, current_month)
 
             # 진입 결정: 40점 이상이면 매수
             if score >= 40:
@@ -89,3 +89,49 @@ class SectorSpilloverSimulator(BaseSimulator):
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
+
+    def _mfhs2_score_kis(self, stock_data: dict, current_month: int) -> int:
+        """
+        KIS 데이터 우선 MFHS2 스코어 산출.
+        KIS 외인/기관 추정 순매수가 있으면 그것을 사용, 없으면 base 메서드 폴백.
+        A(수급 40점) + B(발산 40점) + C(계절성 20점)
+        """
+        score = 0
+
+        # [조건 A] 수급 (40점) — KIS 추정 데이터 우선
+        frgn_kis = stock_data.get('frgn_fake_ntby_qty', 0)
+        orgn_kis = stock_data.get('orgn_fake_ntby_qty', 0)
+        if frgn_kis != 0 or orgn_kis != 0:
+            # KIS 데이터 있음: 외인 OR 기관 순매수 양수면 각각 20점
+            if frgn_kis > 0:
+                score += 20
+            if orgn_kis > 0:
+                score += 20
+        else:
+            # KIS 데이터 없음: 네이버 foreign_change 폴백
+            f_change = stock_data.get('foreign_change', 0)
+            if isinstance(f_change, str):
+                try:
+                    f_change = float(f_change.replace('%', '').replace('+', '').strip())
+                except ValueError:
+                    f_change = 0.0
+            if f_change > 0:
+                score += 40
+
+        # [조건 B] 감정-수급 발산 (40점)
+        posts = int(stock_data.get('recent_posts_count', 0))
+        sentiment = stock_data.get('sentiment', '')
+        pos_percent = 0
+        if 'Positive' in sentiment:
+            try:
+                pos_percent = float(sentiment.split('(')[1].split('%')[0])
+            except Exception:
+                pass
+        if posts >= 30 and pos_percent > 60:
+            score += 40
+
+        # [조건 C] 계절성 (20점)
+        if 1 <= current_month <= 4:
+            score += 20
+
+        return score

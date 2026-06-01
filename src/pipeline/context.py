@@ -61,10 +61,21 @@ class PipelineContext:
         return 130
 
     def is_trading_day(self) -> bool:
-        """오늘이 거래일인지 확인합니다 (네이버 증권 스크래핑 및 holidays 패키지 활용)."""
+        """오늘이 거래일인지 확인합니다 (KIS API 우선, holidays 패키지 폴백)."""
         if self.now_kst.weekday() >= 5:
             return False
-            
+
+        # KIS API로 거래일 확인 (1차)
+        try:
+            result = self._check_trading_day_via_kis()
+            if result is not None:
+                if not result:
+                    self.log(f"[KIS API] 오늘({self.today_display})은 비거래일입니다.")
+                return result
+        except Exception as e:
+            self.log(f"[경고] KIS API 거래일 확인 실패, holidays 폴백: {e}")
+
+        # holidays 패키지로 공휴일 확인 (폴백)
         try:
             import holidays
             if self.now_kst.strftime('%Y-%m-%d') in holidays.KR():
@@ -72,37 +83,60 @@ class PipelineContext:
                 return False
         except Exception as e:
             self.log(f"[경고] holidays 패키지 확인 실패: {e}")
-            pass
-            
-        try:
-            import requests
-            from bs4 import BeautifulSoup
-            import re
-            
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get('https://finance.naver.com/', headers=headers, timeout=5)
-            res.encoding = 'euc-kr'
-            soup = BeautifulSoup(res.text, 'html.parser')
-            time_el = soup.select_one('span#time')
-            
-            if time_el:
-                time_text = time_el.text.strip()
-                if '휴장' in time_text:
-                    self.log(f"[네이버 증권] 현재 휴장 상태 확인됨: {time_text}")
-                    return False
-                
-                match = re.search(r'(\d{4}\.\d{2}\.\d{2})', time_text)
-                if match:
-                    naver_date = match.group(1)
-                    if naver_date != self.today_display:
-                        self.log(f"[네이버 증권] 영업일 기준({naver_date})이 오늘({self.today_display})과 다름 (휴장일 간주)")
-                        return False
-        except Exception as e:
-            self.log(f"[경고] 네이버 증권 휴장일 파싱 실패: {e}")
-            # 스크래핑 실패 시 임시 공휴일일 수도 있으나 기본적으로 평일이므로 True 반환
-            pass
-            
+
         return True
+
+    def _check_trading_day_via_kis(self):
+        """KIS chk-holiday API로 오늘이 거래일인지 확인합니다. 실패 시 None 반환."""
+        import json
+        import requests
+
+        app_key = os.environ.get('KIS_APP_KEY', '').strip()
+        app_secret = os.environ.get('KIS_APP_SECRET', '').strip()
+        if not app_key or not app_secret:
+            return None
+
+        # token_manager.py가 사전에 실행되어 캐시를 보장함
+        token_path = 'data/kis_token_cache.json'
+        try:
+            with open(token_path, 'r', encoding='utf-8') as f:
+                access_token = json.load(f).get('access_token')
+        except Exception:
+            return None
+        if not access_token:
+            return None
+
+        url = "https://openapi.koreainvestment.com:9443/uapi/domestic-stock/v1/quotations/chk-holiday"
+        headers = {
+            "content-type": "application/json; charset=utf-8",
+            "authorization": f"Bearer {access_token}",
+            "appkey": app_key,
+            "appsecret": app_secret,
+            "tr_id": "CTCA0903R",
+            "custtype": "P",
+        }
+        params = {"BASS_DT": self.today_str, "CTX_AREA_NK": "", "CTX_AREA_FK": ""}
+
+        res = requests.get(url, headers=headers, params=params, timeout=5)
+        data = res.json()
+
+        if data.get('rt_cd') != '0':
+            self.log(f"[KIS API] chk-holiday 오류: {data.get('msg1', '')}")
+            return None
+
+        output = data.get('output', [])
+        entry = next((x for x in output if x.get('bass_dt') == self.today_str), output[0] if output else None)
+        if not entry:
+            return None
+
+        bzdy_tp_cd = entry.get('bzdy_tp_cd', '')
+        self.log(f"[KIS API] 거래일 조회: {self.today_str} bzdy_tp_cd={bzdy_tp_cd}")
+        if bzdy_tp_cd:
+            return bzdy_tp_cd == '1'
+        tr_day_yn = entry.get('tr_day_yn', '')
+        if tr_day_yn:
+            return tr_day_yn == 'Y'
+        return None
 
     def should_notify(self) -> bool:
         """

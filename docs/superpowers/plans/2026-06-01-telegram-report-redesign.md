@@ -332,9 +332,18 @@ from src.trade.kis_data_provider import KISDataProvider
 MOCK_NEWS_RESPONSE = {
     "rt_cd": "0",
     "output": [
-        {"hts_pbnt_titl_cntt": "카카오, AI 사업 본격화 선언"},
-        {"hts_pbnt_titl_cntt": "카카오페이 실적 개선 기대"},
-        {"hts_pbnt_titl_cntt": "카카오 플랫폼 사용자 역대 최고"},
+        {"hts_pbnt_titl_cntt": "카카오, AI 사업 본격화 선언",   "news_ofer_entp_code": "A"},
+        {"hts_pbnt_titl_cntt": "카카오페이 실적 개선 기대",     "news_ofer_entp_code": "5"},
+        {"hts_pbnt_titl_cntt": "카카오 플랫폼 사용자 역대 최고", "news_ofer_entp_code": "6"},
+    ]
+}
+
+MOCK_NEWS_DUPLICATE_SRC = {
+    "rt_cd": "0",
+    "output": [
+        {"hts_pbnt_titl_cntt": "카카오 AI 분사 검토",  "news_ofer_entp_code": "A"},
+        {"hts_pbnt_titl_cntt": "AI 키우는 카카오",     "news_ofer_entp_code": "A"},  # 같은 출처
+        {"hts_pbnt_titl_cntt": "카카오 2분기 실적",    "news_ofer_entp_code": "5"},
     ]
 }
 
@@ -353,6 +362,24 @@ def test_get_news_titles_returns_list():
     assert isinstance(result, list)
     assert len(result) == 3
     assert result[0] == "카카오, AI 사업 본격화 선언"
+
+
+def test_get_news_titles_deduplicates_by_source():
+    """같은 출처의 두 번째 기사는 제외된다."""
+    provider = KISDataProvider.__new__(KISDataProvider)
+    provider._cache = {}
+    provider._token = "fake"
+    provider._base_url = "https://fake"
+    provider._app_key = "key"
+    provider._app_secret = "secret"
+
+    with patch.object(provider, '_get', return_value=MOCK_NEWS_DUPLICATE_SRC):
+        result = provider.get_news_titles("035720")
+
+    assert len(result) == 2                        # 출처 A 1건 + 출처 5 1건
+    assert "카카오 AI 분사 검토" in result
+    assert "AI 키우는 카카오" not in result        # 같은 출처 A 중복 제거
+    assert "카카오 2분기 실적" in result
 
 
 def test_get_news_titles_returns_empty_on_failure():
@@ -403,6 +430,7 @@ python -m pytest tests/test_kis_news.py -v 2>&1 | head -20
     def get_news_titles(self, code: str, limit: int = 7) -> list[str]:
         """
         KIS 뉴스 타이틀 API로 종목 관련 최근 뉴스 제목 반환.
+        출처(news_ofer_entp_code)별 1건만 선택해 동일 이벤트 중복 방지.
         반환: 제목 문자열 리스트 (최대 limit개)
         TR ID: FHKST01011800
         """
@@ -433,11 +461,17 @@ python -m pytest tests/test_kis_news.py -v 2>&1 | head -20
         if not isinstance(rows, list):
             rows = [rows]
 
-        titles = [
-            r.get("hts_pbnt_titl_cntt", "").strip()
-            for r in rows
-            if r.get("hts_pbnt_titl_cntt", "").strip()
-        ][:limit]
+        # 출처별 1건씩 선택 (같은 사건을 여러 언론이 다르게 표현하는 중복 방지)
+        seen_sources: set = set()
+        titles: list[str] = []
+        for r in rows:
+            src = r.get("news_ofer_entp_code", "")
+            title = r.get("hts_pbnt_titl_cntt", "").strip()
+            if title and src not in seen_sources:
+                seen_sources.add(src)
+                titles.append(title)
+            if len(titles) >= limit:
+                break
 
         self._set_cache(key, titles)
         return titles

@@ -415,9 +415,9 @@ class StrategyAdvisor:
 
     def generate_deep_dive_report(self, final_candidates, sell_candidate=None):
         """
-        딥다이브 리포트 — Gemini 맥락 분석 + KIS 투자 데이터 블록 병합.
-        - Gemini: 뉴스 제목 + 토론 요약 + 52주 위치 (맥락·트렌드 분석 전용)
-        - 수치 데이터: 투자의견/PER(업종비교)/컨센서스 블록으로 분리
+        딥다이브 리포트 — 5개 섹션 번호 포맷.
+        1. 사업 요약  2. 추천 근거  3. 리스크
+        4. 투자 데이터 (목표가: KIS 컨센서스 평균)  5. 관련 기사
         """
         if not final_candidates and not sell_candidate:
             return "분석 대상 종목이 없습니다."
@@ -439,10 +439,11 @@ class StrategyAdvisor:
         for stock in final_candidates[:2]:
             cur = stock.get('price', stock.get('current_price', 0)) or 0
 
-            news_titles = []
+            # 뉴스 아이템 (제목 + URL)
+            news_items = []
             if kis:
                 try:
-                    news_titles = kis.get_news_titles(stock['code'])
+                    news_items = kis.get_news_items(stock['code'], limit=5)
                 except Exception:
                     pass
 
@@ -453,14 +454,13 @@ class StrategyAdvisor:
                 pos = round((cur - w52l) / (w52h - w52l) * 100) if w52h != w52l else 50
                 w52_text = f"52주 고가 {w52h:,}원 / 저가 {w52l:,}원 (현재 위치 {pos}%)"
 
+            # Gemini 프롬프트용 뉴스 제목
             news_section = ""
-            if news_titles:
-                news_section = "\n[최근 뉴스 제목]\n" + "\n".join(f"- {t}" for t in news_titles)
+            if news_items:
+                news_section = "\n[최근 뉴스 제목]\n" + "\n".join(f"- {n['title']}" for n in news_items)
 
             prompt = f"""당신은 대한민국 주식시장 전문 애널리스트입니다.
-아래 정보를 바탕으로 이 종목이 왜 지금 시장의 주목을 받고 있는지,
-어떤 트렌드·산업 변화·사회적 맥락이 배경인지를 중심으로 분석하세요.
-수치 데이터를 단순 나열하지 말고, 맥락과 인사이트를 제시하세요.
+아래 정보를 바탕으로 이 종목이 왜 지금 시장의 주목을 받고 있는지 분석하세요.
 
 종목: {stock['name']} ({stock['code']})
 현재가: {cur:,}원 | 순위: {stock.get('rank', 'N/A')}위
@@ -470,32 +470,100 @@ class StrategyAdvisor:
 {stock.get('posts_summary', '정보 없음')}
 {news_section}
 
-다음 JSON 형식으로만 답변하세요:
+다음 JSON 형식으로만 답변하세요. 각 항목은 간결한 명사형 불렛 포인트 배열입니다:
 {{
-  "rank_and_recommendation": "{stock.get('rank')}위 매수추천 또는 강력매수 등",
-  "business_summary": "주요 사업 1~2문장",
-  "rationale": "이 종목이 왜 지금 주목받는지, 트렌드·산업 흐름·사회적 변화 기반 맥락 3~5줄",
-  "target_price_flow": "현재가 -> 목표가 (근거)",
-  "risk": "핵심 리스크 요인"
+  "rank_and_recommendation": "강력 매수 또는 매수 등 추천 등급",
+  "business_bullets": ["주요 사업 핵심 1문장 (핵심 키워드 중심)"],
+  "rationale_bullets": ["근거1", "근거2", "근거3 (최대 5개)"],
+  "risk_bullets": ["리스크1", "리스크2 (최대 3개)"]
 }}"""
             try:
                 response = self.gemini._call_gemini_safe(
                     prompt, model_type='report',
                     generation_config={"response_mime_type": "application/json"}
                 )
-                if response and response.text:
-                    data = json.loads(response.text)
-                    formatted = f"{stock['name']} ({data.get('rank_and_recommendation')})\n"
-                    formatted += f"사업 요약: {data.get('business_summary')}\n"
-                    formatted += f"추천 근거: {data.get('rationale')}\n"
-                    formatted += f"목표가: {data.get('target_price_flow')}\n"
-                    formatted += f"리스크: {data.get('risk')}\n"
+                if not (response and response.text):
+                    reports.append(f"{stock['name']} 상세 분석 실패")
+                    continue
 
+                data = json.loads(response.text)
+                recommendation = data.get('rank_and_recommendation', '')
+
+                def to_bullets(v):
+                    if isinstance(v, list):
+                        return [str(x).strip() for x in v if str(x).strip()]
+                    if isinstance(v, str):
+                        return [line.strip().lstrip('-•·').strip() for line in v.split('\n') if line.strip()]
+                    return []
+
+                biz = to_bullets(data.get('business_bullets', []))
+                rationale = to_bullets(data.get('rationale_bullets', []))
+                risk = to_bullets(data.get('risk_bullets', []))
+
+                # 섹션 1: 사업 요약
+                sec1 = "1. 사업 요약\n" + ("\n".join(f"- {b}" for b in biz) if biz else "- 정보 없음")
+
+                # 섹션 2: 추천 근거
+                sec2 = "2. 추천 근거\n" + ("\n".join(f"- {r}" for r in rationale) if rationale else "- 정보 없음")
+
+                # 섹션 3: 리스크
+                sec3 = "3. 리스크\n" + ("\n".join(f"- {r}" for r in risk) if risk else "- 정보 없음")
+
+                # 섹션 4: 투자 데이터
+                sec4_lines = ["4. 투자 데이터"]
+                avg_tp = stock.get('consensus_avg_target', 0) or 0
+                buy_cnt = stock.get('consensus_buy_count', 0) or 0
+                if avg_tp:
+                    sec4_lines.append(f"- 목표가: {avg_tp:,}원 (증권사 {buy_cnt}개사 매수의견 평균)")
+                per = stock.get('per', 0) or 0
+                pbr = stock.get('pbr', 0) or 0
+                if per or pbr:
                     sector_name = stock.get('sector_name', '')
                     sector_avg = sector_cache.get_sector_avg(sector_name) if sector_cache and sector_name else None
-                    formatted += "\n" + self._format_investment_block(stock, sector_avg)
+                    if sector_avg and sector_avg.get('avg_per'):
+                        avg_per = sector_avg['avg_per']
+                        avg_pbr = sector_avg.get('avg_pbr', 0)
+                        per_diff = round((per - avg_per) / avg_per * 100) if avg_per else 0
+                        per_label = f"업종 평균 {avg_per}x 대비 {per_diff:+d}%"
+                        pbr_label = f"업종 평균 {avg_pbr}x" if avg_pbr else ""
+                    else:
+                        per_label = ("고평가 / 성장 기대 반영" if per >= 50 else
+                                     "성장주 수준" if per >= 30 else
+                                     "적정 구간" if per >= 15 else "저평가 구간")
+                        pbr_label = ("성장 프리미엄" if pbr >= 3 else
+                                     "적정" if pbr >= 1 else "자산가치 이하")
+                    per_str = f"PER {per}x ({per_label})" if per else ""
+                    pbr_str = f"PBR {pbr}x ({pbr_label})" if pbr else ""
+                    line = " | ".join(filter(None, [per_str, pbr_str]))
+                    if line:
+                        sec4_lines.append(f"- {line}")
+                if w52h and w52l and cur:
+                    pos = round((cur - w52l) / (w52h - w52l) * 100) if w52h != w52l else 50
+                    sec4_lines.append(f"- 52주: 고 {w52h:,}원 / 저 {w52l:,}원 (현재 위치 {pos}%)")
+                sec4 = "\n".join(sec4_lines)
 
-                    reports.append(formatted)
+                # 섹션 5: 관련 기사 (최대 3개)
+                sec5_lines = ["5. 관련 기사"]
+                for item in news_items[:3]:
+                    title = item.get('title', '')
+                    url = item.get('url', '')
+                    if url:
+                        sec5_lines.append(f"- [{title}]({url})")
+                    elif title:
+                        sec5_lines.append(f"- {title}")
+                if len(sec5_lines) == 1:
+                    sec5_lines.append("- 관련 기사 없음")
+                sec5 = "\n".join(sec5_lines)
+
+                formatted = (
+                    f"{stock['name']} ({recommendation})\n\n"
+                    f"{sec1}\n\n"
+                    f"{sec2}\n\n"
+                    f"{sec3}\n\n"
+                    f"{sec4}\n\n"
+                    f"{sec5}"
+                )
+                reports.append(formatted)
             except Exception:
                 reports.append(f"{stock['name']} 상세 분석 실패")
 

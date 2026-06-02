@@ -265,7 +265,16 @@ class KISDataProvider:
         출처(news_ofer_entp_code)별 1건만 선택해 동일 이벤트 중복 방지.
         TR ID: FHKST01011800
         """
-        key = f"news_{code}"
+        return [item["title"] for item in self.get_news_items(code, limit)]
+
+    def get_news_items(self, code: str, limit: int = 7) -> list[dict]:
+        """
+        KIS 뉴스 타이틀 API로 종목 관련 최근 뉴스 제목 + URL 반환.
+        출처(news_ofer_entp_code)별 1건만 선택해 동일 이벤트 중복 방지.
+        반환 키: title, url (url 없으면 빈 문자열)
+        TR ID: FHKST01011800
+        """
+        key = f"news_items_{code}"
         cached = self._get_cached(key, 1800)  # 30분 캐시
         if cached is not None:
             return cached
@@ -293,18 +302,19 @@ class KISDataProvider:
             rows = [rows]
 
         seen_sources: set = set()
-        titles: list[str] = []
+        items: list[dict] = []
         for r in rows:
             src = r.get("news_ofer_entp_code", "")
             title = r.get("hts_pbnt_titl_cntt", "").strip()
+            url = r.get("hts_pbnt_url", r.get("news_url", r.get("data_src_url", ""))).strip()
             if title and src not in seen_sources:
                 seen_sources.add(src)
-                titles.append(title)
-            if len(titles) >= limit:
+                items.append({"title": title, "url": url})
+            if len(items) >= limit:
                 break
 
-        self._set_cache(key, titles)
-        return titles
+        self._set_cache(key, items)
+        return items
 
     # ──────────────────────────────────────────────────
     # 배치 enrichment (DataFetcher에서 호출)

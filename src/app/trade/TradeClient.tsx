@@ -290,7 +290,7 @@ function TradeContent() {
     function renderPortfolioTable(holdings: any[], isReal: boolean = false) {
         if (!holdings || holdings.length === 0) {
             return (
-                <Box py="xl" style={{ textAlign: 'center', border: '1px dashed #ced4da', borderRadius: '8px' }}>
+                <Box h={560} py="xl" style={{ textAlign: 'center', border: '1px dashed #ced4da', borderRadius: '8px', width: '100%', minWidth: isReal ? 650 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Text c="dimmed">보유 종목이 없습니다.</Text>
                 </Box>
             );
@@ -379,7 +379,7 @@ function TradeContent() {
         const filtered = history.filter(h => h.type === targetType).slice(0, 100);
         if (filtered.length === 0) {
             return (
-                <Box py="md" style={{ textAlign: 'center' }}>
+                <Box h={560} py="md" style={{ textAlign: 'center', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Text size="xs" c="dimmed">최근 거래 내역이 없습니다.</Text>
                 </Box>
             );

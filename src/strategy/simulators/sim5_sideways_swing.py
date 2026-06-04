@@ -107,8 +107,11 @@ class SidewaysSwingSimulator(BaseSimulator):
 
             c_adx = adx >= 20.0
             c_period = period_change > 0
-            c_pullback = 1.5 <= pullback_pct <= 10.0
-            c_daily = daily_change > 0
+            # 하한 1.0%: 얕은 눌림(추세 건재)까지 진입 — 최대 병목이자 가장 효율적 레버(백테스트 +4건/월).
+            c_pullback = 1.0 <= pullback_pct <= 10.0
+            # 눌림목 저가매수는 당일에도 약세인 경우가 많아 '당일 양봉' 강제는 진입을 과도하게 제약.
+            # -2%까지 허용해 진입 기회 확대 (백테스트상 월 진입 ~7→~14건).
+            c_daily = daily_change > -2.0
             c_tick = self.validate_tick_power(stock, threshold=100.0)
 
             # [Debug] 조건별 탈락 사유 기록
@@ -116,7 +119,7 @@ class SidewaysSwingSimulator(BaseSimulator):
                 reasons = []
                 if not c_adx: reasons.append(f"ADX={adx:.0f}<20")
                 if not c_period: reasons.append(f"period={period_change:.1f}%")
-                if not c_pullback: reasons.append(f"pullback={pullback_pct:.1f}%(1.5~8%벗어남)")
+                if not c_pullback: reasons.append(f"pullback={pullback_pct:.1f}%(1.0~10%벗어남)")
                 if not c_daily: reasons.append(f"daily={daily_change:.1f}%")
                 if not c_tick: reasons.append(f"tick={tick_power:.0f}(amount={amount/1e8:.0f}억)")
                 fail_log.append(f"{name}:{','.join(reasons)}")

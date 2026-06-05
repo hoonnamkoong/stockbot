@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 /**
  * [V8.9.9.13] Reservation API (Remote Sync Version)
  * For Vercel (read-only), we sync reservations directly with GitHub db-data branch.
+ *
+ * 인증: 이 API는 브라우저 전용(자동화 엔진은 reservations.json을 직접 읽고 씀)이므로
+ *       webhook 우회 없이 NextAuth 세션을 요구한다. 쓰기(POST)는 PIN까지 추가로 검증.
  */
+async function requireSession(request: Request) {
+    return getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
+}
 
 const OWNER = 'hoonnamkoong';
 const REPO = 'stockbot';
@@ -27,8 +34,11 @@ async function getFileFromGithub() {
     return { sha: data.sha, content };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        if (!await requireSession(request)) {
+            return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 401 });
+        }
         const { content } = await getFileFromGithub();
         
         // [V8.9.9.22 Fix] 한국 시간(KST) 기준 오늘 날짜가 지난 예약은 필터링 (자동 만료)
@@ -49,6 +59,9 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
     try {
+        if (!await requireSession(request)) {
+            return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 401 });
+        }
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
         if (!id) return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
@@ -91,7 +104,20 @@ export async function DELETE(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { code, qty, price, side, time } = body;
+        const { code, qty, price, side, time, pin } = body;
+
+        // 0. 인증: 세션 + PIN (env 필수, 폴백 없음)
+        if (!await requireSession(request)) {
+            return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 401 });
+        }
+        const tradePin = process.env.TRADE_PIN;
+        if (!tradePin) {
+            console.error('[Reservation] ❌ TRADE_PIN not configured on server');
+            return NextResponse.json({ success: false, error: 'Server auth not configured' }, { status: 500 });
+        }
+        if (pin !== tradePin) {
+            return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 403 });
+        }
 
         // 1. Get existing file
         const { sha, content } = await getFileFromGithub();

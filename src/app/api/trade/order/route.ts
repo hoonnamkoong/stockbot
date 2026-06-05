@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { placeRealOrder } from '@/lib/kis-api';
 
 /**
@@ -50,14 +51,28 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { code, qty, price, side, isVirtual, pin } = body;
 
-        // 1. PIN 또는 Webhook Secret Verification (자동화 엔진 대응)
+        // 1. 인증: 자동화 엔진(webhook) 경로는 기존대로, 사람 경로는 세션 + PIN 둘 다 요구
         const authHeader = request.headers.get('Authorization');
         const webhookSecret = process.env.WEBHOOK_SECRET;
         const isAuthorizedByWebhook = webhookSecret && authHeader === `Bearer ${webhookSecret}`;
 
-        if (!isAuthorizedByWebhook && pin !== (process.env.TRADE_PIN || '1234')) {
-            console.error('[API-Order] ❌ Unauthorized order attempt (Invalid PIN or Secret)');
-            return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 403 });
+        if (!isAuthorizedByWebhook) {
+            // 1-1. 세션 검증 (PIN 단독 호출 차단 — 로그인된 세션이어야 함)
+            const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
+            if (!token) {
+                console.error('[API-Order] ❌ Unauthorized order attempt (No valid session)');
+                return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 401 });
+            }
+            // 1-2. PIN 검증 (env 필수, 폴백 없음)
+            const tradePin = process.env.TRADE_PIN;
+            if (!tradePin) {
+                console.error('[API-Order] ❌ TRADE_PIN not configured on server');
+                return NextResponse.json({ success: false, error: 'Server auth not configured' }, { status: 500 });
+            }
+            if (pin !== tradePin) {
+                console.error('[API-Order] ❌ Unauthorized order attempt (Invalid PIN)');
+                return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 403 });
+            }
         }
 
         let result: any;

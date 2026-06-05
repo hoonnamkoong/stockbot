@@ -23,7 +23,8 @@ const handler = NextAuth({
                     throw new Error("Security Error: TRUSTED_DEVICES not configured on server");
                 }
 
-                if (!credentials?.deviceId || !trustedDevices.includes(credentials.deviceId)) {
+                const allowedDevices = trustedDevices.split(',').map(d => d.trim()).filter(Boolean);
+                if (!credentials?.deviceId || !allowedDevices.includes(credentials.deviceId)) {
                     throw new Error("Device Not Allowed. Please add Device ID to TRUSTED_DEVICES env var.");
                 }
 

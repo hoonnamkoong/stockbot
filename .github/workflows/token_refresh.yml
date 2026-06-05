@@ -34,14 +34,14 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          
-          # Sync with db-data branch
-          git fetch origin db-data:db-data
-          git checkout db-data
-          
-          # Copy only the token cache from main (check out from main temporarily)
-          git checkout main -- data/kis_token_cache.json
-          
+
+          # [Fix] db-data를 별도 디렉토리에 clone (작업트리 checkout 충돌 회피 - scraper.yml과 동일 방식)
+          git clone --branch db-data https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo
+
+          # 방금 발급된 토큰 캐시만 복사
+          cp data/kis_token_cache.json db_data_repo/data/kis_token_cache.json
+
+          cd db_data_repo
           git add data/kis_token_cache.json
           git commit -m "🚑 [V8.9.9.44] Fast Token Refresh: Update KIS token cache" || echo "No changes to commit"
           git push origin db-data

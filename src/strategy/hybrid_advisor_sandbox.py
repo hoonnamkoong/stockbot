@@ -4,7 +4,7 @@ import json
 import urllib.parse
 from datetime import datetime
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 from bs4 import BeautifulSoup
 import requests
 from sklearn.ensemble import RandomForestClassifier
@@ -32,11 +32,12 @@ class HybridAnalyzerSandbox:
         # Ensure API key is loaded for Gemini
         load_env()
         self.api_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_KEY')
+        self.model_name = 'gemini-2.5-flash-lite'
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            # [2026-06-05] 레거시 google-generativeai(EOL 2025-11-30) → google-genai SDK 이전
+            self.client = genai.Client(api_key=self.api_key)
         else:
-            self.model = None
+            self.client = None
             print("[HybridSandbox] Warning: No API Key found for Gemini.")
         
         # Auto-load model if path provided
@@ -140,7 +141,7 @@ class HybridAnalyzerSandbox:
 
     def ask_ai_sentiment(self, stock_name, news_titles):
         """Ask Gemini to grade the real-time news from -50 (Bad) to +50 (Good)"""
-        if not self.model or news_titles == ["No recent news."]:
+        if not self.client or news_titles == ["No recent news."]:
             return 0, "No news or AI disabled."
             
         news_context = "\n".join([f"- {n}" for n in news_titles])
@@ -164,7 +165,7 @@ class HybridAnalyzerSandbox:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
             result = response.text.strip()
             # Parse 'Score: 40 | Reason: ...'
             if "Score:" in result:

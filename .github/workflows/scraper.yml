@@ -100,7 +100,11 @@ jobs:
           
           # 최신 데이터 업데이트
           mkdir -p db_data_repo/data/reports
-          cp -r data/*.json db_data_repo/data/ 2>/dev/null || true
+          # [Fix] kis_token_cache.json은 token_refresh.yml이 전담 소유 → 스크래퍼는 덮어쓰지 않음 (토큰 clobber 방지)
+          for f in data/*.json; do
+            [ "$(basename "$f")" = "kis_token_cache.json" ] && continue
+            cp "$f" db_data_repo/data/ 2>/dev/null || true
+          done
           cp -r data/*.csv db_data_repo/data/ 2>/dev/null || true
           cp -r data/*.xlsx db_data_repo/data/ 2>/dev/null || true
           cp -r data/reports/* db_data_repo/data/reports/ 2>/dev/null || true

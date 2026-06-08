@@ -69,12 +69,8 @@ class KISDataProvider:
                 body = r.json()
                 if body.get("rt_cd") == "0":
                     return body
-                # [임시진단] 호출은 됐으나 거부됨 → 원인(권한/레이트리밋 등) 노출
-                print(f"[KISDataProvider] {tr_id} rt_cd={body.get('rt_cd')} msg_cd={body.get('msg_cd')} msg1={body.get('msg1')}")
-            else:
-                print(f"[KISDataProvider] {tr_id} HTTP {r.status_code}")
-        except Exception as e:
-            print(f"[KISDataProvider] {tr_id} 예외: {e}")
+        except Exception:
+            pass
         return {}
 
     # ──────────────────────────────────────────────────

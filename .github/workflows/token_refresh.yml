@@ -1,6 +1,9 @@
 name: Fast Token Refresh
 
 on:
+  schedule:
+    # KIS 1일 1회 발급 원칙 준수: 평일 장 시작 전 1회 선발급 (KST 08:30 = UTC 23:30 전일)
+    - cron: '30 23 * * 0-4'  # Sun-Thu UTC = Mon-Fri 08:30 KST
   repository_dispatch:
     types: [refresh_token]
   workflow_dispatch:
@@ -9,8 +12,6 @@ on:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -25,25 +26,12 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      # token_manager가 토큰을 발급하고 비공개 레포(stockbot-secret)에 직접 기록한다.
+      # public db-data로의 push는 더 이상 없다(자격증명 노출 제거).
       - name: Manage KIS Token
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          GH_PAT: ${{ secrets.GH_PAT }}
           FORCE_TOKEN_REFRESH: 'true'
         run: python scripts/token_manager.py
-
-      - name: Deploy Token to db-data branch
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-
-          # [Fix] db-data를 별도 디렉토리에 clone (작업트리 checkout 충돌 회피 - scraper.yml과 동일 방식)
-          git clone --branch db-data https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo
-
-          # 방금 발급된 토큰 캐시만 복사
-          cp data/kis_token_cache.json db_data_repo/data/kis_token_cache.json
-
-          cd db_data_repo
-          git add data/kis_token_cache.json
-          git commit -m "🚑 [V8.9.9.44] Fast Token Refresh: Update KIS token cache" || echo "No changes to commit"
-          git push origin db-data

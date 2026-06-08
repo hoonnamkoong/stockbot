@@ -60,24 +60,25 @@ const isTokenValid = (cache: any): boolean => {
 
 async function readTokenCache() {
 
-    // 1. Try Remote GitHub Cache (for Vercel persistence)
-    if (process.env.VERCEL) {
+    // 1. Try Remote private repo cache (authenticated, for Vercel persistence)
+    const ghTokenRead = process.env.GH_PAT || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+    if (process.env.VERCEL && ghTokenRead) {
         try {
             const owner = "hoonnamkoong";
-            const repo = "stockbot";
-            const ghPath = "data/kis_token_cache.json";
-            const branch = "db-data";
-            const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${ghPath}?t=${Date.now()}`;
-            
-            console.log(`[KIS-API] Fetching remote token cache from GitHub...`);
-            const res = await axios.get(url, { headers: { 'Cache-Control': 'no-cache' } });
+            const repo = "stockbot-secret";
+            const ghPath = "kis_token_cache.json";
+            const branch = "main";
+            const url = `https://api.github.com/repos/${owner}/${repo}/contents/${ghPath}?ref=${branch}&t=${Date.now()}`;
+
+            console.log(`[KIS-API] Fetching remote token cache from private repo...`);
+            const res = await axios.get(url, { headers: { Authorization: `token ${ghTokenRead}`, Accept: 'application/vnd.github.raw+json', 'Cache-Control': 'no-cache' } });
             const cache = res.data;
-            
+
             if (isTokenValid(cache)) {
-                console.log(`[KIS-API] ✅ GitHub 캐시 토큰 유효 - 재사용 (issued_at: ${cache.issued_at})`);
+                console.log(`[KIS-API] ✅ 비공개 레포 토큰 유효 - 재사용 (issued_at: ${cache.issued_at})`);
                 return cache;
             } else {
-                console.log(`[KIS-API] GitHub 캐시 토큰 만료됨. 재발급 필요.`);
+                console.log(`[KIS-API] 비공개 레포 토큰 만료됨. 재발급 필요.`);
             }
         } catch (e: any) {
             console.log(`[KIS-API] Remote cache check failed: ${e.message}`);
@@ -122,9 +123,9 @@ async function writeTokenCache(token: string, expiresIn: number) {
         if (process.env.VERCEL && ghToken) {
             try {
                 const owner = "hoonnamkoong";
-                const repo = "stockbot";
-                const path = "data/kis_token_cache.json";
-                const branch = "db-data";
+                const repo = "stockbot-secret";
+                const path = "kis_token_cache.json";
+                const branch = "main";
                 
                 // First get the SHA of the existing file (required for PUT)
                 const getRes = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
@@ -230,10 +231,10 @@ async function getAccessToken(): Promise<string> {
 async function triggerTokenRefresh() {
     const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER || 'hoonnamkoong';
     const repo = process.env.NEXT_PUBLIC_GITHUB_REPO || 'stockbot';
-    const pat = process.env.GH_PAT;
+    const pat = process.env.GH_PAT || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
 
     if (!pat) {
-        console.error('[Token] GH_PAT is missing. Cannot trigger refresh.');
+        console.error('[Token] GH_PAT/GITHUB_PAT is missing. Cannot trigger refresh.');
         return;
     }
 

@@ -10,12 +10,15 @@ import { placeRealOrder } from '@/lib/kis-api';
 const OWNER = 'hoonnamkoong';
 const REPO = 'stockbot';
 const BRANCH = 'db-data';
+// [Security] 실거래 로그는 public이 아닌 비공개 레포에 보관
+const SECRET_REPO = 'stockbot-secret';
+const SECRET_BRANCH = 'main';
 const GITHUB_PAT = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
 
-async function getFileFromGithub(filePath: string) {
-    const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filePath}?ref=${BRANCH}`;
+async function getFileFromGithub(filePath: string, repo: string = REPO, branch: string = BRANCH) {
+    const url = `https://api.github.com/repos/${OWNER}/${repo}/contents/${filePath}?ref=${branch}`;
     const res = await fetch(url, {
-        headers: { 
+        headers: {
             'Authorization': `token ${GITHUB_PAT}`,
             'Accept': 'application/vnd.github.v3+json'
         },
@@ -27,13 +30,13 @@ async function getFileFromGithub(filePath: string) {
     return { sha: data.sha, content };
 }
 
-async function updateFileOnGithub(filePath: string, content: any, sha: string | null, message: string) {
-    const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filePath}`;
+async function updateFileOnGithub(filePath: string, content: any, sha: string | null, message: string, repo: string = REPO, branch: string = BRANCH) {
+    const url = `https://api.github.com/repos/${OWNER}/${repo}/contents/${filePath}`;
     const base64Content = Buffer.from(JSON.stringify(content, null, 2)).toString('base64');
-    
+
     await fetch(url, {
         method: 'PUT',
-        headers: { 
+        headers: {
             'Authorization': `token ${GITHUB_PAT}`,
             'Content-Type': 'application/json'
         },
@@ -41,7 +44,7 @@ async function updateFileOnGithub(filePath: string, content: any, sha: string | 
             message,
             content: base64Content,
             sha: sha || undefined,
-            branch: BRANCH
+            branch: branch
         })
     });
 }
@@ -117,7 +120,7 @@ export async function POST(request: Request) {
 
         // [Common] Sync Trade History to GitHub
         try {
-            const { sha: hSha, content: history } = await getFileFromGithub('data/history.json');
+            const { sha: hSha, content: history } = await getFileFromGithub('history.json', SECRET_REPO, SECRET_BRANCH);
             const historyList = Array.isArray(history) ? history : (history?.data || []);
             
             historyList.unshift({
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
 
             // Keep last 500 entries
             const prunedHistory = historyList.slice(0, 500);
-            await updateFileOnGithub('data/history.json', prunedHistory, hSha, `[V8.9.9.22] Add History: ${code} ${side}`);
+            await updateFileOnGithub('history.json', prunedHistory, hSha, `[V8.9.9.22] Add History: ${code} ${side}`, SECRET_REPO, SECRET_BRANCH);
         } catch (hErr) {
             console.error('[History Sync Error]', hErr);
         }

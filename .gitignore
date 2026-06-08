@@ -49,11 +49,18 @@ yarn-error.log*
 
 # Data
 # We keep data/ committed as discussed
-# [2026-06-05 보안] 잔여 토큰 파일은 추적 금지 (활성 캐시 kis_token_cache.json은 token_refresh 워크플로우가 관리하므로 제외)
+# [2026-06-05 보안] 잔여 토큰 파일은 추적 금지
 data/kis_token.json
 data/token.json
 data/token_result.json
 data/stock_data_temp_backup/
+# [보안] 토큰·실계좌 데이터는 public(main/db-data)에 두지 않는다. 비공개 레포 stockbot-secret 전담.
+data/kis_token_cache.json
+data/portfolio.json
+data/order_history.json
+data/order_status.json
+data/trade_history_real.csv
+data/history.json
 
 frontend/
 .vercel

@@ -51,10 +51,11 @@ def get_access_token(force_refresh=False):
     data = None
     # 깃허브 연동을 위한 토큰 확인 (GH_PAT 등 다양한 명칭 대응)
     gh_token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_PAT") or os.environ.get("GITHUB_TOKEN")
+    # [Security] 토큰은 public이 아닌 비공개 레포에 보관(인증 필요)
     repo_owner = "hoonnamkoong"
-    repo_name = "stockbot"
-    branch = "db-data"
-    gh_file_path = "data/kis_token_cache.json"
+    repo_name = "stockbot-secret"
+    branch = "main"
+    gh_file_path = "kis_token_cache.json"
 
     if not force_refresh:
         # [Step 1] 로컬 캐시 파일에서 토큰 읽기 시도
@@ -69,16 +70,16 @@ def get_access_token(force_refresh=False):
                 except Exception as e:
                     print(f"[Auth] 로컬 토큰 로드 실패: {e}")
 
-        # [Step 2] 로컬에 없으면 깃허브 원격 파일(db-data 브랜치)에서 읽기 시도 (동기화 보장)
-        if not data:
-            print("[Auth] 로컬 캐시 없음. GitHub 원격지 확인 중...")
+        # [Step 2] 로컬에 없으면 비공개 레포(stockbot-secret)에서 인증 읽기 시도 (동기화 보장)
+        if not data and gh_token:
+            print("[Auth] 로컬 캐시 없음. 비공개 레포 확인 중...")
             try:
-                gh_url = f"https://raw.githubusercontent.com/{repo_owner}/{repo_name}/{branch}/{gh_file_path}"
-                headers = {"Authorization": f"token {gh_token}"} if gh_token else {}
+                gh_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{gh_file_path}?ref={branch}"
+                headers = {"Authorization": f"token {gh_token}", "Accept": "application/vnd.github.raw+json"}
                 res = requests.get(gh_url, headers=headers, timeout=5)
                 if res.status_code == 200:
                     data = res.json()
-                    print("[Auth] GitHub에서 최신 토큰 동기화 성공.")
+                    print("[Auth] 비공개 레포에서 최신 토큰 동기화 성공.")
                     # 다음 로드를 위해 로컬에 저장
                     try:
                         os.makedirs(os.path.dirname(token_path), exist_ok=True)
@@ -176,16 +177,16 @@ def get_access_token(force_refresh=False):
     return None
 
 def _update_github_token_cache(token_data):
-    """실시간으로 발급된 토큰을 GitHub db-data 브랜치에 동기화합니다."""
+    """실시간으로 발급된 토큰을 비공개 레포(stockbot-secret)에 동기화합니다."""
     gh_token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_PAT") or os.environ.get("GITHUB_TOKEN")
     if not gh_token:
         print("[Auth] Skip: GH_PAT가 없어 원격 동기화를 수행하지 않습니다.")
         return False
 
     repo_owner = "hoonnamkoong"
-    repo_name = "stockbot"
-    branch = "db-data"
-    gh_file_path = "data/kis_token_cache.json"
+    repo_name = "stockbot-secret"
+    branch = "main"
+    gh_file_path = "kis_token_cache.json"
     
     api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{gh_file_path}"
     headers = {

@@ -9,6 +9,7 @@ KIS API 데이터 공급자 (KISDataProvider)
 import os
 import time
 import requests
+from datetime import datetime, timedelta
 from typing import Optional
 
 
@@ -191,10 +192,14 @@ class KISDataProvider:
         if cached is not None:
             return cached
 
+        # [Fix] 종목투자의견 API는 조회기간(FID_INPUT_DATE_1/2)이 필수 → 누락 시 빈 응답
+        today = datetime.now().strftime("%Y%m%d")
+        start = (datetime.now() - timedelta(days=365)).strftime("%Y%m%d")
         body = self._get(
             "/uapi/domestic-stock/v1/quotations/invest-opinion",
             "FHKST663300C0",
-            {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16633", "FID_INPUT_ISCD": code},
+            {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16633", "FID_INPUT_ISCD": code,
+             "FID_INPUT_DATE_1": start, "FID_INPUT_DATE_2": today},
         )
         rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
@@ -224,10 +229,14 @@ class KISDataProvider:
         if cached is not None:
             return cached
 
+        # [Fix] 증권사별 투자의견 API도 조회기간(FID_INPUT_DATE_1/2)이 필수
+        today = datetime.now().strftime("%Y%m%d")
+        start = (datetime.now() - timedelta(days=365)).strftime("%Y%m%d")
         body = self._get(
             "/uapi/domestic-stock/v1/quotations/invest-opbysec",
             "FHKST663400C0",
-            {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16634", "FID_INPUT_ISCD": code},
+            {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16634", "FID_INPUT_ISCD": code,
+             "FID_INPUT_DATE_1": start, "FID_INPUT_DATE_2": today},
         )
         rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:

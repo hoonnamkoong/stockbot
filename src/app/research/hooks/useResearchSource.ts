@@ -118,23 +118,37 @@ export const useResearchSource = () => {
     }, []);
 
     const monitorWorkflow = useCallback(async () => {
+        let lastLine = '';
+        let polls = 0;
         const interval = setInterval(async () => {
+            polls++;
             try {
                 const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?per_page=1`, {
                     headers: { 'Authorization': `Bearer ${githubToken}` }
                 });
-                if (!res.ok) return;
+                if (!res.ok) {
+                    setWorkflowLogs(prev => [...prev, `⚠️ 상태 조회 실패 (HTTP ${res.status})`]);
+                    if (polls >= 12) { clearInterval(interval); setWorkflowStatus('error'); }
+                    return;
+                }
                 const data = await res.json();
-                if (data.workflow_runs?.[0]) {
-                    const run = data.workflow_runs[0];
-                    setWorkflowLogs(prev => [...prev, `🔄 상태: ${run.status} (${run.conclusion || 'Running'})`]);
+                const run = data.workflow_runs?.[0];
+                if (run) {
+                    // 같은 상태 줄은 중복 출력하지 않음
+                    const line = `🔄 상태: ${run.status} (${run.conclusion || 'Running'})`;
+                    if (line !== lastLine) { setWorkflowLogs(prev => [...prev, line]); lastLine = line; }
                     if (run.status === 'completed') {
                         clearInterval(interval);
-                        setWorkflowStatus(run.conclusion === 'success' ? 'success' : 'error');
-                        if (run.conclusion === 'success') setTimeout(fetchData, 3000);
+                        const ok = run.conclusion === 'success';
+                        setWorkflowStatus(ok ? 'success' : 'error');
+                        setWorkflowLogs(prev => [...prev, ok ? '✅ 실행 완료' : `❌ 실행 종료: ${run.conclusion}`]);
+                        if (ok) setTimeout(fetchData, 3000);
                     }
                 }
-            } catch (e) { console.error(e); }
+            } catch (e: any) {
+                setWorkflowLogs(prev => [...prev, `⚠️ 모니터링 오류: ${e?.message || e}`]);
+            }
+            if (polls >= 180) { clearInterval(interval); }  // 15분 안전 종료
         }, 5000);
     }, [githubToken, fetchData]);
 
@@ -149,9 +163,21 @@ export const useResearchSource = () => {
                 headers: { 'Authorization': `Bearer ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' },
                 body: JSON.stringify({ ref: 'main', inputs: { force_run: forceRun.toString() } })
             });
-            if (res.ok) monitorWorkflow();
-            else setWorkflowStatus('error');
-        } catch (e) { setWorkflowStatus('error'); }
+            if (res.ok) {
+                setWorkflowLogs(prev => [...prev, "✅ 실행 요청 성공 — 진행 상황 추적 중..."]);
+                monitorWorkflow();
+            } else {
+                // 실패 사유를 로그창에 그대로 노출 (예전처럼 멈춰있지 않도록)
+                let detail = '';
+                try { const b = await res.json(); detail = b.message || JSON.stringify(b); }
+                catch { try { detail = await res.text(); } catch { detail = ''; } }
+                setWorkflowLogs(prev => [...prev, `❌ 실행 요청 실패 (HTTP ${res.status}): ${detail}`]);
+                setWorkflowStatus('error');
+            }
+        } catch (e: any) {
+            setWorkflowLogs(prev => [...prev, `❌ 네트워크 오류: ${e?.message || e}`]);
+            setWorkflowStatus('error');
+        }
     }, [githubToken, monitorWorkflow]);
 
     const handleSort = (key: string) => {

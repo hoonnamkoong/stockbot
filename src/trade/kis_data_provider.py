@@ -69,8 +69,12 @@ class KISDataProvider:
                 body = r.json()
                 if body.get("rt_cd") == "0":
                     return body
-        except Exception:
-            pass
+                # [임시진단] 호출은 됐으나 거부됨 → 원인(권한/레이트리밋 등) 노출
+                print(f"[KISDataProvider] {tr_id} rt_cd={body.get('rt_cd')} msg_cd={body.get('msg_cd')} msg1={body.get('msg1')}")
+            else:
+                print(f"[KISDataProvider] {tr_id} HTTP {r.status_code}")
+        except Exception as e:
+            print(f"[KISDataProvider] {tr_id} 예외: {e}")
         return {}
 
     # ──────────────────────────────────────────────────
@@ -91,14 +95,21 @@ class KISDataProvider:
             "HHPTJ04160200",
             {"MKSC_SHRN_ISCD": code},
         )
-        rows = body.get("output", [])
+        # [Fix] 이 API는 시간대별 가집계를 output2(또는 output1)에 담는다.
+        #       다른 API와 달리 단수 output이 아니므로 폴백 탐색한다.
+        rows = body.get("output2") or body.get("output1") or body.get("output") or []
+        if isinstance(rows, dict):
+            rows = [rows]
         if not rows:
             result = {"frgn_fake_ntby_qty": 0, "orgn_fake_ntby_qty": 0, "sum_fake_ntby_qty": 0}
             self._set_cache(key, result)
             return result
 
-        # 최신 row(index 0)
-        row = rows[0] if isinstance(rows, list) else rows
+        # 최신 시간대(가장 늦은 bsop_hour)의 누적 가집계 사용
+        try:
+            row = max(rows, key=lambda r: str(r.get("bsop_hour", "")))
+        except Exception:
+            row = rows[-1]
         result = {
             "frgn_fake_ntby_qty": self._to_int(row.get("frgn_fake_ntby_qty", 0)),
             "orgn_fake_ntby_qty": self._to_int(row.get("orgn_fake_ntby_qty", 0)),
@@ -125,7 +136,7 @@ class KISDataProvider:
             "FHKST66430400",
             {"FID_INPUT_ISCD": code, "FID_DIV_CLS_CODE": "0", "FID_COND_MRKT_DIV_CODE": "J"},
         )
-        rows = body.get("output", [])
+        rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"roe": 0.0, "net_profit_rate": 0.0}
             self._set_cache(key, result)
@@ -157,7 +168,7 @@ class KISDataProvider:
             "FHKST66430600",
             {"FID_INPUT_ISCD": code, "FID_DIV_CLS_CODE": "0", "FID_COND_MRKT_DIV_CODE": "J"},
         )
-        rows = body.get("output", [])
+        rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"debt_ratio": 999.0, "current_ratio": 0.0}
             self._set_cache(key, result)
@@ -189,7 +200,7 @@ class KISDataProvider:
             "FHKST663300C0",
             {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16633", "FID_INPUT_ISCD": code},
         )
-        rows = body.get("output", [])
+        rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"invest_opinion": "", "target_price": 0, "opinion_divergence": 0.0}
             self._set_cache(key, result)
@@ -222,7 +233,7 @@ class KISDataProvider:
             "FHKST663400C0",
             {"FID_COND_MRKT_DIV_CODE": "J", "FID_COND_SCR_DIV_CODE": "16634", "FID_INPUT_ISCD": code},
         )
-        rows = body.get("output", [])
+        rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"consensus_buy_count": 0, "consensus_avg_target": 0, "consensus_summary": ""}
             self._set_cache(key, result)
@@ -293,7 +304,7 @@ class KISDataProvider:
                 "FID_INPUT_SRNO": "",
             },
         )
-        rows = body.get("output", [])
+        rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             self._set_cache(key, [])
             return []

@@ -1,9 +1,8 @@
 name: Fast Token Refresh
 
 on:
-  schedule:
-    # KIS 1일 1회 발급 원칙 준수: 평일 장 시작 전 1회 선발급 (KST 08:30 = UTC 23:30 전일)
-    - cron: '30 23 * * 0-4'  # Sun-Thu UTC = Mon-Fri 08:30 KST
+  # 토큰 선발급은 Tasker → /api/cron(평일 07:00 KST)이 담당한다.
+  # GitHub cron은 발화가 최대 수시간 지연되어 장 전 발급을 보장하지 못해 제거함.
   repository_dispatch:
     types: [refresh_token]
   workflow_dispatch:

@@ -8,7 +8,6 @@ export async function GET(request: Request) {
     const GITHUB_PAT = process.env.GITHUB_PAT;
     const REPO_OWNER = 'hoonnamkoong';
     const REPO_NAME = 'stockbot';
-    const WORKFLOW_FILE = 'scraper.yml';
 
     try {
         // Parse debug params
@@ -57,7 +56,11 @@ export async function GET(request: Request) {
         // 1. Check if scraping time (Removed hardcoded hours -> Run on trigger)
         // User manages schedule via Tasker (Hourly)
 
-        console.log(`[Cron] Trigger received (${hour}:${minute.toString().padStart(2, '0')} KST). Triggering GitHub Actions...`);
+        // 장 시작 전(KST 7시대) 호출은 KIS 토큰 선발급 워크플로우로 분기한다.
+        // GitHub cron 미발화 문제를 우회해, 09:00 첫 스크래퍼가 항상 유효 토큰을 만나게 함.
+        const WORKFLOW_FILE = hour === 7 ? 'token_refresh.yml' : 'scraper.yml';
+
+        console.log(`[Cron] Trigger received (${hour}:${minute.toString().padStart(2, '0')} KST). Dispatching ${WORKFLOW_FILE}...`);
 
         if (!GITHUB_PAT) {
             console.error('[Cron] GITHUB_PAT is missing!');
@@ -95,7 +98,8 @@ export async function GET(request: Request) {
         return NextResponse.json({
             success: true,
             time: `${hour}:${minute.toString().padStart(2, '0')} KST`,
-            scrapingTriggered: true
+            dispatched: WORKFLOW_FILE,
+            scrapingTriggered: WORKFLOW_FILE === 'scraper.yml'
         });
 
     } catch (error: any) {

@@ -36,12 +36,13 @@ class PsychDivergenceSimulator(BaseSimulator):
 
             # [V60.0] ATR 기반 동적 익절/손절 (기존 고정 15% / -7% 폐기)
             sparkline = stock.get('sparkline_price', []) if stock else []
-            atr = self.calculate_atr(sparkline) if sparkline else 1.0
-            
-            # 동적 목표가 (TP) = 진입가 + 2 * ATR
-            # 동적 손절가 (SL) = 진입가 - 1 * ATR
-            tp_price = avg_price + (atr * 2.0)
-            sl_price = avg_price - atr
+            # sparkline 부족 시 진입가의 1.5%를 fallback ATR로 사용 (1원 fallback은 즉시 손절 유발)
+            atr = self.calculate_atr(sparkline) if len(sparkline) >= 3 else avg_price * 0.015
+
+            # 동적 목표가 (TP) = 진입가 + 3 * ATR
+            # 동적 손절가 (SL) = 진입가 - 1.5 * ATR  (R:R = 1:2 유지, 노이즈 완충)
+            tp_price = avg_price + (atr * 3.0)
+            sl_price = avg_price - (atr * 1.5)
 
             if current_price >= tp_price:
                 self.sell(code, current_price, reason=f"[심리/공격] 동적 목표가 달성 (ATR 기반 익절)")
@@ -74,7 +75,8 @@ class PsychDivergenceSimulator(BaseSimulator):
             
             # [V60.0] ADX 킬스위치 (ADX < 20 이면 진입 차단)
             sparkline = stock.get('sparkline_price', [])
-            adx_approx = self.calculate_adx(sparkline) if sparkline else 0.0
+            if len(sparkline) < 3: continue  # ATR/ADX 계산 불가 → 진입 스킵
+            adx_approx = self.calculate_adx(sparkline)
 
             # [공격적 진입] 관심 폭발 + 가격 정체 + 체결 강도 확인 (Consensus)
             # 수급의 힘(체결강도 120% 이상)이 확인된 종목만 진입하여 허수 신호 제거

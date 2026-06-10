@@ -34,8 +34,9 @@ class SmartRiskSimulator(BaseSimulator):
             
             # [V60.0 Consensus] ATR 기반 가변 이탈가 적용
             sparkline = stock.get('sparkline_price', []) if stock else []
-            atr = self.calculate_atr(sparkline)
             has_ma = len(sparkline) >= 3
+            # sparkline 부족 시 1.5% fallback (1원 fallback은 즉시 이탈 유발)
+            atr = self.calculate_atr(sparkline) if has_ma else p_item['avg_price'] * 0.015
             ma_val = sum(sparkline[-5:]) / len(sparkline[-5:]) if has_ma else p_item['avg_price']
 
             # 기본 익절/손절/이탈

@@ -19,6 +19,21 @@ def load_env():
     if HAS_DOTENV and os.path.exists('.env'):
         load_dotenv('.env', override=True)
 
+def _is_data_valid(data: dict) -> bool:
+    """토큰 dict의 만료 여부를 빠르게 확인. 만료/파싱오류 → False."""
+    try:
+        token = data.get('access_token')
+        expires_at_str = data.get('expires_at')
+        if not token or not expires_at_str:
+            return False
+        expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone(timedelta(hours=9)))
+        return (expires_at - datetime.now().astimezone()).total_seconds() > 7200
+    except Exception:
+        return False
+
+
 def get_access_token(force_refresh=False):
     """
     한국투자증권(KIS) API 접속을 위한 OAuth2 토큰을 발급하거나 캐시된 토큰을 반환합니다.
@@ -70,9 +85,13 @@ def get_access_token(force_refresh=False):
                 except Exception as e:
                     print(f"[Auth] 로컬 토큰 로드 실패: {e}")
 
-        # [Step 2] 로컬에 없으면 비공개 레포(stockbot-secret)에서 인증 읽기 시도 (동기화 보장)
-        if not data and gh_token:
-            print("[Auth] 로컬 캐시 없음. 비공개 레포 확인 중...")
+        # [Step 2] 로컬 캐시가 없거나 만료됐으면 비공개 레포(stockbot-secret)에서 읽기 시도
+        _local_expired = data is not None and not _is_data_valid(data)
+        if (not data or _local_expired) and gh_token:
+            if _local_expired:
+                print("[Auth] 로컬 캐시 만료됨. 비공개 레포 확인 중...")
+            else:
+                print("[Auth] 로컬 캐시 없음. 비공개 레포 확인 중...")
             try:
                 gh_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{gh_file_path}?ref={branch}"
                 headers = {"Authorization": f"token {gh_token}", "Accept": "application/vnd.github.raw+json"}
@@ -89,44 +108,16 @@ def get_access_token(force_refresh=False):
             except Exception as e:
                 print(f"[Auth] GitHub 동기화 실패: {e}")
 
-        # [Step 3] 가져온 토큰의 유효성 검증 (UTC 절대 시간 기준)
-        if data:
+        # [Step 3] 가져온 토큰의 유효성 검증
+        if data and _is_data_valid(data):
+            access_token = data.get('access_token')
             try:
-                access_token = data.get('access_token')
-                issued_at_str = data.get('issued_at')
-                expires_at_str = data.get('expires_at')
-                
-                if access_token:
-                    # 모든 비교는 타임존이 포함된 UTC 기준으로 정규화
-                    now = datetime.now().astimezone()
-                    
-                    if expires_at_str:
-                        expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
-                        # 만료 시간까지 2시간 이상 여유가 있는 경우에만 재사용 (안전 마진)
-                        
-                        if expires_at.tzinfo is None:
-                            from datetime import timezone, timedelta
-                            expires_at = expires_at.replace(tzinfo=timezone(timedelta(hours=9)))
-                            
-                        time_left = (expires_at - now).total_seconds()
-                        
-                        if time_left > 7200: # 2시간
-                            print(f"[Auth] 유효한 캐시 토큰 발견 (남은 시간: {time_left/3600:.1f}시간)")
-                            return access_token
-                        else:
-                            print(f"[Auth] 캐시 토큰 만료 임박 ({time_left/3600:.1f}시간 남음) -> 갱신 시도")
-                    elif issued_at_str:
-                        # 하위 호환성: 만료 정보가 없으면 발행 시간 기준 23시간 이내인지 확인
-                        issued_at = datetime.fromisoformat(issued_at_str.replace('Z', '+00:00'))
-                        if issued_at.tzinfo is None:
-                            from datetime import timezone, timedelta
-                            issued_at = issued_at.replace(tzinfo=timezone(timedelta(hours=9)))
-                            
-                        if (now - issued_at).total_seconds() < 82800: # 23시간
-                            print(f"[Auth] 발행 기준 유효 토큰 재사용 중 ({issued_at_str})")
-                            return access_token
-            except Exception as e:
-                print(f"[Auth] 토큰 검증 오류: {e}")
+                expires_at = datetime.fromisoformat(data['expires_at'].replace('Z', '+00:00'))
+                time_left = (expires_at - datetime.now().astimezone()).total_seconds()
+                print(f"[Auth] 유효한 캐시 토큰 발견 (남은 시간: {time_left/3600:.1f}시간)")
+            except Exception:
+                pass
+            return access_token
         
         if not gh_token and not os.path.exists(token_path):
              print("[Auth] ⚠️ 경고: GH_PAT 환경 변수가 없어 GitHub 연동 캐시를 사용할 수 없습니다. Vercel 설정을 확인하세요.")

@@ -175,6 +175,14 @@ def manage():
     
     if not force_refresh and is_token_valid(cache):
         print("[TokenManager] * 기존 토큰이 아직 유효합니다. (발급 스킵)")
+        # [Fix] Run Scraper 단계에서 auth.py가 로컬 파일을 먼저 읽도록 항상 로컬에 저장
+        try:
+            os.makedirs('data', exist_ok=True)
+            with open(TOKEN_CACHE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(cache, f, indent=2, ensure_ascii=False)
+            print(f"[TokenManager] * 로컬 캐시 업데이트: {TOKEN_CACHE_PATH}")
+        except Exception as e:
+            print(f"[TokenManager] ⚠️ 로컬 캐시 저장 실패 (무시): {e}")
         return True
     
     # 토큰 발급 시도

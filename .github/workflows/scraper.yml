@@ -11,16 +11,6 @@ on:
         description: 'Bypass market holiday check'
         required: false
         default: 'false'
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'data/**'
-      - 'trending_*.csv'
-      - 'trending_*.xlsx'
-      - 'reports.json'
-      - '*.md'
-
 jobs:
   scrape-and-report:
     runs-on: ubuntu-latest

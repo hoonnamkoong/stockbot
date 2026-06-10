@@ -540,7 +540,7 @@ function TradeContent() {
                         });
                         return (
                             <Group key={sim.id} gap="md" align="stretch" style={{ flexWrap: 'nowrap' }}>
-                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)`, flex: 1, minHeight: 260 }}>
+                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)`, flex: 1, height: 400, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                     <Group justify="space-between" mb="xs">
                                         <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
                                         <Badge color={sim.color}>{sim.id.toUpperCase()}</Badge>
@@ -566,11 +566,11 @@ function TradeContent() {
                                         </Stack>
                                     </Group>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
-                                    {renderPortfolioTable(holdings, false, 250)}
+                                    <Box style={{ flex: 1, overflow: 'hidden' }}>{renderPortfolioTable(holdings, false, 220)}</Box>
                                 </Paper>
-                                <Paper p="md" withBorder radius="md" bg="gray.0" style={{ flex: 1, minHeight: 260 }}>
+                                <Paper p="md" withBorder radius="md" bg="gray.0" style={{ flex: 1, height: 400, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                     <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{sim.label} 기록</Text>
-                                    {renderHistoryTable(sim.type, 250)}
+                                    <Box style={{ flex: 1, overflow: 'hidden' }}>{renderHistoryTable(sim.type, 220)}</Box>
                                 </Paper>
                             </Group>
                         );
@@ -632,7 +632,7 @@ function TradeContent() {
     }
 
     return (
-        <Container size="lg" py="xl">
+        <Container fluid py="xl" px="xl">
             {notification && (
                 <Notification title={notification.title} color={notification.color} onClose={() => setNotification(null)}
                     style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}>
@@ -652,7 +652,7 @@ function TradeContent() {
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Stock Dashboard</Title>
                 <Group gap="xs">
-                    <Badge color="pink" variant="filled">V8.7.0-UI</Badge>
+                    <Badge color="pink" variant="filled">V8.7.1-UI</Badge>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>Out</Button>
                 </Group>

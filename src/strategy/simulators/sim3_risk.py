@@ -1,12 +1,25 @@
 from .base_simulator import BaseSimulator
 
+
 class SmartRiskSimulator(BaseSimulator):
     """
-    [Sim 3] 스마트 리스크형 (Smart-Risk)
-    - 추세 확인된 종목만 진입, 엄격한 손절로 방어
+    [Sim 3] 가치 페어 전략 (Value Pair)
+    - 업종 평균 대비 PER/PBR 20% 이하 저평가 + ADX 20 이상 추세 전환 종목 진입
+    - Sim4(모멘텀)와 음의 상관 목표: 모멘텀 장에서 기회 적음, 조정/가치 장에서 기회 증가
+    - 청산: +8% 익절 / -5% 손절 / 7일 타임스탑
     """
+    MAX_HOLDINGS = 3
+
     def __init__(self, initial_cash=3000000):
         super().__init__("Risk", initial_cash)
+
+    def get_universe(self):
+        """코스피 재무비율 수익성 상위 30개 종목 (FHPST01750000)."""
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_finance_ratio_rank(market='0001', limit=30)
+        except Exception:
+            return None
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
@@ -14,100 +27,97 @@ class SmartRiskSimulator(BaseSimulator):
         portfolio_codes = list(self.state['portfolio'].keys())
         sold_today = set()
 
-        # 고점 갱신
         self.update_peak_prices(current_prices)
 
-        # 1. 청산 로직 (트레일링 스탑 + 지표 이탈)
+        # 1. 청산
         for code in portfolio_codes:
             p_item = self.state['portfolio'][code]
-            stock = candidate_map.get(code)
             current_price = current_prices.get(code, 0)
             if current_price <= 0: continue
-            
-            # [V2] 트레일링 스탑 (5% 수익 후 3% 하락 시)
-            if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
-                self.sell(code, current_price, reason="[리스크/V2] 트레일링 스탑 익절")
+
+            avg_price = p_item.get('avg_price', 0)
+            if avg_price <= 0: continue
+            profit_rate = (current_price - avg_price) / avg_price * 100
+
+            # 목표 익절 +8%
+            if profit_rate >= 8.0:
+                self.sell(code, current_price, reason=f"[가치페어] 목표 익절 ({profit_rate:.1f}%)")
                 sold_today.add(code)
                 continue
 
-            profit_rate = (current_price - p_item['avg_price']) / p_item['avg_price'] * 100
-            
-            # [V60.0 Consensus] ATR 기반 가변 이탈가 적용
-            sparkline = stock.get('sparkline_price', []) if stock else []
-            has_ma = len(sparkline) >= 3
-            # sparkline 부족 시 1.5% fallback (1원 fallback은 즉시 이탈 유발)
-            atr = self.calculate_atr(sparkline) if has_ma else p_item['avg_price'] * 0.015
-            ma_val = sum(sparkline[-5:]) / len(sparkline[-5:]) if has_ma else p_item['avg_price']
-
-            # 기본 익절/손절/이탈
-            # ATR이 클수록(변동성이 클수록) 이탈 허용 범위를 넓힘
-            exit_threshold = ma_val - (atr * 0.5) if atr > 0 else ma_val * 0.98
-
-            if profit_rate >= 10.0:
-                self.sell(code, current_price, reason=f"[리스크/공합] 목표 수익 달성 (+{profit_rate:.1f}%)")
+            # 손절 -5%
+            if profit_rate <= -5.0:
+                self.sell(code, current_price, reason=f"[가치페어] 손절 ({profit_rate:.1f}%)")
                 sold_today.add(code)
-            elif profit_rate <= -5.0:
-                self.sell(code, current_price, reason=f"[리스크/공합] 손절 (-5%)")
-                sold_today.add(code)
-            elif current_price < exit_threshold:
-                self.sell(code, current_price, reason=f"[리스크/공합] Consensus 추세 이탈 (ATR 하회)")
-                sold_today.add(code)
+                continue
 
-        # 2. 진입 로직 (시장 지수 + 유동성 + 추세/횡보 레짐 스위칭)
-        if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
+            # 타임스탑: 7일 (≈5 영업일)
+            from datetime import date
+            entry_date_str = p_item.get('entry_date', '')
+            if entry_date_str:
+                try:
+                    entry_date = date.fromisoformat(entry_date_str)
+                    if (date.today() - entry_date).days >= 7:
+                        self.sell(code, current_price,
+                                  reason=f"[가치페어] 타임스탑 ({(date.today() - entry_date).days}일 보유)")
+                        sold_today.add(code)
+                        continue
+                except Exception:
+                    pass
 
-        # [V60.0] 일일 매매 횟수 상한(5회) 체크
-        from datetime import datetime
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        if self.state.get('last_buy_date') != today_str:
-            self.state['last_buy_date'] = today_str
-            self.state['daily_buys_count'] = 0
+        # 2. 진입
+        if not self.state.get('market_index_healthy', True):
+            return self.calculate_stats(current_prices)
+        if len(self.state['portfolio']) >= self.MAX_HOLDINGS:
+            return self.calculate_stats(current_prices)
 
+        from src.data.sector_cache import SectorCache
+        sector_cache = SectorCache()
         target_amount = self.initial_cash / 10
+
         for stock in candidates:
-            if self.state.get('daily_buys_count', 0) >= 5:
-                break # 최대 5종목 진입 완료
-                
+            if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
-            
-            # [V50.2] 유동성 필터 (10억 이상, amount 필드 사용)
+
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))
-            if amount < 1_000_000_000: continue
+            if price <= 0 or amount < 5_000_000_000: continue  # 50억 유동성
 
-            period_change = stock.get('period_change_rate', 0)
-            daily_change = stock.get('change_rate', stock.get('daily_change_rate', 0))
-            if isinstance(daily_change, str):
-                daily_change = float(daily_change.replace('%', '').replace('+', ''))
-            
-            # [V60.0 Consensus] ADX 기반 레짐 스위칭
+            # PER/PBR 데이터 없으면 진입 제외 (안전 우선)
+            stock_per = float(stock.get('per', 0))
+            stock_pbr = float(stock.get('pbr', 0))
+            if stock_per <= 0 and stock_pbr <= 0: continue
+
+            # 업종 평균 조회
+            sector_name = stock.get('sector_name', '')
+            sector_avg = sector_cache.get_sector_avg(sector_name) if sector_name else None
+            if not sector_avg: continue
+
+            # 업종 평균 대비 20% 이하 저평가 여부
+            avg_per = sector_avg['avg_per']
+            avg_pbr = sector_avg['avg_pbr']
+            per_cheap = (0 < stock_per <= avg_per * 0.8)
+            pbr_cheap = (0 < stock_pbr <= avg_pbr * 0.8)
+            if not (per_cheap or pbr_cheap): continue
+
+            # ADX >= 20 (추세 전환 확인)
             sparkline = stock.get('sparkline_price', [])
-            adx_approx = self.calculate_adx(sparkline) if sparkline else 0.0
-            
-            is_strong = self.validate_tick_power(stock, 110.0)
-            
-            buy_reason = ""
-            
-            if adx_approx >= 15.0:
-                # 추세장 (Trend): 기존 돌파 매매
-                is_trending = (period_change > 3.0 or stock.get('consecutive_days', 0) >= 2)
-                if is_trending and is_strong and daily_change > 0:
-                    buy_reason = f"[리스크/추세] 돌파 진입 (ADX {adx_approx:.1f}, 체결강도 {stock.get('tick_power')}%)"
-            else:
-                # 횡보장 (Range): RSI 과매도 회귀 매매 (낙폭과대 반등)
-                if len(sparkline) >= 3:
-                    ma_val = sum(sparkline[-3:]) / 3
-                    # 3일 평균가보다 낮게 떨어져있으면서 오늘 체결강도가 강하게(반등) 들어오는 놈
-                    if price < ma_val * 0.98 and is_strong and daily_change > 0:
-                        buy_reason = f"[리스크/횡보] 낙폭 반등 진입 (ADX {adx_approx:.1f}, MA이격)"
+            adx = self.calculate_adx(sparkline) if sparkline else 0.0
+            if adx < 20.0: continue
 
-            if buy_reason:
-                if price <= 0: continue
-                qty = int(target_amount / price)
-                if qty > 0:
-                    if self.buy(code, stock['name'], price, qty, reason=buy_reason):
-                        self.state['daily_buys_count'] += 1
+            # 오늘 종가 > 5일 전 종가 (가격 반등 확인)
+            if len(sparkline) >= 6 and sparkline[-1] <= sparkline[-6]: continue
+
+            qty = int(target_amount / price)
+            if qty > 0:
+                reason = (
+                    f"[가치페어] 업종 저평가 진입 "
+                    f"(PER {stock_per:.1f}x / 섹터 {avg_per:.1f}x, "
+                    f"PBR {stock_pbr:.2f}x / 섹터 {avg_pbr:.2f}x, "
+                    f"ADX {adx:.1f}, 섹터: {sector_name})"
+                )
+                self.buy(code, stock['name'], price, qty, reason=reason)
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

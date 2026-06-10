@@ -12,6 +12,14 @@ class BullMomentumSimulator(BaseSimulator):
     def __init__(self, initial_cash=3000000):
         super().__init__("Bull", initial_cash)
 
+    def get_universe(self):
+        """코스피 당일 상승률 상위 30개 종목 (등락률 순위 FHPST01700000)."""
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_fluctuation_rank(market='0001', sort='0', limit=30)
+        except Exception:
+            return None
+
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         candidate_map = {s['code']: s for s in candidates}
@@ -97,7 +105,7 @@ class BullMomentumSimulator(BaseSimulator):
             orgn = stock.get('orgn_fake_ntby_qty', 0)
             frgn = stock.get('frgn_fake_ntby_qty', 0)
             has_inst = (orgn > 0 or frgn > 0)
-            if (period_change >= 5.0 and daily_change > 0 and adx >= 20.0
+            if (5.0 <= period_change <= 40.0 and daily_change > 0 and adx >= 20.0
                     and self.validate_tick_power(stock, threshold=120.0)
                     and has_inst):
                 qty = int(target_amount / price)

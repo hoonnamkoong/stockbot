@@ -171,7 +171,18 @@ class TradeEngineWorker(BaseWorker):
 
             for sim in simulators:
                 try:
-                    sim.run(candidates, current_prices=current_prices)
+                    own_universe = sim.get_universe()
+                    if own_universe:
+                        sim_candidates = self._enrich_universe(own_universe)
+                        sim_prices = dict(current_prices)
+                        sim_prices.update({
+                            s['code']: s.get('price', s.get('current_price', 0))
+                            for s in sim_candidates if s.get('price', 0) > 0
+                        })
+                    else:
+                        sim_candidates = candidates
+                        sim_prices = current_prices
+                    sim.run(sim_candidates, current_prices=sim_prices)
                     self.log(f"  {sim.__class__.__name__} 완료")
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
@@ -179,6 +190,74 @@ class TradeEngineWorker(BaseWorker):
             self.log("시뮬레이터 동기화 완료")
         except Exception as e:
             self.log_error(f"시뮬레이터 전체 실패: {e}")
+
+    def _enrich_universe(self, stocks: list[dict]) -> list[dict]:
+        """
+        sim.get_universe() 반환 종목에 sparkline + per/pbr 보강.
+        DataFetcher를 거치지 않은 종목이므로 별도 enrichment 필요.
+        """
+        import re
+        import requests
+        from bs4 import BeautifulSoup
+        from concurrent.futures import ThreadPoolExecutor
+
+        def fetch_sparkline(stock):
+            code = stock.get('code', '')
+            if not code:
+                return stock
+            try:
+                url = f"https://finance.naver.com/item/frgn.naver?code={code}"
+                res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                soup = BeautifulSoup(res.content, 'html.parser')
+                rows = soup.select('table.type2 tr')
+                data_rows = [
+                    r.select('td') for r in rows
+                    if len(r.select('td')) == 9
+                    and re.match(r'\d{4}', r.select('td')[0].get_text(strip=True))
+                ]
+                if data_rows:
+                    price_text = data_rows[0][1].get_text().replace(',', '').strip()
+                    if price_text.isdigit():
+                        stock['price'] = int(price_text)
+                        stock['current_price'] = stock['price']
+                    sparkline = []
+                    for row in data_rows[:5]:
+                        try:
+                            sparkline.append(int(row[1].get_text().replace(',', '').strip()))
+                        except Exception:
+                            pass
+                    if sparkline:
+                        stock['sparkline_price'] = sparkline[::-1]  # 오래된→최신 순
+                    if len(data_rows) >= 2:
+                        stock['foreign_rate'] = float(
+                            data_rows[0][8].get_text().replace('%', '').replace(',', '').strip() or 0
+                        )
+            except Exception:
+                pass
+            return stock
+
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            enriched = list(ex.map(fetch_sparkline, stocks))
+
+        # per/pbr/sector_name 보강 (Sim3 가치페어에 필요)
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            kis = KISDataProvider()
+            for stock in enriched:
+                code = stock.get('code', '')
+                if not code or (stock.get('per') and stock.get('pbr')):
+                    continue
+                try:
+                    quote = kis.get_price_quote(code)
+                    for k in ('per', 'pbr', 'sector_name'):
+                        if quote.get(k):
+                            stock[k] = quote[k]
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        return enriched
 
     def _fetch_portfolio_prices(self, codes: list) -> dict:
         """

@@ -333,6 +333,216 @@ class KISDataProvider:
         return items
 
     # ──────────────────────────────────────────────────
+    # 7. 개별 종목 시세/밸류에이션 (PER, PBR, sector_name)
+    # ──────────────────────────────────────────────────
+    def get_price_quote(self, code: str) -> dict:
+        """
+        KIS inquire-price(FHKST01010100)로 현재가, PER, PBR, sector_name 반환.
+        반환 키: price, change_rate_pct, per, pbr, sector_name
+        """
+        key = f"price_quote_{code}"
+        cached = self._get_cached(key, self.TTL_REALTIME)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/inquire-price",
+            "FHKST01010100",
+            {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+        )
+        out = body.get("output", {})
+        if not out:
+            result = {"price": 0, "change_rate_pct": 0.0, "per": 0.0, "pbr": 0.0, "sector_name": ""}
+            self._set_cache(key, result)
+            return result
+
+        result = {
+            "price": self._to_int(out.get("stck_prpr", 0)),
+            "change_rate_pct": self._to_float(out.get("prdy_ctrt", 0)),
+            "per": self._to_float(out.get("per", 0)),
+            "pbr": self._to_float(out.get("pbr", 0)),
+            "sector_name": out.get("bstp_kor_isnm", "").strip(),
+        }
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 8. 등락률 순위 (FHPST01700000)
+    # ──────────────────────────────────────────────────
+    def get_fluctuation_rank(self, market: str = '0001', sort: str = '0', limit: int = 30) -> list[dict]:
+        """
+        등락률 순위 조회.
+        market: '0000'=전체, '0001'=코스피, '1001'=코스닥
+        sort: '0'=상승률, '1'=하락률
+        반환: [{code, name, price, change_rate, acml_vol, amount}, ...]
+        """
+        key = f"fluctuation_rank_{market}_{sort}"
+        cached = self._get_cached(key, self.TTL_REALTIME)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/ranking/fluctuation",
+            "FHPST01700000",
+            {
+                "fid_cond_mrkt_div_code": "J",
+                "fid_cond_scr_div_code": "20170",
+                "fid_input_iscd": market,
+                "fid_rank_sort_cls_code": sort,
+                "fid_input_cnt_1": "0",
+                "fid_prc_cls_code": "1",
+                "fid_input_price_1": "",
+                "fid_input_price_2": "",
+                "fid_vol_cnt": "",
+                "fid_trgt_cls_code": "0",
+                "fid_trgt_exls_cls_code": "0",
+                "fid_div_cls_code": "0",
+                "fid_rsfl_rate1": "",
+                "fid_rsfl_rate2": "",
+            },
+        )
+        rows = body.get("output") or []
+        if not isinstance(rows, list):
+            rows = [rows] if rows else []
+
+        result = []
+        for r in rows[:limit]:
+            code = r.get("stck_shrn_iscd", "").strip()
+            if not code:
+                continue
+            price = self._to_int(r.get("stck_prpr", 0))
+            vol = self._to_int(r.get("acml_vol", 0))
+            rate = self._to_float(r.get("prdy_ctrt", 0))
+            result.append({
+                "code": code,
+                "name": r.get("hts_kor_isnm", "").strip(),
+                "price": price,
+                "current_price": price,
+                "change_rate": f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%",
+                "acml_vol": vol,
+                "amount": price * vol,
+            })
+
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 9. 외국인/기관 순매수 상위 (FHPTJ04400000)
+    # ──────────────────────────────────────────────────
+    def get_foreign_institution_rank(self, market: str = '0001', etc_cls: str = '0', limit: int = 30) -> list[dict]:
+        """
+        외국인/기관 순매수 상위 종목 조회.
+        market: '0000'=전체, '0001'=코스피, '1001'=코스닥
+        etc_cls: '0'=전체, '1'=외국인, '2'=기관
+        반환: [{code, name, price, frgn_fake_ntby_qty, orgn_fake_ntby_qty, amount}, ...]
+        """
+        key = f"frgn_inst_rank_{market}_{etc_cls}"
+        cached = self._get_cached(key, self.TTL_REALTIME)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/foreign-institution-total",
+            "FHPTJ04400000",
+            {
+                "FID_COND_MRKT_DIV_CODE": "V",
+                "FID_COND_SCR_DIV_CODE": "16449",
+                "FID_INPUT_ISCD": market,
+                "FID_DIV_CLS_CODE": "0",
+                "FID_RANK_SORT_CLS_CODE": "0",
+                "FID_ETC_CLS_CODE": etc_cls,
+            },
+        )
+        rows = body.get("output") or []
+        if not isinstance(rows, list):
+            rows = [rows] if rows else []
+
+        result = []
+        for r in rows[:limit]:
+            code = r.get("mksc_shrn_iscd", "").strip()
+            if not code:
+                continue
+            price = self._to_int(r.get("stck_prpr", 0))
+            vol = self._to_int(r.get("acml_vol", 0))
+            rate = self._to_float(r.get("prdy_ctrt", 0))
+            frgn = self._to_int(r.get("frgn_ntby_qty", 0))
+            orgn = self._to_int(r.get("orgn_ntby_qty", r.get("ntby_qty", 0)))
+            result.append({
+                "code": code,
+                "name": r.get("hts_kor_isnm", "").strip(),
+                "price": price,
+                "current_price": price,
+                "change_rate": f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%",
+                "acml_vol": vol,
+                "amount": price * vol,
+                "frgn_fake_ntby_qty": frgn,
+                "orgn_fake_ntby_qty": orgn,
+            })
+
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
+    # 10. 재무비율 수익성 순위 (FHPST01750000)
+    # ──────────────────────────────────────────────────
+    def get_finance_ratio_rank(self, market: str = '0001', limit: int = 30) -> list[dict]:
+        """
+        재무비율 수익성 순위 상위 종목 조회 (Sim3 유니버스용).
+        반환: [{code, name, price, roe, debt_ratio, amount}, ...]
+        """
+        key = f"finance_ratio_rank_{market}"
+        cached = self._get_cached(key, self.TTL_FINANCIAL)
+        if cached is not None:
+            return cached
+
+        year = str(datetime.now().year - 1)
+        body = self._get(
+            "/uapi/domestic-stock/v1/ranking/finance-ratio",
+            "FHPST01750000",
+            {
+                "fid_cond_mrkt_div_code": "J",
+                "fid_cond_scr_div_code": "20175",
+                "fid_input_iscd": market,
+                "fid_div_cls_code": "0",
+                "fid_input_price_1": "",
+                "fid_input_price_2": "",
+                "fid_vol_cnt": "",
+                "fid_input_option_1": year,
+                "fid_input_option_2": "3",
+                "fid_rank_sort_cls_code": "7",
+                "fid_blng_cls_code": "0",
+                "fid_trgt_cls_code": "0",
+                "fid_trgt_exls_cls_code": "0",
+            },
+        )
+        rows = body.get("output") or []
+        if not isinstance(rows, list):
+            rows = [rows] if rows else []
+
+        result = []
+        for r in rows[:limit]:
+            code = r.get("mksc_shrn_iscd", r.get("stck_shrn_iscd", "")).strip()
+            if not code:
+                continue
+            price = self._to_int(r.get("stck_prpr", 0))
+            vol = self._to_int(r.get("acml_vol", 0))
+            rate = self._to_float(r.get("prdy_ctrt", 0))
+            result.append({
+                "code": code,
+                "name": r.get("hts_kor_isnm", "").strip(),
+                "price": price,
+                "current_price": price,
+                "change_rate": f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%",
+                "acml_vol": vol,
+                "amount": price * vol,
+                "roe": self._to_float(r.get("cptl_ntin_rate", 0)),
+                "debt_ratio": self._to_float(r.get("lblt_rate", 999)),
+            })
+
+        self._set_cache(key, result)
+        return result
+
+    # ──────────────────────────────────────────────────
     # 배치 enrichment (DataFetcher에서 호출)
     # ──────────────────────────────────────────────────
     def enrich_batch(self, candidates: list[dict]) -> list[dict]:

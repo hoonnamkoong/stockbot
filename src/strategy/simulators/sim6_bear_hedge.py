@@ -13,6 +13,14 @@ class BearHedgeSimulator(BaseSimulator):
     def __init__(self, initial_cash=3000000):
         super().__init__("Bear", initial_cash)
 
+    def get_universe(self):
+        """코스피 당일 하락률 상위 30개 종목 (등락률 순위 FHPST01700000, 하락)."""
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_fluctuation_rank(market='0001', sort='1', limit=30)
+        except Exception:
+            return None
+
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         candidate_map = {s['code']: s for s in candidates}

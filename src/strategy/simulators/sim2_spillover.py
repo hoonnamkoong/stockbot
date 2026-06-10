@@ -10,6 +10,14 @@ class SectorSpilloverSimulator(BaseSimulator):
     def __init__(self, initial_cash=3000000):
         super().__init__("Spillover", initial_cash)
 
+    def get_universe(self):
+        """코스피 외국인+기관 순매수 상위 30개 종목 (FHPTJ04400000)."""
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_foreign_institution_rank(market='0001', etc_cls='0', limit=30)
+        except Exception:
+            return None
+
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         candidate_map = {s['code']: s for s in candidates}
@@ -62,6 +70,7 @@ class SectorSpilloverSimulator(BaseSimulator):
                 profit_rate = (current_price - avg_price) / avg_price * 100
                 if profit_rate <= -7.0:
                     self.sell(code, current_price, reason="[MFHS2] 하드 손절 (-7%)")
+                    self.add_cooldown(code, 3)
                     sold_today.add(code)
 
         # 2. 진입 로직 (MFHS2 통합 스코어링 기반 진입)
@@ -73,6 +82,8 @@ class SectorSpilloverSimulator(BaseSimulator):
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
             
+            if self.is_in_cooldown(code): continue
+
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))
             if amount < 1_000_000_000 or price <= 0: continue # 거래대금 10억 미만 패스
@@ -80,8 +91,8 @@ class SectorSpilloverSimulator(BaseSimulator):
             # MFHS2 통합 스코어 계산 (KIS 데이터 우선, 폴백은 base 메서드)
             score = self._mfhs2_score_kis(stock, current_month)
 
-            # 진입 결정: 40점 이상이면 매수
-            if score >= 40:
+            # 진입 결정: 60점 이상이면 매수 (이전 40점 → 수급 신호 강도 상향)
+            if score >= 60:
                 qty = int(target_amount / price)
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty, 

@@ -70,6 +70,8 @@ class BaseSimulator:
                     # 포트폴리오 내 고점 데이터 보정
                     for code, item in self.state['portfolio'].items():
                         item.setdefault('peak_price', item.get('avg_price', 0))
+
+                    self.state.setdefault('cooldown_codes', {})
                     
                     print(f"[Sim] {self.name} 상태 로드 성공 (잔고: {self.state['cash']:,}원)")
                 else:
@@ -99,7 +101,8 @@ class BaseSimulator:
             "total_fees": 0, 
             "history": [self.initial_cash],
             "daily_trades": [],
-            "market_index_healthy": True # [V2] 시장 지수 상태
+            "market_index_healthy": True, # [V2] 시장 지수 상태
+            "cooldown_codes": {}
         }
         
         # [Fix] 상태 초기화 시 기존 로그 및 CSV 파일도 함께 삭제하여 히스토리 불일치 해결
@@ -273,6 +276,25 @@ class BaseSimulator:
             
         er = direction / volatility
         return er * 100.0
+
+    def add_cooldown(self, code: str, days: int):
+        """손절 후 재진입 금지 기간 등록. expire 당일은 아직 쿨다운 해제 안 됨."""
+        from datetime import date, timedelta
+        expire = (date.today() + timedelta(days=days)).isoformat()
+        self.state.setdefault('cooldown_codes', {})[code] = expire
+        self.save_state()
+
+    def is_in_cooldown(self, code: str) -> bool:
+        """쿨다운 기간 중이면 True (expire date 당일부터 재진입 허용)."""
+        from datetime import date
+        expire_str = self.state.get('cooldown_codes', {}).get(code)
+        if not expire_str:
+            return False
+        return date.today().isoformat() < expire_str
+
+    def get_universe(self):
+        """심 전용 1차 스크리닝 유니버스. None이면 공통 버즈 후보 사용."""
+        return None
 
     def calc_period_change(self, sparkline_price: list) -> float:
         """[Sim4/6] 기간 변동률(%). 프로덕션 후보에 period_change_rate가 없어 sparkline 종가로 계산."""

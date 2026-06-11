@@ -42,9 +42,10 @@ class SectorSpilloverSimulator(BaseSimulator):
             # (A) 5월 말 달력 기반 강제 청산 (Sell in May)
             if current_month == 5 and current_day >= 25:
                 self.sell(code, current_price, reason="[MFHS2] 5월말 계절성 캘린더 청산 (Sell in May)")
+                self.add_cooldown(code, 3)
                 sold_today.add(code)
                 continue
-                
+
             # (B) 외인 수급 역전(-EMA 근사치) 파악
             f_change = stock.get('foreign_change', 0)
             if isinstance(f_change, str):
@@ -52,15 +53,17 @@ class SectorSpilloverSimulator(BaseSimulator):
                     f_change = float(f_change.replace('%', '').replace('+', '').strip())
                 except:
                     f_change = 0.0
-            
+
             if f_change <= -0.5: # 외인 지분 0.5% 이상 대량 이탈 시
                 self.sell(code, current_price, reason="[MFHS2] 외인 대량 이탈 감지 (수급 역전)")
+                self.add_cooldown(code, 3)
                 sold_today.add(code)
                 continue
 
             # (C) 트레일링 스탑
             if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
                 self.sell(code, current_price, reason="[MFHS2] 트레일링 스탑 익절")
+                self.add_cooldown(code, 2)
                 sold_today.add(code)
                 continue
 

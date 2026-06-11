@@ -31,6 +31,7 @@ class PsychDivergenceSimulator(BaseSimulator):
             # [V2] 트레일링 스탑 체크 (5% 수익 후 3% 하락 시)
             if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=3.0):
                 self.sell(code, current_price, reason=f"[심리/공격] 트레일링 스탑 익절 (고점 대비 하락)")
+                self.add_cooldown(code, 2)
                 sold_today.add(code)
                 continue
 
@@ -46,9 +47,11 @@ class PsychDivergenceSimulator(BaseSimulator):
 
             if current_price >= tp_price:
                 self.sell(code, current_price, reason=f"[심리/공격] 동적 목표가 달성 (ATR 기반 익절)")
+                self.add_cooldown(code, 2)
                 sold_today.add(code)
             elif current_price <= sl_price:
                 self.sell(code, current_price, reason=f"[심리/공격] 동적 손절가 이탈 (ATR 기반 손절)")
+                self.add_cooldown(code, 3)
                 sold_today.add(code)
 
         # 2. 진입 로직 (시장 지수 + 유동성 + 심리 괴리)
@@ -58,7 +61,8 @@ class PsychDivergenceSimulator(BaseSimulator):
         for stock in candidates:
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
-            
+            if self.is_in_cooldown(code): continue
+
             # [V50.2] 유동성 필터: 거래대금 10억 미만 제외 (amount 필드 사용)
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))

@@ -42,6 +42,7 @@ class SidewaysSwingSimulator(BaseSimulator):
             # 익절: +4%
             if profit_rate >= 4.0:
                 self.sell(code, current_price, reason=f"[눌림목] 목표 익절 (+{profit_rate:.1f}%)")
+                self.add_cooldown(code, 2)  # 익절 후 2일 재진입 금지 (눌림 재형성 대기)
                 sold_today.add(code)
                 continue
             # 눌림 회복 익절: 최근 고점 근접 시 (진입가 대비 +2% 이상이면서 sparkline 신고가 돌파)
@@ -49,6 +50,7 @@ class SidewaysSwingSimulator(BaseSimulator):
                 recent_high = max(sparkline[-5:]) if len(sparkline) >= 5 else max(sparkline)
                 if current_price >= recent_high * 0.99:
                     self.sell(code, current_price, reason="[눌림목] 반등 회복 익절 (고점 근접)")
+                    self.add_cooldown(code, 2)
                     sold_today.add(code)
                     continue
             # 타임 스탑: 7일(≈5영업일) 경과 시 손익 무관 청산
@@ -58,6 +60,7 @@ class SidewaysSwingSimulator(BaseSimulator):
                     entry_d = datetime.strptime(entry_str, '%Y-%m-%d').date()
                     if (today - entry_d).days >= 7:
                         self.sell(code, current_price, reason="[눌림목] 타임 스탑 (7일 경과)")
+                        self.add_cooldown(code, 1)
                         sold_today.add(code)
                         continue
                 except ValueError:
@@ -65,6 +68,7 @@ class SidewaysSwingSimulator(BaseSimulator):
             # 하드 손절: -3% (백테스트상 -2%보다 우수 — 노이즈 털림 방지)
             if profit_rate <= -3.0:
                 self.sell(code, current_price, reason=f"[눌림목] 하드 손절 ({profit_rate:.1f}%)")
+                self.add_cooldown(code, 3)  # 손절 후 3일 재진입 금지
                 sold_today.add(code)
                 continue
 
@@ -79,6 +83,7 @@ class SidewaysSwingSimulator(BaseSimulator):
             code = stock['code']
             name = stock.get('name', code)
             if code in self.state['portfolio'] or code in sold_today: continue
+            if self.is_in_cooldown(code): continue
 
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))

@@ -69,6 +69,7 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
                 # --- 1차 익절 전 ---
                 if self._holding_days(p_item) >= 2:
                     self.sell(code, current_price, reason="[단타] 2일 경과 모멘텀 소멸 강제청산")
+                    self.add_cooldown(code, 1)
                     sold_today.add(code)
                     continue
                 if profit_rate <= -3.0:
@@ -89,14 +90,17 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
                 # --- 1차 익절 후 ---
                 if self._partial_days(p_item) >= 5:
                     self.sell(code, current_price, reason="[단타] 5일 경과 2차 강제청산")
+                    self.add_cooldown(code, 1)
                     sold_today.add(code)
                     continue
                 if profit_rate <= 0.0:
                     self.sell(code, current_price, reason=f"[단타] 매입가 복귀 손절 ({profit_rate:.1f}%)")
+                    self.add_cooldown(code, 2)
                     sold_today.add(code)
                     continue
                 if profit_rate >= 10.0:
                     self.sell(code, current_price, reason=f"[단타] 2차 전량 익절 +10% ({profit_rate:.1f}%)")
+                    self.add_cooldown(code, 2)
                     sold_today.add(code)
                     continue
 

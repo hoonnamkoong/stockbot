@@ -41,6 +41,7 @@ class BullMomentumSimulator(BaseSimulator):
             # 트레일링 스탑 (5% 활성화 후 고점 대비 5% 콜백) — 넓은 밴드로 잔파도 방어
             if self.check_trailing_stop(code, current_price, activation_pct=5.0, callback_pct=5.0):
                 self.sell(code, current_price, reason="[상승모멘텀] 트레일링 스탑 익절 (라이딩 종료)")
+                self.add_cooldown(code, 2)
                 sold_today.add(code)
                 continue
 
@@ -53,6 +54,7 @@ class BullMomentumSimulator(BaseSimulator):
                 atr_pct = 3.0  # sparkline 부재 시 기본 3% (→ -9% 손절)
             if profit_rate <= -(3.0 * atr_pct):
                 self.sell(code, current_price, reason=f"[상승모멘텀] ATR 3배 손절 ({profit_rate:.1f}%)")
+                self.add_cooldown(code, 3)
                 sold_today.add(code)
                 continue
 
@@ -90,6 +92,7 @@ class BullMomentumSimulator(BaseSimulator):
             if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
+            if self.is_in_cooldown(code): continue
 
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))

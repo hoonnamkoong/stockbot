@@ -37,10 +37,12 @@ class BearHedgeSimulator(BaseSimulator):
 
             if profit_rate >= 2.5:
                 self.sell(code, current_price, reason=f"[하락줍줍] 데드캣 빠른 익절 (+{profit_rate:.1f}%)")
+                self.add_cooldown(code, 2)  # 반등 소진 후 같은 종목 재진입 방지
                 sold_today.add(code)
                 continue
             if profit_rate <= -2.0:
                 self.sell(code, current_price, reason=f"[하락줍줍] 타이트 손절 ({profit_rate:.1f}%)")
+                self.add_cooldown(code, 3)
                 sold_today.add(code)
                 continue
 
@@ -56,6 +58,7 @@ class BearHedgeSimulator(BaseSimulator):
 
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
+            if self.is_in_cooldown(code): continue
 
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))

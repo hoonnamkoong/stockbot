@@ -42,12 +42,14 @@ class SmartRiskSimulator(BaseSimulator):
             # 목표 익절 +8%
             if profit_rate >= 8.0:
                 self.sell(code, current_price, reason=f"[가치페어] 목표 익절 ({profit_rate:.1f}%)")
+                self.add_cooldown(code, 2)
                 sold_today.add(code)
                 continue
 
             # 손절 -5%
             if profit_rate <= -5.0:
                 self.sell(code, current_price, reason=f"[가치페어] 손절 ({profit_rate:.1f}%)")
+                self.add_cooldown(code, 3)
                 sold_today.add(code)
                 continue
 
@@ -60,6 +62,7 @@ class SmartRiskSimulator(BaseSimulator):
                     if (date.today() - entry_date).days >= 7:
                         self.sell(code, current_price,
                                   reason=f"[가치페어] 타임스탑 ({(date.today() - entry_date).days}일 보유)")
+                        self.add_cooldown(code, 1)
                         sold_today.add(code)
                         continue
                 except Exception:
@@ -79,6 +82,7 @@ class SmartRiskSimulator(BaseSimulator):
             if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
+            if self.is_in_cooldown(code): continue
 
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))

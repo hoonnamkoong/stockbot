@@ -75,6 +75,12 @@ simulators:
     description: "하락장 줍줍형 - 극단적 현금보유 + 데드캣 반등 2.5% 빠른 익절"
     active: true
 
+  - id: "sim4_bull_daytrading"
+    module: "src.strategy.simulators.sim4_bull_daytrading"
+    class: "BullMomentumDayTradingSimulator"
+    description: "상승 모멘텀 단타 — 분할 익절(+5%/+10%) + 2일/5일 강제청산"
+    active: true
+
   - id: "sim7_libero"
     module: "src.strategy.simulators.sim7_libero"
     class: "LiberoSimulator"

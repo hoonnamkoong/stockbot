@@ -290,13 +290,13 @@ function TradeContent() {
     function renderPortfolioTable(holdings: any[], isReal: boolean = false, tableH: string | number = 560) {
         if (!holdings || holdings.length === 0) {
             return (
-                <Box style={{ height: tableH, minHeight: 120, textAlign: 'center', border: '1px dashed #ced4da', borderRadius: '8px', width: '100%', minWidth: isReal ? 650 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box style={{ height: 120, textAlign: 'center', border: '1px dashed #ced4da', borderRadius: '8px', width: '100%', minWidth: isReal ? 650 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Text c="dimmed">보유 종목이 없습니다.</Text>
                 </Box>
             );
         }
         return (
-            <ScrollArea style={{ height: tableH, minHeight: 120 }} offsetScrollbars>
+            <ScrollArea.Autosize mah={tableH} offsetScrollbars>
                 <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 650 : 600 }}>
                     <Table.Thead>
                         <Table.Tr>
@@ -371,7 +371,7 @@ function TradeContent() {
                         })}
                     </Table.Tbody>
                 </Table>
-            </ScrollArea>
+            </ScrollArea.Autosize>
         );
     }
 
@@ -379,13 +379,13 @@ function TradeContent() {
         const filtered = history.filter(h => h.type === targetType).slice(0, 100);
         if (filtered.length === 0) {
             return (
-                <Box style={{ height: histH, minHeight: 120, textAlign: 'center', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box style={{ height: 120, textAlign: 'center', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Text size="xs" c="dimmed">최근 거래 내역이 없습니다.</Text>
                 </Box>
             );
         }
         return (
-            <ScrollArea style={{ height: histH, minHeight: 120 }} offsetScrollbars>
+            <ScrollArea.Autosize mah={histH} offsetScrollbars>
                 <Table striped highlightOnHover stickyHeader verticalSpacing="xs" style={{ minWidth: 500 }}>
                     <Table.Thead>
                         <Table.Tr>
@@ -440,7 +440,7 @@ function TradeContent() {
                         ))}
                     </Table.Tbody>
                 </Table>
-            </ScrollArea>
+            </ScrollArea.Autosize>
         );
     }
 
@@ -504,12 +504,13 @@ function TradeContent() {
     function renderSimulationTripod() {
         if (!geminiBalance) return null;
         const simConfigs = [
-            { id: 'sim1', key: 'sim1', label: '심리 괴리형 (Sim 1)',   color: 'blue',   type: 'sim_psych' },
-            { id: 'sim2', key: 'sim2', label: '수급 동승형 (Sim 2)',   color: 'violet', type: 'sim_spillover' },
-            { id: 'sim3', key: 'sim3', label: '가치 페어형 (Sim 3)',   color: 'red',    type: 'sim_risk' },
-            { id: 'sim4', key: 'sim4', label: '상승 모멘텀형 (Sim 4)', color: 'green',  type: 'sim_bull' },
-            { id: 'sim5', key: 'sim5', label: '추세 눌림목형 (Sim 5)', color: 'orange', type: 'sim_sideways' },
-            { id: 'sim6', key: 'sim6', label: '하락 줍줍형 (Sim 6)',   color: 'cyan',   type: 'sim_bear' },
+            { id: 'sim1',              key: 'sim1',              label: '심리 괴리형 (Sim 1)',      color: 'blue',   type: 'sim_psych' },
+            { id: 'sim2',              key: 'sim2',              label: '수급 동승형 (Sim 2)',      color: 'violet', type: 'sim_spillover' },
+            { id: 'sim3',              key: 'sim3',              label: '가치 페어형 (Sim 3)',      color: 'red',    type: 'sim_risk' },
+            { id: 'sim4',              key: 'sim4',              label: '상승 모멘텀형 (Sim 4)',    color: 'green',  type: 'sim_bull' },
+            { id: 'sim4_daytrading',   key: 'sim4_daytrading',   label: '상승 단타형 (Sim 4-1)',   color: 'teal',   type: 'sim4_bull_daytrading' },
+            { id: 'sim5',              key: 'sim5',              label: '추세 눌림목형 (Sim 5)',    color: 'orange', type: 'sim_sideways' },
+            { id: 'sim6',              key: 'sim6',              label: '하락 줍줍형 (Sim 6)',      color: 'cyan',   type: 'sim_bear' },
         ];
         return (
             <Stack gap="xl">
@@ -536,8 +537,8 @@ function TradeContent() {
                             };
                         });
                         return (
-                            <Stack key={sim.id} gap="sm" style={{ height: 500 }}>
-                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)`, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                            <Stack key={sim.id} gap="sm">
+                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)` }}>
                                     <Group justify="space-between" mb="xs">
                                         <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
                                         <Badge color={sim.color}>{sim.id.toUpperCase()}</Badge>
@@ -563,11 +564,13 @@ function TradeContent() {
                                         </Stack>
                                     </Group>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
-                                    <Box style={{ flex: 1, overflow: 'hidden' }}>{renderPortfolioTable(holdings, false, 140)}</Box>
+                                    {/* 5행(행 ~61px + 헤더)까지 표시 후 스크롤 */}
+                                    {renderPortfolioTable(holdings, false, 360)}
                                 </Paper>
-                                <Paper p="md" withBorder radius="md" bg="gray.0" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                <Paper p="md" withBorder radius="md" bg="gray.0">
                                     <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{sim.label} 기록</Text>
-                                    <Box style={{ flex: 1, overflow: 'hidden' }}>{renderHistoryTable(sim.type, 140)}</Box>
+                                    {/* 5행(행 ~52px + 헤더)까지 표시 후 스크롤 */}
+                                    {renderHistoryTable(sim.type, 305)}
                                 </Paper>
                             </Stack>
                         );

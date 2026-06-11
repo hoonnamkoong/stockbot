@@ -129,16 +129,11 @@ class SectorSpilloverSimulator(BaseSimulator):
             if f_change > 0:
                 score += 40
 
-        # [조건 B] 감정-수급 발산 (40점)
-        posts = int(stock_data.get('recent_posts_count', 0))
-        sentiment = stock_data.get('sentiment', '')
-        pos_percent = 0
-        if 'Positive' in sentiment:
-            try:
-                pos_percent = float(sentiment.split('(')[1].split('%')[0])
-            except Exception:
-                pass
-        if posts >= 30 and pos_percent > 60:
+        # [조건 B] 수급-가격 발산 (40점) — 스마트머니가 사고 있는데 가격이 아직 덜 올랐다
+        frgn = stock_data.get('frgn_fake_ntby_qty', 0)
+        orgn = stock_data.get('orgn_fake_ntby_qty', 0)
+        daily_chg = self.parse_change_rate(stock_data)
+        if frgn > 0 and orgn > 0 and daily_chg < 3.0:
             score += 40
 
         # [조건 C] 계절성 (20점)

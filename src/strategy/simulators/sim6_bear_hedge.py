@@ -14,12 +14,9 @@ class BearHedgeSimulator(BaseSimulator):
         super().__init__("Bear", initial_cash)
 
     def get_universe(self):
-        """코스피 당일 하락률 상위 30개 종목 (등락률 순위 FHPST01700000, 하락)."""
-        try:
-            from src.trade.kis_data_provider import KISDataProvider
-            return KISDataProvider().get_fluctuation_rank(market='0001', sort='1', limit=30)
-        except Exception:
-            return None
+        """전일 하락률 상위 30개 종목 (state에 저장된 값 반환 — 당일 반등 포착용)."""
+        yesterday = self.state.get('yesterday_decline_universe')
+        return yesterday if yesterday else None
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
@@ -82,6 +79,15 @@ class BearHedgeSimulator(BaseSimulator):
                 if qty > 0:
                     self.buy(code, stock['name'], price, qty,
                              reason=f"[하락줍줍] 데드캣 반등 (기간 {period_change:.1f}%, ROE {roe:.1f}%, 부채 {debt_ratio:.0f}%)")
+
+        # 오늘의 하락률 상위를 저장 → 내일 유니버스로 사용
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            today_decline = KISDataProvider().get_fluctuation_rank(market='0001', sort='1', limit=30)
+            if today_decline:
+                self.state['yesterday_decline_universe'] = today_decline
+        except Exception:
+            pass
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

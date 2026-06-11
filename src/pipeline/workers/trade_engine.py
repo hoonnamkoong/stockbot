@@ -239,21 +239,31 @@ class TradeEngineWorker(BaseWorker):
         with ThreadPoolExecutor(max_workers=10) as ex:
             enriched = list(ex.map(fetch_sparkline, stocks))
 
-        # per/pbr/sector_name 보강 (Sim3 가치페어에 필요)
+        # per/pbr/sector_name + 수급 보강 (Sim3 가치페어, Sim4/4-1 has_inst 조건용)
         try:
             from src.trade.kis_data_provider import KISDataProvider
             kis = KISDataProvider()
             for stock in enriched:
                 code = stock.get('code', '')
-                if not code or (stock.get('per') and stock.get('pbr')):
+                if not code:
                     continue
-                try:
-                    quote = kis.get_price_quote(code)
-                    for k in ('per', 'pbr', 'sector_name'):
-                        if quote.get(k):
-                            stock[k] = quote[k]
-                except Exception:
-                    pass
+                # PER/PBR
+                if not (stock.get('per') and stock.get('pbr')):
+                    try:
+                        quote = kis.get_price_quote(code)
+                        for k in ('per', 'pbr', 'sector_name'):
+                            if quote.get(k):
+                                stock[k] = quote[k]
+                    except Exception:
+                        pass
+                # 수급 — 유니버스 자체에 이미 값이 있으면 덮어쓰지 않음
+                if 'frgn_fake_ntby_qty' not in stock or 'orgn_fake_ntby_qty' not in stock:
+                    try:
+                        trend = kis.get_investor_trend_estimate(code)
+                        stock.setdefault('frgn_fake_ntby_qty', trend.get('frgn_fake_ntby_qty', 0))
+                        stock.setdefault('orgn_fake_ntby_qty', trend.get('orgn_fake_ntby_qty', 0))
+                    except Exception:
+                        pass
         except Exception:
             pass
 

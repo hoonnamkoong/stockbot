@@ -38,10 +38,22 @@ export async function GET() {
         } catch { /* GitHub 조회 실패 시 빈 배열 */ }
 
         // 2) KOSPI top100 close CSV → 날짜별 breadth 계산
+        // GitHub db-data 우선, 없으면 로컬 static 파일 사용
+        const GITHUB_CSV = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data/kospi_top100_close.csv';
         const csvPath = path.join(process.cwd(), 'output', 'kospi_top100_close.csv');
         const marketData: { date: string; breadth: number; regime: string }[] = [];
         try {
-            const raw = await readFile(csvPath, 'utf-8');
+            let raw: string;
+            try {
+                const csvRes = await fetch(`${GITHUB_CSV}?t=${Date.now()}`, { cache: 'no-store' });
+                if (csvRes.ok) {
+                    raw = await csvRes.text();
+                } else {
+                    raw = await readFile(csvPath, 'utf-8');
+                }
+            } catch {
+                raw = await readFile(csvPath, 'utf-8');
+            }
             const lines = raw.split('\n').filter(l => l.trim());
             const headers = lines[0].split(',');
             const stockCount = headers.length - 1; // 첫 컬럼이 date

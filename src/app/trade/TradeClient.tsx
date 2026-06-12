@@ -536,6 +536,13 @@ function TradeContent() {
                                 pl_rate: pl
                             };
                         });
+                        // 순수 평가손익: NAV - 초기자본 (수수료는 이미 현금에서 차감됨)
+                        const INITIAL_CASH = 3000000;
+                        const netPL = Math.round((stats.total_asset || stats.cash || 0) - INITIAL_CASH);
+                        // 금일 KST 기준 거래 종목수 (BUY+SELL 합산, 종목 중복 제거)
+                        const todayKST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+                        const todayTrades = history.filter(h => h.type === sim.type && h.time?.startsWith(todayKST));
+                        const todayTickerCount = new Set(todayTrades.map(h => h.symbol)).size;
                         return (
                             <Stack key={sim.id} gap="sm">
                                 <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)` }}>
@@ -555,12 +562,22 @@ function TradeContent() {
                                             </Text>
                                         </Stack>
                                         <Stack gap={2}>
+                                            <Text size="xs" c="dimmed">평가손익</Text>
+                                            <Text size="md" fw={800} c={netPL >= 0 ? 'red' : 'blue'}>
+                                                {netPL >= 0 ? '+' : ''}{netPL.toLocaleString()}원
+                                            </Text>
+                                        </Stack>
+                                        <Stack gap={2}>
                                             <Text size="xs" c="dimmed">누적 수수료</Text>
                                             <Text size="md" fw={700} c="gray.6">{(Math.round(stats.total_fees || 0)).toLocaleString()}원</Text>
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">보유 종목</Text>
                                             <Text size="md" fw={800} c={sim.color}>{(holdings?.length || 0)}개</Text>
+                                        </Stack>
+                                        <Stack gap={2}>
+                                            <Text size="xs" c="dimmed">금일 거래</Text>
+                                            <Text size="md" fw={800} c={todayTickerCount > 0 ? 'dark' : 'dimmed'}>{todayTickerCount}종목</Text>
                                         </Stack>
                                     </Group>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />

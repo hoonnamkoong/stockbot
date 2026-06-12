@@ -76,6 +76,8 @@ export async function GET() {
                     recommended_sims: s.recommended_sims ?? [],
                     metrics: s.metrics ?? {},
                     last_run: s.last_run ?? null,
+                    regime_history: s.regime_history ?? [],
+                    daily_regime_log: s.daily_regime_log ?? [],
                 };
             } else {
                 results.libero = null;

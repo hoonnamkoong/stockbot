@@ -3,15 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ResponsiveContainer, Tooltip, Legend
+  ResponsiveContainer, Tooltip, Legend,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  ReferenceLine, ReferenceArea,
 } from 'recharts';
-import { Card, Text, Group, Loader, Badge, Stack, Table } from '@mantine/core';
-import { IconDna, IconTrendingUp } from '@tabler/icons-react';
-
-interface SimulationStat {
-  raw: Record<string, number>;
-  normalized: Record<string, number>;
-}
+import { Card, Text, Group, Loader, Badge, Stack, Table, Divider } from '@mantine/core';
+import { IconDna, IconTrendingUp, IconActivity } from '@tabler/icons-react';
 
 interface LiberoInfo {
   current_regime: string | null;
@@ -20,61 +17,79 @@ interface LiberoInfo {
   recommended_sims: string[];
   metrics: Record<string, number>;
   last_run: string | null;
+  regime_history: string[];
+  daily_regime_log: { date: string; regime: string; bull_score: number; breadth?: number }[];
 }
 
-// 차트에 그릴 시뮬레이터 정의 (단일 소스). 색상/라벨/설명을 여기서 관리.
+// 전략 시리즈 정의 (단일 소스)
 const SERIES = [
-  { key: 'sim1', label: '심리 괴리형 (Sim 1)', color: '#228be6', desc: 'Buzz 급증·가격 정체 종목 매집' },
-  { key: 'sim2', label: '수급 동승형 (Sim 2)', color: '#7950f2', desc: '외인 수급 + 감정 발산 스코어' },
-  { key: 'sim3', label: '스마트 리스크형 (Sim 3)', color: '#fa5252', desc: '추세 돌파 / 횡보 반등 + 트레일링' },
-  { key: 'sim4', label: '상승 모멘텀형 (Sim 4)', color: '#2f9e44', desc: '주도주 탑승·불타기, 고정익절 없이 라이딩' },
-  { key: 'sim5', label: '추세 눌림목형 (Sim 5)', color: '#f08c00', desc: '상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절' },
-  { key: 'sim6', label: '하락 줍줍형 (Sim 6)', color: '#0c8599', desc: '폭락 후 데드캣 반등 2.5% 빠른 익절' },
+  { key: 'sim1',            label: '심리 괴리형 (Sim 1)',   color: '#228be6', desc: 'Buzz 급증·가격 정체 종목 매집' },
+  { key: 'sim2',            label: '수급 동승형 (Sim 2)',   color: '#7950f2', desc: '외인 수급 + 감정 발산 스코어' },
+  { key: 'sim3',            label: '스마트 리스크형 (Sim 3)', color: '#fa5252', desc: '추세 돌파 / 횡보 반등 + 트레일링' },
+  { key: 'sim4',            label: '상승 모멘텀형 (Sim 4)',  color: '#2f9e44', desc: '주도주 탑승·불타기, 고정익절 없이 라이딩' },
+  { key: 'sim4_daytrading', label: '상승 단타형 (Sim 4-1)', color: '#0ca678', desc: 'Sim4 기반 당일 데이트레이딩 — 빠른 익절' },
+  { key: 'sim5',            label: '추세 눌림목형 (Sim 5)',  color: '#f08c00', desc: '상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절' },
+  { key: 'sim6',            label: '하락 줍줍형 (Sim 6)',   color: '#0c8599', desc: '폭락 후 데드캣 반등 2.5% 빠른 익절' },
 ];
 
-// Sim7 리베로 recommended_sims의 manifest id → 라벨
+const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
+const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5', 'sim6'].includes(s.key));
+
+// ID → 라벨 (리베로 추천 표시용)
 const ID_LABEL: Record<string, string> = {
-  sim_psych: '심리 괴리형(S1)',
-  sim_spillover: '수급 동승형(S2)',
-  sim_risk: '스마트 리스크형(S3)',
-  sim4_bull: '상승 모멘텀형(S4)',
-  sim5_sideways: '횡보 스윙형(S5)',
-  sim6_bear: '하락 줍줍형(S6)',
+  sim_psych:            '심리 괴리형(S1)',
+  sim_spillover:        '수급 동승형(S2)',
+  sim_risk:             '스마트 리스크형(S3)',
+  sim4_bull:            '상승 모멘텀형(S4)',
+  sim4_bull_daytrading: '상승 단타형(S4-1)',
+  sim5_sideways:        '횡보 스윙형(S5)',
+  sim6_bear:            '하락 줍줍형(S6)',
 };
 
 const REGIME_STYLE: Record<string, { color: string; label: string }> = {
-  BULL: { color: '#2f9e44', label: '상승장 (BULL)' },
+  BULL:     { color: '#2f9e44', label: '상승장 (BULL)' },
   SIDEWAYS: { color: '#f08c00', label: '횡보장 (SIDEWAYS)' },
-  BEAR: { color: '#fa5252', label: '하락장 (BEAR)' },
+  BEAR:     { color: '#fa5252', label: '하락장 (BEAR)' },
 };
 
-// 5대 지표 축 정의 (BaseSimulator.get_normalized_stats와 일치)
 const METRICS = [
-  { subject: '승률', apiKey: 'win_rate', desc: '총 매매 중 익절로 마감한 비율 (성공 확률)' },
+  { subject: '승률',    apiKey: 'win_rate',      desc: '총 매매 중 익절로 마감한 비율 (성공 확률)' },
   { subject: '수익팩터', apiKey: 'profit_factor', desc: '총수익 ÷ 총손실. 1 초과면 손실보다 수익이 큼' },
-  { subject: 'MDD', apiKey: 'mdd', desc: '고점 대비 최대 낙폭. 차트 바깥쪽일수록 방어 우수(낙폭 작음)' },
-  { subject: '거래빈도', apiKey: 'frequency', desc: '일 평균 매매 횟수 (회전 속도)' },
-  { subject: '자본회전율', apiKey: 'turnover', desc: '초기자본 대비 누적 거래대금 (자금 활용도)' },
+  { subject: 'MDD',    apiKey: 'mdd',            desc: '고점 대비 최대 낙폭. 바깥쪽일수록 방어 우수' },
+  { subject: '거래빈도', apiKey: 'frequency',     desc: '일 평균 매매 횟수 (회전 속도)' },
+  { subject: '자본회전율', apiKey: 'turnover',    desc: '초기자본 대비 누적 거래대금 (자금 활용도)' },
 ];
 
 const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <Card shadow="sm" padding="xs" radius="md" withBorder>
-        <Text size="xs" fw={700} mb={5}>{payload[0].payload.subject}</Text>
-        {payload.map((entry: any, index: number) => (
-          <Group key={index} justify="apart" wrap="nowrap" gap="xs">
-            <Badge color={entry.color} size="xs" variant="filled" circle />
-            <Text size="xs" style={{ minWidth: 120 }}>{entry.name}:</Text>
-            <Text size="xs" fw={500} c={entry.color}>
-              {entry.payload.rawValues[entry.dataKey]}
-            </Text>
-          </Group>
-        ))}
-      </Card>
-    );
-  }
-  return null;
+  if (!active || !payload?.length) return null;
+  return (
+    <Card shadow="sm" padding="xs" radius="md" withBorder>
+      <Text size="xs" fw={700} mb={5}>{payload[0].payload.subject}</Text>
+      {payload.map((entry: any, i: number) => (
+        <Group key={i} justify="apart" wrap="nowrap" gap="xs">
+          <Badge color={entry.color} size="xs" variant="filled" circle />
+          <Text size="xs" style={{ minWidth: 130 }}>{entry.name}:</Text>
+          <Text size="xs" fw={500} c={entry.color}>
+            {entry.payload.rawValues?.[entry.dataKey] ?? entry.value}
+          </Text>
+        </Group>
+      ))}
+    </Card>
+  );
+};
+
+const Sim7Tooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <Card shadow="sm" padding="xs" radius="md" withBorder>
+      <Text size="xs" fw={700} mb={4}>{label}</Text>
+      {payload.map((p: any, i: number) => (
+        <Text key={i} size="xs" c={p.color}>
+          {p.name}: <b>{p.value}</b>
+        </Text>
+      ))}
+    </Card>
+  );
 };
 
 const formatRaw = (key: string, value: number | undefined) => {
@@ -90,18 +105,67 @@ const pct = (v: number | undefined) => {
   return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 };
 
+function RadarPanel({
+  title,
+  series,
+  data,
+  hidden,
+  onToggle,
+}: {
+  title: string;
+  series: typeof SERIES;
+  data: any[];
+  hidden: Set<string>;
+  onToggle: (key: string) => void;
+}) {
+  return (
+    <div style={{ flex: '1 1 420px', minWidth: 300 }}>
+      <Text size="sm" fw={700} mb={6} ta="center">{title}</Text>
+      <div style={{ height: 340 }}>
+        <ResponsiveContainer>
+          <RadarChart cx="50%" cy="50%" outerRadius="78%" data={data}>
+            <PolarGrid stroke="#e9ecef" />
+            <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: '#495057' }} />
+            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+            {series.map((s) => (
+              <Radar
+                key={s.key}
+                name={s.label}
+                dataKey={s.key}
+                stroke={s.color}
+                fill={s.color}
+                fillOpacity={0.07}
+                strokeWidth={2}
+                hide={hidden.has(s.key)}
+              />
+            ))}
+            <Tooltip content={<CustomTooltip />} />
+            <Legend
+              wrapperStyle={{ paddingTop: 10, fontSize: 10, cursor: 'pointer' }}
+              onClick={(e: any) => onToggle(e.dataKey as string)}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+      <Text size="xs" c="dimmed" ta="center" mt={4}>※ 범례 클릭 시 해당 전략 선 토글</Text>
+    </div>
+  );
+}
+
 export default function StrategyRadarChart() {
   const [data, setData] = useState<any[]>([]);
   const [ranking, setRanking] = useState<any[]>([]);
   const [libero, setLibero] = useState<LiberoInfo | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [sim7Data, setSim7Data] = useState<any[]>([]);
+  const [sim7Loading, setSim7Loading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/simulation/stats');
-        const stats = await response.json() as Record<string, any>;
+        const res = await fetch('/api/simulation/stats');
+        const stats = await res.json() as Record<string, any>;
 
         // 레이더용 5축 데이터
         const chartData = METRICS.map(({ subject, apiKey }) => {
@@ -114,7 +178,7 @@ export default function StrategyRadarChart() {
         });
         setData(chartData);
 
-        // 수익률 순위표 (단기 최대 성과 핵심 지표)
+        // 수익률 순위표
         const rank = SERIES.map((s) => {
           const raw = stats[s.key]?.raw || {};
           return {
@@ -128,14 +192,46 @@ export default function StrategyRadarChart() {
         setRanking(rank);
 
         setLibero(stats.libero ?? null);
-      } catch (error) {
-        console.error('Failed to load simulation stats:', error);
+      } catch (e) {
+        console.error('Failed to load simulation stats:', e);
       } finally {
         setLoading(false);
       }
     };
 
+    const fetchSim7 = async () => {
+      setSim7Loading(true);
+      try {
+        const res = await fetch(`/api/simulation/libero-history?cb=${Date.now()}`);
+        const d = await res.json();
+        // 실제 시장 breadth 데이터
+        const marketMap: Record<string, number> = {};
+        for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
+        // 리베로 log와 병합
+        const liberoMap: Record<string, number> = {};
+        for (const l of (d.libero_log ?? [])) liberoMap[l.date] = l.bull_score;
+
+        // 최근 14 거래일 날짜 합집합 정렬
+        const allDates = Array.from(new Set([
+          ...Object.keys(marketMap),
+          ...Object.keys(liberoMap),
+        ])).sort().slice(-14);
+
+        const merged = allDates.map(date => ({
+          date: date.slice(5), // "MM-DD" 형식
+          sim7Score: liberoMap[date] ?? null,
+          marketBreadth: marketMap[date] ?? null,
+        }));
+        setSim7Data(merged);
+      } catch {
+        setSim7Data([]);
+      } finally {
+        setSim7Loading(false);
+      }
+    };
+
     fetchStats();
+    fetchSim7();
   }, []);
 
   const toggleSeries = (key: string) => {
@@ -188,7 +284,7 @@ export default function StrategyRadarChart() {
         </Group>
       </Card>
 
-      {/* ② 수익률 순위표 */}
+      {/* ② 수익률 순위표 (Sim4-1 포함) */}
       <Group gap={6} mb={4}>
         <IconTrendingUp size={18} color="#2f9e44" />
         <Text size="sm" fw={700}>누적 수익률 순위 (단기 성과)</Text>
@@ -223,37 +319,26 @@ export default function StrategyRadarChart() {
         </Table.Tbody>
       </Table>
 
-      {/* ③ 레이더(범례 클릭 토글) + 옆 주석 패널 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'stretch' }}>
-        <div style={{ flex: '1 1 420px', minWidth: 320, height: 380 }}>
-          <ResponsiveContainer>
-            <RadarChart cx="50%" cy="50%" outerRadius="78%" data={data}>
-              <PolarGrid stroke="#e9ecef" />
-              <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12, fill: '#495057' }} />
-              <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-              {SERIES.map((s) => (
-                <Radar
-                  key={s.key}
-                  name={s.label}
-                  dataKey={s.key}
-                  stroke={s.color}
-                  fill={s.color}
-                  fillOpacity={0.06}
-                  strokeWidth={2}
-                  hide={hidden.has(s.key)}
-                />
-              ))}
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                wrapperStyle={{ paddingTop: 12, fontSize: 11, cursor: 'pointer' }}
-                onClick={(e: any) => toggleSeries(e.dataKey as string)}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-          <Text size="xs" c="dimmed" ta="center">※ 범례를 클릭하면 해당 전략 선을 켜고 끌 수 있습니다.</Text>
-        </div>
+      {/* ③ 레이더 차트 — Sim1~3 / Sim4~6 분리 */}
+      <Divider mb="md" label="Radar Chart (전략 프로파일)" labelPosition="center" />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
+        <RadarPanel
+          title="Sim 1~3 (심리·수급·리스크)"
+          series={SERIES_G1}
+          data={data}
+          hidden={hidden}
+          onToggle={toggleSeries}
+        />
+        <RadarPanel
+          title="Sim 4~6 (모멘텀·단타·눌림·줍줍)"
+          series={SERIES_G2}
+          data={data}
+          hidden={hidden}
+          onToggle={toggleSeries}
+        />
 
-        <Stack gap="md" style={{ flex: '1 1 280px', minWidth: 260 }}>
+        {/* 우측 범례 설명 */}
+        <Stack gap="md" style={{ flex: '0 1 260px', minWidth: 220 }}>
           <div>
             <Text size="xs" fw={700} mb={4} c="dark">📊 축(지표)의 의미 — 바깥쪽일수록 우수</Text>
             <Stack gap={3}>
@@ -264,7 +349,6 @@ export default function StrategyRadarChart() {
               ))}
             </Stack>
           </div>
-
           <div>
             <Text size="xs" fw={700} mb={4} c="dark">🧬 전략(선) 색상</Text>
             <Stack gap={3}>
@@ -283,6 +367,59 @@ export default function StrategyRadarChart() {
           </div>
         </Stack>
       </div>
+
+      {/* ④ Sim7 리베로 2주 판단 vs 실제 시장 차트 */}
+      <Divider mt="xl" mb="md" label="Sim7 리베로 — 2주 시장 판단 vs 실제 장" labelPosition="center" />
+      <Group gap={6} mb={8}>
+        <IconActivity size={18} color="#7950f2" />
+        <Text size="sm" fw={700}>리베로 bull_score vs KOSPI 실제 Breadth (최근 14 거래일)</Text>
+      </Group>
+      <Text size="xs" c="dimmed" mb={8}>
+        · <b style={{ color: '#7950f2' }}>보라선</b>: Sim7의 시장 판단 점수 (bull_score 0~100) &nbsp;
+        · <b style={{ color: '#868e96' }}>회색선</b>: KOSPI top100 실제 Breadth (상승 종목 비율 %) &nbsp;
+        · 60 이상 = BULL, 40 이하 = BEAR
+      </Text>
+      {sim7Loading ? (
+        <Group justify="center" p="lg"><Loader size="xs" /></Group>
+      ) : sim7Data.length === 0 ? (
+        <Text size="xs" c="dimmed" ta="center" p="lg">데이터가 아직 없습니다. 리베로가 실행되면 자동으로 채워집니다.</Text>
+      ) : (
+        <div style={{ height: 260 }}>
+          <ResponsiveContainer>
+            <LineChart data={sim7Data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              {/* 배경 구역 */}
+              <ReferenceArea y1={60} y2={100} fill="#2f9e44" fillOpacity={0.07} />
+              <ReferenceArea y1={40} y2={60} fill="#f08c00" fillOpacity={0.07} />
+              <ReferenceArea y1={0} y2={40} fill="#fa5252" fillOpacity={0.07} />
+              <CartesianGrid stroke="#e9ecef" strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickCount={6} width={30} />
+              <Tooltip content={<Sim7Tooltip />} />
+              <ReferenceLine y={60} stroke="#2f9e44" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BULL', position: 'insideTopRight', fontSize: 9, fill: '#2f9e44' }} />
+              <ReferenceLine y={40} stroke="#fa5252" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BEAR', position: 'insideBottomRight', fontSize: 9, fill: '#fa5252' }} />
+              <Line
+                type="monotone"
+                dataKey="sim7Score"
+                name="Sim7 bull_score"
+                stroke="#7950f2"
+                strokeWidth={2}
+                dot={{ r: 3, fill: '#7950f2' }}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="marketBreadth"
+                name="실제 Breadth"
+                stroke="#868e96"
+                strokeWidth={2}
+                strokeDasharray="5 3"
+                dot={{ r: 3, fill: '#868e96' }}
+                connectNulls
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </Card>
   );
 }

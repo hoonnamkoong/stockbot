@@ -106,6 +106,18 @@ class LiberoSimulator(BaseSimulator):
         history = history[-5:]
         confirmed_regime, confidence = self._confirm_regime(history)
 
+        # 날짜별 판단 로그 (최근 30일 유지, 하루 1회만 기록)
+        today_str = get_kst_now().strftime('%Y-%m-%d')
+        daily_log = list(self.state.get('daily_regime_log', []))
+        if not daily_log or daily_log[-1].get('date') != today_str:
+            daily_log.append({
+                'date': today_str,
+                'regime': confirmed_regime,
+                'bull_score': bull_score,
+                'breadth': breadth,
+            })
+            daily_log = daily_log[-30:]
+
         self.state.update({
             'last_run': get_kst_now().strftime('%Y-%m-%d %H:%M:%S'),
             'current_regime': confirmed_regime,
@@ -122,6 +134,7 @@ class LiberoSimulator(BaseSimulator):
             'regime_history': history,
             'recommended_sims': self.REGIME_TO_SIMS.get(confirmed_regime, []),
             'sample_size': total,
+            'daily_regime_log': daily_log,
         })
         self.save_state()
         return self.state

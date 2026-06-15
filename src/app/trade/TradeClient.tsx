@@ -511,11 +511,12 @@ function TradeContent() {
             { id: 'sim4_daytrading',   key: 'sim4_daytrading',   label: '상승 단타형 (Sim 4-1)',   color: 'teal',   type: 'sim4_bull_daytrading' },
             { id: 'sim5',              key: 'sim5',              label: '추세 눌림목형 (Sim 5)',    color: 'orange', type: 'sim_sideways' },
             { id: 'sim6',              key: 'sim6',              label: '하락 줍줍형 (Sim 6)',      color: 'cyan',   type: 'sim_bear' },
+            { id: 'sim8',              key: 'sim8',              label: '리포트 팔로워 (Sim 8)',    color: 'pink',   type: 'sim8_report_follower' },
         ];
         return (
             <Stack gap="xl">
                 <Group justify="space-between">
-                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>6-Track 지능형 시뮬레이션</Title>
+                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>8-Track 지능형 시뮬레이션</Title>
                     <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
                 </Group>
                 <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">

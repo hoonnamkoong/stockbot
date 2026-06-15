@@ -184,6 +184,11 @@ class TradeEngineWorker(BaseWorker):
                         sim_prices = current_prices
                     sim.run(sim_candidates, current_prices=sim_prices)
                     self.log(f"  {sim.__class__.__name__} 완료")
+                    # Libero 캘리브레이션: run 직후 실제 KOSPI 브레드스 기록
+                    if getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator':
+                        actual_breadth = self._get_actual_breadth_from_csv()
+                        if actual_breadth is not None:
+                            sim.record_calibration(actual_breadth)
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
 
@@ -268,6 +273,30 @@ class TradeEngineWorker(BaseWorker):
             pass
 
         return enriched
+
+    def _get_actual_breadth_from_csv(self, csv_path: str = 'output/kospi_top100_close.csv') -> float | None:
+        """KOSPI top100 CSV의 최근 2행으로 오늘 실제 브레드스(상승 종목 비율%) 산출."""
+        try:
+            with open(csv_path, 'r', encoding='utf-8-sig') as f:
+                lines = [l for l in f.read().split('\n') if l.strip()]
+            if len(lines) < 3:  # 헤더 + 데이터 최소 2행
+                return None
+            prev_cols = lines[-2].split(',')
+            curr_cols = lines[-1].split(',')
+            ups, total = 0, 0
+            for p_str, c_str in zip(prev_cols[1:], curr_cols[1:]):
+                try:
+                    p, c = float(p_str.strip()), float(c_str.strip())
+                    if p > 0:
+                        total += 1
+                        if c > p:
+                            ups += 1
+                except ValueError:
+                    continue
+            return round(ups / total * 100, 1) if total > 0 else None
+        except Exception as e:
+            self.log_error(f"KOSPI 브레드스 CSV 산출 실패: {e}")
+            return None
 
     def _fetch_portfolio_prices(self, codes: list) -> dict:
         """

@@ -6,6 +6,9 @@
 Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 """
 
+import json
+import os
+
 from src.pipeline.context import PipelineContext
 from src.data.storage_manager import StorageManager
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
@@ -79,6 +82,29 @@ def run_pipeline(ctx: PipelineContext) -> None:
     if not final_picks:
         # [Bug 1 Fix] 신규 picks 없어도 reports.json 항상 재생성
         storage.rebuild_reports_index(ctx.now_kst)
+
+    # ── Stage 3.6: Sim8 신규 매수 ────────────────────────────────
+    # rank_and_recommendation이 final_picks에 역전파된 이후 실행
+    try:
+        strong_picks = [
+            p for p in final_picks
+            if '강력 매수' in (p.get('rank_and_recommendation') or '')
+        ]
+        bull_score = 50.0
+        try:
+            with open(os.path.join('data', 'sim_libero_state.json'), 'r', encoding='utf-8') as _f:
+                bull_score = float(json.load(_f).get('bull_score', 50.0))
+        except Exception:
+            pass
+
+        if strong_picks and bull_score >= 45.0:
+            from src.strategy.simulators.sim8_report_follower import ReportFollowerSimulator
+            ctx.log(f"▶ Stage 3.6: Sim8 강력 매수 처리 ({len(strong_picks)}개 / bull_score={bull_score:.1f})")
+            ReportFollowerSimulator().buy_from_report(strong_picks, bull_score=bull_score)
+        else:
+            ctx.log(f"▶ Stage 3.6: Sim8 스킵 (강력매수={len(strong_picks)}개 / bull_score={bull_score:.1f})")
+    except Exception as _e:
+        ctx.log(f"[Warn] Stage 3.6 Sim8 실패: {_e}")
 
     # ── Stage 4: 텔레그램 발송 + 최종 저장 ───────────────────────
     ctx.log("▶ Stage 4: 리포트 발송 + 저장")

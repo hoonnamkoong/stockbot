@@ -87,6 +87,12 @@ simulators:
     description: "리베로 - 시장 국면(BULL/SIDEWAYS/BEAR) 감지 + 전략 추천 (매매 없음)"
     active: true
 
+  - id: "sim8_report_follower"
+    module: "src.strategy.simulators.sim8_report_follower"
+    class: "ReportFollowerSimulator"
+    description: "리포트 팔로워 — 딥다이브 강력 매수 종목 자동 매수 + 트레일링 라이딩"
+    active: true
+
   # 새 시뮬레이터 추가 예시:
   # - id: "sim_momentum"
   #   module: "src.strategy.simulators.sim4_momentum"

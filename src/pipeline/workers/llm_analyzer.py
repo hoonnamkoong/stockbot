@@ -131,11 +131,14 @@ class LLMAnalyzerWorker(BaseWorker):
             # 2. 리포트 생성 (추천 2개 + 매도 1개)
             report_str = advisor.generate_deep_dive_report(detail_picks, sell_candidate=sell_candidate)
             
-            # 3. 상세 텍스트 백필 (기존 로직 유지)
+            # 3. 상세 텍스트 및 추천 등급 백필
             for p in final_picks:
                 dp = next((c for c in detail_picks if c['code'] == p['code']), None)
-                if dp and 'deep_dive_text' in dp:
-                    p['deep_dive_text'] = dp['deep_dive_text']
+                if dp:
+                    if 'deep_dive_text' in dp:
+                        p['deep_dive_text'] = dp['deep_dive_text']
+                    if 'rank_and_recommendation' in dp:
+                        p['rank_and_recommendation'] = dp['rank_and_recommendation']
             return report_str
         except Exception as e:
             self.log_error(f"딥다이브 리포트 생성 실패: {e}")

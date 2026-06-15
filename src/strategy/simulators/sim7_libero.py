@@ -138,3 +138,29 @@ class LiberoSimulator(BaseSimulator):
         })
         self.save_state()
         return self.state
+
+    def record_calibration(self, actual_kospi_breadth: float) -> None:
+        """
+        실제 KOSPI 브레드스와 리베로 추정치의 갭을 calibration_log에 기록.
+        하루 1회만 기록 (중복 방지). 최대 90일 롤링 보관.
+        """
+        today_str = get_kst_now().strftime('%Y-%m-%d')
+        log = list(self.state.get('calibration_log', []))
+        if log and log[-1].get('date') == today_str:
+            return
+
+        libero_breadth = self.state.get('metrics', {}).get('breadth_score', 0.0)
+        bull_score = self.state.get('bull_score', 0.0)
+        regime = self.state.get('current_regime', 'SIDEWAYS')
+
+        log.append({
+            'date':                 today_str,
+            'libero_breadth':       round(libero_breadth, 1),
+            'actual_kospi_breadth': round(actual_kospi_breadth, 1),
+            'gap':                  round(libero_breadth - actual_kospi_breadth, 1),
+            'bull_score':           round(bull_score, 1),
+            'regime':               regime,
+        })
+        self.state['calibration_log'] = log[-90:]
+        self.save_state()
+        print(f"[Libero] 캘리브레이션: libero={libero_breadth:.1f}% / actual={actual_kospi_breadth:.1f}% / gap={libero_breadth - actual_kospi_breadth:+.1f}%")

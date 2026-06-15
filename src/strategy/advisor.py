@@ -370,6 +370,7 @@ class StrategyAdvisor:
 
                 data = json.loads(response.text)
                 recommendation = data.get('rank_and_recommendation', '')
+                stock['rank_and_recommendation'] = recommendation  # Sim8 Stage 3.6용
 
                 def to_bullets(v):
                     if isinstance(v, list):

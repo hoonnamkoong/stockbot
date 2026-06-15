@@ -30,10 +30,11 @@ const SERIES = [
   { key: 'sim4_daytrading', label: '상승 단타형 (Sim 4-1)', color: '#0ca678', desc: 'Sim4 기반 당일 데이트레이딩 — 빠른 익절' },
   { key: 'sim5',            label: '추세 눌림목형 (Sim 5)',  color: '#f08c00', desc: '상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절' },
   { key: 'sim6',            label: '하락 줍줍형 (Sim 6)',   color: '#0c8599', desc: '폭락 후 데드캣 반등 2.5% 빠른 익절' },
+  { key: 'sim8',            label: '리포트 팔로워 (Sim 8)', color: '#e64980', desc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩' },
 ];
 
-const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
-const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5', 'sim6'].includes(s.key));
+const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3', 'sim4', 'sim4_daytrading'].includes(s.key));
+const SERIES_G2 = SERIES.filter(s => ['sim5', 'sim6', 'sim8'].includes(s.key));
 
 // ID → 라벨 (리베로 추천 표시용)
 const ID_LABEL: Record<string, string> = {
@@ -160,6 +161,7 @@ export default function StrategyRadarChart() {
   const [loading, setLoading] = useState(true);
   const [sim7Data, setSim7Data] = useState<any[]>([]);
   const [sim7Loading, setSim7Loading] = useState(true);
+  const [sim7HitRate, setSim7HitRate] = useState<{ hits: number; total: number; pct: number } | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -204,25 +206,39 @@ export default function StrategyRadarChart() {
       try {
         const res = await fetch(`/api/simulation/libero-history?cb=${Date.now()}`);
         const d = await res.json();
-        // 실제 시장 breadth 데이터
+
+        // 실제 KOSPI 브레드스 맵
         const marketMap: Record<string, number> = {};
         for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
-        // 리베로 log와 병합
-        const liberoMap: Record<string, number> = {};
-        for (const l of (d.libero_log ?? [])) liberoMap[l.date] = l.bull_score;
 
-        // 최근 14 거래일 날짜 합집합 정렬
+        // 리베로 자체 breadth 맵 (bull_score 대신 breadth — 같은 단위)
+        const liberoMap: Record<string, number> = {};
+        for (const l of (d.libero_log ?? [])) {
+          if (l.breadth != null) liberoMap[l.date] = l.breadth;
+        }
+
         const allDates = Array.from(new Set([
           ...Object.keys(marketMap),
           ...Object.keys(liberoMap),
         ])).sort().slice(-14);
 
         const merged = allDates.map(date => ({
-          date: date.slice(5), // "MM-DD" 형식
+          date: date.slice(5),
           sim7Score: liberoMap[date] ?? null,
           marketBreadth: marketMap[date] ?? null,
+          gap: (liberoMap[date] != null && marketMap[date] != null)
+            ? parseFloat((liberoMap[date] - marketMap[date]).toFixed(1))
+            : null,
         }));
         setSim7Data(merged);
+
+        // 방향 적중률: 60이상=BULL, 40이하=BEAR, 사이=SIDEWAYS
+        const zone = (v: number) => v >= 60 ? 'BULL' : v <= 40 ? 'BEAR' : 'SIDEWAYS';
+        const comparable = merged.filter(r => r.sim7Score !== null && r.marketBreadth !== null);
+        const hits = comparable.filter(r => zone(r.sim7Score!) === zone(r.marketBreadth!));
+        if (comparable.length > 0) {
+          setSim7HitRate({ hits: hits.length, total: comparable.length, pct: Math.round(hits.length / comparable.length * 100) });
+        }
       } catch {
         setSim7Data([]);
       } finally {
@@ -319,18 +335,18 @@ export default function StrategyRadarChart() {
         </Table.Tbody>
       </Table>
 
-      {/* ③ 레이더 차트 — Sim1~3 / Sim4~6 분리 */}
+      {/* ③ 레이더 차트 — Sim1~4-1 / Sim5~8 분리 */}
       <Divider mb="md" label="Radar Chart (전략 프로파일)" labelPosition="center" />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
         <RadarPanel
-          title="Sim 1~3 (심리·수급·리스크)"
+          title="Sim 1~4-1 (심리·수급·리스크·모멘텀)"
           series={SERIES_G1}
           data={data}
           hidden={hidden}
           onToggle={toggleSeries}
         />
         <RadarPanel
-          title="Sim 4~6 (모멘텀·단타·눌림·줍줍)"
+          title="Sim 5~8 (눌림·줍줍·리포트팔로워)"
           series={SERIES_G2}
           data={data}
           hidden={hidden}
@@ -370,13 +386,22 @@ export default function StrategyRadarChart() {
 
       {/* ④ Sim7 리베로 2주 판단 vs 실제 시장 차트 */}
       <Divider mt="xl" mb="md" label="Sim7 리베로 — 2주 시장 판단 vs 실제 장" labelPosition="center" />
-      <Group gap={6} mb={8}>
+      <Group gap={6} mb={4}>
         <IconActivity size={18} color="#7950f2" />
-        <Text size="sm" fw={700}>리베로 bull_score vs KOSPI 실제 Breadth (최근 14 거래일)</Text>
+        <Text size="sm" fw={700}>리베로 추정 Breadth vs KOSPI 실제 Breadth (최근 14 거래일)</Text>
+        {sim7HitRate && (
+          <Badge
+            color={sim7HitRate.pct >= 60 ? 'green' : sim7HitRate.pct >= 40 ? 'yellow' : 'red'}
+            variant="light" size="sm"
+          >
+            방향 적중 {sim7HitRate.hits}/{sim7HitRate.total}일 ({sim7HitRate.pct}%)
+          </Badge>
+        )}
       </Group>
       <Text size="xs" c="dimmed" mb={8}>
-        · <b style={{ color: '#7950f2' }}>보라선</b>: Sim7의 시장 판단 점수 (bull_score 0~100) &nbsp;
+        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 추정 Breadth (버즈 유니버스 상승 비율 %) &nbsp;
         · <b style={{ color: '#868e96' }}>회색선</b>: KOSPI top100 실제 Breadth (상승 종목 비율 %) &nbsp;
+        · <b style={{ color: '#ced4da' }}>점선</b>: 갭 (리베로 − 실제) &nbsp;
         · 60 이상 = BULL, 40 이하 = BEAR
       </Text>
       {sim7Loading ? (
@@ -395,12 +420,13 @@ export default function StrategyRadarChart() {
               <XAxis dataKey="date" tick={{ fontSize: 10 }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickCount={6} width={30} />
               <Tooltip content={<Sim7Tooltip />} />
+              <ReferenceLine y={0} stroke="#ced4da" strokeDasharray="2 2" strokeWidth={1} />
               <ReferenceLine y={60} stroke="#2f9e44" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BULL', position: 'insideTopRight', fontSize: 9, fill: '#2f9e44' }} />
               <ReferenceLine y={40} stroke="#fa5252" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BEAR', position: 'insideBottomRight', fontSize: 9, fill: '#fa5252' }} />
               <Line
                 type="monotone"
                 dataKey="sim7Score"
-                name="Sim7 bull_score"
+                name="리베로 추정 Breadth"
                 stroke="#7950f2"
                 strokeWidth={2}
                 dot={{ r: 3, fill: '#7950f2' }}
@@ -414,6 +440,16 @@ export default function StrategyRadarChart() {
                 strokeWidth={2}
                 strokeDasharray="5 3"
                 dot={{ r: 3, fill: '#868e96' }}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="gap"
+                name="갭 (리베로−실제)"
+                stroke="#ced4da"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+                dot={false}
                 connectNulls
               />
             </LineChart>

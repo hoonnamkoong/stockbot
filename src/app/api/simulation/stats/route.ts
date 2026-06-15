@@ -16,7 +16,8 @@ export async function GET() {
             { id: 'sim4',            file: 'sim_bull_state.json' },
             { id: 'sim4_daytrading', file: 'sim_bulldaytrade_state.json' },
             { id: 'sim5',            file: 'sim_sideways_state.json' },
-            { id: 'sim6',            file: 'sim_bear_state.json' }
+            { id: 'sim6',            file: 'sim_bear_state.json' },
+            { id: 'sim8',            file: 'sim_reportfollower_state.json' },
         ];
 
         const results: any = {};

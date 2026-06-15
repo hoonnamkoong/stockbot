@@ -85,8 +85,9 @@ export async function GET(req: NextRequest) {
             { type: 'sim_bull',             name: 'trade_history_sim_bull.csv' },
             { type: 'sim4_bull_daytrading', name: 'trade_history_sim_bulldaytrade.csv' },
             { type: 'sim_sideways',         name: 'trade_history_sim_sideways.csv' },
-            { type: 'sim_bear',         name: 'trade_history_sim_bear.csv' },
-            { type: 'sim_original',     name: 'trade_history_sim_original.csv' },
+            { type: 'sim_bear',             name: 'trade_history_sim_bear.csv' },
+            { type: 'sim8_report_follower', name: 'trade_history_sim_reportfollower.csv' },
+            { type: 'sim_original',         name: 'trade_history_sim_original.csv' },
             { type: 'sim_conservative', name: 'trade_history_sim_conservative.csv' },
             { type: 'sim_aggressive',   name: 'trade_history_sim_aggressive.csv' }
         ];

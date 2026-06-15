@@ -45,10 +45,22 @@ Sim8은 유니버스 구성을 하지 않고, 오케스트레이터의 **Stage 3
 
 ### 2-4. 포지션 사이징
 
-- 종목당 비중: 보유 현금의 **20%**
 - MAX_HOLDINGS: **5**
-- 총 배치 한도: 100% (5 × 20%)
-- 매수 수량: `floor(cash * 0.20 / current_price)`
+- 종목당 비중: **리베로 bull_score 선형 스케일링 (최소 10%, 최대 20%)**
+
+```python
+WEIGHT_MIN = 0.10   # bull_score = 45 (진입 게이트) 시
+WEIGHT_MAX = 0.20   # bull_score = 100 시
+GATE       = 45
+
+weight = WEIGHT_MIN + (WEIGHT_MAX - WEIGHT_MIN) * (bull_score - GATE) / (100 - GATE)
+weight = max(WEIGHT_MIN, min(WEIGHT_MAX, weight))  # clamp
+```
+
+예시: bull_score 45 → 10%, 72 → 15%, 100 → 20%
+
+- 매수 수량: `floor(cash * weight / current_price)`
+- 총 배치 한도: bull_score에 따라 50~100% (5슬롯 × 10~20%)
 
 ### 2-5. 청산 조건 (승자 라이딩 철학)
 
@@ -210,8 +222,8 @@ Sim7 리베로는 IS_ANALYZER=True로 성과 데이터 없음 → 레이더 차�
 | 항목 | 결정값 | 근거 |
 |---|---|---|
 | 진입 필터 | "강력 매수"만 | 빈도 제한 + 고확신 픽만 추적 |
-| 비중 | 20% | 사용자 지정 |
-| MAX_HOLDINGS | 5 | 20% × 5 = 100% 배치 한도 |
+| 비중 | bull_score 선형 10~20% | 시장 강도 연동, 단일 권위 신호 |
+| MAX_HOLDINGS | 5 | 10~20% × 5 = 50~100% 배치 한도 |
 | 교체 매매 | 없음 | 승자 라이딩 — 슬롯 빌 때까지 대기 |
 | 리베로 스탑 | 없음 | 진입 게이트에서 이미 처리, 트레일링으로 충분 |
 | 트레일링 | -5% | 라이딩 유지 |

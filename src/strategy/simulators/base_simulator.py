@@ -176,6 +176,8 @@ class BaseSimulator:
         self.state['cash'] -= total_cost
         self.state['invested'] += cost
         self.state['total_fees'] = self.state.get('total_fees', 0) + fee # 수수료 누적
+        if 'raw_stats' in self.state:
+            self.state['raw_stats']['cash'] = self.state['cash']
         if code in self.state['portfolio']:
             old_item = self.state['portfolio'][code]
             old_q = old_item['quantity']
@@ -215,6 +217,8 @@ class BaseSimulator:
         is_win = net > (q_to_sell * avg_price)
         self.state['cash'] += net
         self.state['invested'] = max(0, self.state['invested'] - (q_to_sell * avg_price))
+        if 'raw_stats' in self.state:
+            self.state['raw_stats']['cash'] = self.state['cash']
         today_str = get_kst_now().strftime('%Y-%m-%d')
         self.state.setdefault('daily_trades', []).append({"date": today_str, "is_win": is_win})
         if q_to_sell >= p_item['quantity']:

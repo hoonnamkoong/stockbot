@@ -30,31 +30,31 @@ export async function GET() {
                 
                 const state = await res.json();
                 
-                // 간단한 통계 산출 (평가 금액 합산)
-                // 상태 데이터에 이미 total_asset 등이 포함되어 있다고 가정하거나, 
-                // 포트폴리오 정보를 기반으로 계산
+                // 항상 live state.cash 기준으로 계산 (raw_stats.cash는 buy() 직후 stale 가능)
+                const currentPrices = state.raw_stats?.current_prices || {};
                 let portfolioValue = 0;
                 if (state.portfolio) {
-                    Object.values(state.portfolio).forEach((item: any) => {
-                        // Python 시뮬레이터가 저장한 마지막 가격 혹은 평균 단가 사용
-                        const price = item.current_price || item.avg_price || 0;
+                    Object.entries(state.portfolio).forEach(([code, item]: [string, any]) => {
+                        const price = currentPrices[code] || item.current_price || item.avg_price || 0;
                         const qty = item.quantity || item.qty || 0;
                         portfolioValue += price * qty;
                     });
                 }
 
-                const totalAsset = (state.cash || 0) + portfolioValue;
+                const liveCash = state.cash || 0;
+                const totalAsset = liveCash + portfolioValue;
                 const initialCash = state.initial_cash || 3000000;
                 const profit = totalAsset - initialCash;
-                const returnRate = (profit / initialCash) * 100;
+                const returnRate = initialCash > 0 ? (profit / initialCash) * 100 : 0;
 
                 results[type.id] = {
-                    raw: state.raw_stats || {
-                        cash: state.cash,
+                    raw: {
+                        ...(state.raw_stats || {}),
+                        cash: liveCash,
                         portfolio_value: portfolioValue,
                         total_asset: totalAsset,
-                        profit: profit,
-                        profit_rate: returnRate
+                        profit,
+                        profit_rate: returnRate,
                     },
                     normalized: state.normalized_stats || {},
                     portfolio: state.portfolio || {}

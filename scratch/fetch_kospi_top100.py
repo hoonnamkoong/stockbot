@@ -1,0 +1,236 @@
+"""
+KOSPI 거래대금 상위 100 종목 + 일별 종가 100건 수집
+=======================================================
+출력: output/kospi_top100_close.csv
+
+실행 전 .env 파일에 다음 항목 필요:
+  KIS_APP_KEY=
+  KIS_APP_SECRET=...
+"""
+
+import os
+import sys
+import time
+import json
+import csv
+import requests
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+# ── 0. 환경변수 로드 ──────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    if Path(".env").exists():
+        load_dotenv(".env", override=True)
+except ImportError:
+    pass
+
+APP_KEY    = os.environ.get("KIS_APP_KEY", "").strip()
+APP_SECRET = os.environ.get("KIS_APP_SECRET", "").strip()
+BASE_URL   = "https://openapi.koreainvestment.com:9443"
+
+if not APP_KEY or not APP_SECRET:
+    print("KIS_APP_KEY / KIS_APP_SECRET 환경변수가 없습니다.")
+    sys.exit(1)
+
+
+# ── 1. 토큰 발급 ──────────────────────────────────────
+def get_token() -> str:
+    cache_path = Path("data/kis_token_cache.json")
+    if cache_path.exists():
+        try:
+            d = json.loads(cache_path.read_text(encoding="utf-8"))
+            token = d.get("access_token", "")
+            exp   = d.get("expires_at", "")
+            if token and exp:
+                exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone(timedelta(hours=9)))
+                if (exp_dt - datetime.now().astimezone()).total_seconds() > 7200:
+                    print(f"[토큰] 캐시 사용 (만료: {exp[:16]})")
+                    return token
+        except Exception:
+            pass
+
+    print("[토큰] 새로 발급 중...")
+    r = requests.post(
+        f"{BASE_URL}/oauth2/tokenP",
+        json={"grant_type": "client_credentials", "appkey": APP_KEY, "appsecret": APP_SECRET},
+        timeout=10,
+    )
+    r.raise_for_status()
+    body = r.json()
+    token = body["access_token"]
+    exp   = body.get("access_token_token_expired", "")
+
+    cache_path.parent.mkdir(exist_ok=True)
+    cache_path.write_text(
+        json.dumps({"access_token": token, "expires_at": exp}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    print(f"[토큰] 발급 완료 (만료: {exp[:16]})")
+    return token
+
+
+# ── 2. 공통 헤더 ─────────────────────────────────────
+def headers(tr_id: str, token: str) -> dict:
+    return {
+        "Content-Type": "application/json; charset=utf-8",
+        "authorization": f"Bearer {token}",
+        "appkey": APP_KEY,
+        "appsecret": APP_SECRET,
+        "tr_id": tr_id,
+    }
+
+
+# ── 3. KOSPI 거래대금 순위 상위 100 ──────────────────
+def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
+    """
+    네이버 금융 sise_quant 페이지에서 KOSPI 거래대금 상위 100 종목.
+    KIS volume-rank API는 1회 30건 고정이라 네이버 1회 스크래핑으로 대체.
+    ETF/ETN 제외 후 100건 채움.
+    """
+    from bs4 import BeautifulSoup
+
+    EXCLUDE = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
+    naver_hdrs = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Referer': 'https://finance.naver.com/',
+    }
+
+    results = []
+    seen_codes: set = set()
+    print("[STEP 1] KOSPI 거래대금 상위 100 종목 수집 중 (네이버 금융, 1회)...")
+    for page in range(1, 10):
+        url = f"https://finance.naver.com/sise/sise_quant.naver?sosok=0&page={page}"
+        r = requests.get(url, headers=naver_hdrs, timeout=10)
+        soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
+        table = soup.select_one('table.type_2')
+        if not table:
+            break
+        new_in_page = 0
+        for row in table.select('tr'):
+            cols = row.select('td')
+            if len(cols) < 7:
+                continue
+            name_tag = cols[1].select_one('a')
+            if not name_tag:
+                continue
+            name = name_tag.get_text(strip=True)
+            if any(k in name.upper() for k in EXCLUDE):
+                continue
+            code = name_tag['href'].split('code=')[-1]
+            if code in seen_codes:
+                continue
+            seen_codes.add(code)
+            price_str = cols[2].get_text(strip=True).replace(',', '')
+            amt_str   = cols[6].get_text(strip=True).replace(',', '')
+            price     = int(price_str) if price_str.isdigit() else 0
+            trade_amt = int(amt_str) * 1_000_000 if amt_str.isdigit() else 0
+            results.append({"code": code, "name": name, "price": str(price), "trade_amt": str(trade_amt)})
+            new_in_page += 1
+            if len(results) >= 100:
+                break
+        if len(results) >= 100:
+            break
+        if new_in_page == 0:  # 페이지 전체가 중복 → 더 이상 새 종목 없음
+            break
+        time.sleep(0.3)
+
+    results = results[:100]
+    print(f"  → {len(results)}개 종목 수집 완료")
+    return results
+
+
+# ── 4. 종목별 일별 종가 100건 ─────────────────────────
+def fetch_daily_close(code: str, token: str, count: int = 100) -> list[dict]:
+    """
+    KIS 국내주식 기간별 시세 (TR: FHKST03010100)
+    최대 100건 반환. count=100이면 1회 호출로 충분.
+    """
+    today     = datetime.now().strftime("%Y%m%d")
+    start_dt  = (datetime.now() - timedelta(days=200)).strftime("%Y%m%d")  # 여유있게 200일 전
+
+    url = f"{BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
+    params = {
+        "FID_COND_MRKT_DIV_CODE": "J",
+        "FID_INPUT_ISCD": code,
+        "FID_INPUT_DATE_1": start_dt,
+        "FID_INPUT_DATE_2": today,
+        "FID_PERIOD_DIV_CODE": "D",   # 일별
+        "FID_ORG_ADJ_PRC": "0",       # 수정주가
+    }
+    r = requests.get(url, headers=headers("FHKST03010100", token), params=params, timeout=10)
+    body = r.json()
+
+    if body.get("rt_cd") != "0":
+        return []
+
+    rows = body.get("output2", body.get("output", []))
+    if not isinstance(rows, list):
+        rows = [rows]
+
+    records = []
+    for row in rows:
+        date  = row.get("stck_bsop_date", "")
+        close = row.get("stck_clpr", "")
+        if date and close:
+            records.append({"date": date, "close": close})
+
+    # 내림차순(최신→오래된) → 오름차순으로 뒤집기
+    records.reverse()
+    return records[-count:]  # 최신 100건
+
+
+# ── 5. 메인 ──────────────────────────────────────────
+def main():
+    token = get_token()
+    stocks = fetch_top100_by_trade_amount(token)
+
+    if not stocks:
+        print("[오류] 종목 목록을 가져오지 못했습니다.")
+        sys.exit(1)
+
+    # Wide 형태 CSV: 행=날짜, 열=종목코드
+    # 먼저 모든 날짜 수집
+    all_data: dict[str, dict[str, str]] = {}   # {code: {date: close}}
+    all_dates: set[str] = set()
+
+    print(f"\n[STEP 2] {len(stocks)}개 종목 종가 수집 중...")
+    for i, s in enumerate(stocks, 1):
+        code = s["code"]
+        records = fetch_daily_close(code, token, count=100)
+        all_data[code] = {r["date"]: r["close"] for r in records}
+        all_dates.update(all_data[code].keys())
+
+        if i % 10 == 0:
+            print(f"  {i}/{len(stocks)} 완료...")
+        time.sleep(0.06)  # ~17 req/s (20/s 제한 안전 여유)
+
+    sorted_dates = sorted(all_dates)[-100:]  # 최신 100거래일
+
+    # CSV 저장: 행=날짜, 열=종목
+    out_path = Path("output/kospi_top100_close.csv")
+    out_path.parent.mkdir(exist_ok=True)
+
+    with out_path.open("w", newline="", encoding="utf-8-sig") as f:
+        header = ["date"] + [f"{s['code']}_{s['name']}" for s in stocks]
+        writer = csv.DictWriter(f, fieldnames=header)
+        writer.writeheader()
+        for date in sorted_dates:
+            row = {"date": date}
+            for s in stocks:
+                row[f"{s['code']}_{s['name']}"] = all_data[s["code"]].get(date, "")
+            writer.writerow(row)
+
+    print(f"\n[완료] {out_path} 저장 ({len(sorted_dates)}행 × {len(stocks)+1}열)")
+
+    # 요약 출력
+    print("\n=== 거래대금 상위 10 ===")
+    for i, s in enumerate(stocks[:10], 1):
+        amt = int(s["trade_amt"]) if s["trade_amt"].isdigit() else 0
+        print(f"  {i:2}. {s['name']}({s['code']})  {amt/1e8:,.0f}억원")
+
+
+if __name__ == "__main__":
+    main()

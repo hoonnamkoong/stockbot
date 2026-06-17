@@ -30,12 +30,12 @@ const SERIES = [
   { key: 'sim4_daytrading', label: '상승 단타형 (Sim 4-1)', color: '#0ca678', desc: 'Sim4 기반 당일 데이트레이딩 — 빠른 익절' },
   { key: 'sim5',            label: '추세 눌림목형 (Sim 5)',  color: '#f08c00', desc: '상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절' },
   { key: 'sim6',            label: '하락 줍줍형 (Sim 6)',   color: '#0c8599', desc: '폭락 후 데드캣 반등 2.5% 빠른 익절' },
-  { key: 'sim8',            label: '리포트 팔로워 (Sim 8)', color: '#e64980', desc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩' },
+  { key: 'sim7',            label: '리포트 팔로워 (Sim 7)', color: '#e64980', desc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩' },
 ];
 
 const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
 const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5'].includes(s.key));
-const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim8'].includes(s.key));
+const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim7'].includes(s.key));
 
 // ID → 라벨 (리베로 추천 표시용)
 const ID_LABEL: Record<string, string> = {
@@ -355,7 +355,7 @@ export default function StrategyRadarChart() {
           onToggle={toggleSeries}
         />
         <RadarPanel
-          title="Sim 6~8 (줍줍·리포트팔로워)"
+          title="Sim 6~7 (줍줍·리포트팔로워)"
           series={SERIES_G3}
           data={data}
           hidden={hidden}
@@ -393,8 +393,8 @@ export default function StrategyRadarChart() {
         </Stack>
       </div>
 
-      {/* ④ Sim7 리베로 2주 판단 vs 실제 시장 차트 */}
-      <Divider mt="xl" mb="md" label="Sim7 리베로 — 2주 시장 판단 vs 실제 장" labelPosition="center" />
+      {/* ④ Sim0 리베로 2주 판단 vs 실제 시장 차트 */}
+      <Divider mt="xl" mb="md" label="Sim0 리베로 — 2주 시장 판단 vs 실제 장" labelPosition="center" />
       <Group gap={6} mb={4}>
         <IconActivity size={18} color="#7950f2" />
         <Text size="sm" fw={700}>리베로 추정 Breadth vs KOSPI 실제 Breadth (최근 14 거래일)</Text>

@@ -135,7 +135,7 @@ jobs:
             [ "$(basename "$f")" = "trade_history_real.csv" ] && continue
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done
-          # KOSPI top100 종가 CSV (Sim7 차트용 실제 시장 breadth 계산에 사용)
+          # KOSPI top100 종가 CSV (Sim0 차트용 실제 시장 breadth 계산에 사용)
           [ -f output/kospi_top100_close.csv ] && cp output/kospi_top100_close.csv db_data_repo/data/ || true
           cp -r data/*.xlsx db_data_repo/data/ 2>/dev/null || true
           cp -r data/reports/* db_data_repo/data/reports/ 2>/dev/null || true

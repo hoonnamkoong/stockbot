@@ -1,0 +1,38 @@
+{
+  "initial_cash": 0,
+  "cash": 0,
+  "invested": 0,
+  "portfolio": {},
+  "peak_nav": 0,
+  "total_fees": 0,
+  "history": [
+    0
+  ],
+  "daily_trades": [],
+  "market_index_healthy": true,
+  "last_run": "2026-06-04 16:41:29",
+  "current_regime": "BULL",
+  "instant_regime": "BULL",
+  "regime_confidence": 0.6,
+  "bull_score": 83.5,
+  "metrics": {
+    "breadth_score": 91.7,
+    "momentum_score": 26.13,
+    "trend_strength": 93.6,
+    "foreign_score": -0.021,
+    "volatility_score": 16.21
+  },
+  "regime_history": [
+    "SIDEWAYS",
+    "BULL",
+    "BULL",
+    "SIDEWAYS",
+    "BULL"
+  ],
+  "recommended_sims": [
+    "sim4_bull",
+    "sim_psych",
+    "sim_risk"
+  ],
+  "sample_size": 24
+}

@@ -157,7 +157,7 @@ class StorageManager:
     # ================================================================
 
     def _load_market_regime(self) -> tuple:
-        """Sim7 리베로 state에서 시장 국면, bull_score, 상세 메트릭스를 읽는다."""
+        """Sim0 리베로 state에서 시장 국면, bull_score, 상세 메트릭스를 읽는다."""
         path = os.path.join(self.DATA_DIR, "sim_libero_state.json")
         try:
             with open(path, "r", encoding="utf-8-sig") as f:
@@ -186,7 +186,7 @@ class StorageManager:
         month_str = now_kst.strftime('%Y-%m')
         filepath = os.path.join(self.REPORTS_DIR, f"monthly_research_{month_str}.xlsx")
 
-        # Sim7 리베로의 시장 국면 판단을 함께 기록
+        # Sim0 리베로의 시장 국면 판단을 함께 기록
         regime, bull_score, regime_conf, breadth, momentum, trend_str, volatility = self._load_market_regime()
 
         new_rows = []
@@ -200,7 +200,7 @@ class StorageManager:
                 'Stock': d.get('name', 'Unknown'),
                 'Code': d.get('code', 'Unknown'),
                 'Signal': d.get('signal', 'WATCH'),
-                # ── Sim7 장 현황 ────────────────────────────────
+                # ── Sim0 장 현황 ────────────────────────────────
                 'Market Regime': regime,
                 'Bull Score': bull_score,
                 'Regime Confidence': regime_conf,

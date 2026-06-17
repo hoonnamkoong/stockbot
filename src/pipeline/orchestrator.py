@@ -83,7 +83,7 @@ def run_pipeline(ctx: PipelineContext) -> None:
         # [Bug 1 Fix] 신규 picks 없어도 reports.json 항상 재생성
         storage.rebuild_reports_index(ctx.now_kst)
 
-    # ── Stage 3.6: Sim8 신규 매수 ────────────────────────────────
+    # ── Stage 3.6: Sim7 신규 매수 ────────────────────────────────
     # rank_and_recommendation이 final_picks에 역전파된 이후 실행
     try:
         strong_picks = [
@@ -98,13 +98,13 @@ def run_pipeline(ctx: PipelineContext) -> None:
             pass
 
         if strong_picks and bull_score >= 45.0:
-            from src.strategy.simulators.sim8_report_follower import ReportFollowerSimulator
-            ctx.log(f"▶ Stage 3.6: Sim8 강력 매수 처리 ({len(strong_picks)}개 / bull_score={bull_score:.1f})")
+            from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator
+            ctx.log(f"▶ Stage 3.6: Sim7 강력 매수 처리 ({len(strong_picks)}개 / bull_score={bull_score:.1f})")
             ReportFollowerSimulator().buy_from_report(strong_picks, bull_score=bull_score)
         else:
-            ctx.log(f"▶ Stage 3.6: Sim8 스킵 (강력매수={len(strong_picks)}개 / bull_score={bull_score:.1f})")
+            ctx.log(f"▶ Stage 3.6: Sim7 스킵 (강력매수={len(strong_picks)}개 / bull_score={bull_score:.1f})")
     except Exception as _e:
-        ctx.log(f"[Warn] Stage 3.6 Sim8 실패: {_e}")
+        ctx.log(f"[Warn] Stage 3.6 Sim7 실패: {_e}")
 
     # ── Stage 4: 텔레그램 발송 + 최종 저장 ───────────────────────
     ctx.log("▶ Stage 4: 리포트 발송 + 저장")

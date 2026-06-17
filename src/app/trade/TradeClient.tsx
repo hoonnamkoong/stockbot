@@ -511,7 +511,7 @@ function TradeContent() {
             { id: 'sim4_daytrading',   key: 'sim4_daytrading',   label: '상승 단타형 (Sim 4-1)',   color: 'teal',   type: 'sim4_bull_daytrading' },
             { id: 'sim5',              key: 'sim5',              label: '추세 눌림목형 (Sim 5)',    color: 'orange', type: 'sim_sideways' },
             { id: 'sim6',              key: 'sim6',              label: '하락 줍줍형 (Sim 6)',      color: 'cyan',   type: 'sim_bear' },
-            { id: 'sim8',              key: 'sim8',              label: '리포트 팔로워 (Sim 8)',    color: 'pink',   type: 'sim8_report_follower' },
+            { id: 'sim7',              key: 'sim7',              label: '리포트 팔로워 (Sim 7)',    color: 'pink',   type: 'sim7_report_follower' },
         ];
         return (
             <Stack gap="xl">

@@ -551,36 +551,36 @@ function TradeContent() {
                                         <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
                                         <Badge color={sim.color}>{sim.id.toUpperCase()}</Badge>
                                     </Group>
-                                    <Group grow mb="md">
+                                    <SimpleGrid cols={{ base: 3, sm: 6 }} mb="md">
                                         <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">예수금 (잔고)</Text>
-                                            <Text fw={700} size="md">{(Math.round(stats.cash || 0)).toLocaleString()}원</Text>
+                                            <Text size="xs" c="dimmed">예수금</Text>
+                                            <Text fw={700} size="sm">{(Math.round(stats.cash || 0)).toLocaleString()}원</Text>
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">수익률</Text>
-                                            <Text size="md" fw={800} c={(stats.profit_rate || 0) >= 0 ? 'red' : 'blue'}>
+                                            <Text size="sm" fw={800} c={(stats.profit_rate || 0) >= 0 ? 'red' : 'blue'}>
                                                 {(stats.profit_rate || 0).toFixed(2)}%
                                             </Text>
                                         </Stack>
                                         <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">평가손익</Text>
-                                            <Text size="md" fw={800} c={netPL >= 0 ? 'red' : 'blue'}>
+                                            <Text size="xs" c="dimmed">누적 수익</Text>
+                                            <Text size="sm" fw={800} c={netPL >= 0 ? 'red' : 'blue'}>
                                                 {netPL >= 0 ? '+' : ''}{netPL.toLocaleString()}원
                                             </Text>
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">누적 수수료</Text>
-                                            <Text size="md" fw={700} c="gray.6">{(Math.round(stats.total_fees || 0)).toLocaleString()}원</Text>
+                                            <Text size="sm" fw={700} c="gray.6">{(Math.round(stats.total_fees || 0)).toLocaleString()}원</Text>
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">보유 종목</Text>
-                                            <Text size="md" fw={800} c={sim.color}>{(holdings?.length || 0)}개</Text>
+                                            <Text size="sm" fw={800} c={sim.color}>{(holdings?.length || 0)}개</Text>
                                         </Stack>
                                         <Stack gap={2}>
                                             <Text size="xs" c="dimmed">금일 거래</Text>
-                                            <Text size="md" fw={800} c={todayTickerCount > 0 ? 'dark' : 'dimmed'}>{todayTickerCount}종목</Text>
+                                            <Text size="sm" fw={800} c={todayTickerCount > 0 ? 'dark' : 'dimmed'}>{todayTickerCount}종목</Text>
                                         </Stack>
-                                    </Group>
+                                    </SimpleGrid>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
                                     {/* 5행(행 ~61px + 헤더)까지 표시 후 스크롤 */}
                                     {renderPortfolioTable(holdings, false, 360)}

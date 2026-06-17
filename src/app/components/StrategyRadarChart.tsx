@@ -33,8 +33,9 @@ const SERIES = [
   { key: 'sim8',            label: '리포트 팔로워 (Sim 8)', color: '#e64980', desc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩' },
 ];
 
-const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3', 'sim4', 'sim4_daytrading'].includes(s.key));
-const SERIES_G2 = SERIES.filter(s => ['sim5', 'sim6', 'sim8'].includes(s.key));
+const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
+const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5'].includes(s.key));
+const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim8'].includes(s.key));
 
 // ID → 라벨 (리베로 추천 표시용)
 const ID_LABEL: Record<string, string> = {
@@ -211,10 +212,11 @@ export default function StrategyRadarChart() {
         const marketMap: Record<string, number> = {};
         for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
 
-        // 리베로 자체 breadth 맵 (bull_score 대신 breadth — 같은 단위)
+        // 리베로 자체 breadth 맵 (breadth 없으면 bull_score로 폴백)
         const liberoMap: Record<string, number> = {};
         for (const l of (d.libero_log ?? [])) {
-          if (l.breadth != null) liberoMap[l.date] = l.breadth;
+          const val = l.breadth ?? l.bull_score;
+          if (val != null) liberoMap[l.date] = val;
         }
 
         const allDates = Array.from(new Set([
@@ -335,19 +337,26 @@ export default function StrategyRadarChart() {
         </Table.Tbody>
       </Table>
 
-      {/* ③ 레이더 차트 — Sim1~4-1 / Sim5~8 분리 */}
+      {/* ③ 레이더 차트 — 3그룹 분리 */}
       <Divider mb="md" label="Radar Chart (전략 프로파일)" labelPosition="center" />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
         <RadarPanel
-          title="Sim 1~4-1 (심리·수급·리스크·모멘텀)"
+          title="Sim 1~3 (심리·수급·리스크)"
           series={SERIES_G1}
           data={data}
           hidden={hidden}
           onToggle={toggleSeries}
         />
         <RadarPanel
-          title="Sim 5~8 (눌림·줍줍·리포트팔로워)"
+          title="Sim 4~5 (모멘텀·단타·눌림목)"
           series={SERIES_G2}
+          data={data}
+          hidden={hidden}
+          onToggle={toggleSeries}
+        />
+        <RadarPanel
+          title="Sim 6~8 (줍줍·리포트팔로워)"
+          series={SERIES_G3}
           data={data}
           hidden={hidden}
           onToggle={toggleSeries}
@@ -399,7 +408,7 @@ export default function StrategyRadarChart() {
         )}
       </Group>
       <Text size="xs" c="dimmed" mb={8}>
-        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 추정 Breadth (버즈 유니버스 상승 비율 %) &nbsp;
+        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 추정 Breadth (breadth 기록 없을 시 bull_score 대체) &nbsp;
         · <b style={{ color: '#868e96' }}>회색선</b>: KOSPI top100 실제 Breadth (상승 종목 비율 %) &nbsp;
         · <b style={{ color: '#ced4da' }}>점선</b>: 갭 (리베로 − 실제) &nbsp;
         · 60 이상 = BULL, 40 이하 = BEAR

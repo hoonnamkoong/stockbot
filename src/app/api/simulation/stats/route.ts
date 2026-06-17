@@ -18,6 +18,7 @@ export async function GET() {
             { id: 'sim5',            file: 'sim_sideways_state.json' },
             { id: 'sim6',            file: 'sim_bear_state.json' },
             { id: 'sim7',            file: 'sim_reportfollower_state.json' },
+            { id: 'sim10',           file: 'sim_orchestrator_state.json' },
         ];
 
         const results: any = {};

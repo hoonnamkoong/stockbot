@@ -93,9 +93,10 @@ simulators:
     description: "Sim7 리포트 팔로워 — 딥다이브 강력 매수 종목 자동 매수 + 트레일링 라이딩"
     active: true
 
-  # 새 시뮬레이터 추가 예시:
-  # - id: "sim_momentum"
-  #   module: "src.strategy.simulators.sim4_momentum"
-  #   class: "MomentumSimulator"
-  #   description: "모멘텀 추종 시뮬레이터"
-  #   active: false  # 테스트 완료 후 true로 변경
+  - id: "sim10_orchestrator"
+    module: "src.strategy.simulators.sim10_orchestrator"
+    class: "Sim10OrchestratorSimulator"
+    description: "Sim10 오케스트레이터 — Sim0 국면(BULL/SIDEWAYS/BEAR)에 따라 전략 파라미터 동적 전환 (300만 독립 운용)"
+    active: true
+
+  # Sim8, Sim9는 예비 슬롯

@@ -512,6 +512,7 @@ function TradeContent() {
             { id: 'sim5',              key: 'sim5',              label: '추세 눌림목형 (Sim 5)',    color: 'orange', type: 'sim_sideways' },
             { id: 'sim6',              key: 'sim6',              label: '하락 줍줍형 (Sim 6)',      color: 'cyan',   type: 'sim_bear' },
             { id: 'sim7',              key: 'sim7',              label: '리포트 팔로워 (Sim 7)',    color: 'pink',   type: 'sim7_report_follower' },
+            { id: 'sim10',             key: 'sim10',             label: '오케스트레이터 (Sim 10)',   color: 'violet', type: 'sim10_orchestrator' },
         ];
         return (
             <Stack gap="xl">

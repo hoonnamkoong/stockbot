@@ -31,11 +31,12 @@ const SERIES = [
   { key: 'sim5',            label: '추세 눌림목형 (Sim 5)',  color: '#f08c00', desc: '상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절' },
   { key: 'sim6',            label: '하락 줍줍형 (Sim 6)',   color: '#0c8599', desc: '폭락 후 데드캣 반등 2.5% 빠른 익절' },
   { key: 'sim7',            label: '리포트 팔로워 (Sim 7)', color: '#e64980', desc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩' },
+  { key: 'sim10',           label: '오케스트레이터 (Sim 10)', color: '#ae3ec9', desc: 'Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용' },
 ];
 
 const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
 const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5'].includes(s.key));
-const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim7'].includes(s.key));
+const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim7', 'sim10'].includes(s.key));
 
 // ID → 라벨 (리베로 추천 표시용)
 const ID_LABEL: Record<string, string> = {
@@ -355,7 +356,7 @@ export default function StrategyRadarChart() {
           onToggle={toggleSeries}
         />
         <RadarPanel
-          title="Sim 6~7 (줍줍·리포트팔로워)"
+          title="Sim 6~7·10 (줍줍·리포트·오케스트레이터)"
           series={SERIES_G3}
           data={data}
           hidden={hidden}

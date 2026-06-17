@@ -461,7 +461,7 @@ class BaseSimulator:
                 win_rate = (len([t for t in trades if t > 0]) / len(trades) * 100)
                 gp = sum([t for t in trades if t > 0])
                 gl = abs(sum([t for t in trades if t < 0]))
-                pf = gp / gl if gl > 0 else (gp if gp > 0 else 1.0)
+                pf = gp / gl if gl > 0 else (99.0 if gp > 0 else 1.0)
             
             # 자본 회전율: 총 거래대금 / 초기자본
             turnover = total_volume / self.initial_cash if self.initial_cash > 0 else 0

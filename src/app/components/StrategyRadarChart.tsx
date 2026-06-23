@@ -409,9 +409,9 @@ export default function StrategyRadarChart() {
         )}
       </Group>
       <Text size="xs" c="dimmed" mb={8}>
-        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 추정 Breadth (breadth 기록 없을 시 bull_score 대체) &nbsp;
-        · <b style={{ color: '#868e96' }}>회색선</b>: KOSPI top100 실제 Breadth (상승 종목 비율 %) &nbsp;
-        · <b style={{ color: '#ced4da' }}>점선</b>: 갭 (리베로 − 실제) &nbsp;
+        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 추정 Breadth &nbsp;
+        · <b style={{ color: '#868e96' }}>회색 점선</b>: KOSPI top100 실제 Breadth &nbsp;
+        · 각 점 위 숫자: 갭 (리베로 − 실제, 보라=양수 / 빨강=음수) &nbsp;
         · 60 이상 = BULL, 40 이하 = BEAR
       </Text>
       {sim7Loading ? (
@@ -441,6 +441,17 @@ export default function StrategyRadarChart() {
                 strokeWidth={2}
                 dot={{ r: 3, fill: '#7950f2' }}
                 connectNulls
+                label={({ x, y, index }: any) => {
+                  const gap = sim7Data[index]?.gap;
+                  if (gap == null) return <g />;
+                  const color = gap > 0 ? '#7950f2' : gap < 0 ? '#fa5252' : '#868e96';
+                  const text = gap > 0 ? `+${gap}` : `${gap}`;
+                  return (
+                    <text x={x} y={y - 8} textAnchor="middle" fontSize={9} fill={color} fontWeight={600}>
+                      {text}
+                    </text>
+                  );
+                }}
               />
               <Line
                 type="monotone"
@@ -450,16 +461,6 @@ export default function StrategyRadarChart() {
                 strokeWidth={2}
                 strokeDasharray="5 3"
                 dot={{ r: 3, fill: '#868e96' }}
-                connectNulls
-              />
-              <Line
-                type="monotone"
-                dataKey="gap"
-                name="갭 (리베로−실제)"
-                stroke="#ced4da"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                dot={false}
                 connectNulls
               />
             </LineChart>

@@ -83,16 +83,15 @@ def headers(tr_id: str, token: str) -> dict:
     }
 
 
-# ── 3. KOSPI 거래대금 순위 상위 100 ──────────────────
+# ── 3. KOSPI 시가총액 상위 100 ────────────────────────
 def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
     """
-    네이버 금융 sise_quant 페이지에서 KOSPI 거래대금 상위 100 종목.
-    KIS volume-rank API는 1회 30건 고정이라 네이버 1회 스크래핑으로 대체.
-    ETF/ETN 제외 후 100건 채움.
+    네이버 금융 sise_market_sum 페이지에서 KOSPI 시가총액 상위 100 종목.
+    거래대금 순위(sise_quant)는 ETF/ETN이 상위를 독식하므로 시가총액 순위로 대체.
+    시가총액 상위는 정상 주식만 포함 — ETF/ETN 필터링 불필요.
     """
     from bs4 import BeautifulSoup
 
-    EXCLUDE = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
     naver_hdrs = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         'Referer': 'https://finance.naver.com/',
@@ -100,9 +99,9 @@ def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
 
     results = []
     seen_codes: set = set()
-    print("[STEP 1] KOSPI 거래대금 상위 100 종목 수집 중 (네이버 금융, 1회)...")
-    for page in range(1, 10):
-        url = f"https://finance.naver.com/sise/sise_quant.naver?sosok=0&page={page}"
+    print("[STEP 1] KOSPI 시가총액 상위 100 종목 수집 중 (네이버 금융)...")
+    for page in range(1, 5):
+        url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
         r = requests.get(url, headers=naver_hdrs, timeout=10)
         soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
         table = soup.select_one('table.type_2')
@@ -111,29 +110,25 @@ def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
         new_in_page = 0
         for row in table.select('tr'):
             cols = row.select('td')
-            if len(cols) < 7:
+            if len(cols) < 5:
                 continue
             name_tag = cols[1].select_one('a')
             if not name_tag:
                 continue
             name = name_tag.get_text(strip=True)
-            if any(k in name.upper() for k in EXCLUDE):
-                continue
             code = name_tag['href'].split('code=')[-1]
-            if code in seen_codes:
+            if not code.isdigit() or code in seen_codes:
                 continue
             seen_codes.add(code)
             price_str = cols[2].get_text(strip=True).replace(',', '')
-            amt_str   = cols[6].get_text(strip=True).replace(',', '')
-            price     = int(price_str) if price_str.isdigit() else 0
-            trade_amt = int(amt_str) * 1_000_000 if amt_str.isdigit() else 0
-            results.append({"code": code, "name": name, "price": str(price), "trade_amt": str(trade_amt)})
+            price = int(price_str) if price_str.isdigit() else 0
+            results.append({"code": code, "name": name, "price": str(price), "trade_amt": "0"})
             new_in_page += 1
             if len(results) >= 100:
                 break
         if len(results) >= 100:
             break
-        if new_in_page == 0:  # 페이지 전체가 중복 → 더 이상 새 종목 없음
+        if new_in_page == 0:
             break
         time.sleep(0.3)
 

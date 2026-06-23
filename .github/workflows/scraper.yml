@@ -89,6 +89,8 @@ jobs:
         run: PYTHONPATH=. python scripts/scraper.py
 
       - name: Refresh KOSPI top100 close CSV (하루 1회, 15:00 KST 이후 첫 실행)
+        if: always()
+        continue-on-error: true
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
@@ -99,9 +101,40 @@ jobs:
           FORCE="${FORCE_RUN:-false}"
           if [ "$CURRENT_UTC_HOUR" -ge 7 ] || [ "$EVENT" = "workflow_dispatch" ] || [ "$FORCE" = "true" ]; then
             echo "[KOSPI CSV] 갱신 시작 (UTC ${CURRENT_UTC_HOUR}시 / event=${EVENT})..."
-            PYTHONPATH=. python scratch/fetch_kospi_top100.py && echo "[KOSPI CSV] 갱신 완료" || echo "[KOSPI CSV] 갱신 실패 (이전 파일 유지)"
+            PYTHONPATH=. python scratch/fetch_kospi_top100.py
+            echo "[KOSPI CSV] 갱신 완료"
           else
             echo "[KOSPI CSV] 갱신 스킵 (UTC ${CURRENT_UTC_HOUR}시 / 장 마감 전 자동 실행)"
+          fi
+
+      - name: Deploy KOSPI CSV to db-data (스크래퍼 실패 시 독립 배포)
+        if: failure()
+        run: |
+          # 스크래퍼가 실패해도 KOSPI CSV는 독립적으로 배포
+          if [ ! -f output/kospi_top100_close.csv ]; then
+            echo "[KOSPI CSV] 파일 없음 - 배포 스킵"
+            exit 0
+          fi
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git clone --branch db-data https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_kospi_repo 2>/dev/null || {
+            mkdir -p db_kospi_repo/data
+            cd db_kospi_repo
+            git init
+            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+            git checkout -b db-data
+            cd ..
+          }
+          mkdir -p db_kospi_repo/data
+          cp output/kospi_top100_close.csv db_kospi_repo/data/
+          cd db_kospi_repo
+          git add data/kospi_top100_close.csv
+          if ! git diff --cached --quiet; then
+            git commit -m "data: KOSPI top100 종가 CSV 갱신 $(date +'%Y-%m-%d KST')"
+            git push origin db-data
+            echo "[KOSPI CSV] db-data 독립 배포 완료"
+          else
+            echo "[KOSPI CSV] 변경사항 없음"
           fi
 
       - name: Deploy Data to db-data branch

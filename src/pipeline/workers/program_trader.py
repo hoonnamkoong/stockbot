@@ -10,7 +10,8 @@ config(비공개 stockbot-secret/program_trading.json)가 ON이고 유효할 때
 - selected_sim은 tradeable 화이트리스트(active && tradeable)만 허용 → 임의 코드 실행 차단.
 - 심의 실제 가상 상태 파일은 절대 건드리지 않는다(save_state/log_trade no-op).
 - 매도는 프로그램 원장(program_positions.json) 종목만 → 수동 보유분 미매도.
-- 매수는 budget − 프로그램 기투자액 내(스냅샷 cash로 강제).
+- 매수는 effective_budget(=budget + 누적실현손익) − 프로그램 기투자액 내(스냅샷 cash로 강제).
+  실현손익이 원장에 누적되어 자동 복리 — 수익은 다음 실행부터 굴리고, 손실도 그만큼 반영.
 - 중복 실행 가드(원장 last_run).
 
 이 파일은 파이프라인(GitHub Actions)에서 trade_engine.run() 종료부에 호출된다.
@@ -62,14 +63,15 @@ def _read_config_fresh(log=print) -> dict | None:
 
 def _read_ledger() -> dict:
     if not os.path.exists(_LEDGER_FILE):
-        return {'positions': {}, 'last_run': None, 'sim': None}
+        return {'positions': {}, 'last_run': None, 'sim': None, 'realized_pnl': 0}
     try:
         with open(_LEDGER_FILE, 'r', encoding='utf-8') as f:
             d = json.load(f)
         d.setdefault('positions', {})
+        d.setdefault('realized_pnl', 0)  # 프로그램 자체 실현손익 누적(복리 반영의 기준)
         return d
     except Exception:
-        return {'positions': {}, 'last_run': None, 'sim': None}
+        return {'positions': {}, 'last_run': None, 'sim': None, 'realized_pnl': 0}
 
 
 def _write_ledger(ledger: dict) -> None:
@@ -190,17 +192,27 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         return
     real_holdings = {h['code']: h for h in bal.get('holdings', []) if h.get('code')}
 
-    # [보안/안전 교정] budget이 config 상 값만으로 정해지면, 잘못된 큰 budget이나 사용자가
-    # 계좌에서 다른 용도로 현금을 소진한 경우 실제 살 수 없는 주문을 낼 위험이 있다.
+    # [복리 반영] 프로그램 자체 실현손익(realized_pnl, 원장 누적)을 설정 budget에 더해
+    # '이번 실행에서 실제 쓸 수 있는 예산(effective_budget)'을 만든다. 수익이 나면 다음
+    # 실행부터 그 수익까지 포함해 굴리고(복리), 손실이 나면 그만큼 줄어든다(사용자 확정 설계).
+    realized_pnl = ledger.get('realized_pnl', 0)
+    effective_budget = budget + realized_pnl
+    if realized_pnl:
+        log(f"[Program] budget({budget:,}) + 누적실현손익({realized_pnl:+,.0f}) = "
+            f"effective_budget({effective_budget:,.0f})")
+
+    # [보안/안전 교정] effective_budget이 잘못 커지거나(계산 drift) 사용자가 계좌에서
+    # 다른 용도로 현금을 소진한 경우 실제 살 수 없는 주문을 낼 위험이 있다.
     # 증권사 거부에만 기대지 않고, 여기서 실제 예수금으로 상한을 강제한다.
     real_deposit = int(bal.get('deposit') or 0)
     real_invested = sum(h['avg_price'] * h['qty'] for h in real_holdings.values())
     real_account_value = real_deposit + real_invested
-    if budget > real_account_value:
-        log(f"[Program] budget({budget:,})이 실제 계좌가치({real_account_value:,.0f})를 초과 — 클램프")
-        budget = int(real_account_value)
-    if budget <= 0:
-        log('[Program] 클램프 후 budget<=0 — skip')
+    if effective_budget > real_account_value:
+        log(f"[Program] effective_budget({effective_budget:,.0f})이 실제 계좌가치"
+            f"({real_account_value:,.0f})를 초과 — 클램프")
+        effective_budget = real_account_value
+    if effective_budget <= 0:
+        log('[Program] 클램프 후 effective_budget<=0 — skip')
         return
 
     # 5. 원장 ↔ 실보유 정합: 프로그램 포지션이 실제로 남아있는 것만 유지(수동 매도분 제거)
@@ -221,16 +233,16 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             if cp > p.get('peak_price', 0):
                 p['peak_price'] = cp  # 트레일링용 고점 갱신
 
-    # 6. 실계좌 스냅샷 state 구성 (cash = budget − 프로그램 기투자 원가)
+    # 6. 실계좌 스냅샷 state 구성 (cash = effective_budget − 프로그램 기투자 원가)
     invested_cost = sum(p['avg_price'] * p['quantity'] for p in positions.values())
     snapshot = {
-        'cash': max(0.0, budget - invested_cost),
+        'cash': max(0.0, effective_budget - invested_cost),
         'invested': invested_cost,
         'portfolio': {c: {'name': p.get('name', c), 'quantity': p['quantity'], 'avg_price': p['avg_price'],
                           'peak_price': p.get('peak_price', p['avg_price']),
                           'entry_date': p.get('entry_date', today),
                           'is_scaled_out': p.get('is_scaled_out', False)} for c, p in positions.items()},
-        'total_fees': 0, 'history': [budget], 'daily_trades': [], 'peak_nav': budget,
+        'total_fees': 0, 'history': [effective_budget], 'daily_trades': [], 'peak_nav': effective_budget,
     }
 
     # 7. 심 인스턴스화(화이트리스트) + 개조 + 실행
@@ -273,6 +285,13 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         try:
             res = place_order_via_vercel(side, code, qty, price)
             if res.get('success'):
+                # [복리] 매도 체결분의 실현손익을 원장에 누적(다음 실행의 effective_budget에 반영).
+                # _apply_order_to_positions가 positions[code]를 지우거나 수량을 줄이기 전에 계산해야 함.
+                # price는 KIS 확정 체결가가 아닌 주문가 추정치 — 원장의 avg_price/peak_price와 동일한
+                # 근사 정밀도(기존 설계와 일관).
+                if side == 'sell' and code in positions:
+                    realized_delta = qty * (price - positions[code]['avg_price'])
+                    ledger['realized_pnl'] = round(ledger.get('realized_pnl', 0) + realized_delta, 2)
                 _apply_order_to_positions(positions, o, today)
                 append_order_history({
                     'executed_at': now_kst.isoformat(), 'side': side, 'code': code,

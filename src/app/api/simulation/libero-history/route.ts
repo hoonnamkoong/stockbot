@@ -13,15 +13,19 @@ export async function GET() {
     try {
         const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
 
-        // 1) 리베로 daily_regime_log + calibration_log
+        // 1) 리베로 daily_regime_log + calibration_log + 예측기 채택/누적 채점
         let liberoLog: any[] = [];
         let calibrationLog: any[] = [];
+        let preferredPredictor: string | null = null;
+        let scoreTotals: any = null;
         try {
             const res = await fetch(`${GITHUB_BASE}/sim_libero_state.json?t=${Date.now()}`, { cache: 'no-store' });
             if (res.ok) {
                 const s = await res.json();
                 liberoLog = s.daily_regime_log ?? [];
                 calibrationLog = s.calibration_log ?? [];
+                preferredPredictor = s.preferred_predictor ?? null;
+                scoreTotals = s.score_totals ?? null;
                 // daily_regime_log 없으면 regime_history + last_run으로 근사 구성
                 if (liberoLog.length === 0 && s.regime_history?.length > 0 && s.last_run) {
                     const lastDate = new Date(s.last_run.replace(' ', 'T'));
@@ -89,7 +93,10 @@ export async function GET() {
             }
         } catch { /* CSV 없으면 빈 배열 */ }
 
-        return NextResponse.json({ libero_log: liberoLog, market_data: marketData, calibration_log: calibrationLog });
+        return NextResponse.json({
+            libero_log: liberoLog, market_data: marketData, calibration_log: calibrationLog,
+            preferred_predictor: preferredPredictor, score_totals: scoreTotals,
+        });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

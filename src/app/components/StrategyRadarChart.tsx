@@ -164,6 +164,7 @@ export default function StrategyRadarChart() {
   const [sim7Data, setSim7Data] = useState<any[]>([]);
   const [sim7Loading, setSim7Loading] = useState(true);
   const [sim7HitRate, setSim7HitRate] = useState<{ hits: number; total: number; pct: number } | null>(null);
+  const [preferred, setPreferred] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -209,33 +210,42 @@ export default function StrategyRadarChart() {
         const res = await fetch(`/api/simulation/libero-history?cb=${Date.now()}`);
         const d = await res.json();
 
-        // 실제 KOSPI 브레드스 맵
-        const marketMap: Record<string, number> = {};
-        for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
-
-        // 리베로 자체 breadth 맵 (breadth 없으면 bull_score로 폴백)
-        const liberoMap: Record<string, number> = {};
-        for (const l of (d.libero_log ?? [])) {
-          const val = l.breadth ?? l.bull_score;
-          if (val != null) liberoMap[l.date] = val;
+        // 예측 vs 실제: calibration_log(그날 첫 장중 나우캐스트 예측 vs EOD 실제)가
+        // 진짜 예측 갭. 없으면 daily_regime_log(리베로) vs market_data로 폴백.
+        type Row = { date: string; sim7Score: number | null; marketBreadth: number | null; gap: number | null };
+        const cal = (d.calibration_log ?? []) as any[];
+        let merged: Row[];
+        if (cal.length > 0) {
+          merged = cal.slice(-14).map((c: any) => ({
+            date: (c.date ?? '').slice(5),
+            sim7Score: c.libero_breadth ?? null,
+            marketBreadth: c.actual_kospi_breadth ?? null,
+            gap: c.gap ?? ((c.libero_breadth != null && c.actual_kospi_breadth != null)
+              ? parseFloat((c.libero_breadth - c.actual_kospi_breadth).toFixed(1)) : null),
+          }));
+        } else {
+          const marketMap: Record<string, number> = {};
+          for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
+          const liberoMap: Record<string, number> = {};
+          for (const l of (d.libero_log ?? [])) {
+            const val = l.breadth ?? l.bull_score;
+            if (val != null) liberoMap[l.date] = val;
+          }
+          const allDates = Array.from(new Set([
+            ...Object.keys(marketMap), ...Object.keys(liberoMap),
+          ])).sort().slice(-14);
+          merged = allDates.map(date => ({
+            date: date.slice(5),
+            sim7Score: liberoMap[date] ?? null,
+            marketBreadth: marketMap[date] ?? null,
+            gap: (liberoMap[date] != null && marketMap[date] != null)
+              ? parseFloat((liberoMap[date] - marketMap[date]).toFixed(1)) : null,
+          }));
         }
-
-        const allDates = Array.from(new Set([
-          ...Object.keys(marketMap),
-          ...Object.keys(liberoMap),
-        ])).sort().slice(-14);
-
-        const merged = allDates.map(date => ({
-          date: date.slice(5),
-          sim7Score: liberoMap[date] ?? null,
-          marketBreadth: marketMap[date] ?? null,
-          gap: (liberoMap[date] != null && marketMap[date] != null)
-            ? parseFloat((liberoMap[date] - marketMap[date]).toFixed(1))
-            : null,
-        }));
         setSim7Data(merged);
+        setPreferred(d.preferred_predictor ?? null);
 
-        // 방향 적중률: 60이상=BULL, 40이하=BEAR, 사이=SIDEWAYS
+        // 방향 적중률(예측 vs 실제): 60이상=BULL, 40이하=BEAR, 사이=SIDEWAYS
         const zone = (v: number) => v >= 60 ? 'BULL' : v <= 40 ? 'BEAR' : 'SIDEWAYS';
         const comparable = merged.filter(r => r.sim7Score !== null && r.marketBreadth !== null);
         const hits = comparable.filter(r => zone(r.sim7Score!) === zone(r.marketBreadth!));
@@ -395,10 +405,10 @@ export default function StrategyRadarChart() {
       </div>
 
       {/* ④ Sim0 리베로 2주 판단 vs 실제 시장 차트 */}
-      <Divider mt="xl" mb="md" label="Sim0 리베로 — 2주 시장 판단 vs 실제 장" labelPosition="center" />
+      <Divider mt="xl" mb="md" label="Sim0 리베로 — 2주 예측 vs 마감 실제" labelPosition="center" />
       <Group gap={6} mb={4}>
         <IconActivity size={18} color="#7950f2" />
-        <Text size="sm" fw={700}>리베로 추정 Breadth vs KOSPI 실제 Breadth (최근 14 거래일)</Text>
+        <Text size="sm" fw={700}>리베로 예측 Breadth(그날 첫 나우캐스트) vs KOSPI 마감 실제 (최근 14 거래일)</Text>
         {sim7HitRate && (
           <Badge
             color={sim7HitRate.pct >= 60 ? 'green' : sim7HitRate.pct >= 40 ? 'yellow' : 'red'}
@@ -407,11 +417,16 @@ export default function StrategyRadarChart() {
             방향 적중 {sim7HitRate.hits}/{sim7HitRate.total}일 ({sim7HitRate.pct}%)
           </Badge>
         )}
+        {preferred && (
+          <Badge color={preferred === 'P1' ? 'grape' : 'blue'} variant="outline" size="sm">
+            채택 예측기 {preferred}{preferred === 'P1' ? ' (궤적 보정)' : ' (원시 최신)'}
+          </Badge>
+        )}
       </Group>
       <Text size="xs" c="dimmed" mb={8}>
-        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 추정 Breadth &nbsp;
-        · <b style={{ color: '#868e96' }}>회색 점선</b>: KOSPI top100 실제 Breadth &nbsp;
-        · 각 점 위 숫자: 갭 (리베로 − 실제, 보라=양수 / 빨강=음수) &nbsp;
+        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 예측 Breadth (그날 첫 장중 나우캐스트) &nbsp;
+        · <b style={{ color: '#868e96' }}>회색 점선</b>: KOSPI top100 마감 실제 Breadth &nbsp;
+        · 각 점 위 숫자: 갭 (예측 − 실제, 보라=양수 / 빨강=음수) &nbsp;
         · 60 이상 = BULL, 40 이하 = BEAR
       </Text>
       {sim7Loading ? (
@@ -436,7 +451,7 @@ export default function StrategyRadarChart() {
               <Line
                 type="monotone"
                 dataKey="sim7Score"
-                name="리베로 추정 Breadth"
+                name="리베로 예측 Breadth"
                 stroke="#7950f2"
                 strokeWidth={2}
                 dot={{ r: 3, fill: '#7950f2' }}

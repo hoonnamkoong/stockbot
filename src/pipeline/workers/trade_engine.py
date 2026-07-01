@@ -182,13 +182,21 @@ class TradeEngineWorker(BaseWorker):
                     else:
                         sim_candidates = candidates
                         sim_prices = current_prices
+                    # Libero(분석기)는 buzz 후보군 대신 KOSPI top100의 장중 등락으로
+                    # 실시간 국면을 '예측'한다(측정 아님). 장중가는 알지만 마감가는 모름 → 룩어헤드 없음.
+                    is_libero = getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator'
+                    if is_libero:
+                        nowcast = self._fetch_top100_nowcast()
+                        if nowcast:
+                            sim_candidates = nowcast
+                            sim_prices = {s['code']: s['sparkline_price'][-1] for s in nowcast if s.get('sparkline_price')}
                     sim.run(sim_candidates, current_prices=sim_prices)
                     self.log(f"  {sim.__class__.__name__} 완료")
-                    # Libero 캘리브레이션: run 직후 실제 KOSPI 브레드스 기록
-                    if getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator':
-                        actual_breadth = self._get_actual_breadth_from_csv()
-                        if actual_breadth is not None:
-                            sim.record_calibration(actual_breadth)
+                    # Libero 예측력 채점: 마감 후 확정된 EOD 실제 breadth로 해당일 장중 예측 채점
+                    if is_libero:
+                        actual_breadth, actual_date = self._get_actual_breadth_with_date()
+                        if actual_breadth is not None and actual_date:
+                            sim.score_pending(actual_date, actual_breadth)
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
 
@@ -274,13 +282,18 @@ class TradeEngineWorker(BaseWorker):
 
         return enriched
 
-    def _get_actual_breadth_from_csv(self, csv_path: str = 'output/kospi_top100_close.csv') -> float | None:
-        """KOSPI top100 CSV의 최근 2행으로 오늘 실제 브레드스(상승 종목 비율%) 산출."""
+    def _get_actual_breadth_with_date(self, csv_path: str = 'output/kospi_top100_close.csv'):
+        """CSV 최근 2행으로 (EOD 실제 breadth%, 해당 종가일 'YYYY-MM-DD')를 반환.
+
+        예측 채점의 '라벨'. CSV는 장 마감 후(15:00+ KST) 하루 1회만 갱신되므로,
+        curr_cols[0]의 날짜가 곧 그 breadth가 확정된 거래일이다. 장중엔 이 날짜가
+        '어제'이고, 마감 후 '오늘'이 된다. 리베로는 이 날짜의 장중 예측 로그를 채점한다.
+        """
         try:
             with open(csv_path, 'r', encoding='utf-8-sig') as f:
                 lines = [l for l in f.read().split('\n') if l.strip()]
-            if len(lines) < 3:  # 헤더 + 데이터 최소 2행
-                return None
+            if len(lines) < 3:  # 헤더 + 최소 2 거래일
+                return None, None
             prev_cols = lines[-2].split(',')
             curr_cols = lines[-1].split(',')
             ups, total = 0, 0
@@ -293,10 +306,111 @@ class TradeEngineWorker(BaseWorker):
                             ups += 1
                 except ValueError:
                     continue
-            return round(ups / total * 100, 1) if total > 0 else None
+            if total == 0:
+                return None, None
+            breadth = round(ups / total * 100, 1)
+            raw = curr_cols[0].strip()  # YYYYMMDD
+            date = f"{raw[:4]}-{raw[4:6]}-{raw[6:]}" if len(raw) == 8 and raw.isdigit() else raw
+            return breadth, date
         except Exception as e:
-            self.log_error(f"KOSPI 브레드스 CSV 산출 실패: {e}")
+            self.log_error(f"EOD breadth/date 산출 실패: {e}")
+            return None, None
+
+    def _fetch_top100_nowcast(self, csv_path: str = 'output/kospi_top100_close.csv',
+                              pages: int = 4, window: int = 20) -> list[dict] | None:
+        """네이버 시총 상위 top100의 '장중 등락률'을 스크래핑해 리베로 실시간 나우캐스트 유니버스 생성.
+
+        breadth = 등락률>0 비율(정답 EOD와 같은 top100 유니버스 → 편향 0). momentum/trend용
+        sparkline은 CSV 최근 종가 + 현재 장중가로 구성한다. 장중가는 알지만 오늘 마감가는
+        모르므로 이 값은 마감 국면에 대한 '예측'이다(측정/룩어헤드 아님). 반환 딕셔너리는
+        base 헬퍼(parse_change_rate/calc_period_change/calculate_adx)가 그대로 소비한다.
+        수집 실패 시 None → 호출부가 공용 buzz 후보군으로 폴백(무중단).
+        """
+        import re
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+        except Exception:
             return None
+
+        # 1) CSV 최근 종가 시계열 맵 (momentum/trend sparkline 구성용)
+        closes: dict[str, list] = {}
+        try:
+            with open(csv_path, 'r', encoding='utf-8-sig') as f:
+                lines = [l for l in f.read().split('\n') if l.strip()]
+            if len(lines) >= 2:
+                header = lines[0].split(',')
+                rows = [ln.split(',') for ln in lines[1:]][-window:]
+                for j in range(1, len(header)):
+                    col = header[j].strip()
+                    if not col:
+                        continue
+                    code = col.split('_')[0].strip()
+                    if not code:
+                        continue
+                    series = []
+                    for r in rows:
+                        if j < len(r) and r[j].strip():
+                            try:
+                                v = float(r[j].strip())
+                                if v > 0:
+                                    series.append(v)
+                            except ValueError:
+                                continue
+                    closes[code] = series
+        except Exception:
+            pass  # sparkline 없이도 breadth는 산출 가능
+
+        # 2) 네이버 시총 페이지 스크래핑 (현재가 td[2] + 등락률 td[4])
+        hdrs = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Referer': 'https://finance.naver.com/'}
+        universe, seen = [], set()
+        try:
+            for page in range(1, pages + 1):
+                url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
+                res = requests.get(url, headers=hdrs, timeout=10)
+                soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
+                table = soup.select_one('table.type_2')
+                if not table:
+                    break
+                for row in table.select('tr'):
+                    cols = row.select('td')
+                    if len(cols) < 6:
+                        continue
+                    a = cols[1].select_one('a')
+                    if not a or 'code=' not in a.get('href', ''):
+                        continue
+                    code = a['href'].split('code=')[-1]
+                    if not code.isdigit() or code in seen:
+                        continue
+                    try:
+                        price = int(cols[2].get_text(strip=True).replace(',', ''))
+                    except ValueError:
+                        continue
+                    # 등락률: 부호가 텍스트('-')로 오거나 blind span('하락')으로 올 수 있어 방어적 파싱
+                    rate_txt = cols[4].get_text(strip=True)
+                    m = re.search(r'([0-9.]+)', rate_txt)
+                    if not m:
+                        continue
+                    val = float(m.group(1))
+                    rate = -val if ('-' in rate_txt or '하락' in rate_txt) else val
+                    seen.add(code)
+                    spark = list(closes.get(code, []))
+                    spark.append(float(price))
+                    universe.append({
+                        'code': code,
+                        'change_rate': rate,           # float % (parse_change_rate 숫자 분기)
+                        'price': price,
+                        'sparkline_price': spark,
+                    })
+                    if len(universe) >= 100:
+                        break
+                if len(universe) >= 100:
+                    break
+        except Exception as e:
+            self.log_error(f"Libero top100 나우캐스트 수집 실패: {e}")
+            return None
+        return universe if len(universe) >= 2 else None
 
     def _fetch_portfolio_prices(self, codes: list) -> dict:
         """

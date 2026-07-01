@@ -107,3 +107,22 @@ def get_simulator_ids() -> list[str]:
     """활성화된 시뮬레이터의 ID 목록을 반환합니다."""
     manifest = _load_manifest()
     return [s['id'] for s in manifest.get('simulators', []) if s.get('active', True)]
+
+
+def get_tradeable_simulator_ids() -> list[str]:
+    """프로그램 매매 가능(active && tradeable) 시뮬레이터 ID 목록. 화이트리스트 소스."""
+    manifest = _load_manifest()
+    return [
+        s['id'] for s in manifest.get('simulators', [])
+        if s.get('active', True) and s.get('tradeable', False)
+    ]
+
+
+def get_simulator_by_id(sim_id: str):
+    """id로 매매 가능 시뮬레이터 인스턴스를 반환. active && tradeable 이 아니면 None(화이트리스트 강제)."""
+    manifest = _load_manifest()
+    for s in manifest.get('simulators', []):
+        if s['id'] == sim_id and s.get('active', True) and s.get('tradeable', False):
+            cls = _load_class(s['module'], s['class'])
+            return cls()
+    return None

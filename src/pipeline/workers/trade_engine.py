@@ -137,6 +137,19 @@ class TradeEngineWorker(BaseWorker):
         # 6. 시뮬레이터 3종 실행 (Registry에서 자동 로드)
         self._run_simulators(candidates)
 
+        # 7. 프로그램 매매(실전 계좌 자동 심 운용) — config ON & 유효 시에만 실주문(내부 fail-closed)
+        try:
+            from src.pipeline.workers.program_trader import run_program_trading
+            run_program_trading(
+                candidates,
+                is_market_hours=self.ctx.is_market_hours(),
+                now_kst=self.ctx.now_kst,
+                log=self.log,
+                log_error=self.log_error,
+            )
+        except Exception as e:
+            self.log_error(f"프로그램 매매 실행 실패(무시하고 계속): {e}")
+
         return final_picks, simulation_results, sell_candidate
 
     def _run_simulators(self, candidates: list[dict]) -> None:

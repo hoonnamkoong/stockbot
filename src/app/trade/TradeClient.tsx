@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack, SimpleGrid,
     Table, Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea, Box, Divider
+    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea, Box, Divider
 } from '@mantine/core';
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
@@ -80,6 +80,16 @@ function TradeContent() {
     // Multi-select for Portfolio
     const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
     const [bulkActionType, setBulkActionType] = useState<{ type: 'immediate' | 'reservation' } | null>(null);
+
+    // Program trading (실전 계좌 자동 심 운용)
+    const [programEnabled, setProgramEnabled] = useState(false);
+    const [programSim, setProgramSim] = useState<string | null>(null);
+    const [programBudget, setProgramBudget] = useState<number | ''>('');
+    const [programSims, setProgramSims] = useState<{ id: string; name: string; description: string }[]>([]);
+    const [programValid, setProgramValid] = useState(true);
+    const [programBusy, setProgramBusy] = useState(false);
+    const [programPinOpen, setProgramPinOpen] = useState(false);
+    const [programPin, setProgramPin] = useState('');
 
     const pinContainerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
@@ -187,6 +197,58 @@ function TradeContent() {
         balancePoller.start();
         return () => balancePoller.stop();
     }, [balancePoller]);
+
+    // ── 프로그램 매매 ──────────────────────────────────────────
+    const fetchProgram = useCallback(async () => {
+        try {
+            const res = await axios.get('/api/trade/program');
+            const d = res.data || {};
+            setProgramEnabled(!!d.enabled);
+            setProgramSim(d.selected_sim ?? null);
+            setProgramBudget(d.budget ? Number(d.budget) : '');
+            setProgramSims(Array.isArray(d.sims) ? d.sims : []);
+            setProgramValid(d.selected_valid !== false);
+        } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
+    }, []);
+
+    useEffect(() => { fetchProgram(); }, [fetchProgram]);
+
+    const submitProgram = async (enable: boolean, pinVal?: string) => {
+        setProgramBusy(true);
+        try {
+            const res = await axios.post('/api/trade/program', {
+                enabled: enable,
+                selected_sim: programSim,
+                budget: Number(programBudget) || 0,
+                pin: pinVal,
+            });
+            if (res.data?.success) {
+                setProgramEnabled(!!res.data.enabled);
+                showNotify('프로그램 매매', res.data.enabled ? `ON — ${programSim} 자동 운용` : 'OFF (수동 매매만)', res.data.enabled ? 'red' : 'gray');
+                fetchProgram();
+            } else {
+                showNotify('프로그램 매매 실패', res.data?.error || '변경 실패', 'red');
+            }
+        } catch (e: any) {
+            showNotify('프로그램 매매 실패', e.response?.data?.error || e.message, 'red');
+        } finally {
+            setProgramBusy(false);
+            setProgramPinOpen(false);
+            setProgramPin('');
+        }
+    };
+
+    const onToggleProgram = (checked: boolean) => {
+        if (checked) {
+            // arm: 로컬 유효성 확인 후 PIN
+            if (!programSim) { showNotify('프로그램 매매', '먼저 매매 심을 선택하세요.', 'yellow'); return; }
+            if (!(Number(programBudget) > 0)) { showNotify('프로그램 매매', '프로그램 예산(>0)을 입력하세요.', 'yellow'); return; }
+            setProgramPin('');
+            setProgramPinOpen(true);
+        } else {
+            submitProgram(false); // kill-switch: PIN 없이 즉시 OFF
+        }
+    };
 
     const handleOrder = async (isReservation: boolean) => {
         if (!code || !qty) {
@@ -462,6 +524,40 @@ function TradeContent() {
                             <Button variant="subtle" size="xs" leftSection={<IconRefresh size={14}/>} onClick={() => fetchBalance()}>새로고침</Button>
                         </Group>
                     </Group>
+                    {/* 프로그램 매매: ON 시 선택 심이 실계좌를 자동 운용 / OFF 시 수동만 */}
+                    <Group gap="sm" align="flex-end" mb="sm" wrap="wrap" p={8}
+                        style={{ borderRadius: 8, background: programEnabled ? 'var(--mantine-color-red-0)' : 'var(--mantine-color-gray-0)' }}>
+                        <Switch
+                            checked={programEnabled}
+                            onChange={(e) => onToggleProgram(e.currentTarget.checked)}
+                            disabled={programBusy}
+                            color="red" size="md"
+                            label={<Text size="sm" fw={700}>프로그램 매매 {programEnabled ? 'ON' : 'OFF'}</Text>}
+                        />
+                        <Select
+                            label="프로그램 선택" size="xs" w={210} searchable
+                            placeholder={programSims.length ? '매매 심 선택' : '목록 로딩...'}
+                            data={programSims.map(s => ({ value: s.id, label: s.name }))}
+                            value={programSim}
+                            onChange={setProgramSim}
+                            disabled={programEnabled || programBusy}
+                        />
+                        <NumberInput
+                            label="프로그램 예산(원)" size="xs" w={160}
+                            placeholder="예: 1000000"
+                            value={programBudget}
+                            onChange={(v) => setProgramBudget(typeof v === 'number' ? v : '')}
+                            onBlur={() => { if (programEnabled) return; }}
+                            disabled={programEnabled || programBusy}
+                            min={0} step={100000} thousandSeparator=","
+                        />
+                        {programEnabled && !programValid && (
+                            <Badge color="red" variant="filled">선택 심이 목록에서 사라짐 — 파이프라인 자동 OFF</Badge>
+                        )}
+                        {programEnabled && programValid && (
+                            <Text size="xs" c="red" fw={700}>● 실계좌 자동 운용 중</Text>
+                        )}
+                    </Group>
                     <Group grow mb="md" align="flex-end">
                         <Stack gap={2}>
                             <Text size="xs" c="dimmed">예수금 (잔고)</Text>
@@ -658,6 +754,22 @@ function TradeContent() {
                     {notification.msg}
                 </Notification>
             )}
+            <Modal opened={programPinOpen} onClose={() => setProgramPinOpen(false)} title="프로그램 매매 활성화 — PIN 확인" centered zIndex={2000}>
+                <Stack>
+                    <Text size="sm" c="dimmed">
+                        선택 심 <b>{programSims.find(s => s.id === programSim)?.name ?? programSim}</b> 을(를) 예산{' '}
+                        <b>{(Number(programBudget) || 0).toLocaleString()}원</b> 한도로 <b style={{ color: '#fa5252' }}>실계좌에서 자동 운용</b>합니다.
+                        수동 보유분은 건드리지 않습니다. PIN을 입력하세요.
+                    </Text>
+                    <PinInput data-autofocus length={4} type="number" mask value={programPin} onChange={setProgramPin}
+                        onComplete={() => submitProgram(true, programPin)} />
+                    <Group justify="flex-end">
+                        <Button variant="default" onClick={() => setProgramPinOpen(false)}>취소</Button>
+                        <Button color="red" onClick={() => submitProgram(true, programPin)} disabled={programPin.length !== 4 || programBusy}>활성화</Button>
+                    </Group>
+                </Stack>
+            </Modal>
+
             <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security PIN" centered zIndex={2000}>
                 <Stack align="center" py="md" ref={pinContainerRef}>
                     <Text size="sm">보안 PIN 4자리를 입력하세요.</Text>

@@ -85,6 +85,7 @@ function TradeContent() {
     const [programEnabled, setProgramEnabled] = useState(false);
     const [programSim, setProgramSim] = useState<string | null>(null);
     const [programBudget, setProgramBudget] = useState<number | ''>('');
+    const [programConfirmedBudget, setProgramConfirmedBudget] = useState(0);
     const [programSims, setProgramSims] = useState<{ id: string; name: string; description: string }[]>([]);
     const [programValid, setProgramValid] = useState(true);
     const [programBusy, setProgramBusy] = useState(false);
@@ -208,6 +209,7 @@ function TradeContent() {
             setProgramEnabled(!!d.enabled);
             setProgramSim(d.selected_sim ?? null);
             setProgramBudget(d.budget ? Number(d.budget) : '');
+            setProgramConfirmedBudget(Number(d.budget) || 0);
             setProgramSims(Array.isArray(d.sims) ? d.sims : []);
             setProgramValid(d.selected_valid !== false);
             setProgramPositions(d.positions && typeof d.positions === 'object' ? d.positions : {});
@@ -526,7 +528,7 @@ function TradeContent() {
             return sum + (currentPrice - pos.avg_price) * pos.quantity;
         }, 0);
         const programTotalPnl = programRealizedPnl + programUnrealizedPnl;
-        const programBudgetNum = Number(programBudget) || 0;
+        const programBudgetNum = programConfirmedBudget;
         const programTotalPnlRate = programBudgetNum > 0 ? (programTotalPnl / programBudgetNum) * 100 : 0;
         const programHasData = programBudgetNum > 0 || Object.keys(programPositions).length > 0 || programRealizedPnl !== 0;
 

@@ -85,11 +85,14 @@ function TradeContent() {
     const [programEnabled, setProgramEnabled] = useState(false);
     const [programSim, setProgramSim] = useState<string | null>(null);
     const [programBudget, setProgramBudget] = useState<number | ''>('');
+    const [programConfirmedBudget, setProgramConfirmedBudget] = useState(0);
     const [programSims, setProgramSims] = useState<{ id: string; name: string; description: string }[]>([]);
     const [programValid, setProgramValid] = useState(true);
     const [programBusy, setProgramBusy] = useState(false);
     const [programPinOpen, setProgramPinOpen] = useState(false);
     const [programPin, setProgramPin] = useState('');
+    const [programPositions, setProgramPositions] = useState<Record<string, { name: string; quantity: number; avg_price: number }>>({});
+    const [programRealizedPnl, setProgramRealizedPnl] = useState(0);
 
     const pinContainerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
@@ -206,8 +209,11 @@ function TradeContent() {
             setProgramEnabled(!!d.enabled);
             setProgramSim(d.selected_sim ?? null);
             setProgramBudget(d.budget ? Number(d.budget) : '');
+            setProgramConfirmedBudget(Number(d.budget) || 0);
             setProgramSims(Array.isArray(d.sims) ? d.sims : []);
             setProgramValid(d.selected_valid !== false);
+            setProgramPositions(d.positions && typeof d.positions === 'object' ? d.positions : {});
+            setProgramRealizedPnl(Number(d.realized_pnl) || 0);
         } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
     }, []);
 
@@ -513,6 +519,19 @@ function TradeContent() {
         const totalEval = holdings.reduce((sum: any, h: any) => sum + ((h.price || 0) * (h.qty || 0)), 0);
         const totalPL = holdings.reduce((sum: any, h: any) => sum + (h.pl_amount || 0), 0);
 
+        // 프로그램 매매 수익률/평가손익: 자체 원장(avg_price) 기준 + 실시간 시세 매칭
+        // (브로커 계좌 전체 손익과 섞이지 않도록 program_positions.json의 avg_price를 그대로 씀)
+        const allHoldings = balance?.holdings || [];
+        const programUnrealizedPnl = Object.entries(programPositions).reduce((sum, [code, pos]) => {
+            const live = allHoldings.find((h: any) => h.code === code);
+            const currentPrice = live?.price ?? pos.avg_price; // 시세 매칭 실패 시 기여분 0
+            return sum + (currentPrice - pos.avg_price) * pos.quantity;
+        }, 0);
+        const programTotalPnl = programRealizedPnl + programUnrealizedPnl;
+        const programBudgetNum = programConfirmedBudget;
+        const programTotalPnlRate = programBudgetNum > 0 ? (programTotalPnl / programBudgetNum) * 100 : 0;
+        const programHasData = programBudgetNum > 0 || Object.keys(programPositions).length > 0 || programRealizedPnl !== 0;
+
         return (
             <Stack gap="md">
                 <Paper p="md" withBorder radius="md" style={{ position: 'relative' }}>
@@ -576,6 +595,22 @@ function TradeContent() {
                             </Text>
                         </Stack>
                     </Group>
+                    {programHasData && (
+                        <Group grow mb="md" align="flex-end">
+                            <Stack gap={2}>
+                                <Text size="xs" c="dimmed">프로그램 매매 수익률</Text>
+                                <Text fw={800} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
+                                    {programTotalPnl >= 0 ? '+' : ''}{programTotalPnlRate.toFixed(2)}%
+                                </Text>
+                            </Stack>
+                            <Stack gap={2}>
+                                <Text size="xs" c="dimmed">프로그램 매매 평가손익</Text>
+                                <Text fw={700} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
+                                    {programTotalPnl >= 0 ? '+' : ''}{Math.round(programTotalPnl).toLocaleString()} 원
+                                </Text>
+                            </Stack>
+                        </Group>
+                    )}
                     <Divider mb="xs" label="보유 포트폴리오 (일괄 매도 가능)" labelPosition="center" />
                     {renderPortfolioTable(holdings, true, 'calc(100vh - 320px)')}
                     {selectedCodes.length > 0 && (

@@ -46,6 +46,32 @@ async function putConfig(content: any, sha: string | null, message: string) {
     if (!res.ok) throw new Error(`config write ${res.status}: ${await res.text()}`);
 }
 
+// ── 프로그램 매매 원장(program_positions.json) 읽기 전용 조회 ────────────
+// 표시 전용 데이터이므로 실패해도 GET 전체를 막지 않고 빈 원장으로 대체한다(fail-safe).
+const POSITIONS_PATH = 'program_positions.json';
+
+async function getPositions(): Promise<{
+    positions: Record<string, { name: string; quantity: number; avg_price: number }>;
+    realized_pnl: number;
+}> {
+    try {
+        const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${POSITIONS_PATH}?ref=${SECRET_BRANCH}`;
+        const res = await fetch(url, {
+            headers: { Authorization: `token ${GITHUB_PAT}`, Accept: 'application/vnd.github.v3+json' },
+            cache: 'no-store',
+        });
+        if (!res.ok) return { positions: {}, realized_pnl: 0 }; // 404(미실행) 등은 빈 원장으로 취급
+        const data = await res.json();
+        const content = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
+        return {
+            positions: content.positions && typeof content.positions === 'object' ? content.positions : {},
+            realized_pnl: Number(content.realized_pnl) || 0,
+        };
+    } catch {
+        return { positions: {}, realized_pnl: 0 }; // 네트워크 실패 등도 non-blocking
+    }
+}
+
 // ── PIN 무차별 대입 방어 (파일 기반 카운터, secret repo) ─────────────────
 // 프로그램 매매 ON은 4자리 PIN 하나가 무인 자동매매를 여는 유일한 문 → 브루트포스 방어 필수.
 const PIN_LOCK_PATH = 'program_pin_lockout.json';
@@ -120,6 +146,7 @@ export async function GET(request: Request) {
         const validIds = new Set(sims.map((s) => s.id));
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
+        const { positions, realized_pnl } = await getPositions();
         return NextResponse.json({
             enabled: !!content.enabled,
             selected_sim: content.selected_sim ?? null,
@@ -127,6 +154,8 @@ export async function GET(request: Request) {
             selected_valid: selectedValid,
             updated_at: content.updated_at ?? null,
             sims, // 프론트 드롭다운 재사용
+            positions, // 프로그램 원장 포지션(code -> {name, quantity, avg_price})
+            realized_pnl, // 프로그램 누적 실현손익(원)
         });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

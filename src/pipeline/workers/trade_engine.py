@@ -146,6 +146,7 @@ class TradeEngineWorker(BaseWorker):
                 now_kst=self.ctx.now_kst,
                 log=self.log,
                 log_error=self.log_error,
+                enrich=self._enrich_universe,  # 심 전용 유니버스 보강 — 페이퍼 경로와 동일 적용
             )
         except Exception as e:
             self.log_error(f"프로그램 매매 실행 실패(무시하고 계속): {e}")

@@ -54,8 +54,10 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           # 실거래 누적 기록은 비공개 레포에서 가져온다 (public db-data에는 없음)
+          # program_positions.json(프로그램 원장)은 program_trader.py가 API로 직접 읽고 쓰므로 제외
+          # (clone/push 실패 시 백지 원장으로 중복 매수하던 사고 방지 — fail-closed는 코드 쪽에서 강제)
           if git clone --depth 1 https://x-access-token:${GH_PAT}@github.com/hoonnamkoong/stockbot-secret.git secret_repo 2>/dev/null; then
-            for f in order_history.json trade_history_real.csv program_positions.json; do
+            for f in order_history.json trade_history_real.csv; do
               [ -f "secret_repo/$f" ] && cp "secret_repo/$f" "data/$f" && echo "[Private] fetched $f"
             done
             rm -rf secret_repo
@@ -195,8 +197,9 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           # 스크래퍼 런에서 갱신된 실거래 누적 기록을 비공개 레포에 보존
+          # (program_positions.json은 program_trader.py가 API로 직접 기록 — 여기서 다루지 않음)
           git clone --depth 1 https://x-access-token:${GH_PAT}@github.com/hoonnamkoong/stockbot-secret.git secret_repo
-          for f in order_history.json trade_history_real.csv program_positions.json; do
+          for f in order_history.json trade_history_real.csv; do
             [ -f "data/$f" ] && cp "data/$f" "secret_repo/$f"
           done
           cd secret_repo

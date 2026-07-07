@@ -118,11 +118,19 @@ def get_tradeable_simulator_ids() -> list[str]:
     ]
 
 
-def get_simulator_by_id(sim_id: str):
-    """id로 매매 가능 시뮬레이터 인스턴스를 반환. active && tradeable 이 아니면 None(화이트리스트 강제)."""
+def get_simulator_by_id(sim_id: str, initial_cash: int | None = None):
+    """id로 매매 가능 시뮬레이터 인스턴스를 반환. active && tradeable 이 아니면 None(화이트리스트 강제).
+
+    initial_cash 지정 시 인스턴스 생성 후 속성만 덮어쓴다(프로그램 매매의 예산 스케일 사이징용).
+    생성자 인자로 넘기지 않는 이유: 가상 상태 파일이 없을 때 reset_state()가 그 값으로
+    상태 파일을 만들어 가상 심 자본을 오염시키는 것을 방지 — 사이징(self.initial_cash 참조)만 바꾼다.
+    """
     manifest = _load_manifest()
     for s in manifest.get('simulators', []):
         if s['id'] == sim_id and s.get('active', True) and s.get('tradeable', False):
             cls = _load_class(s['module'], s['class'])
-            return cls()
+            sim = cls()
+            if initial_cash is not None:
+                sim.initial_cash = initial_cash
+            return sim
     return None

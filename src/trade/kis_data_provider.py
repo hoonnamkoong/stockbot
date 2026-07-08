@@ -116,6 +116,34 @@ class KISDataProvider:
         return result
 
     # ──────────────────────────────────────────────────
+    # 1-1. 당일 분봉 특정 시각 가격 (백필 전용 — 캐시 없음)
+    # ──────────────────────────────────────────────────
+    def get_minute_price_at(self, code: str, hhmmss: str) -> dict:
+        """
+        당일 분봉조회(FHKST03010200)로 특정 시각의 체결가와 전일종가를 반환.
+        반환: {'price': int, 'prev_close': int} — 실패/데이터 없음 시 빈 dict.
+        """
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice",
+            "FHKST03010200",
+            {
+                "FID_ETC_CLS_CODE": "",
+                "FID_COND_MRKT_DIV_CODE": "J",
+                "FID_INPUT_ISCD": code,
+                "FID_INPUT_HOUR_1": hhmmss,
+                "FID_PW_DATA_INCU_YN": "Y",
+            },
+        )
+        rows = body.get("output2") or []
+        prev_close = self._to_int(body.get("output1", {}).get("stck_prdy_clpr", 0))
+        if not rows or prev_close <= 0:
+            return {}
+        price = self._to_int(rows[0].get("stck_prpr", 0))
+        if price <= 0:
+            return {}
+        return {"price": price, "prev_close": prev_close}
+
+    # ──────────────────────────────────────────────────
     # 2. 재무 수익성비율 (ROE 등)
     # ──────────────────────────────────────────────────
     def get_finance_profit_ratio(self, code: str) -> dict:

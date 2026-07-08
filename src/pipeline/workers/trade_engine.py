@@ -24,6 +24,7 @@ class TradeEngineWorker(BaseWorker):
     def __init__(self, ctx: PipelineContext, storage: StorageManager):
         super().__init__(ctx)
         self.storage = storage
+        self._kis_provider = None  # 백필용 KISDataProvider 지연 생성
 
     def run(
         self,
@@ -169,6 +170,15 @@ class TradeEngineWorker(BaseWorker):
             simulators = get_active_simulators()
             self.log(f"시뮬레이터 동기화 시작 ({len(simulators)}개 활성, {len(current_prices)}개 현재가)")
 
+            # 리베로 나우캐스트용 top100 라이브 실측 (실패해도 파이프라인 계속)
+            live_breadth = None  # (breadth%, 표본수, [codes]) | None
+            try:
+                live_breadth = self._fetch_top100_breadth()
+                if live_breadth:
+                    self.log(f"  top100 라이브 breadth: {live_breadth[0]:.1f}% (표본 {live_breadth[1]})")
+            except Exception as e:
+                self.log_error(f"top100 라이브 breadth 수집 실패: {e}")
+
             # 2. 포트폴리오 종목 중 현재가 미확보된 코드 수집
             missing_codes = set()
             for sim in simulators:
@@ -185,6 +195,10 @@ class TradeEngineWorker(BaseWorker):
 
             for sim in simulators:
                 try:
+                    is_libero = getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator'
+                    if is_libero:
+                        # 국면 판단의 breadth를 top100 라이브 실측으로 교체 (버즈 표본 편향 제거)
+                        sim.live_breadth_info = (live_breadth[0], live_breadth[1]) if live_breadth else None
                     own_universe = sim.get_universe()
                     if own_universe:
                         sim_candidates = self._enrich_universe(own_universe)
@@ -198,11 +212,19 @@ class TradeEngineWorker(BaseWorker):
                         sim_prices = current_prices
                     sim.run(sim_candidates, current_prices=sim_prices)
                     self.log(f"  {sim.__class__.__name__} 완료")
-                    # Libero 캘리브레이션: run 직후 실제 KOSPI 브레드스 기록
-                    if getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator':
-                        actual_breadth = self._get_actual_breadth_from_csv()
-                        if actual_breadth is not None:
-                            sim.record_calibration(actual_breadth)
+                    # Libero 나우캐스트: 장중엔 시간당 실측·예측·채점, 마감 후엔 EOD 확정 채점
+                    if is_libero:
+                        now_kst = self.ctx.now_kst
+                        if self.ctx.is_market_hours():
+                            if live_breadth:
+                                codes = live_breadth[2]
+                                sim.update_nowcast(
+                                    live_breadth[0], now_kst=now_kst,
+                                    backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
+                        elif now_kst.weekday() < 5 and now_kst.hour >= 15:
+                            # 마감 후 라이브 등락률 = 확정 종가 기준. 실패 시 당일 갱신 CSV 폴백.
+                            actual_eod = live_breadth[0] if live_breadth else self._get_actual_breadth_from_csv()
+                            sim.finalize_eod(actual_eod, now_kst=now_kst)
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
 
@@ -287,6 +309,83 @@ class TradeEngineWorker(BaseWorker):
             pass
 
         return enriched
+
+    def _fetch_top100_breadth(self) -> tuple[float, int, list] | None:
+        """네이버 시총 페이지에서 KOSPI top100 장중 등락률 → 실측 breadth(상승 비율%).
+
+        fetch_kospi_top100.py와 동일 소스(sise_market_sum). 반환 (breadth, 표본수, codes).
+        표본이 80 미만이면 부분 실패로 보고 None (왜곡된 실측으로 채점 오염 방지).
+        """
+        import requests
+        from bs4 import BeautifulSoup
+
+        naver_hdrs = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Referer': 'https://finance.naver.com/',
+        }
+        ups, codes = 0, []
+        seen: set = set()
+        for page in range(1, 5):
+            url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
+            res = requests.get(url, headers=naver_hdrs, timeout=10)
+            soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
+            table = soup.select_one('table.type_2')
+            if not table:
+                break
+            for row in table.select('tr'):
+                cols = row.select('td')
+                if len(cols) < 5:
+                    continue
+                name_tag = cols[1].select_one('a')
+                if not name_tag:
+                    continue
+                code = name_tag['href'].split('code=')[-1]
+                if not code.isdigit() or code in seen:
+                    continue
+                rate_txt = cols[4].get_text(strip=True).replace('%', '').replace(',', '')
+                try:
+                    rate = float(rate_txt)
+                except ValueError:
+                    continue
+                seen.add(code)
+                codes.append(code)
+                if rate > 0:
+                    ups += 1
+                if len(codes) >= 100:
+                    break
+            if len(codes) >= 100:
+                break
+        if len(codes) < 80:
+            return None
+        return round(ups / len(codes) * 100, 1), len(codes), codes
+
+    def _backfill_breadth_kis(self, hhmm: str, codes: list) -> float | None:
+        """KIS 당일분봉으로 특정 시각(HH:MM)의 top100 breadth 복원 — 런 결측 백필 전용.
+
+        종목당 1콜(총 ~100콜, 유량제한 초당 20건 고려 0.06s 간격). 표본 80 미만이면 None.
+        """
+        import time as _time
+        if not codes:
+            return None
+        if self._kis_provider is None:
+            from src.trade.kis_data_provider import KISDataProvider
+            self._kis_provider = KISDataProvider()
+        hhmmss = hhmm.replace(':', '') + '00'
+        self.log(f"  [백필] {hhmm} 시점 breadth 복원 시작 ({len(codes)}종목, KIS 분봉)")
+        ups, total = 0, 0
+        for code in codes:
+            d = self._kis_provider.get_minute_price_at(code, hhmmss)
+            if d:
+                total += 1
+                if d['price'] > d['prev_close']:
+                    ups += 1
+            _time.sleep(0.06)
+        if total < 80:
+            self.log_error(f"  [백필] 표본 부족({total}) — 채점 보류")
+            return None
+        breadth = round(ups / total * 100, 1)
+        self.log(f"  [백필] {hhmm} breadth={breadth}% (표본 {total})")
+        return breadth
 
     def _get_actual_breadth_from_csv(self, csv_path: str = 'output/kospi_top100_close.csv') -> float | None:
         """KOSPI top100 CSV의 최근 2행으로 오늘 실제 브레드스(상승 종목 비율%) 산출."""

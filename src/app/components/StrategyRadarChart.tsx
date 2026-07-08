@@ -164,6 +164,8 @@ export default function StrategyRadarChart() {
   const [sim7Data, setSim7Data] = useState<any[]>([]);
   const [sim7Loading, setSim7Loading] = useState(true);
   const [sim7HitRate, setSim7HitRate] = useState<{ hits: number; total: number; pct: number } | null>(null);
+  const [intradayData, setIntradayData] = useState<any[]>([]);
+  const [intradayDate, setIntradayDate] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -209,31 +211,66 @@ export default function StrategyRadarChart() {
         const res = await fetch(`/api/simulation/libero-history?cb=${Date.now()}`);
         const d = await res.json();
 
-        // 실제 KOSPI 브레드스 맵
-        const marketMap: Record<string, number> = {};
-        for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
+        // [v2] 나우캐스트 재설계 이후 calibration_log = "그날 첫 EOD 예측 vs 마감 확정 실측".
+        // v2 항목이 있으면 그것만 사용 (이전 항목은 actual이 낡은 CSV 고정값이라 무효).
+        const calV2 = (d.calibration_log ?? []).filter((e: any) => e.v === 2);
+        let merged: any[];
+        if (calV2.length > 0) {
+          merged = calV2.slice(-14).map((e: any) => ({
+            date: e.date.slice(5),
+            sim7Score: e.libero_breadth,
+            marketBreadth: e.actual_kospi_breadth,
+            gap: e.gap,
+          }));
+        } else {
+          // 레거시 폴백: daily_regime_log(추정) vs CSV breadth
+          const marketMap: Record<string, number> = {};
+          for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
 
-        // 리베로 자체 breadth 맵 (breadth 없으면 bull_score로 폴백)
-        const liberoMap: Record<string, number> = {};
-        for (const l of (d.libero_log ?? [])) {
-          const val = l.breadth ?? l.bull_score;
-          if (val != null) liberoMap[l.date] = val;
+          const liberoMap: Record<string, number> = {};
+          for (const l of (d.libero_log ?? [])) {
+            const val = l.breadth ?? l.bull_score;
+            if (val != null) liberoMap[l.date] = val;
+          }
+
+          const allDates = Array.from(new Set([
+            ...Object.keys(marketMap),
+            ...Object.keys(liberoMap),
+          ])).sort().slice(-14);
+
+          merged = allDates.map(date => ({
+            date: date.slice(5),
+            sim7Score: liberoMap[date] ?? null,
+            marketBreadth: marketMap[date] ?? null,
+            gap: (liberoMap[date] != null && marketMap[date] != null)
+              ? parseFloat((liberoMap[date] - marketMap[date]).toFixed(1))
+              : null,
+          }));
         }
-
-        const allDates = Array.from(new Set([
-          ...Object.keys(marketMap),
-          ...Object.keys(liberoMap),
-        ])).sort().slice(-14);
-
-        const merged = allDates.map(date => ({
-          date: date.slice(5),
-          sim7Score: liberoMap[date] ?? null,
-          marketBreadth: marketMap[date] ?? null,
-          gap: (liberoMap[date] != null && marketMap[date] != null)
-            ? parseFloat((liberoMap[date] - marketMap[date]).toFixed(1))
-            : null,
-        }));
         setSim7Data(merged);
+
+        // 당일 시간 단위 나우캐스트 (실측 / +1h 예측 / EOD 예측)
+        const intr = d.intraday;
+        if (intr?.measurements?.length || intr?.predictions?.length) {
+          const meas: Record<string, number> = {};
+          for (const m of (intr.measurements ?? [])) meas[m.t] = m.breadth;
+          const predH1: Record<string, number> = {};
+          const predEOD: Record<string, number> = {};
+          for (const p of (intr.predictions ?? [])) {
+            if (p.type === 'h1') predH1[p.target] = p.value;
+            else if (p.type === 'eod') predEOD[p.made_at] = p.value;
+          }
+          const ts = Array.from(new Set([
+            ...Object.keys(meas), ...Object.keys(predH1), ...Object.keys(predEOD),
+          ])).sort();
+          setIntradayData(ts.map(t => ({
+            t,
+            actual: meas[t] ?? null,
+            predH1: predH1[t] ?? null,
+            predEOD: predEOD[t] ?? null,
+          })));
+          setIntradayDate(intr.date ?? null);
+        }
 
         // 방향 적중률: 60이상=BULL, 40이하=BEAR, 사이=SIDEWAYS
         const zone = (v: number) => v >= 60 ? 'BULL' : v <= 40 ? 'BEAR' : 'SIDEWAYS';
@@ -394,11 +431,42 @@ export default function StrategyRadarChart() {
         </Stack>
       </div>
 
+      {/* ④-0 Sim0 리베로 — 오늘 시간 단위 나우캐스트 */}
+      <Divider mt="xl" mb="md" label={`Sim0 리베로 — 오늘 시간 단위 나우캐스트${intradayDate ? ` (${intradayDate})` : ''}`} labelPosition="center" />
+      <Text size="xs" c="dimmed" mb={8}>
+        · <b style={{ color: '#868e96' }}>회색 실선</b>: 실측 Breadth (top100 라이브) &nbsp;
+        · <b style={{ color: '#7950f2' }}>보라선</b>: +1h 예측 (1시간 전 시점) &nbsp;
+        · <b style={{ color: '#f08c00' }}>주황 점선</b>: EOD 예측 (그 시각 기준) &nbsp;
+        · 매시 스크래퍼 런마다 실측 1건 + 예측 2건 기록, 다음 런에서 채점
+      </Text>
+      {intradayData.length === 0 ? (
+        <Text size="xs" c="dimmed" ta="center" p="lg">오늘 나우캐스트 데이터가 아직 없습니다. 장중 스크래퍼가 돌면 채워집니다.</Text>
+      ) : (
+        <div style={{ height: 220 }}>
+          <ResponsiveContainer>
+            <LineChart data={intradayData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <ReferenceArea y1={60} y2={100} fill="#2f9e44" fillOpacity={0.07} />
+              <ReferenceArea y1={40} y2={60} fill="#f08c00" fillOpacity={0.07} />
+              <ReferenceArea y1={0} y2={40} fill="#fa5252" fillOpacity={0.07} />
+              <CartesianGrid stroke="#e9ecef" strokeDasharray="3 3" />
+              <XAxis dataKey="t" tick={{ fontSize: 10 }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickCount={6} width={30} />
+              <Tooltip content={<Sim7Tooltip />} />
+              <ReferenceLine y={60} stroke="#2f9e44" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BULL', position: 'insideTopRight', fontSize: 9, fill: '#2f9e44' }} />
+              <ReferenceLine y={40} stroke="#fa5252" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BEAR', position: 'insideBottomRight', fontSize: 9, fill: '#fa5252' }} />
+              <Line type="monotone" dataKey="actual" name="실측 Breadth" stroke="#868e96" strokeWidth={2} dot={{ r: 3, fill: '#868e96' }} connectNulls />
+              <Line type="monotone" dataKey="predH1" name="+1h 예측" stroke="#7950f2" strokeWidth={2} dot={{ r: 3, fill: '#7950f2' }} connectNulls />
+              <Line type="monotone" dataKey="predEOD" name="EOD 예측" stroke="#f08c00" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3, fill: '#f08c00' }} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* ④ Sim0 리베로 2주 판단 vs 실제 시장 차트 */}
-      <Divider mt="xl" mb="md" label="Sim0 리베로 — 2주 시장 판단 vs 실제 장" labelPosition="center" />
+      <Divider mt="xl" mb="md" label="Sim0 리베로 — 2주 EOD 예측 vs 실제 장" labelPosition="center" />
       <Group gap={6} mb={4}>
         <IconActivity size={18} color="#7950f2" />
-        <Text size="sm" fw={700}>리베로 추정 Breadth vs KOSPI 실제 Breadth (최근 14 거래일)</Text>
+        <Text size="sm" fw={700}>리베로 EOD 예측 vs KOSPI 실제 Breadth (최근 14 거래일)</Text>
         {sim7HitRate && (
           <Badge
             color={sim7HitRate.pct >= 60 ? 'green' : sim7HitRate.pct >= 40 ? 'yellow' : 'red'}
@@ -409,9 +477,9 @@ export default function StrategyRadarChart() {
         )}
       </Group>
       <Text size="xs" c="dimmed" mb={8}>
-        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 추정 Breadth &nbsp;
-        · <b style={{ color: '#868e96' }}>회색 점선</b>: KOSPI top100 실제 Breadth &nbsp;
-        · 각 점 위 숫자: 갭 (리베로 − 실제, 보라=양수 / 빨강=음수) &nbsp;
+        · <b style={{ color: '#7950f2' }}>보라선</b>: 리베로 EOD 예측 (그날 첫 나우캐스트) &nbsp;
+        · <b style={{ color: '#868e96' }}>회색 점선</b>: KOSPI top100 확정 Breadth &nbsp;
+        · 각 점 위 숫자: 갭 (예측 − 실제, 보라=양수 / 빨강=음수) &nbsp;
         · 60 이상 = BULL, 40 이하 = BEAR
       </Text>
       {sim7Loading ? (
@@ -436,7 +504,7 @@ export default function StrategyRadarChart() {
               <Line
                 type="monotone"
                 dataKey="sim7Score"
-                name="리베로 추정 Breadth"
+                name="리베로 EOD 예측"
                 stroke="#7950f2"
                 strokeWidth={2}
                 dot={{ r: 3, fill: '#7950f2' }}

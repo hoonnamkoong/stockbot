@@ -442,7 +442,7 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
                 "PDNO": code,
                 "ORD_DVSN": "01", // 시장가(01) 또는 지정가(00) - 여기서는 시장가 기본
                 "ORD_QTY": qty.toString(),
-                "ORD_UNPR": side === 'buy' ? "0" : price.toString() // 시장가 매수 시 0
+                "ORD_UNPR": "0" // 시장가(01) 주문은 매수·매도 모두 단가 0 필수 (KIS 규칙)
             };
 
             const hashKey = await getHashKey(body);

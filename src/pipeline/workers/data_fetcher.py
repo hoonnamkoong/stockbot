@@ -27,6 +27,15 @@ PAGE_RETRIES = 3
 PAGE_RETRY_WAIT = 0.5
 
 
+def classify(count: int, threshold: int, adopted: set, code: str = '') -> str | None:
+    """임계값은 신규 채택 기준으로만 쓴다. 이미 채택된 종목은 미달이어도 추적한다."""
+    if count >= threshold:
+        return '활성'
+    if code in adopted:
+        return '추적'
+    return None
+
+
 class DataFetcherWorker(BaseWorker):
     """
     Stage 1: 네이버 금융 데이터 수집 및 1차 필터링.
@@ -69,6 +78,16 @@ class DataFetcherWorker(BaseWorker):
             self.log_error(f"후보 종목 수집 실패: {e}")
             return []
 
+        # 3-1. 당일 채택 종목 합집합: 거래량 상위에서 빠졌어도 오늘 이미 채택된 종목은 유니버스에 유지
+        from src.data import adopted_registry
+        adopted = adopted_registry.load(self.ctx.today_str)
+        known = {c['code'] for c in candidates}
+        for code, info in adopted.items():
+            if code not in known:
+                candidates.append({'code': code, 'name': info.get('name', ''),
+                                   'market': info.get('market', '')})
+        self.log(f"유니버스 {len(candidates)}개 (당일 채택 {len(adopted)}개 포함)")
+
         self.log(f"후보 종목 {len(candidates)}개 분석 시작")
 
         # [V61.0] KIS API 토큰 사전 발급 (체결강도 조회용)
@@ -95,14 +114,20 @@ class DataFetcherWorker(BaseWorker):
                 count = stats['recent_posts_count']
                 pages = (stats['total_pages'], stats['failed_pages'])
 
-                if count >= self.ctx.threshold:
-                    s['recent_posts_count'] = count
+                status = classify(count, self.ctx.threshold, set(adopted), s['code'])
+                if status is None:
+                    return None, stats['updated_state'], False, pages
+
+                s['recent_posts_count'] = count
+                s['status'] = status
+                if status == '활성':
                     posts = sorted(stats['new_posts'], key=lambda x: x['likes'], reverse=True)[:5]
                     for p in posts:
                         p['body'] = self._get_post_body(s['code'], p['nid'])
                     s['posts'] = posts
-                    return s, stats['updated_state'], True, pages
-                return None, stats['updated_state'], False, pages
+                else:
+                    s['posts'] = []
+                return s, stats['updated_state'], True, pages
             except Exception as e:
                 print(f"   [DataFetcher] {s.get('name', '?')} 스킵: {e}")
                 return None, None, False, (0, 0)
@@ -124,8 +149,8 @@ class DataFetcherWorker(BaseWorker):
                 f" ({self.ctx.scrape_pages_failed / max(self.ctx.scrape_pages_total, 1):.1%})"
             )
 
-        # 5. 연속 카운트 갱신
-        passed_codes = [s['code'] for s in results_raw]
+        # 5. 연속 카운트 갱신 (추적 종목은 임계값 미달이므로 연속일수에 포함하지 않는다)
+        passed_codes = [s['code'] for s in results_raw if s.get('status') == '활성']
         counts = self.storage.update_consecutive_counts(passed_codes, self.ctx.now_kst)
         for s in results_raw:
             s['consecutive_days'] = counts.get(s['code'], 1)

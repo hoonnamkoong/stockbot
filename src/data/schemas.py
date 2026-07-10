@@ -46,6 +46,7 @@ class StockData(BaseModel):
     sentiment: str = "Neutral"
     top_keywords: list = []
     consecutive_days: int = 1
+    status: str = '활성'        # '활성'(임계값 통과) | '추적'(당일 채택 이력만)
     change_rate: str = ""       # "±X.XX%" 형식
     signal: Optional[str] = None
     current_price: int = 0  # price의 별칭 (호환성 유지)

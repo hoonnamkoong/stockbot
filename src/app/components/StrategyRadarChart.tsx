@@ -38,6 +38,9 @@ const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
 const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5'].includes(s.key));
 const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim7', 'sim10'].includes(s.key));
 
+// 나우캐스트 시간축: 장 시간대 고정 슬롯 (sim0_libero의 _hour_label과 동일한 'HH:00' 포맷)
+const HOUR_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'];
+
 // ID → 라벨 (리베로 추천 표시용)
 const ID_LABEL: Record<string, string> = {
   sim_psych:            '심리 괴리형(S1)',
@@ -216,12 +219,27 @@ export default function StrategyRadarChart() {
         const calV2 = (d.calibration_log ?? []).filter((e: any) => e.v === 2);
         let merged: any[];
         if (calV2.length > 0) {
-          merged = calV2.slice(-14).map((e: any) => ({
-            date: e.date.slice(5),
-            sim7Score: e.libero_breadth,
-            marketBreadth: e.actual_kospi_breadth,
-            gap: e.gap,
-          }));
+          // X축은 예측이 있는 날이 아니라 실제 거래일(market_data)을 기준으로 깐다.
+          const marketMap: Record<string, number> = {};
+          for (const m of (d.market_data ?? [])) marketMap[m.date] = m.breadth;
+
+          const calMap: Record<string, any> = {};
+          for (const e of calV2) calMap[e.date] = e;
+
+          const allDates = Array.from(new Set([
+            ...Object.keys(marketMap),
+            ...Object.keys(calMap),
+          ])).sort().slice(-14);
+
+          merged = allDates.map((date) => {
+            const c = calMap[date];
+            return {
+              date: date.slice(5),
+              sim7Score: c?.libero_breadth ?? null,
+              marketBreadth: c?.actual_kospi_breadth ?? marketMap[date] ?? null,
+              gap: c?.gap ?? null,
+            };
+          });
         } else {
           // 레거시 폴백: daily_regime_log(추정) vs CSV breadth
           const marketMap: Record<string, number> = {};
@@ -260,7 +278,9 @@ export default function StrategyRadarChart() {
             if (p.type === 'h1') predH1[p.target] = p.value;
             else if (p.type === 'eod') predEOD[p.made_at] = p.value;
           }
+          // 장 시간대(09~15시)를 항상 축에 깐다. 16:00 실측 등 슬롯 밖 기록도 잃지 않도록 합집합.
           const ts = Array.from(new Set([
+            ...HOUR_SLOTS,
             ...Object.keys(meas), ...Object.keys(predH1), ...Object.keys(predEOD),
           ])).sort();
           setIntradayData(ts.map(t => ({
@@ -449,7 +469,7 @@ export default function StrategyRadarChart() {
               <ReferenceArea y1={40} y2={60} fill="#f08c00" fillOpacity={0.07} />
               <ReferenceArea y1={0} y2={40} fill="#fa5252" fillOpacity={0.07} />
               <CartesianGrid stroke="#e9ecef" strokeDasharray="3 3" />
-              <XAxis dataKey="t" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="t" tick={{ fontSize: 10 }} interval={0} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickCount={6} width={30} />
               <Tooltip content={<Sim7Tooltip />} />
               <ReferenceLine y={60} stroke="#2f9e44" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BULL', position: 'insideTopRight', fontSize: 9, fill: '#2f9e44' }} />

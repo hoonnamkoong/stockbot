@@ -34,6 +34,13 @@ def get_recent_working_days(count=5):
         
     return working_days
 
+def filter_active(df):
+    """추적 종목(임계값 미달)은 누적 분석에서 제외한다.
+    상태 컬럼이 없는 과거 스냅샷은 전부 활성으로 간주한다."""
+    if '상태' not in df.columns:
+        return df
+    return df[df['상태'] == '활성']
+
 def normalize_columns(df):
     """
     Renames Korean columns to English for consistency.
@@ -45,11 +52,11 @@ def normalize_columns(df):
         '시장': 'market', # Legacy support
         '현재가': 'price',
         '등락률': 'change_rate',
-        '당일_게시글수': 'recent_posts_count', 
+        '당일_게시글수': 'recent_posts_count',
         '당일 게시글수': 'recent_posts_count',
         '게시글수': 'recent_posts_count', # Legacy
         '현재_외국인비중': 'foreign_rate',
-        '외인소진율': 'foreign_rate', 
+        '외인소진율': 'foreign_rate',
         '어제_종가': 'prev_close',
         '어제_외국인비중': 'prev_foreign_rate',
         '연속_등록': 'is_last_captured',
@@ -136,7 +143,8 @@ def load_daily_snapshots(target_dates):
                 df = pd.read_excel(file_path)
             else:
                 continue
-            
+
+            df = filter_active(df)
             df = normalize_columns(df)
             daily_dfs[date_str] = df
             print(f"[5Day] Loaded {date_str}: {len(df)} stocks from {os.path.basename(file_path)}")

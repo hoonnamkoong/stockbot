@@ -169,7 +169,8 @@ class DataFetcherWorker(BaseWorker):
         """네이버 외인비중 페이지에서 수급 데이터를 수집합니다."""
         details = {
             'foreign_rate': 0.0, 'foreign_change': 0.0,
-            'foreign_net_buy': 0, 'prev_close': 0, 'prev_foreign_rate': 0.0
+            'foreign_net_buy': 0, 'prev_close': 0, 'prev_foreign_rate': 0.0,
+            'current_price': 0,
         }
         url = f"https://finance.naver.com/item/frgn.naver?code={code}"
         try:
@@ -188,7 +189,10 @@ class DataFetcherWorker(BaseWorker):
                 details['foreign_net_buy'] = int((data_rows[0][6].get_text().replace(',', '').replace('+', '').strip()) or 0)
                 details['prev_close'] = int((data_rows[1][1].get_text().replace(',', '').strip()) or 0)
                 details['prev_foreign_rate'] = prev_rate
-                
+
+                # 거래상위에서 빠진 종목은 시세를 여기서만 얻을 수 있다 (표 첫 행 = 오늘 종가/현재가)
+                details['current_price'] = int(data_rows[0][1].get_text().replace(',', '').strip() or 0)
+
                 # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
                 sparkline = []
                 for r in data_rows[:5]:

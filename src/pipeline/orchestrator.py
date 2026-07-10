@@ -17,6 +17,11 @@ from src.pipeline.workers.trade_engine import TradeEngineWorker
 from src.pipeline.workers.notifier import NotifierWorker
 
 
+def active_only(stocks: list) -> list:
+    """추적 종목은 기록용이다. 시뮬레이터·실전 매매에는 활성 종목만 넘긴다."""
+    return [s for s in stocks if getattr(s, 'status', '활성') == '활성']
+
+
 def run_pipeline(ctx: PipelineContext) -> None:
     """
     StockBot 메인 파이프라인을 실행합니다.
@@ -53,7 +58,7 @@ def run_pipeline(ctx: PipelineContext) -> None:
     ctx.log("▶ Stage 3: 전략 판단 + 시뮬레이터")
     sync_state, _ = storage.load_sync_state(ctx.today_str)
     trade_worker = TradeEngineWorker(ctx, storage)
-    final_picks, simulation_results, sell_candidate = trade_worker.run(stocks, sync_state)
+    final_picks, simulation_results, sell_candidate = trade_worker.run(active_only(stocks), sync_state)
 
     # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
     deep_dive_report = ""

@@ -10,6 +10,9 @@
 import os
 from datetime import datetime, timedelta
 
+# 이 비율을 넘는 페이지가 실패하면 그 런의 게시글 수는 실제보다 작다.
+DEGRADED_PAGE_FAIL_RATIO = 0.10
+
 
 class PipelineContext:
     """
@@ -30,6 +33,16 @@ class PipelineContext:
 
         # 시간대별 게시글 수 임계값
         self.threshold: int = self._calc_threshold()
+
+        # 수집 건전성 (Stage 1이 채운다). 페이지 실패는 게시글 수를 조용히 깎는다.
+        self.scrape_pages_total: int = 0
+        self.scrape_pages_failed: int = 0
+
+    def scrape_degraded(self) -> bool:
+        """페이지 실패율이 기준을 넘으면 이번 런의 게시글 수를 믿을 수 없다."""
+        if self.scrape_pages_total <= 0:
+            return False
+        return (self.scrape_pages_failed / self.scrape_pages_total) > DEGRADED_PAGE_FAIL_RATIO
 
     @classmethod
     def from_env(cls) -> 'PipelineContext':

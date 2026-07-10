@@ -10,6 +10,7 @@
 import re
 import requests
 import os
+import time
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.pipeline.context import PipelineContext
@@ -17,6 +18,13 @@ from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
 from src.data.storage_manager import StorageManager
 from src.strategy import analyzer
+
+# 동시 요청량은 게시글 임계값과 무관해야 한다. 임계값에 묶어두면 오후로 갈수록
+# 네이버에 던지는 동시 요청이 늘어 페이지가 타임아웃으로 조용히 유실된다.
+STOCK_WORKERS = 8   # 동시에 분석할 종목 수
+PAGE_WORKERS = 8    # 종목당 동시에 긁을 토론방 페이지 수
+PAGE_RETRIES = 3
+PAGE_RETRY_WAIT = 0.5
 
 
 class DataFetcherWorker(BaseWorker):
@@ -85,6 +93,7 @@ class DataFetcherWorker(BaseWorker):
                 s.update(d)
                 stats = self._get_discussion_stats(s['code'], today_display)
                 count = stats['recent_posts_count']
+                pages = (stats['total_pages'], stats['failed_pages'])
 
                 if count >= self.ctx.threshold:
                     s['recent_posts_count'] = count
@@ -92,20 +101,28 @@ class DataFetcherWorker(BaseWorker):
                     for p in posts:
                         p['body'] = self._get_post_body(s['code'], p['nid'])
                     s['posts'] = posts
-                    return s, stats['updated_state'], True
-                return None, stats['updated_state'], False
+                    return s, stats['updated_state'], True, pages
+                return None, stats['updated_state'], False, pages
             except Exception as e:
                 print(f"   [DataFetcher] {s.get('name', '?')} 스킵: {e}")
-                return None, None, False
+                return None, None, False, (0, 0)
 
-        with ThreadPoolExecutor(max_workers=self.ctx.threshold) as executor:
+        with ThreadPoolExecutor(max_workers=STOCK_WORKERS) as executor:
             futures = list(executor.map(process_one, candidates))
 
-        for res, updated_state, passed in futures:
+        for res, updated_state, passed, (pages, failed) in futures:
+            self.ctx.scrape_pages_total += pages
+            self.ctx.scrape_pages_failed += failed
             if updated_state:
                 sync_state.stocks.update(updated_state)
             if passed and res:
                 results_raw.append(res)
+
+        if self.ctx.scrape_pages_failed:
+            self.log(
+                f"페이지 수집 실패 {self.ctx.scrape_pages_failed}/{self.ctx.scrape_pages_total}"
+                f" ({self.ctx.scrape_pages_failed / max(self.ctx.scrape_pages_total, 1):.1%})"
+            )
 
         # 5. 연속 카운트 갱신
         passed_codes = [s['code'] for s in results_raw]
@@ -283,29 +300,41 @@ class DataFetcherWorker(BaseWorker):
         session.headers.update({'User-Agent': 'Mozilla/5.0'})
         unique_nids = set()
         new_posts = []
-        max_pages, chunk_size = 40, 8
+        max_pages, chunk_size = 40, PAGE_WORKERS
+        total_pages = 0
+        failed_pages = 0
+
+        def parse_page(res):
+            soup = BeautifulSoup(res.content, 'html.parser')
+            posts, stop = [], False
+            for row in soup.select('table.type2 tr'):
+                cols = row.select('td')
+                if len(cols) < 5: continue
+                if today_str not in cols[0].get_text(strip=True):
+                    stop = True; break
+                tag = row.select_one('td.title a')
+                if not tag: continue
+                nid = re.search(r'nid=(\d+)', tag['href'])
+                if not nid: continue
+                try: likes = int(cols[4].get_text(strip=True))
+                except: likes = 0
+                posts.append({'nid': nid.group(1), 'title': tag.get_text(strip=True), 'likes': likes})
+            return posts, stop
 
         def fetch_page(p_idx):
+            """(posts, stop, ok). 실패한 페이지를 '글 0건'으로 반환하면 게시글 수가 조용히 깎인다."""
             url = f"https://finance.naver.com/item/board.naver?code={code}&page={p_idx}"
-            try:
-                res = session.get(url, timeout=5)
-                soup = BeautifulSoup(res.content, 'html.parser')
-                posts, stop = [], False
-                for row in soup.select('table.type2 tr'):
-                    cols = row.select('td')
-                    if len(cols) < 5: continue
-                    if today_str not in cols[0].get_text(strip=True):
-                        stop = True; break
-                    tag = row.select_one('td.title a')
-                    if not tag: continue
-                    nid = re.search(r'nid=(\d+)', tag['href'])
-                    if not nid: continue
-                    try: likes = int(cols[4].get_text(strip=True))
-                    except: likes = 0
-                    posts.append({'nid': nid.group(1), 'title': tag.get_text(strip=True), 'likes': likes})
-                return posts, stop
-            except:
-                return [], False
+            for attempt in range(PAGE_RETRIES):
+                try:
+                    res = session.get(url, timeout=5)
+                    if res.status_code != 200:
+                        raise requests.HTTPError(f"HTTP {res.status_code}")
+                    posts, stop = parse_page(res)
+                    return posts, stop, True
+                except requests.RequestException:
+                    if attempt < PAGE_RETRIES - 1:
+                        time.sleep(PAGE_RETRY_WAIT * (attempt + 1))
+            return [], False, False
 
         for start_p in range(1, max_pages + 1, chunk_size):
             chunk = range(start_p, min(start_p + chunk_size, max_pages + 1))
@@ -316,7 +345,10 @@ class DataFetcherWorker(BaseWorker):
                 )
                 stop_all = False
                 for future, _ in chunk_res:
-                    posts, stop = future.result()
+                    posts, stop, ok = future.result()
+                    total_pages += 1
+                    if not ok:
+                        failed_pages += 1
                     for p in posts:
                         if p['nid'] not in unique_nids:
                             unique_nids.add(p['nid'])
@@ -328,6 +360,8 @@ class DataFetcherWorker(BaseWorker):
         return {
             'recent_posts_count': len(unique_nids),
             'new_posts': new_posts,
+            'total_pages': total_pages,
+            'failed_pages': failed_pages,
             'updated_state': {'cumulative_count': len(unique_nids), 'last_nid': latest_nid}
         }
 

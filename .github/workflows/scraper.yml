@@ -1,8 +1,9 @@
 name: Stock Scraper Schedule
 
+# 스크래퍼는 태스커 신호로만 돈다 (docs/SCRAPER_OPERATION_SPEC.md).
+# GitHub cron은 발화가 수 분~수 시간 밀려 태스커 런과 겹쳤고, 두 런이 연달아
+# 네이버를 두드리면 페이지 수집이 무너졌다. 장 마감 후 데이터 수집은 eod_data.yml이 맡는다.
 on:
-  schedule:
-    - cron: '0 0-7 * * 1-5'  # KST 09:00 ~ 16:00 (07=16:00 KOSPI CSV 갱신용)
   repository_dispatch:
     types: [tasker_trigger]
   workflow_dispatch:
@@ -94,53 +95,6 @@ jobs:
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
         run: PYTHONPATH=. python scripts/scraper.py
 
-      - name: Refresh KOSPI top100 close CSV (장중 제외 — KST 09~15시엔 스킵)
-        if: always()
-        continue-on-error: true
-        env:
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-        run: |
-          # 장중에 갱신하면 당일 행에 종가가 아닌 현재가가 박힌다. UTC 07+ (KST 16+)에만 갱신.
-          CURRENT_UTC_HOUR=$(date -u +%H | sed 's/^0//')
-          if [ "$CURRENT_UTC_HOUR" -ge 7 ]; then
-            echo "[KOSPI CSV] 갱신 시작 (UTC ${CURRENT_UTC_HOUR}시)..."
-            PYTHONPATH=. python scratch/fetch_kospi_top100.py
-            echo "[KOSPI CSV] 갱신 완료"
-          else
-            echo "[KOSPI CSV] 갱신 스킵 (UTC ${CURRENT_UTC_HOUR}시 / 장 마감 전)"
-          fi
-
-      - name: Deploy KOSPI CSV to db-data (스크래퍼 실패 시 독립 배포)
-        if: failure()
-        run: |
-          # 스크래퍼가 실패해도 KOSPI CSV는 독립적으로 배포
-          if [ ! -f output/kospi_top100_close.csv ]; then
-            echo "[KOSPI CSV] 파일 없음 - 배포 스킵"
-            exit 0
-          fi
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          git clone --branch db-data https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_kospi_repo 2>/dev/null || {
-            mkdir -p db_kospi_repo/data
-            cd db_kospi_repo
-            git init
-            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-            git checkout -b db-data
-            cd ..
-          }
-          mkdir -p db_kospi_repo/data
-          cp output/kospi_top100_close.csv db_kospi_repo/data/
-          cd db_kospi_repo
-          git add data/kospi_top100_close.csv
-          if ! git diff --cached --quiet; then
-            git commit -m "data: KOSPI top100 종가 CSV 갱신 $(date +'%Y-%m-%d KST')"
-            git push origin db-data
-            echo "[KOSPI CSV] db-data 독립 배포 완료"
-          else
-            echo "[KOSPI CSV] 변경사항 없음"
-          fi
-
       - name: Deploy Data to db-data branch
         if: success()
         run: |
@@ -174,8 +128,7 @@ jobs:
             [ "$(basename "$f")" = "trade_history_real.csv" ] && continue
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done
-          # KOSPI top100 종가 CSV (Sim0 차트용 실제 시장 breadth 계산에 사용)
-          [ -f output/kospi_top100_close.csv ] && cp output/kospi_top100_close.csv db_data_repo/data/ || true
+          # KOSPI top100 종가 CSV는 eod_data.yml이 소유한다 (여기서 배포하지 않는다).
           cp -r data/*.xlsx db_data_repo/data/ 2>/dev/null || true
           cp -r data/reports/* db_data_repo/data/reports/ 2>/dev/null || true
           

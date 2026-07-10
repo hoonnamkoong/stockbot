@@ -77,6 +77,7 @@ export const useResearchSource = () => {
                 consecutive_days: Number(item.consecutive_days || item['연속']) || (item['연속_등록'] === true ? 2 : 1),
                 foreign_change_rate: parseNum(item.foreign_change_rate || item['외인변화'] || item['외국인_변화'] || item['foreign_change'] || 0),
                 latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
+                status: item.status || item['상태'] || '활성',
             }));
             setStocks(mappedData);
 

@@ -20,6 +20,7 @@ export interface Stock {
     price_history?: number[];
     tick_power?: number;
     bid_ask_ratio?: number;
+    status?: string;   // '활성' | '추적' (없으면 활성)
     // KIS API 보강 필드
     frgn_fake_ntby_qty?: number;   // 외국인 추정 순매수
     orgn_fake_ntby_qty?: number;   // 기관 추정 순매수

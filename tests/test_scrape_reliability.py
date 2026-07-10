@@ -13,6 +13,12 @@ from src.pipeline.workers.llm_analyzer import LLMAnalyzerWorker
 TODAY = '2026.07.10'
 
 
+@pytest.fixture(autouse=True)
+def chdir_tmp(tmp_path, monkeypatch):
+    """레지스트리 저장이 실제 repo data/를 오염시키지 않도록 임시 CWD로 격리한다."""
+    monkeypatch.chdir(tmp_path)
+
+
 def page_html(post_nids, trailing_old_row=False):
     rows = []
     for nid in post_nids:
@@ -118,6 +124,8 @@ def test_stock_workers_are_decoupled_from_threshold():
 
 
 class FakeCtx:
+    today_str = '20260710'
+
     def __init__(self, failed, total):
         self.scrape_pages_failed = failed
         self.scrape_pages_total = total

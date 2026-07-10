@@ -13,7 +13,14 @@ from src.pipeline.context import PipelineContext
 from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
 from src.data.storage_manager import StorageManager
+from src.data import adopted_registry
 from src.strategy import analyzer
+
+
+def analyze_batch(candidates: list[dict]) -> dict:
+    """StrategyAdvisor 호출을 감싸 테스트에서 대체할 수 있게 한다."""
+    from src.strategy.advisor import StrategyAdvisor
+    return StrategyAdvisor().analyze_batch_discovery(candidates)
 
 
 class LLMAnalyzerWorker(BaseWorker):
@@ -61,15 +68,23 @@ class LLMAnalyzerWorker(BaseWorker):
         return stocks, candidates
 
     def _run_with_ai(self, candidates: list[dict]) -> list[dict]:
-        """Gemini AI를 사용한 배치 분석 (Primary)."""
-        self.log(f"AI 배치 분석 시작 ({len(candidates)}개 종목)")
+        """Gemini 배치 분석 (활성 종목만). 추적 종목은 캐시된 요약을 재사용한다."""
+        self._analyze_active(candidates)
+        self._apply_cached_ai(candidates)
+        self._persist(candidates)
+        self.log("AI 분석 완료")
+        return candidates
+
+    def _analyze_active(self, candidates: list[dict]) -> None:
+        """활성 종목만 Gemini 배치 분석 대상으로 삼는다 (비용 절감)."""
+        active = [c for c in candidates if c.get('status', '활성') == '활성']
+        if not active:
+            return
+        self.log(f"AI 배치 분석 시작 ({len(active)}개 종목)")
         time.sleep(2)  # 429 방어용 지연
+        batch_results = analyze_batch(active)
 
-        from src.strategy.advisor import StrategyAdvisor
-        advisor = StrategyAdvisor()
-        batch_results = advisor.analyze_batch_discovery(candidates)
-
-        for s in candidates:
+        for s in active:
             code = s['code']
             if code in batch_results:
                 ai = batch_results[code]
@@ -82,10 +97,16 @@ class LLMAnalyzerWorker(BaseWorker):
                 kws = ", ".join(s.get('keywords', [])) or "시장 주도주"
                 s['posts_summary'] = f"[데이터 분석] '{kws}' 중심 {s.get('recent_posts_count', 0)}건 토론 포착"
 
-        self._persist(candidates)
-
-        self.log("AI 분석 완료")
-        return candidates
+    def _apply_cached_ai(self, candidates: list[dict]) -> None:
+        """추적 종목에는 마지막으로 활성이었을 때의 AI 결과를 붙인다."""
+        registry = adopted_registry.load(self.ctx.today_str)
+        for s in candidates:
+            if s.get('status') != '추적':
+                continue
+            ai = registry.get(s['code'], {}).get('ai', {})
+            s['posts_summary'] = ai.get('posts_summary', '추적 중 (신규 게시글 적음)')
+            s['sentiment'] = ai.get('sentiment', 'Neutral')
+            s['keywords'] = ai.get('keywords', [])
 
     def _persist(self, candidates: list[dict]) -> bool:
         """엑셀·대시보드에 기록한다. 반쪽 런은 기록하지 않는다.
@@ -103,7 +124,24 @@ class LLMAnalyzerWorker(BaseWorker):
         df_final, _ = analyzer.analyze_discussion_trend(candidates)
         analyzer.save_data(df_final)
         self.storage.save_latest_stocks(candidates, self.ctx.now_kst)
+        self._update_registry(candidates)
         return True
+
+    def _update_registry(self, candidates: list[dict]) -> None:
+        """활성 종목의 AI 결과를 채택 레지스트리에 반영한다 (건강한 런에서만 호출됨)."""
+        registry = adopted_registry.load(self.ctx.today_str)
+        for s in candidates:
+            if s.get('status', '활성') != '활성':
+                continue
+            entry = registry.setdefault(s['code'], {})
+            entry['name'] = s.get('name', entry.get('name', ''))
+            entry['market'] = s.get('market', entry.get('market', ''))
+            entry['ai'] = {
+                'posts_summary': s.get('posts_summary', ''),
+                'sentiment': s.get('sentiment', 'Neutral'),
+                'keywords': s.get('keywords', []),
+            }
+        adopted_registry.save(self.ctx.today_str, registry)
 
     def _run_rule_based_fallback(self, candidates: list[dict]) -> list[dict]:
         """AI 장애 시 규칙 기반 Fallback."""
@@ -115,6 +153,8 @@ class LLMAnalyzerWorker(BaseWorker):
                 f"외인 {direction} {abs(s.get('foreign_change', 0)):.2f}%p"
             )
             s['sentiment'] = "Positive" if s.get('foreign_change', 0) > 0 else "Negative"
+
+        self._apply_cached_ai(candidates)
 
         # Fallback에서도 데이터 저장
         try:

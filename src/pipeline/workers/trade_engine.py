@@ -15,6 +15,19 @@ from src.data.storage_manager import StorageManager
 from src.strategy.registry import get_active_simulators
 
 
+def libero_action(after_close: bool, market_hours: bool) -> str | None:
+    """리베로가 이번 런에서 할 일.
+
+    15:30~15:49는 두 조건이 함께 참이다. 마감 후 확정을 먼저 판정하지 않으면
+    EOD 채점이 영영 돌지 않는다 (태스커의 마지막 신호가 15:30이기 때문).
+    """
+    if after_close:
+        return 'finalize'
+    if market_hours:
+        return 'nowcast'
+    return None
+
+
 class TradeEngineWorker(BaseWorker):
     """
     Stage 3: 전략 판단(BUY/WATCH) + 시뮬레이터 주가 동기화.
@@ -215,16 +228,19 @@ class TradeEngineWorker(BaseWorker):
                     # Libero 나우캐스트: 장중엔 시간당 실측·예측·채점, 마감 후엔 EOD 확정 채점
                     if is_libero:
                         now_kst = self.ctx.now_kst
-                        if self.ctx.is_market_hours():
-                            if live_breadth:
-                                codes = live_breadth[2]
-                                sim.update_nowcast(
-                                    live_breadth[0], now_kst=now_kst,
-                                    backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
-                        elif now_kst.weekday() < 5 and now_kst.hour >= 15:
+                        action = libero_action(
+                            after_close=self.ctx.is_after_market_close(),
+                            market_hours=self.ctx.is_market_hours(),
+                        )
+                        if action == 'finalize':
                             # 마감 후 라이브 등락률 = 확정 종가 기준. 실패 시 당일 갱신 CSV 폴백.
                             actual_eod = live_breadth[0] if live_breadth else self._get_actual_breadth_from_csv()
                             sim.finalize_eod(actual_eod, now_kst=now_kst)
+                        elif action == 'nowcast' and live_breadth:
+                            codes = live_breadth[2]
+                            sim.update_nowcast(
+                                live_breadth[0], now_kst=now_kst,
+                                backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
 

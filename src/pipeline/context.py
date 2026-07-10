@@ -13,6 +13,9 @@ from datetime import datetime, timedelta
 # 이 비율을 넘는 페이지가 실패하면 그 런의 게시글 수는 실제보다 작다.
 DEGRADED_PAGE_FAIL_RATIO = 0.10
 
+# KRX 정규장 마감 (종가 단일가 종료)
+MARKET_CLOSE_HHMM = (15, 30)
+
 
 class PipelineContext:
     """
@@ -171,12 +174,29 @@ class PipelineContext:
         return False
 
     def is_market_hours(self) -> bool:
-        """장중 시간대(09:00~15:50)에 해당하는지 확인합니다."""
+        """장중 시간대(09:00~15:50)에 해당하는지 확인합니다.
+
+        [주의] 실거래 게이트다 (trade_engine의 allow_buy, program_trader).
+        장은 15:30에 닫지만 이 상한은 15:50이다. 마감 후 판정에는
+        is_after_market_close()를 쓸 것 — 여기를 낮추면 매수 허용 시간대가 바뀐다.
+        """
         return (
             self.is_trading_day() and
             9 <= self.now_kst.hour < 16 and
             not (self.now_kst.hour == 15 and self.now_kst.minute >= 50)
         )
+
+    def is_after_market_close(self) -> bool:
+        """거래일의 장 마감(15:30) 이후인지 확인합니다.
+
+        is_market_hours()와 15:30~15:49 구간이 겹친다. 둘을 함께 쓰는 곳은
+        이쪽을 먼저 판정해야 한다.
+        """
+        if self.now_kst.weekday() >= 5:
+            return False
+        if (self.now_kst.hour, self.now_kst.minute) < MARKET_CLOSE_HHMM:
+            return False
+        return self.is_trading_day()
 
     def log(self, msg: str) -> None:
         """타임스탬프가 포함된 로그를 출력합니다."""

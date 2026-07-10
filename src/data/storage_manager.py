@@ -20,7 +20,7 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 
-from src.data.schemas import TradeRecord, StockData, SyncState, ReportEntry
+from src.data.schemas import StockData, SyncState, ReportEntry
 
 
 class StorageManager:
@@ -137,20 +137,6 @@ class StorageManager:
     # ================================================================
     # [매매 이력] CSV 추가
     # ================================================================
-
-    def append_trade(self, sim_id: str, record: TradeRecord) -> None:
-        """
-        TradeRecord를 해당 시뮬레이터/실계좌의 CSV에 추가합니다.
-        파일이 없으면 헤더와 함께 새로 생성합니다.
-        """
-        path = os.path.join(self.DATA_DIR, f"trade_history_{sim_id}.csv")
-        row_df = pd.DataFrame([record.to_csv_row()])
-
-        if os.path.exists(path):
-            row_df.to_csv(path, mode='a', header=False, index=False, encoding='utf-8')
-        else:
-            row_df.to_csv(path, mode='w', header=True, index=False, encoding='utf-8')
-        print(f"[Storage] 매매 기록: {sim_id} / {record.action} {record.symbol}")
 
     # ================================================================
     # [월별 리서치 엑셀] 누적 업데이트

@@ -72,3 +72,6 @@ _legacy_backups/
 logs/
 node_modules
 .gstack/
+
+# KOSPI top100 종가 CSV — 원본은 db-data 브랜치. main의 사본이 낡아 db-data를 역행시킨 이력 있음.
+output/kospi_top100_close.csv

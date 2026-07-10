@@ -19,6 +19,14 @@ import base64
 
 TOKEN_CACHE_PATH = 'data/kis_token_cache.json'  # 런타임 내 로컬 캐시(부차적)
 
+# 러너의 일시적 DNS/커넥트 장애로 파이프라인 전체가 죽지 않도록 하는 재시도
+NET_RETRIES = 3
+NET_BACKOFF_SEC = (5, 15)  # 시도 사이 대기 (마지막 시도 뒤에는 대기하지 않음)
+
+
+class TokenSourceUnavailable(Exception):
+    """네트워크 문제로 토큰 저장소에 닿지 못함 — 토큰의 유효 여부를 알 수 없는 상태."""
+
 # [Security] 토큰 단일 보관처: 비공개 레포
 SECRET_OWNER = 'hoonnamkoong'
 SECRET_REPO = 'stockbot-secret'
@@ -38,12 +46,21 @@ def get_current_kst_time():
     from datetime import timezone
     return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=9)))
 
-def load_token_cache():
-    """비공개 레포에서 토큰을 읽는다. 실패 시 로컬 캐시로 폴백."""
-    gh = _gh_token()
-    if gh:
+def _load_local_cache():
+    if os.path.exists(TOKEN_CACHE_PATH):
         try:
-            headers = {"Authorization": f"token {gh}", "Accept": "application/vnd.github.raw+json"}
+            with open(TOKEN_CACHE_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except: pass
+    return None
+
+
+def _fetch_token_from_secret(gh):
+    """비공개 레포에서 토큰을 읽는다. 네트워크로 닿지 못하면 TokenSourceUnavailable."""
+    headers = {"Authorization": f"token {gh}", "Accept": "application/vnd.github.raw+json"}
+    last_err = None
+    for attempt in range(NET_RETRIES):
+        try:
             res = requests.get(f"{_secret_api_url()}?ref={SECRET_BRANCH}", headers=headers, timeout=8)
             if res.status_code == 200:
                 return res.json()
@@ -51,17 +68,32 @@ def load_token_cache():
                 print("[TokenManager] 비공개 레포에 토큰 없음(최초 발급 필요).")
             else:
                 print(f"[TokenManager] 비공개 레포 읽기 실패: {res.status_code}")
-        except Exception as e:
-            print(f"[TokenManager] 비공개 레포 읽기 오류: {e}")
+            return None
+        except requests.RequestException as e:
+            last_err = e
+            print(f"[TokenManager] 비공개 레포 읽기 오류 (시도 {attempt + 1}/{NET_RETRIES}): {e}")
+            if attempt < NET_RETRIES - 1:
+                time.sleep(NET_BACKOFF_SEC[attempt])
+    raise TokenSourceUnavailable(str(last_err))
+
+
+def load_token_cache():
+    """비공개 레포에서 토큰을 읽는다. 실패 시 로컬 캐시로 폴백."""
+    gh = _gh_token()
+    if gh:
+        try:
+            token = _fetch_token_from_secret(gh)
+        except TokenSourceUnavailable:
+            local = _load_local_cache()
+            if local:
+                print("[TokenManager] 비공개 레포 접근 불가 → 로컬 캐시 사용")
+                return local
+            raise
+        if token:
+            return token
     else:
         print("[TokenManager] ⚠️ GH_PAT 없음 → 비공개 레포 접근 불가.")
-    # 폴백: 로컬 캐시
-    if os.path.exists(TOKEN_CACHE_PATH):
-        try:
-            with open(TOKEN_CACHE_PATH, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except: pass
-    return None
+    return _load_local_cache()
 
 def save_token_cache(token_data):
     # 발급 시각 기록 추가
@@ -129,20 +161,24 @@ def issue_new_token():
         "appsecret": app_secret
     }
     
-    try:
-        # 분당 1회 제한(EGW00133)을 피하기 위해 혹시 모를 짧은 대기
-        time.sleep(1)
-        res = requests.post(url, json=payload, timeout=10)
-        data = res.json()
-        
-        if 'access_token' in data:
-            return data
-        else:
-            print(f"[TokenManager] ❌ 발급 실패: {data}")
-            return None
-    except Exception as e:
-        print(f"[TokenManager] ❌ 통신 오류: {e}")
-        return None
+    for attempt in range(NET_RETRIES):
+        try:
+            # 분당 1회 제한(EGW00133)을 피하기 위해 혹시 모를 짧은 대기
+            time.sleep(1)
+            res = requests.post(url, json=payload, timeout=10)
+            data = res.json()
+
+            if 'access_token' in data:
+                return data
+            else:
+                # KIS가 응답으로 거부한 것이므로 재시도해도 결과는 같다
+                print(f"[TokenManager] ❌ 발급 실패: {data}")
+                return None
+        except requests.RequestException as e:
+            print(f"[TokenManager] ❌ 통신 오류 (시도 {attempt + 1}/{NET_RETRIES}): {e}")
+            if attempt < NET_RETRIES - 1:
+                time.sleep(NET_BACKOFF_SEC[attempt])
+    return None
 
 def is_token_valid(cache):
     if not cache or 'access_token' not in cache:
@@ -171,8 +207,13 @@ def manage():
     # 강제 갱신 모드 여부 (Vercel에서 요청 시)
     force_refresh = os.environ.get('FORCE_TOKEN_REFRESH', 'false').lower() == 'true'
     
-    cache = load_token_cache()
-    
+    try:
+        cache = load_token_cache()
+    except TokenSourceUnavailable as e:
+        # 토큰이 살아있을 수 있는데도 재발급하면 기존 토큰이 무효화되고 발급 제한만 소모한다.
+        print(f"[TokenManager] ❌ 토큰 저장소 접근 불가 → 재발급하지 않고 종료: {e}")
+        return False
+
     if not force_refresh and is_token_valid(cache):
         print("[TokenManager] * 기존 토큰이 아직 유효합니다. (발급 스킵)")
         # [Fix] Run Scraper 단계에서 auth.py가 로컬 파일을 먼저 읽도록 항상 로컬에 저장

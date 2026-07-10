@@ -82,13 +82,28 @@ class LLMAnalyzerWorker(BaseWorker):
                 kws = ", ".join(s.get('keywords', [])) or "시장 주도주"
                 s['posts_summary'] = f"[데이터 분석] '{kws}' 중심 {s.get('recent_posts_count', 0)}건 토론 포착"
 
-        # 대시보드용 데이터 저장 (기존 방식 유지)
-        df_final, _ = analyzer.analyze_discussion_trend(candidates)
-        analyzer.save_data(df_final)
-        self.storage.save_latest_stocks(candidates, self.ctx.now_kst)
+        self._persist(candidates)
 
         self.log("AI 분석 완료")
         return candidates
+
+    def _persist(self, candidates: list[dict]) -> bool:
+        """엑셀·대시보드에 기록한다. 반쪽 런은 기록하지 않는다.
+
+        월간 엑셀은 누적 append라 한 번 들어간 반쪽 데이터를 되돌릴 수 없고,
+        대시보드는 전량 덮어쓰기라 멀쩡한 스냅샷이 사라진다.
+        """
+        if self.ctx.scrape_degraded():
+            self.log_error(
+                f"수집 실패율 초과 → 이번 런은 기록하지 않습니다 "
+                f"(페이지 {self.ctx.scrape_pages_failed}/{self.ctx.scrape_pages_total} 실패)"
+            )
+            return False
+
+        df_final, _ = analyzer.analyze_discussion_trend(candidates)
+        analyzer.save_data(df_final)
+        self.storage.save_latest_stocks(candidates, self.ctx.now_kst)
+        return True
 
     def _run_rule_based_fallback(self, candidates: list[dict]) -> list[dict]:
         """AI 장애 시 규칙 기반 Fallback."""
@@ -103,9 +118,7 @@ class LLMAnalyzerWorker(BaseWorker):
 
         # Fallback에서도 데이터 저장
         try:
-            df_final, _ = analyzer.analyze_discussion_trend(candidates)
-            analyzer.save_data(df_final)
-            self.storage.save_latest_stocks(candidates, self.ctx.now_kst)
+            self._persist(candidates)
         except Exception as e:
             self.log_error(f"Fallback 저장 실패: {e}")
 

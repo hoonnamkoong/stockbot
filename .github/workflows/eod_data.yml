@@ -13,6 +13,11 @@ on:
   schedule:
     - cron: '0 7 * * 1-5'  # 07:00 UTC = KST 16:00 (장 마감 후)
   workflow_dispatch:
+    inputs:
+      force:
+        description: '장중이어도 강제 수집 (당일 행에 현재가가 박힌다)'
+        required: false
+        default: 'false'
 
 jobs:
   collect:
@@ -23,21 +28,39 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 장중에 수집하면 당일 행에 종가가 아닌 현재가가 박힌다.
+      # cron은 마감 후에만 발화하지만 수동 실행은 아무 때나 가능하므로 여기서 막는다.
+      - name: 장중 여부 판정 (KST 09:00~15:30 = UTC 00:00~06:29)
+        id: gate
+        run: |
+          MINS=$(( 10#$(date -u +%H) * 60 + 10#$(date -u +%M) ))
+          if [ "$MINS" -lt 390 ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "[Gate] 장중(UTC $(date -u +%H:%M)) — 종가 수집을 건너뛴다"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "[Gate] 장 마감 후(UTC $(date -u +%H:%M)) — 종가 수집 진행"
+          fi
+
       - name: Checkout content
+        if: steps.gate.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: steps.gate.outputs.run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
         # fetch_kospi_top100.py는 bs4를 함수 안에서 지연 import한다 (dotenv는 가드됨).
         run: pip install requests beautifulsoup4
 
       # 토큰의 유일한 발급자는 token_manager다. 여기서는 비공개 레포의 유효 토큰을
       # data/kis_token_cache.json에 내려놓기만 하고, fetch_kospi_top100.py가 그것을 읽는다.
       - name: Manage KIS Token
+        if: steps.gate.outputs.run == 'true'
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
@@ -45,12 +68,14 @@ jobs:
         run: python scripts/token_manager.py
 
       - name: Fetch KOSPI top100 close CSV
+        if: steps.gate.outputs.run == 'true'
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
         run: PYTHONPATH=. python scratch/fetch_kospi_top100.py
 
       - name: Deploy CSV to db-data
+        if: steps.gate.outputs.run == 'true'
         run: |
           if [ ! -f output/kospi_top100_close.csv ]; then
             echo "[KOSPI CSV] 파일 없음 - 배포 스킵"

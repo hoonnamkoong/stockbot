@@ -76,6 +76,9 @@ export const StockTable = ({ stocks, sortConfig, onSort, onCellClick, onQuickOrd
                                 <Text size="sm" fw={700} component="a" href={`https://finance.naver.com/item/main.naver?code=${s.code}`} target="_blank">
                                     {s.name}
                                 </Text>
+                                {s.status === '추적' && (
+                                    <Badge size="xs" color="gray" variant="light" ml={4}>추적</Badge>
+                                )}
                             </Table.Td>
                             <Table.Td onClick={() => onQuickOrder(s)} style={{ cursor: 'pointer' }}>
                                 <Badge size="xs" variant="outline" color={s.market === 'KOSPI' ? 'blue' : 'cyan'}>{s.market}</Badge>

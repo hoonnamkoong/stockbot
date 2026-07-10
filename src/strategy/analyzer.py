@@ -42,19 +42,20 @@ def analyze_discussion_trend(data_list):
         'prev_close': '전일종가',
         'prev_foreign_rate': '전일외인',
         'change_rate': '등락률',
-        'foreign_change': '외인변화', 
+        'foreign_change': '외인변화',
         'recent_posts_count': '게시물', # Vercel 대시보드와 맞춤
         'posts_summary': '게시물_요약',
         'sentiment_score': '감정',
         'keywords': '키워드',
-        'consecutive_days': '연속'
+        'consecutive_days': '연속',
+        'status': '상태'
     }
     
     # 2. 존재하는 컬럼만 선택하여 순서 지정
     desired_order = [
         'name', 'price', 'change_rate', 'foreign_change', 'recent_posts_count', 'foreign_rate', 'market',
-        'prev_close', 'prev_foreign_rate', 'posts_summary', 
-        'sentiment_score', 'keywords', 'consecutive_days', 'code'
+        'prev_close', 'prev_foreign_rate', 'posts_summary',
+        'sentiment_score', 'keywords', 'consecutive_days', 'status', 'code'
     ]
     
     final_cols = [c for c in desired_order if c in df_final.columns]

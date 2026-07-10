@@ -36,6 +36,17 @@ def classify(count: int, threshold: int, adopted: set, code: str = '') -> str | 
     return None
 
 
+def merge_universe(trending: list[dict], adopted: dict) -> list[dict]:
+    """거래량 상위(trending)에 당일 채택 종목(adopted) 중 빠진 것을 뒤에 덧붙인다."""
+    known = {c['code'] for c in trending}
+    merged = list(trending)
+    for code, info in adopted.items():
+        if code not in known:
+            merged.append({'code': code, 'name': info.get('name', ''),
+                           'market': info.get('market', '')})
+    return merged
+
+
 class DataFetcherWorker(BaseWorker):
     """
     Stage 1: 네이버 금융 데이터 수집 및 1차 필터링.
@@ -81,11 +92,7 @@ class DataFetcherWorker(BaseWorker):
         # 3-1. 당일 채택 종목 합집합: 거래량 상위에서 빠졌어도 오늘 이미 채택된 종목은 유니버스에 유지
         from src.data import adopted_registry
         adopted = adopted_registry.load(self.ctx.today_str)
-        known = {c['code'] for c in candidates}
-        for code, info in adopted.items():
-            if code not in known:
-                candidates.append({'code': code, 'name': info.get('name', ''),
-                                   'market': info.get('market', '')})
+        candidates = merge_universe(candidates, adopted)
         self.log(f"유니버스 {len(candidates)}개 (당일 채택 {len(adopted)}개 포함)")
 
         self.log(f"후보 종목 {len(candidates)}개 분석 시작")

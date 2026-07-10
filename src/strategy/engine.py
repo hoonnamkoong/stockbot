@@ -119,7 +119,3 @@ class StrategyEngine:
                         return {"reject": True, "reason": f"DART 악재({text})"}
             return {"reject": False, "reason": "특이 공시 없음"}
         except: return {"reject": False, "reason": "DART 모니터링 일시 중단"}
-
-    def fetch_news_data(self, code, name):
-        # [I/O 전담] 뉴스 데이터 수집 로직
-        return [] # TODO: Implement real news fetcher

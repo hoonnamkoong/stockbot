@@ -103,12 +103,6 @@ def get_active_simulators() -> list:
     return simulators
 
 
-def get_simulator_ids() -> list[str]:
-    """활성화된 시뮬레이터의 ID 목록을 반환합니다."""
-    manifest = _load_manifest()
-    return [s['id'] for s in manifest.get('simulators', []) if s.get('active', True)]
-
-
 def get_tradeable_simulator_ids() -> list[str]:
     """프로그램 매매 가능(active && tradeable) 시뮬레이터 ID 목록. 화이트리스트 소스."""
     manifest = _load_manifest()

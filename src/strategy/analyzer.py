@@ -72,11 +72,6 @@ def analyze_discussion_trend(data_list):
     return df_result, df_final[final_cols]
 
 
-
-
-    return df_sorted
-
-
 def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_time=None):
     """
     [V8.9.9.5] DataFrame을 CSV/Excel/JSON으로 저장합니다.
@@ -452,12 +447,6 @@ def compare_with_history(current_df):
         
     return current_df
 
-def filter_promising_stocks(df, criteria):
-    """
-    기준에 맞는 유망 종목을 필터링합니다.
-    """
-    return df
-
 
 def get_top_trending_stocks(market_type='KOSPI'):
     """
@@ -526,62 +515,4 @@ def get_top_trending_stocks(market_type='KOSPI'):
         return data[:20]
     except Exception as e:
         print(f"[Error] get_top_trending_stocks failed: {e}")
-        raise e # 에러 은폐 금지 (글로벌 룰)
-
-def get_top_rising_stocks(market_type='KOSPI'):
-    """
-    네이버 금융 상승률 상위(Top Rising) 종목 리스트를 가져옵니다.
-    market_type: 'KOSPI' or 'KOSDAQ'
-    """
-    sosok = '0' if market_type == 'KOSPI' else '1'
-    url = f"https://finance.naver.com/sise/sise_rise.naver?sosok={sosok}" 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    }
-    
-    exclude_keywords = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
-
-    try:
-        print(f"[Analyzer] Fetching {market_type} Rising stocks...")
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.content.decode('euc-kr', 'replace'), 'html.parser')
-        
-        table = soup.select_one('table.type_2')
-        data = []
-        if table:
-            rows = table.select('tr')
-            for row in rows:
-                cols = row.select('td')
-                if len(cols) < 10: continue
-
-                name_tag = cols[1].select_one('a')
-                if not name_tag: continue
-                name = name_tag.get_text(strip=True)
-                
-                if any(kw in name.upper() for kw in exclude_keywords): continue
-
-                code = name_tag['href'].split('code=')[-1]
-                price_str = cols[2].get_text(strip=True).replace(',', '')
-                current_price = int(price_str) if price_str.isdigit() else 0
-                change_rate = cols[4].get_text(strip=True).strip()
-                
-                # [V50.2] 거래량(volume) 및 거래대금(amount) 추출
-                volume_str = cols[5].get_text(strip=True).replace(',', '')
-                volume = int(volume_str) if volume_str.isdigit() else 0
-                amount_str = cols[6].get_text(strip=True).replace(',', '')
-                amount = int(amount_str) * 1_000_000 if amount_str.isdigit() else 0 # 단위: 백만
-                
-                data.append({
-                    'market': market_type,
-                    'code': code,
-                    'name': name,
-                    'price': current_price,
-                    'change_rate': change_rate,
-                    'volume': volume,
-                    'amount': amount,
-                    'source': 'rising'
-                })
-        return data[:20]
-    except Exception as e:
-        print(f"[Error] get_top_rising_stocks failed: {e}")
         raise e # 에러 은폐 금지 (글로벌 룰)

@@ -320,46 +320,6 @@ class BaseSimulator:
                 return 0.0
         return float(cr or 0)
 
-    def calculate_mfhs2_score(self, stock_data: dict, current_month: int) -> int:
-        """
-        [Sim2 MFHS2] 다중 필터 하이브리드 수급 동승 전략 스코어 산출
-        - A(수급 40점) + B(발산 40점) + C(계절성 20점) = 총합 산출
-        """
-        score = 0
-        
-        # [조건 A] 외국인 수급 (40점)
-        f_change = stock_data.get('foreign_change', 0)
-        if isinstance(f_change, str):
-            try:
-                f_change = float(f_change.replace('%', '').replace('+', '').strip())
-            except ValueError:
-                f_change = 0.0
-        
-        # 외국인 비중이 전일 대비 증가했다면 40점
-        if f_change > 0:
-            score += 40
-            
-        # [조건 B] 감정-수급 발산 (40점)
-        posts = int(stock_data.get('recent_posts_count', 0))
-        sentiment = stock_data.get('sentiment', '')
-        pos_percent = 0
-        if 'Positive' in sentiment:
-            try:
-                pos_percent = float(sentiment.split('(')[1].split('%')[0])
-            except:
-                pass
-                
-        # 거래량이 터지기 전 게시판이 달아오르는 발산 현상 (Positive 60% 초과 & 게시물수 30개 이상)
-        if posts >= 30 and pos_percent > 60:
-            score += 40
-            
-        # [조건 C] 계절성 (20점)
-        # 1~4월은 강세 가중치 (리밸런싱, 실적), 5월 이후는 공매도 등 보수적 접근
-        if 1 <= current_month <= 4:
-            score += 20
-            
-        return score
-
     def check_trailing_stop(self, code, current_price, activation_pct=5.0, callback_pct=3.0):
         """
         [V2] 수익률이 activation_pct 이상 도달 후 고점 대비 callback_pct 하락 시 매도 신호

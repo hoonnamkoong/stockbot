@@ -34,6 +34,25 @@ if not APP_KEY or not APP_SECRET:
     sys.exit(1)
 
 
+# 러너의 일시적 네트워크 장애로 종가 수집 전체가 죽지 않도록 한다.
+# 2026-07-10 마감 후 런이 KIS 커넥트 타임아웃 한 번에 실패했다.
+NET_RETRIES = 3
+NET_BACKOFF_SEC = (5, 15)
+
+
+def _with_retry(fn, *args, **kwargs):
+    last = None
+    for attempt in range(NET_RETRIES):
+        try:
+            return fn(*args, **kwargs)
+        except requests.RequestException as e:
+            last = e
+            print(f"[재시도] 통신 오류 (시도 {attempt + 1}/{NET_RETRIES}): {e}")
+            if attempt < NET_RETRIES - 1:
+                time.sleep(NET_BACKOFF_SEC[attempt])
+    raise last
+
+
 # ── 1. 토큰 발급 ──────────────────────────────────────
 def get_token() -> str:
     cache_path = Path("data/kis_token_cache.json")
@@ -53,7 +72,8 @@ def get_token() -> str:
             pass
 
     print("[토큰] 새로 발급 중...")
-    r = requests.post(
+    r = _with_retry(
+        requests.post,
         f"{BASE_URL}/oauth2/tokenP",
         json={"grant_type": "client_credentials", "appkey": APP_KEY, "appsecret": APP_SECRET},
         timeout=10,
@@ -102,7 +122,7 @@ def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
     print("[STEP 1] KOSPI 시가총액 상위 100 종목 수집 중 (네이버 금융)...")
     for page in range(1, 5):
         url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
-        r = requests.get(url, headers=naver_hdrs, timeout=10)
+        r = _with_retry(requests.get, url, headers=naver_hdrs, timeout=10)
         soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
         table = soup.select_one('table.type_2')
         if not table:
@@ -155,7 +175,7 @@ def fetch_daily_close(code: str, token: str, count: int = 100) -> list[dict]:
         "FID_PERIOD_DIV_CODE": "D",   # 일별
         "FID_ORG_ADJ_PRC": "0",       # 수정주가
     }
-    r = requests.get(url, headers=headers("FHKST03010100", token), params=params, timeout=10)
+    r = _with_retry(requests.get, url, headers=headers("FHKST03010100", token), params=params, timeout=10)
     body = r.json()
 
     if body.get("rt_cd") != "0":

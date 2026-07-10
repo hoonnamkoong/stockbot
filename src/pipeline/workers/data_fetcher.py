@@ -123,7 +123,7 @@ class DataFetcherWorker(BaseWorker):
 
                 status = classify(count, self.ctx.threshold, set(adopted), s['code'])
                 if status is None:
-                    return None, stats['updated_state'], False, pages
+                    return None, False, pages
 
                 s['recent_posts_count'] = count
                 s['status'] = status
@@ -134,19 +134,17 @@ class DataFetcherWorker(BaseWorker):
                     s['posts'] = posts
                 else:
                     s['posts'] = []
-                return s, stats['updated_state'], True, pages
+                return s, True, pages
             except Exception as e:
                 print(f"   [DataFetcher] {s.get('name', '?')} 스킵: {e}")
-                return None, None, False, (0, 0)
+                return None, False, (0, 0)
 
         with ThreadPoolExecutor(max_workers=STOCK_WORKERS) as executor:
             futures = list(executor.map(process_one, candidates))
 
-        for res, updated_state, passed, (pages, failed) in futures:
+        for res, passed, (pages, failed) in futures:
             self.ctx.scrape_pages_total += pages
             self.ctx.scrape_pages_failed += failed
-            if updated_state:
-                sync_state.stocks.update(updated_state)
             if passed and res:
                 results_raw.append(res)
 
@@ -392,13 +390,11 @@ class DataFetcherWorker(BaseWorker):
                     if stop: stop_all = True
                 if stop_all: break
 
-        latest_nid = new_posts[0]['nid'] if new_posts else None
         return {
             'recent_posts_count': len(unique_nids),
             'new_posts': new_posts,
             'total_pages': total_pages,
             'failed_pages': failed_pages,
-            'updated_state': {'cumulative_count': len(unique_nids), 'last_nid': latest_nid}
         }
 
     def _get_post_body(self, code: str, nid: str) -> str:

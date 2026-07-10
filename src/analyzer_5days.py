@@ -1,4 +1,9 @@
+"""5일/3일 누적 분석 (독립 CLI).
 
+[주의] 이 모듈은 파이프라인이 import하지 않는다. 대시보드가 읽는
+data/analysis_{3,5}days.json을 만드는 것은 notifier._aggregate_multi_day 다.
+여기 있는 filter_active()를 고쳐도 대시보드 보드는 바뀌지 않는다.
+"""
 import pandas as pd
 import os
 import re

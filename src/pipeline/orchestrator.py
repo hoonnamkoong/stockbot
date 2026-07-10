@@ -17,9 +17,19 @@ from src.pipeline.workers.trade_engine import TradeEngineWorker
 from src.pipeline.workers.notifier import NotifierWorker
 
 
-def active_only(stocks: list) -> list:
-    """추적 종목은 기록용이다. 시뮬레이터·실전 매매에는 활성 종목만 넘긴다."""
-    return [s for s in stocks if getattr(s, 'status', '활성') == '활성']
+def _status_of(item) -> str:
+    """Stage 1은 StockData, Stage 2 이후는 dict를 넘긴다."""
+    if isinstance(item, dict):
+        return item.get('status', '활성')
+    return getattr(item, 'status', '활성')
+
+
+def active_only(items: list) -> list:
+    """추적 종목은 기록(엑셀·대시보드)용이다.
+
+    매매·시뮬레이터·텔레그램 리포트·누적 보드에는 활성 종목만 넘긴다.
+    """
+    return [x for x in items if _status_of(x) == '활성']
 
 
 def run_pipeline(ctx: PipelineContext) -> None:
@@ -115,8 +125,10 @@ def run_pipeline(ctx: PipelineContext) -> None:
     ctx.log("▶ Stage 4: 리포트 발송 + 저장")
     # 최신 sync_state 재로드 (Stage 3에서 업데이트됐을 수 있음)
     sync_state, _ = storage.load_sync_state(ctx.today_str)
+    # 추적 종목은 5일/3일 누적 보드(_aggregate_multi_day), 텔레그램 종목 수,
+    # reported_codes에 섞이면 안 된다. 이 인자가 그 넷의 유일한 입구다.
     NotifierWorker(ctx, storage).run(
-        all_stocks=candidates,
+        all_stocks=active_only(candidates),
         simulation_results=simulation_results,
         final_picks=final_picks,
         deep_dive_report=deep_dive_report,

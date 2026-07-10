@@ -83,3 +83,54 @@ def test_degraded_run_does_not_touch_registry(monkeypatch):
 
     assert w._persist([{'code': '111111', 'status': '활성'}]) is False
     assert adopted_registry.load('20260710') == {}
+
+
+def test_round_trip_active_then_tracked_keeps_ai_summary(monkeypatch):
+    """09시에 활성 상태로 저장된 AI 요약/감성/키워드가 11시 추적 상태까지 그대로 이어져야 한다."""
+    monkeypatch.setattr(llm_analyzer.analyzer, 'analyze_discussion_trend', lambda c: (c, None))
+    monkeypatch.setattr(llm_analyzer.analyzer, 'save_data', lambda df: None)
+    w = make_worker()
+
+    # 1차 런(09:00): 활성 종목으로 AI 분석 결과를 저장한다.
+    w._persist([{
+        'code': '111111', 'status': '활성',
+        'posts_summary': '요약1', 'sentiment': 'Positive',
+        'keywords': ['키워드1', '키워드2'],
+    }])
+
+    # 2차 런(11:00): 같은 종목이 추적 상태로 넘어온다 (AI 필드 없이 새로 만든 dict).
+    tracked = {'code': '111111', 'status': '추적'}
+    w._apply_cached_ai([tracked])
+    w._persist([tracked])
+
+    saved = w.storage.saved[-1]
+    assert saved[0]['posts_summary'] == '요약1'
+    assert saved[0]['sentiment'] == 'Positive'
+    assert saved[0]['keywords'] == ['키워드1', '키워드2']
+
+
+def test_missing_keywords_key_does_not_erase_cached_keywords(monkeypatch):
+    """Gemini가 일부 종목을 배치 결과에서 누락하면 s에는 'keywords' 키 자체가 없다
+    (StockData.to_dict()는 top_keywords만 만든다). 이런 반쪽 결과가 레지스트리에
+    이미 저장된 keywords를 빈 리스트로 덮어써서는 안 된다."""
+    monkeypatch.setattr(llm_analyzer.analyzer, 'analyze_discussion_trend', lambda c: (c, None))
+    monkeypatch.setattr(llm_analyzer.analyzer, 'save_data', lambda df: None)
+    from src.data import adopted_registry
+    w = make_worker()
+
+    # 1차 런: 정상적으로 키워드가 캐시된 상태를 만든다.
+    w._persist([{
+        'code': '111111', 'status': '활성',
+        'posts_summary': '요약1', 'sentiment': 'Positive',
+        'keywords': ['키워드1', '키워드2'],
+    }])
+
+    # 2차 런: Gemini가 이 종목을 배치 결과에서 누락 -> 'keywords' 키 자체가 없음
+    w._persist([{
+        'code': '111111', 'status': '활성',
+        'posts_summary': '요약2', 'sentiment': 'Neutral',
+        # 'keywords' 키 없음
+    }])
+
+    registry = adopted_registry.load('20260710')
+    assert registry['111111']['ai']['keywords'] == ['키워드1', '키워드2']

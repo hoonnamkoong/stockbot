@@ -136,10 +136,14 @@ class LLMAnalyzerWorker(BaseWorker):
             entry = registry.setdefault(s['code'], {})
             entry['name'] = s.get('name', entry.get('name', ''))
             entry['market'] = s.get('market', entry.get('market', ''))
+            # Gemini가 일부 종목을 배치 결과에서 누락하면 s에 'keywords' 키 자체가
+            # 없을 수 있다. s.get(key, 기본값)으로 바로 쓰면 기존에 캐시된 값을
+            # 빈 기본값으로 덮어써버리므로, 기존 항목을 기본값으로 사용한다.
+            prev_ai = entry.get('ai', {})
             entry['ai'] = {
-                'posts_summary': s.get('posts_summary', ''),
-                'sentiment': s.get('sentiment', 'Neutral'),
-                'keywords': s.get('keywords', []),
+                'posts_summary': s.get('posts_summary', prev_ai.get('posts_summary', '')),
+                'sentiment': s.get('sentiment', prev_ai.get('sentiment', 'Neutral')),
+                'keywords': s.get('keywords', prev_ai.get('keywords', [])),
             }
         adopted_registry.save(self.ctx.today_str, registry)
 

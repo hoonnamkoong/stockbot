@@ -32,7 +32,8 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install requests
+        # fetch_kospi_top100.py는 bs4를 함수 안에서 지연 import한다 (dotenv는 가드됨).
+        run: pip install requests beautifulsoup4
 
       # 토큰의 유일한 발급자는 token_manager다. 여기서는 비공개 레포의 유효 토큰을
       # data/kis_token_cache.json에 내려놓기만 하고, fetch_kospi_top100.py가 그것을 읽는다.

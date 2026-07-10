@@ -30,3 +30,19 @@ def test_corrupt_file_returns_empty():
     with open(reg.PATH, 'w', encoding='utf-8') as f:
         f.write('{ broken')
     assert reg.load('20260710') == {}
+
+
+def test_valid_json_non_dict_list_returns_empty():
+    """유효한 JSON이지만 dict가 아닌 경우 (배열)"""
+    os.makedirs('data', exist_ok=True)
+    with open(reg.PATH, 'w', encoding='utf-8') as f:
+        json.dump([], f)
+    assert reg.load('20260710') == {}
+
+
+def test_valid_json_non_dict_null_returns_empty():
+    """유효한 JSON이지만 dict가 아닌 경우 (null)"""
+    os.makedirs('data', exist_ok=True)
+    with open(reg.PATH, 'w', encoding='utf-8') as f:
+        json.dump(None, f)
+    assert reg.load('20260710') == {}

@@ -19,11 +19,12 @@ def load(today_str: str) -> dict:
     try:
         with open(PATH, 'r', encoding='utf-8') as f:
             raw = json.load(f)
+        # JSON이 dict가 아니거나 다른 타입이면 AttributeError 발생 방지
+        if raw.get('date') != today_str:
+            return {}
+        return raw.get('stocks', {})
     except Exception:
         return {}
-    if raw.get('date') != today_str:
-        return {}
-    return raw.get('stocks', {})
 
 
 def save(today_str: str, stocks: dict) -> None:

@@ -1,8 +1,6 @@
 import json
 import os
 
-from datetime import date
-
 from .base_simulator import BaseSimulator, get_kst_now
 from .sim4_bull_daytrading import decide_bull_daytrade
 from .sim5_sideways_swing import decide_sideways

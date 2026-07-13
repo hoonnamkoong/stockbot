@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from datetime import datetime
 
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, get_kst_now
 
 # base 순수 헬퍼(Task 3 @staticmethod) 재사용
 _adx = BaseSimulator.calculate_adx
@@ -16,7 +16,7 @@ def decide_sideways(view, candidates, current_prices):
     """[Sim5] 추세 눌림목 결정. 순수 함수. Order 리스트 반환."""
     orders = []
     portfolio = view['portfolio']
-    today = date.today()
+    today = get_kst_now().date()
     sold = set()
     # 1. 청산
     for code in list(portfolio.keys()):
@@ -98,8 +98,6 @@ class SidewaysSwingSimulator(BaseSimulator):
     - 청산: 빠른 익절(+4%) / 눌림 회복(MA5 상회) / 7일 타임스탑 / -3% 손절.
     - Sim4(추격·라이딩)와 상호보완: 이쪽은 저가매수·빠른 익절.
     """
-    MAX_HOLDINGS = 4
-
     def __init__(self, initial_cash=3000000):
         super().__init__("Sideways", initial_cash)
 

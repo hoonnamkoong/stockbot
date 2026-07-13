@@ -90,14 +90,16 @@ class LiberoSimulator(BaseSimulator):
             foreigns.append(float(s.get('foreign_change', 0) or 0))
 
         total = len(candidates)
-        # breadth는 top100 라이브 실측(trade_engine이 주입)을 우선 사용.
-        # 버즈 후보군(3~30개)은 표본 편향·양자화가 심해 top100 breadth의 추정치로 부적합
-        # (2026-07-08 갭 분석). 라이브 수집 실패 시에만 기존 후보 기반으로 폴백.
+        # breadth/momentum/trend는 top100 라이브 실측(trade_engine이 주입)을 우선 사용.
+        # 버즈 후보군(3~30개)은 표본 편향·양자화가 심해 top100 지표의 추정치로 부적합
+        # (2026-07-08 갭 분석). trend는 CSV 파싱 실패 시에만 버즈 ADX median으로 개별 폴백하고,
+        # breadth/momentum은 라이브 실측 실패(live_market_metrics=None) 시에만 후보 기반으로 폴백.
         metrics = getattr(self, 'live_market_metrics', None)
         if metrics:
             breadth = round(float(metrics['breadth']), 1)
             momentum = round(float(metrics['momentum']), 2)
-            trend = round(float(metrics['trend']), 1)
+            trend = round(float(metrics['trend']), 1) if metrics.get('trend') is not None \
+                else (round(_median(adxs), 1) if adxs else 0.0)
             breadth_sample = int(metrics.get('sample', 0))
             breadth_source = 'top100_live'
         else:

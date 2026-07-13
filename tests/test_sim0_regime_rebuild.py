@@ -40,6 +40,23 @@ def test_injected_weak_metrics_trigger_bear(tmp_path):
     assert sim.state['instant_regime'] == 'BEAR'
 
 
+def test_injected_metrics_with_none_trend_falls_back_to_buzz_adx(tmp_path):
+    sim = _libero(tmp_path)
+    # trend CSV 파싱 실패(None)라도 breadth/momentum은 라이브 실측을 그대로 써야 함
+    # (trend를 breadth/momentum과 묶어서 통째로 버즈풀로 되돌리면 안 됨)
+    sim.live_market_metrics = {'breadth': 65, 'momentum': 1.5, 'trend': None, 'sample': 100}
+    candidates = [
+        {'code': '1', 'change_rate': '+1.0%', 'sparkline_price': [100]},
+        {'code': '2', 'change_rate': '+2.0%', 'sparkline_price': [100]},
+    ]
+    sim.run(candidates)
+    assert sim.state['breadth_source'] == 'top100_live'
+    assert sim.state['metrics']['breadth_score'] == 65.0
+    assert sim.state['metrics']['momentum_score'] == 1.5
+    # trend는 None이 아니라 버즈 후보 ADX median으로 폴백되어야 함 (크래시 금지)
+    assert sim.state['metrics']['trend_strength'] == 0.0
+
+
 def test_no_injection_falls_back_to_buzz(tmp_path):
     sim = _libero(tmp_path)
     # live_market_metrics 미설정 → 후보 기반 폴백, breadth_source='candidates'

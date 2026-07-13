@@ -226,11 +226,11 @@ class TradeEngineWorker(BaseWorker):
                     is_libero = getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator'
                     if is_libero:
                         # 국면 판단의 breadth/momentum/trend를 top100 라이브 실측으로 교체 (버즈 표본 편향 제거)
-                        trend = self._top100_trend_from_csv()
-                        if live_breadth and trend is not None:
+                        if live_breadth:
                             sim.live_market_metrics = {
                                 'breadth': live_breadth[0], 'momentum': live_breadth[1],
-                                'trend': trend, 'sample': live_breadth[2]}
+                                'trend': self._top100_trend_from_csv(),  # None이면 Sim0가 버즈 ADX로 폴백
+                                'sample': live_breadth[2]}
                         else:
                             sim.live_market_metrics = None
                     own_universe = sim.get_universe()

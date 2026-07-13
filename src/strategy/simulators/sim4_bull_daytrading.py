@@ -112,8 +112,6 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
     - 청산: 분할 익절 (+5% 절반 / +10% 전량) + 타이트 손절/강제청산
     - 불타기 없음. 빠른 회전율 목표.
     """
-    MAX_HOLDINGS = 4
-
     def __init__(self, initial_cash=3000000):
         super().__init__("BullDayTrade", initial_cash)
 

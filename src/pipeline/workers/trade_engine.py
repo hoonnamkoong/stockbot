@@ -15,6 +15,21 @@ from src.data.storage_manager import StorageManager
 from src.strategy.registry import get_active_simulators
 
 
+def _median(xs):
+    if not xs:
+        return 0.0
+    s = sorted(xs); n = len(s); m = n // 2
+    return float(s[m]) if n % 2 else (s[m - 1] + s[m]) / 2.0
+
+
+def _adx(series):
+    if len(series) < 2:
+        return 0.0
+    direction = abs(series[-1] - series[0])
+    volatility = sum(abs(series[i] - series[i - 1]) for i in range(1, len(series)))
+    return (direction / volatility * 100.0) if volatility else 0.0
+
+
 def libero_action(after_close: bool, market_hours: bool) -> str | None:
     """리베로가 이번 런에서 할 일.
 
@@ -184,11 +199,11 @@ class TradeEngineWorker(BaseWorker):
             self.log(f"시뮬레이터 동기화 시작 ({len(simulators)}개 활성, {len(current_prices)}개 현재가)")
 
             # 리베로 나우캐스트용 top100 라이브 실측 (실패해도 파이프라인 계속)
-            live_breadth = None  # (breadth%, 표본수, [codes]) | None
+            live_breadth = None  # (breadth%, momentum, 표본수, [codes]) | None
             try:
                 live_breadth = self._fetch_top100_breadth()
                 if live_breadth:
-                    self.log(f"  top100 라이브 breadth: {live_breadth[0]:.1f}% (표본 {live_breadth[1]})")
+                    self.log(f"  top100 라이브 breadth: {live_breadth[0]:.1f}% (표본 {live_breadth[2]})")
             except Exception as e:
                 self.log_error(f"top100 라이브 breadth 수집 실패: {e}")
 
@@ -210,8 +225,14 @@ class TradeEngineWorker(BaseWorker):
                 try:
                     is_libero = getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator'
                     if is_libero:
-                        # 국면 판단의 breadth를 top100 라이브 실측으로 교체 (버즈 표본 편향 제거)
-                        sim.live_breadth_info = (live_breadth[0], live_breadth[1]) if live_breadth else None
+                        # 국면 판단의 breadth/momentum/trend를 top100 라이브 실측으로 교체 (버즈 표본 편향 제거)
+                        trend = self._top100_trend_from_csv()
+                        if live_breadth and trend is not None:
+                            sim.live_market_metrics = {
+                                'breadth': live_breadth[0], 'momentum': live_breadth[1],
+                                'trend': trend, 'sample': live_breadth[2]}
+                        else:
+                            sim.live_market_metrics = None
                     own_universe = sim.get_universe()
                     if own_universe:
                         sim_candidates = self._enrich_universe(own_universe)
@@ -237,7 +258,7 @@ class TradeEngineWorker(BaseWorker):
                             actual_eod = live_breadth[0] if live_breadth else self._get_actual_breadth_from_csv()
                             sim.finalize_eod(actual_eod, now_kst=now_kst)
                         elif action == 'nowcast' and live_breadth:
-                            codes = live_breadth[2]
+                            codes = live_breadth[3]
                             sim.update_nowcast(
                                 live_breadth[0], now_kst=now_kst,
                                 backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
@@ -326,10 +347,43 @@ class TradeEngineWorker(BaseWorker):
 
         return enriched
 
-    def _fetch_top100_breadth(self) -> tuple[float, int, list] | None:
-        """네이버 시총 페이지에서 KOSPI top100 장중 등락률 → 실측 breadth(상승 비율%).
+    @staticmethod
+    def _breadth_momentum(rates):
+        """top100 등락률 리스트 → (breadth%, momentum median). 빈 리스트면 None."""
+        if not rates:
+            return None
+        ups = sum(1 for r in rates if r > 0)
+        return round(ups / len(rates) * 100, 1), round(_median(rates), 2)
 
-        fetch_kospi_top100.py와 동일 소스(sise_market_sum). 반환 (breadth, 표본수, codes).
+    def _top100_trend_from_csv(self, csv_path='data/kospi_top100_close.csv', lookback=10):
+        """종가 시계열 CSV(wide)에서 종목별 ADX 근사의 median. 실패 시 None."""
+        import csv as _csv
+        try:
+            with open(csv_path, 'r', encoding='utf-8-sig') as f:
+                rows = list(_csv.reader(f))
+        except Exception:
+            return None
+        if len(rows) < 3:
+            return None
+        header = rows[0]
+        data = rows[1:][-lookback:]
+        adxs = []
+        for col in range(1, len(header)):
+            series = []
+            for r in data:
+                if col < len(r):
+                    try:
+                        series.append(float(r[col]))
+                    except ValueError:
+                        pass
+            if len(series) >= 2:
+                adxs.append(_adx(series))
+        return round(_median(adxs), 1) if adxs else None
+
+    def _fetch_top100_breadth(self) -> tuple[float, float, int, list] | None:
+        """네이버 시총 페이지에서 KOSPI top100 장중 등락률 → 실측 breadth/momentum.
+
+        fetch_kospi_top100.py와 동일 소스(sise_market_sum). 반환 (breadth, momentum, 표본수, codes).
         표본이 80 미만이면 부분 실패로 보고 None (왜곡된 실측으로 채점 오염 방지).
         """
         import requests
@@ -339,7 +393,7 @@ class TradeEngineWorker(BaseWorker):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'Referer': 'https://finance.naver.com/',
         }
-        ups, codes = 0, []
+        codes, rates = [], []
         seen: set = set()
         for page in range(1, 5):
             url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
@@ -365,15 +419,15 @@ class TradeEngineWorker(BaseWorker):
                     continue
                 seen.add(code)
                 codes.append(code)
-                if rate > 0:
-                    ups += 1
+                rates.append(rate)
                 if len(codes) >= 100:
                     break
             if len(codes) >= 100:
                 break
         if len(codes) < 80:
             return None
-        return round(ups / len(codes) * 100, 1), len(codes), codes
+        breadth, momentum = self._breadth_momentum(rates)
+        return breadth, momentum, len(codes), codes
 
     def _backfill_breadth_kis(self, hhmm: str, codes: list) -> float | None:
         """KIS 당일분봉으로 특정 시각(HH:MM)의 top100 breadth 복원 — 런 결측 백필 전용.

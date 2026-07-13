@@ -319,6 +319,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Produces: `sim._view() -> dict` (읽기 전용 상태 뷰), `sim._apply(orders, current_prices)` (Order 리스트 실행). Order 규약은 이 문서 상단 참조.
+- Produces: `BaseSimulator.calculate_adx`, `calc_period_change`, `parse_change_rate`, `validate_tick_power`, `cooldown_active`를 `@staticmethod`로 노출 (Task 4·5의 decide 함수가 인스턴스 없이 재사용). 기존 `self.method(...)` 호출부는 staticmethod라 그대로 동작.
 
 - [ ] **Step 1: 실패 테스트 작성**
 
@@ -365,16 +366,51 @@ def test_apply_partial_sell_sets_flag(tmp_path):
                'reason': 'partial', 'cooldown': None, 'mark_partial': True}], {'005930': 1050})
     assert s.state['portfolio']['005930']['partial_sold'] is True
     assert 'partial_sold_date' in s.state['portfolio']['005930']
+
+
+def test_cooldown_active_staticmethod():
+    from datetime import date, timedelta
+    future = (date.today() + timedelta(days=2)).isoformat()
+    past = (date.today() - timedelta(days=1)).isoformat()
+    assert SidewaysSwingSimulator.cooldown_active({'A': future}, 'A') is True
+    assert SidewaysSwingSimulator.cooldown_active({'A': past}, 'A') is False
+    assert SidewaysSwingSimulator.cooldown_active({}, 'A') is False
 ```
 
 - [ ] **Step 2: 테스트 실패 확인**
 
 Run: `python -m pytest tests/test_base_view_apply.py -v`
-Expected: FAIL — `_view`/`_apply` 미정의
+Expected: FAIL — `_view`/`_apply`/`cooldown_active` 미정의
 
 - [ ] **Step 3: 헬퍼 구현**
 
-`base_simulator.py`의 `BaseSimulator`에 추가:
+먼저 기존 순수 메서드를 `@staticmethod`로 전환한다(이미 `self` 미사용). `base_simulator.py`에서
+`calculate_adx`, `calc_period_change`, `parse_change_rate`, `validate_tick_power`의
+`def method(self, ...)` → `@staticmethod` + `def method(...)`로 바꾸고 본문의 `self.` 참조를 제거한다
+(이 4개는 본문에서 `self`를 쓰지 않으므로 시그니처만 변경). 예:
+```python
+    @staticmethod
+    def calculate_adx(sparkline_price):
+        if len(sparkline_price) < 2:
+            return 0.0
+        direction = abs(sparkline_price[-1] - sparkline_price[0])
+        volatility = sum(abs(sparkline_price[i] - sparkline_price[i-1]) for i in range(1, len(sparkline_price)))
+        if volatility == 0:
+            return 0.0
+        return direction / volatility * 100.0
+```
+그리고 쿨다운 판정을 staticmethod로 추가하고 `is_in_cooldown`이 위임하도록 한다:
+```python
+    @staticmethod
+    def cooldown_active(cooldown_codes, code):
+        from datetime import date
+        exp = cooldown_codes.get(code)
+        return bool(exp) and date.today().isoformat() < exp
+
+    def is_in_cooldown(self, code):
+        return self.cooldown_active(self.state.get('cooldown_codes', {}), code)
+```
+이어서 `_view`/`_apply`를 추가:
 ```python
     def _view(self):
         """decide 함수에 넘길 읽기 전용 상태 뷰."""
@@ -485,8 +521,18 @@ Expected: FAIL — `decide_bull_daytrade` 미정의(ImportError)
 ```python
 from datetime import date, datetime
 
+from .base_simulator import BaseSimulator
 
-def _holding_days(p_item, today):
+# base의 순수 헬퍼(Task 3에서 @staticmethod로 전환됨)를 재사용 — 중복 정의 없음.
+# decide 본문은 이 로컬 이름들을 그대로 쓴다.
+_adx = BaseSimulator.calculate_adx
+_period_change = BaseSimulator.calc_period_change
+_parse_change_rate = BaseSimulator.parse_change_rate
+_validate_tick = BaseSimulator.validate_tick_power
+_cooldown_active = BaseSimulator.cooldown_active
+
+
+def _holding_days(p_item, today):   # sim4-1 고유(base에 없음)
     s = p_item.get('entry_date', '')
     try:
         return (today - datetime.strptime(s, '%Y-%m-%d').date()).days if s else 0
@@ -494,46 +540,12 @@ def _holding_days(p_item, today):
         return 0
 
 
-def _partial_days(p_item, today):
+def _partial_days(p_item, today):   # sim4-1 고유(base에 없음)
     s = p_item.get('partial_sold_date', '')
     try:
         return (today - datetime.strptime(s, '%Y-%m-%d').date()).days if s else 0
     except Exception:
         return 0
-
-
-def _cooldown_active(cooldown_codes, code):
-    exp = cooldown_codes.get(code)
-    return bool(exp) and date.today().isoformat() < exp
-
-
-def _validate_tick(stock, threshold=120.0):
-    tp = float(stock.get('tick_power', 0.0))
-    return True if tp == 0.0 else tp >= threshold
-
-
-def _adx(sparkline):
-    if len(sparkline) < 2:
-        return 0.0
-    direction = abs(sparkline[-1] - sparkline[0])
-    vol = sum(abs(sparkline[i] - sparkline[i-1]) for i in range(1, len(sparkline)))
-    return (direction / vol * 100.0) if vol else 0.0
-
-
-def _period_change(sparkline):
-    if not sparkline or len(sparkline) < 2 or sparkline[0] <= 0:
-        return 0.0
-    return (sparkline[-1] - sparkline[0]) / sparkline[0] * 100.0
-
-
-def _parse_change_rate(stock):
-    cr = stock.get('change_rate', stock.get('daily_change_rate', 0))
-    if isinstance(cr, str):
-        try:
-            return float(cr.replace('%', '').replace('+', '').strip())
-        except ValueError:
-            return 0.0
-    return float(cr or 0)
 
 
 MAX_HOLDINGS = 4
@@ -655,7 +667,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Test: `tests/test_sim5_parity.py`
 
 **Interfaces:**
-- Consumes: `sim._view()`, `sim._apply()`. Order 규약. Task 4의 모듈 헬퍼(`_adx`, `_period_change`, `_parse_change_rate`, `_cooldown_active`, `_validate_tick`)는 sim5에도 필요하므로 **Task 5에서 sim5 파일에 동일 헬퍼를 복제**한다(파일 간 결합 최소화; 두 파일이 독립적으로 읽힘).
+- Consumes: `sim._view()`, `sim._apply()`, `BaseSimulator`의 staticmethod 헬퍼(Task 3). Order 규약.
 - Produces: `decide_sideways(view, candidates, current_prices) -> list[Order]` (Sim10이 import).
 
 - [ ] **Step 1: 실패 테스트 작성**
@@ -706,9 +718,18 @@ Expected: FAIL — `decide_sideways` 미정의
 
 - [ ] **Step 3: decide 추출**
 
-`sim5_sideways_swing.py`에 Task 4와 동일한 모듈 헬퍼(`_adx`, `_period_change`, `_parse_change_rate`, `_cooldown_active`, `_validate_tick`)를 복제하고, `run()`의 청산+진입 로직을 옮긴 모듈 함수 추가:
+`sim5_sideways_swing.py`에 base staticmethod 헬퍼를 로컬 이름으로 alias(Task 4와 동일 방식, 중복 정의 없음)하고, `run()`의 청산+진입 로직을 옮긴 모듈 함수 추가:
 ```python
 from datetime import date, datetime
+
+from .base_simulator import BaseSimulator
+
+# base 순수 헬퍼(Task 3 @staticmethod) 재사용
+_adx = BaseSimulator.calculate_adx
+_period_change = BaseSimulator.calc_period_change
+_parse_change_rate = BaseSimulator.parse_change_rate
+_validate_tick = BaseSimulator.validate_tick_power
+_cooldown_active = BaseSimulator.cooldown_active
 
 MAX_HOLDINGS = 4
 

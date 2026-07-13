@@ -355,7 +355,7 @@ class TradeEngineWorker(BaseWorker):
         ups = sum(1 for r in rates if r > 0)
         return round(ups / len(rates) * 100, 1), round(_median(rates), 2)
 
-    def _top100_trend_from_csv(self, csv_path='data/kospi_top100_close.csv', lookback=10):
+    def _top100_trend_from_csv(self, csv_path='output/kospi_top100_close.csv', lookback=10):
         """종가 시계열 CSV(wide)에서 종목별 ADX 근사의 median. 실패 시 None."""
         import csv as _csv
         try:

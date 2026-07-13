@@ -1,6 +1,109 @@
 from .base_simulator import BaseSimulator
 from datetime import date, datetime
 
+# base의 순수 헬퍼(Task 3에서 @staticmethod로 전환됨)를 재사용 — 중복 정의 없음.
+# decide 본문은 이 로컬 이름들을 그대로 쓴다.
+_adx = BaseSimulator.calculate_adx
+_period_change = BaseSimulator.calc_period_change
+_parse_change_rate = BaseSimulator.parse_change_rate
+_validate_tick = BaseSimulator.validate_tick_power
+_cooldown_active = BaseSimulator.cooldown_active
+
+
+def _holding_days(p_item, today):   # sim4-1 고유(base에 없음)
+    s = p_item.get('entry_date', '')
+    try:
+        return (today - datetime.strptime(s, '%Y-%m-%d').date()).days if s else 0
+    except Exception:
+        return 0
+
+
+def _partial_days(p_item, today):   # sim4-1 고유(base에 없음)
+    s = p_item.get('partial_sold_date', '')
+    try:
+        return (today - datetime.strptime(s, '%Y-%m-%d').date()).days if s else 0
+    except Exception:
+        return 0
+
+
+MAX_HOLDINGS = 4
+
+
+def decide_bull_daytrade(view, candidates, current_prices):
+    """[Sim4-1] 단타 결정. 순수 함수 — 매매·상태 없음. Order 리스트 반환."""
+    orders = []
+    portfolio = view['portfolio']
+    today = date.today()
+    # 1. 청산
+    sold = set()
+    for code in list(portfolio.keys()):
+        p = portfolio[code]
+        cur = current_prices.get(code, 0)
+        if cur <= 0:
+            continue
+        avg = p.get('avg_price', 0)
+        if avg <= 0:
+            continue
+        pr = (cur - avg) / avg * 100
+        if not p.get('partial_sold', False):
+            if _holding_days(p, today) >= 2:
+                orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                               'reason': "[단타] 2일 경과 모멘텀 소멸 강제청산", 'cooldown': 1, 'mark_partial': False})
+                sold.add(code); continue
+            if pr <= -3.0:
+                orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                               'reason': f"[단타] 손절 ({pr:.1f}%)", 'cooldown': 2, 'mark_partial': False})
+                sold.add(code); continue
+            if pr >= 5.0:
+                half = p['quantity'] // 2
+                if half > 0:
+                    orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': half,
+                                   'reason': f"[단타] 1차 분할 익절 +5% ({pr:.1f}%)", 'cooldown': None, 'mark_partial': True})
+        else:
+            if _partial_days(p, today) >= 5:
+                orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                               'reason': "[단타] 5일 경과 2차 강제청산", 'cooldown': 1, 'mark_partial': False})
+                sold.add(code); continue
+            if pr <= 0.0:
+                orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                               'reason': f"[단타] 매입가 복귀 손절 ({pr:.1f}%)", 'cooldown': 2, 'mark_partial': False})
+                sold.add(code); continue
+            if pr >= 10.0:
+                orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                               'reason': f"[단타] 2차 전량 익절 +10% ({pr:.1f}%)", 'cooldown': 2, 'mark_partial': False})
+                sold.add(code); continue
+    # 2. 진입
+    if not view['market_index_healthy']:
+        return orders
+    target_amount = view['initial_cash'] / 10
+    held = len(portfolio) - len(sold)
+    for stock in candidates:
+        if held >= MAX_HOLDINGS:
+            break
+        code = stock['code']
+        if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            continue
+        price = float(stock.get('price', 0))
+        amount = float(stock.get('amount', 0))
+        if price <= 0 or amount < 3_000_000_000:
+            continue
+        sparkline = stock.get('sparkline_price', [])
+        adx = _adx(sparkline) if sparkline else 0.0
+        if adx < 20.0:
+            continue
+        period_change = _period_change(sparkline)
+        daily_change = _parse_change_rate(stock)
+        has_inst = (stock.get('orgn_fake_ntby_qty', 0) > 0 or stock.get('frgn_fake_ntby_qty', 0) > 0)
+        if (5.0 <= period_change <= 40.0 and daily_change > 0 and adx >= 20.0
+                and _validate_tick(stock, 120.0) and has_inst):
+            qty = int(target_amount / price)
+            if qty > 0:
+                orders.append({'action': 'BUY', 'code': code, 'name': stock['name'], 'price': price,
+                               'quantity': qty, 'cooldown': None,
+                               'reason': f"[단타] 탑승 (기간 {period_change:.1f}%, ADX {adx:.1f}, 기관{stock.get('orgn_fake_ntby_qty',0):+,}/외인{stock.get('frgn_fake_ntby_qty',0):+,})"})
+                held += 1
+    return orders
+
 
 class BullMomentumDayTradingSimulator(BaseSimulator):
     """
@@ -22,126 +125,10 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
         except Exception:
             return None
 
-    def _holding_days(self, p_item: dict) -> int:
-        entry_str = p_item.get('entry_date', '')
-        if not entry_str:
-            return 0
-        try:
-            entry = datetime.strptime(entry_str, '%Y-%m-%d').date()
-            return (date.today() - entry).days
-        except Exception:
-            return 0
-
-    def _partial_days(self, p_item: dict) -> int:
-        sold_str = p_item.get('partial_sold_date', '')
-        if not sold_str:
-            return 0
-        try:
-            sold = datetime.strptime(sold_str, '%Y-%m-%d').date()
-            return (date.today() - sold).days
-        except Exception:
-            return 0
-
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
-        portfolio_codes = list(self.state['portfolio'].keys())
-        sold_today = set()
-
         self.update_peak_prices(current_prices)
-
-        today_str = date.today().isoformat()
-
-        # 1. 청산
-        for code in portfolio_codes:
-            p_item = self.state['portfolio'].get(code)
-            if not p_item:
-                continue
-            current_price = current_prices.get(code, 0)
-            if current_price <= 0:
-                continue
-            avg_price = p_item.get('avg_price', 0)
-            if avg_price <= 0:
-                continue
-            profit_rate = (current_price - avg_price) / avg_price * 100
-            partial_sold = p_item.get('partial_sold', False)
-
-            if not partial_sold:
-                # --- 1차 익절 전 ---
-                if self._holding_days(p_item) >= 2:
-                    self.sell(code, current_price, reason="[단타] 2일 경과 모멘텀 소멸 강제청산")
-                    self.add_cooldown(code, 1)
-                    sold_today.add(code)
-                    continue
-                if profit_rate <= -3.0:
-                    self.sell(code, current_price, reason=f"[단타] 손절 ({profit_rate:.1f}%)")
-                    self.add_cooldown(code, 2)
-                    sold_today.add(code)
-                    continue
-                if profit_rate >= 5.0:
-                    half_qty = p_item['quantity'] // 2
-                    if half_qty > 0:
-                        self.sell(code, current_price, quantity=half_qty,
-                                  reason=f"[단타] 1차 분할 익절 +5% ({profit_rate:.1f}%)")
-                        if code in self.state['portfolio']:
-                            self.state['portfolio'][code]['partial_sold'] = True
-                            self.state['portfolio'][code]['partial_sold_date'] = today_str
-                            self.save_state(current_prices)
-            else:
-                # --- 1차 익절 후 ---
-                if self._partial_days(p_item) >= 5:
-                    self.sell(code, current_price, reason="[단타] 5일 경과 2차 강제청산")
-                    self.add_cooldown(code, 1)
-                    sold_today.add(code)
-                    continue
-                if profit_rate <= 0.0:
-                    self.sell(code, current_price, reason=f"[단타] 매입가 복귀 손절 ({profit_rate:.1f}%)")
-                    self.add_cooldown(code, 2)
-                    sold_today.add(code)
-                    continue
-                if profit_rate >= 10.0:
-                    self.sell(code, current_price, reason=f"[단타] 2차 전량 익절 +10% ({profit_rate:.1f}%)")
-                    self.add_cooldown(code, 2)
-                    sold_today.add(code)
-                    continue
-
-        # 2. 진입 (Sim4와 동일 조건)
-        if not self.state.get('market_index_healthy', True):
-            return self.calculate_stats(current_prices)
-
-        target_amount = self.initial_cash / 10
-        for stock in candidates:
-            if len(self.state['portfolio']) >= self.MAX_HOLDINGS:
-                break
-            code = stock['code']
-            if code in self.state['portfolio'] or code in sold_today:
-                continue
-            if self.is_in_cooldown(code):
-                continue
-
-            price = float(stock.get('price', 0))
-            amount = float(stock.get('amount', 0))
-            if price <= 0 or amount < 3_000_000_000:
-                continue
-
-            sparkline = stock.get('sparkline_price', [])
-            adx = self.calculate_adx(sparkline) if sparkline else 0.0
-            if adx < 20.0:
-                continue
-
-            period_change = self.calc_period_change(sparkline)
-            daily_change = self.parse_change_rate(stock)
-
-            orgn = stock.get('orgn_fake_ntby_qty', 0)
-            frgn = stock.get('frgn_fake_ntby_qty', 0)
-            has_inst = (orgn > 0 or frgn > 0)
-
-            if (5.0 <= period_change <= 40.0 and daily_change > 0 and adx >= 20.0
-                    and self.validate_tick_power(stock, threshold=120.0)
-                    and has_inst):
-                qty = int(target_amount / price)
-                if qty > 0:
-                    self.buy(code, stock['name'], price, qty,
-                             reason=f"[단타] 탑승 (기간 {period_change:.1f}%, ADX {adx:.1f}, 기관{orgn:+,}/외인{frgn:+,})")
-
+        orders = decide_bull_daytrade(self._view(), candidates, current_prices)
+        self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

@@ -254,7 +254,8 @@ class BaseSimulator:
         atr = sum(diffs[-period:]) / len(diffs[-period:])
         return max(atr, 1.0) # ATR이 0이 되지 않도록 보장
 
-    def validate_tick_power(self, stock_data: dict, threshold: float = 120.0) -> bool:
+    @staticmethod
+    def validate_tick_power(stock_data: dict, threshold: float = 120.0) -> bool:
         """[V60.0] 수급의 힘(체결강도)이 임계치를 넘는지 확인합니다.
         KIS API 실패로 0.0인 경우, 데이터 없음 ≠ 수급 나쁨이므로 조건 스킵(통과).
         """
@@ -263,7 +264,8 @@ class BaseSimulator:
             return True  # KIS 실패 시 데이터 없음으로 간주, 조건 면제
         return tp >= threshold
 
-    def calculate_adx(self, sparkline_price: list) -> float:
+    @staticmethod
+    def calculate_adx(sparkline_price: list) -> float:
         """
         [V2] ADX (Average Directional Index) 근사치 계산 (Efficiency Ratio 사용)
         - sparkline_price: 최근 종가 리스트 (과거 -> 최신)
@@ -288,19 +290,22 @@ class BaseSimulator:
         self.state.setdefault('cooldown_codes', {})[code] = expire
         self.save_state()
 
+    @staticmethod
+    def cooldown_active(cooldown_codes, code):
+        from datetime import date
+        exp = cooldown_codes.get(code)
+        return bool(exp) and date.today().isoformat() < exp
+
     def is_in_cooldown(self, code: str) -> bool:
         """쿨다운 기간 중이면 True (expire date 당일부터 재진입 허용)."""
-        from datetime import date
-        expire_str = self.state.get('cooldown_codes', {}).get(code)
-        if not expire_str:
-            return False
-        return date.today().isoformat() < expire_str
+        return self.cooldown_active(self.state.get('cooldown_codes', {}), code)
 
     def get_universe(self):
         """심 전용 1차 스크리닝 유니버스. None이면 공통 버즈 후보 사용."""
         return None
 
-    def calc_period_change(self, sparkline_price: list) -> float:
+    @staticmethod
+    def calc_period_change(sparkline_price: list) -> float:
         """[Sim4/6] 기간 변동률(%). 프로덕션 후보에 period_change_rate가 없어 sparkline 종가로 계산."""
         if not sparkline_price or len(sparkline_price) < 2:
             return 0.0
@@ -310,7 +315,8 @@ class BaseSimulator:
             return 0.0
         return (end - start) / start * 100.0
 
-    def parse_change_rate(self, stock_data: dict) -> float:
+    @staticmethod
+    def parse_change_rate(stock_data: dict) -> float:
         """당일 등락률을 실수로 정제. change_rate는 '±X.XX%' 문자열로 저장됨."""
         cr = stock_data.get('change_rate', stock_data.get('daily_change_rate', 0))
         if isinstance(cr, str):
@@ -474,3 +480,27 @@ class BaseSimulator:
             "자본회전율": min(100, raw['turnover'] * 2)
         }
         return {"raw": raw, "normalized": norm, "portfolio": self.state['portfolio']}
+
+    def _view(self):
+        """decide 함수에 넘길 읽기 전용 상태 뷰."""
+        return {
+            'portfolio': self.state['portfolio'],
+            'cash': self.state['cash'],
+            'initial_cash': self.initial_cash,
+            'cooldown_codes': self.state.get('cooldown_codes', {}),
+            'market_index_healthy': self.state.get('market_index_healthy', True),
+        }
+
+    def _apply(self, orders, current_prices=None):
+        """decide가 반환한 Order 리스트를 실제 매매로 실행."""
+        from datetime import date
+        for o in orders:
+            if o['action'] == 'BUY':
+                self.buy(o['code'], o['name'], o['price'], o['quantity'], reason=o.get('reason', ''))
+            elif o['action'] == 'SELL':
+                self.sell(o['code'], o['price'], quantity=o.get('quantity'), reason=o.get('reason', ''))
+                if o.get('mark_partial') and o['code'] in self.state['portfolio']:
+                    self.state['portfolio'][o['code']]['partial_sold'] = True
+                    self.state['portfolio'][o['code']]['partial_sold_date'] = date.today().isoformat()
+            if o.get('cooldown'):
+                self.add_cooldown(o['code'], o['cooldown'])

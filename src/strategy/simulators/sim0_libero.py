@@ -52,12 +52,11 @@ class LiberoSimulator(BaseSimulator):
             return "BEAR"
         return "SIDEWAYS"
 
-    def calc_bull_score(self, breadth, momentum, foreign, trend):
-        """0(극단 약세)~100(극단 강세). 각 지표를 0~100으로 정규화 후 가중합."""
+    def calc_bull_score(self, breadth, momentum, trend):
+        """0(극단 약세)~100(극단 강세). breadth/momentum/trend를 가중합. foreign 제거(top100 소스 없음)."""
         momentum_n = self._clamp(50 + momentum * 5)   # 0%→50, +10%→100, -10%→0
-        foreign_n = self._clamp(50 + foreign * 50)    # 외인 변화 ±1%p 기준
         trend_n = self._clamp(trend)                  # ADX 근사 0~100
-        return round(breadth * 0.30 + momentum_n * 0.25 + foreign_n * 0.25 + trend_n * 0.20, 1)
+        return round(breadth * 0.40 + momentum_n * 0.35 + trend_n * 0.25, 1)
 
     def _confirm_regime(self, history):
         """최근 국면 히스토리에서 최빈 국면과 신뢰도를 반환.
@@ -94,22 +93,24 @@ class LiberoSimulator(BaseSimulator):
         # breadth는 top100 라이브 실측(trade_engine이 주입)을 우선 사용.
         # 버즈 후보군(3~30개)은 표본 편향·양자화가 심해 top100 breadth의 추정치로 부적합
         # (2026-07-08 갭 분석). 라이브 수집 실패 시에만 기존 후보 기반으로 폴백.
-        live = getattr(self, 'live_breadth_info', None)  # (breadth, 표본수) | None
-        if live:
-            breadth = round(float(live[0]), 1)
-            breadth_sample = int(live[1])
+        metrics = getattr(self, 'live_market_metrics', None)
+        if metrics:
+            breadth = round(float(metrics['breadth']), 1)
+            momentum = round(float(metrics['momentum']), 2)
+            trend = round(float(metrics['trend']), 1)
+            breadth_sample = int(metrics.get('sample', 0))
             breadth_source = 'top100_live'
         else:
             breadth = round(ups / total * 100, 1) if total else 0.0
+            momentum = round(_median(period_changes), 2) if period_changes else 0.0
+            trend = round(_median(adxs), 1) if adxs else 0.0
             breadth_sample = total
             breadth_source = 'candidates'
-        momentum = round(_median(period_changes), 2) if period_changes else 0.0
-        trend = round(_median(adxs), 1) if adxs else 0.0
-        foreign = round(_mean(foreigns), 3) if foreigns else 0.0
+        foreign = round(_mean(foreigns), 3) if foreigns else 0.0   # metrics 표시 전용(bull_score 미사용)
         volatility = round(_pstdev(dailies), 2) if len(dailies) > 1 else 0.0
 
         instant_regime = self.classify_regime(breadth, momentum, trend)
-        bull_score = self.calc_bull_score(breadth, momentum, foreign, trend)
+        bull_score = self.calc_bull_score(breadth, momentum, trend)
 
         # 국면 지속성(Smoothing): 최근 5회 중 과반 확정으로 False signal 방지
         history = list(self.state.get('regime_history', []))

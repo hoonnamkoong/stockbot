@@ -218,11 +218,26 @@ export async function GET(request: Request) {
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
         const { ok: ledgerOk, positions, realized_pnl, turn } = await getPositions();
-        // 원장 turn은 파이썬만 쓰고 OFF 시 지워지지 않는다 → config와 대조해 stale을 걸러낸다.
-        // ON이고 config가 연 턴과 id가 같을 때만 '진행 중인 턴'이다. 그 외(OFF 후,
-        // 턴 교체 후 파이썬 미실행)의 원장 turn은 stale — 동결값(last_turn_result)이 진실이다.
-        const cfgTurnId = content.turn?.id ?? null;
-        const liveTurn = content.enabled && cfgTurnId && turn?.id === cfgTurnId ? turn : null;
+        // 진행 중인 턴은 config가 정의한다(ON 시 route가 연다). 원장 turn은 파이썬만 쓰고
+        // OFF 시 지워지지 않으므로, id가 config와 같을 때만 채택한다(stale 방지).
+        //
+        // 아직 파이썬이 한 번도 안 돈 턴(ON 직후 ~ 다음 파이프라인 런, 또는 장 외 시간에 ON)은
+        // 원장에 turn이 없다. 이때 null을 주면 사용자가 방금 켠 턴이 화면에서 사라진다 —
+        // config의 opening_basis·capital만으로도 손익은 계산 가능하므로 그것으로 턴을 구성한다.
+        // active_tag: null이 '아직 파이썬 미실행'의 신호다(원장에 저장된 턴은 항상 태그가 있다).
+        const cfgTurn = content.turn;
+        let liveTurn: ProgramTurn | null = null;
+        if (content.enabled && cfgTurn?.id) {
+            liveTurn = turn && turn.id === cfgTurn.id
+                ? turn
+                : {
+                    id: cfgTurn.id,
+                    capital: Number(cfgTurn.capital) || 0,
+                    basis: cfgTurn.opening_basis || {},
+                    by_tag: {},
+                    active_tag: null,
+                };
+        }
         return NextResponse.json({
             enabled: !!content.enabled,
             selected_sim: content.selected_sim ?? null,

@@ -550,8 +550,12 @@ function TradeContent() {
         const liveTurn = programTurn ? computeTurnPnl(programTurn, programPositions, priceMap) : null;
         const turnIsLive = programEnabled && !!programTurn;
         const hasTurn = !!programTurn || !!programLastTurn;
-        const turnMeasurable = turnIsLive || programLastTurn?.pnl != null;
         const turnCapital = programTurn?.capital ?? programLastTurn?.capital ?? 0;
+        // 원금(분모)이 없으면 수익률을 만들 수 없다 — 0%가 아니라 측정 불가다.
+        const turnMeasurable = (turnIsLive || programLastTurn?.pnl != null) && turnCapital > 0;
+        // 파이썬이 아직 이 턴을 한 번도 안 돌았다(원장에 저장된 턴은 항상 active_tag가 있다).
+        // 손익은 config의 기준가로 계산되지만, 어느 전략의 몫인지는 아직 확정되지 않았다.
+        const turnPendingFirstRun = turnIsLive && programTurn?.active_tag == null;
         const turnPnl = liveTurn ? liveTurn.pnl : (programLastTurn?.pnl ?? 0);
         const turnByTag = liveTurn ? liveTurn.byTag : (programLastTurn?.by_tag ?? {});
         const turnRate = turnCapital > 0 ? (turnPnl / turnCapital) * 100 : 0;
@@ -689,7 +693,9 @@ function TradeContent() {
                     {hasTurn && (
                         <Stack gap={6} mb="md">
                             <Text size="xs" c="dimmed">턴당 SIM별 수익률 (기여도 — 합계 = 턴 수익률)</Text>
-                            {!turnMeasurable ? (
+                            {turnPendingFirstRun ? (
+                                <Text size="sm" c="dimmed">전략별 집계 대기 — 다음 파이프라인 런부터</Text>
+                            ) : !turnMeasurable ? (
                                 <Text size="sm" c="dimmed">측정 불가</Text>
                             ) : turnTagRows.length === 0 ? (
                                 <Text size="sm" c="dimmed">아직 확정된 손익이 없습니다</Text>

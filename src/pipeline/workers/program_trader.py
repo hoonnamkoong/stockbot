@@ -272,7 +272,7 @@ def _merge_strategy_flags(positions: dict, snapshot_portfolio: dict, failed_code
         if not snap_p or code in failed_codes:
             continue
         for k, v in snap_p.items():
-            if k not in ('quantity', 'avg_price'):
+            if k not in ('quantity', 'avg_price', 'tag'):
                 p[k] = v
 
 
@@ -471,9 +471,9 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                     realized_delta = qty * (price - positions[code]['avg_price'])
                     ledger['realized_pnl'] = round(ledger.get('realized_pnl', 0) + realized_delta, 2)
                 # [턴 회계] 표시 전용 별도 트랙(기준가 대비). 실패해도 매매·원장은 계속한다.
-                prev_qty = positions.get(code, {}).get('quantity', 0)
                 try:
                     if turn:
+                        prev_qty = positions.get(code, {}).get('quantity', 0)
                         if side == 'sell':
                             record_sell(turn, code, qty, price)
                         else:

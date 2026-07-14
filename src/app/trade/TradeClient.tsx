@@ -17,6 +17,7 @@ import {
 } from '@tabler/icons-react';
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
+import { computeTurnPnl, type ProgramTurn, type LastTurnResult } from '@/lib/program-turn';
 // [V8.9.9.22] 차트 라이브러리 SSR 충돌 방지를 위한 동적 임포트 적용
 const StrategyRadarChart = dynamic(() => import('../components/StrategyRadarChart'), { 
     ssr: false,
@@ -91,8 +92,10 @@ function TradeContent() {
     const [programBusy, setProgramBusy] = useState(false);
     const [programPinOpen, setProgramPinOpen] = useState(false);
     const [programPin, setProgramPin] = useState('');
-    const [programPositions, setProgramPositions] = useState<Record<string, { name: string; quantity: number; avg_price: number }>>({});
+    const [programPositions, setProgramPositions] = useState<Record<string, { name: string; quantity: number; avg_price: number; tag?: string }>>({});
     const [programRealizedPnl, setProgramRealizedPnl] = useState(0);
+    const [programTurn, setProgramTurn] = useState<ProgramTurn | null>(null);
+    const [programLastTurn, setProgramLastTurn] = useState<LastTurnResult | null>(null);
 
     const pinContainerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
@@ -214,6 +217,8 @@ function TradeContent() {
             setProgramValid(d.selected_valid !== false);
             setProgramPositions(d.positions && typeof d.positions === 'object' ? d.positions : {});
             setProgramRealizedPnl(Number(d.realized_pnl) || 0);
+            setProgramTurn(d.turn && d.turn.id ? d.turn : null);
+            setProgramLastTurn(d.last_turn_result ?? null);
         } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
     }, []);
 
@@ -532,6 +537,30 @@ function TradeContent() {
         const programTotalPnlRate = programBudgetNum > 0 ? (programTotalPnl / programBudgetNum) * 100 : 0;
         const programHasData = programBudgetNum > 0 || Object.keys(programPositions).length > 0 || programRealizedPnl !== 0;
 
+        // 프로그램 보유 종목 총액 (원장 포지션 × 실시간 시세)
+        const priceMap: Record<string, number> = {};
+        for (const h of allHoldings) if (h?.code) priceMap[h.code] = Number(h.price) || 0;
+        const programHoldingsValue = Object.entries(programPositions).reduce(
+            (sum, [code, pos]) => sum + (priceMap[code] || pos.avg_price) * pos.quantity, 0);
+
+        // 턴 손익: ON이면 원장 turn으로 실시간(항상 측정 가능), OFF면 동결된 직전 턴.
+        // 직전 턴은 pnl === null이면 OFF 시점 조회 실패로 '측정 불가' — 0으로 그리지 않는다.
+        const liveTurn = programTurn ? computeTurnPnl(programTurn, programPositions, priceMap) : null;
+        const turnIsLive = !!programTurn;
+        const hasTurn = !!programTurn || !!programLastTurn;
+        const turnMeasurable = turnIsLive || programLastTurn?.pnl != null;
+        const turnCapital = programTurn?.capital ?? programLastTurn?.capital ?? 0;
+        const turnPnl = liveTurn ? liveTurn.pnl : (programLastTurn?.pnl ?? 0);
+        const turnByTag = liveTurn ? liveTurn.byTag : (programLastTurn?.by_tag ?? {});
+        const turnRate = turnCapital > 0 ? (turnPnl / turnCapital) * 100 : 0;
+
+        // 태그 → 표시명. 하위 전략도 매매 가능 심이라 programSims에 이름이 들어있다.
+        const tagLabel = (tag: string) =>
+            tag === 'cash' ? '현금(하락장)' : (programSims.find(s => s.id === tag)?.name ?? tag);
+        const turnTagRows = Object.entries(turnByTag)
+            .filter(([, pnl]) => pnl !== 0)
+            .sort((a, b) => b[1] - a[1]);
+
         return (
             <Stack gap="md">
                 <Paper p="md" withBorder radius="md" style={{ position: 'relative' }}>
@@ -594,6 +623,10 @@ function TradeContent() {
                                 {totalPL >= 0 ? '+' : ''}{(Number(totalPL) || 0).toLocaleString()} 원
                             </Text>
                         </Stack>
+                        <Stack gap={2}>
+                            <Text size="xs" c="dimmed">보유 종목 총액</Text>
+                            <Text fw={700} size="lg">{Math.round(totalEval).toLocaleString()} 원</Text>
+                        </Stack>
                     </Group>
                     {programHasData && (
                         <Group grow mb="md" align="flex-end">
@@ -608,6 +641,47 @@ function TradeContent() {
                                 <Text fw={700} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
                                     {programTotalPnl >= 0 ? '+' : ''}{Math.round(programTotalPnl).toLocaleString()} 원
                                 </Text>
+                            </Stack>
+                            <Stack gap={2}>
+                                <Text size="xs" c="dimmed">프로그램 매매 보유 종목 총액</Text>
+                                <Text fw={700} size="lg">{Math.round(programHoldingsValue).toLocaleString()} 원</Text>
+                            </Stack>
+                        </Group>
+                    )}
+                    {hasTurn && (
+                        <Group grow mb="md" align="flex-start">
+                            <Stack gap={2}>
+                                <Text size="xs" c="dimmed">
+                                    프로그램 매매 턴당 수익률{turnIsLive ? '' : ' (직전 턴)'}
+                                </Text>
+                                {turnMeasurable ? (
+                                    <>
+                                        <Text fw={800} size="lg" c={turnPnl >= 0 ? 'red' : 'blue'}>
+                                            {turnPnl >= 0 ? '+' : ''}{turnRate.toFixed(2)}%
+                                        </Text>
+                                        <Text size="xs" c="dimmed">
+                                            {turnPnl >= 0 ? '+' : ''}{Math.round(turnPnl).toLocaleString()} 원 / 원금 {Math.round(turnCapital).toLocaleString()} 원
+                                        </Text>
+                                    </>
+                                ) : (
+                                    <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
+                                )}
+                            </Stack>
+                            <Stack gap={2}>
+                                <Text size="xs" c="dimmed">턴당 SIM별 수익률</Text>
+                                {!turnMeasurable ? (
+                                    <Text size="sm" c="dimmed">측정 불가</Text>
+                                ) : turnTagRows.length === 0 ? (
+                                    <Text size="sm" c="dimmed">—</Text>
+                                ) : turnTagRows.map(([tag, pnl]) => (
+                                    <Group key={tag} gap={6} justify="space-between" wrap="nowrap">
+                                        <Text size="sm" truncate>{tagLabel(tag)}</Text>
+                                        <Text size="sm" fw={700} c={pnl >= 0 ? 'red' : 'blue'} style={{ whiteSpace: 'nowrap' }}>
+                                            {pnl >= 0 ? '+' : ''}{(turnCapital > 0 ? (pnl / turnCapital) * 100 : 0).toFixed(2)}%
+                                            {' '}({pnl >= 0 ? '+' : ''}{Math.round(pnl).toLocaleString()})
+                                        </Text>
+                                    </Group>
+                                ))}
                             </Stack>
                         </Group>
                     )}

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { fetchTradeableSims } from '@/lib/manifest-sims';
+import { getRealPortfolio } from '@/lib/kis-api';
+import { computeTurnPnl, type ProgramTurn, type ProgramPosition } from '@/lib/program-turn';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,24 +53,42 @@ async function putConfig(content: any, sha: string | null, message: string) {
 const POSITIONS_PATH = 'program_positions.json';
 
 async function getPositions(): Promise<{
-    positions: Record<string, { name: string; quantity: number; avg_price: number }>;
+    positions: Record<string, ProgramPosition>;
     realized_pnl: number;
+    turn: ProgramTurn | null;
 }> {
+    const empty = { positions: {}, realized_pnl: 0, turn: null };
     try {
         const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${POSITIONS_PATH}?ref=${SECRET_BRANCH}`;
         const res = await fetch(url, {
             headers: { Authorization: `token ${GITHUB_PAT}`, Accept: 'application/vnd.github.v3+json' },
             cache: 'no-store',
         });
-        if (!res.ok) return { positions: {}, realized_pnl: 0 }; // 404(미실행) 등은 빈 원장으로 취급
+        if (!res.ok) return empty; // 404(미실행) 등은 빈 원장으로 취급
         const data = await res.json();
         const content = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
         return {
             positions: content.positions && typeof content.positions === 'object' ? content.positions : {},
             realized_pnl: Number(content.realized_pnl) || 0,
+            turn: content.turn && content.turn.id ? content.turn : null,
         };
     } catch {
-        return { positions: {}, realized_pnl: 0 }; // 네트워크 실패 등도 non-blocking
+        return empty; // 네트워크 실패 등도 non-blocking
+    }
+}
+
+/** 프로그램 원장 종목의 현재가 맵. 실패 시 빈 맵(표시 전용이므로 non-blocking). */
+async function getLivePrices(): Promise<Record<string, number>> {
+    try {
+        const p: any = await getRealPortfolio();
+        if (p?.error) return {};
+        const map: Record<string, number> = {};
+        for (const h of p?.holdings || []) {
+            if (h?.code) map[h.code] = Number(h.price) || 0;
+        }
+        return map;
+    } catch {
+        return {};
     }
 }
 
@@ -146,7 +166,7 @@ export async function GET(request: Request) {
         const validIds = new Set(sims.map((s) => s.id));
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
-        const { positions, realized_pnl } = await getPositions();
+        const { positions, realized_pnl, turn } = await getPositions();
         return NextResponse.json({
             enabled: !!content.enabled,
             selected_sim: content.selected_sim ?? null,
@@ -154,8 +174,10 @@ export async function GET(request: Request) {
             selected_valid: selectedValid,
             updated_at: content.updated_at ?? null,
             sims, // 프론트 드롭다운 재사용
-            positions, // 프로그램 원장 포지션(code -> {name, quantity, avg_price})
+            positions, // 프로그램 원장 포지션(code -> {name, quantity, avg_price, tag})
             realized_pnl, // 프로그램 누적 실현손익(원)
+            turn, // 진행 중인 턴(원장) — 프론트가 실시간 손익 계산
+            last_turn_result: content.last_turn_result ?? null, // OFF 시 동결된 직전 턴
         });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -180,8 +202,34 @@ export async function POST(request: Request) {
         // 저장되는 것을 원천 차단(다음 PIN-ON 시 사용자 모르게 다른 값으로 무장되는 것 방지).
         if (!wantEnabled) {
             const now = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+            // [턴 동결] OFF를 누른 순간의 턴 손익을 박제한다. OFF 이후의 시세 변동은
+            // 어느 턴의 성과도 아니므로 섞이지 않는다.
+            // 실패해도 OFF(kill-switch)는 무조건 진행한다 — 표시용 계산이 정지를 막아선 안 된다.
+            let lastTurnResult: any = content.last_turn_result ?? null;
+            try {
+                const { positions, turn } = await getPositions();
+                const cfgTurn = content.turn;
+                if (cfgTurn?.id) {
+                    // 원장의 턴 id가 config와 다르면 이번 턴에 파이썬이 한 번도 안 돌았다(장 외 ON→OFF 등).
+                    const matched = turn && turn.id === cfgTurn.id ? turn : null;
+                    const { pnl, byTag } = matched
+                        ? computeTurnPnl(matched, positions, await getLivePrices())
+                        : { pnl: 0, byTag: {} };
+                    lastTurnResult = {
+                        id: cfgTurn.id,
+                        ended_at: now,
+                        sim: content.selected_sim ?? null,
+                        capital: Number(matched?.capital) || Number(cfgTurn.capital) || 0,
+                        pnl,
+                        by_tag: byTag,
+                    };
+                }
+            } catch (e) {
+                console.error('[program] 턴 동결 실패(무시):', e);
+            }
             const next = { ...content, enabled: false, updated_at: now,
-                updated_by: (token as any).email || (token as any).name || 'user' };
+                updated_by: (token as any).email || (token as any).name || 'user',
+                turn: null, last_turn_result: lastTurnResult };
             await putConfig(next, sha, 'program-trading: OFF (kill-switch)');
             return NextResponse.json({ success: true, enabled: false, selected_sim: next.selected_sim, budget: next.budget });
         }
@@ -214,11 +262,30 @@ export async function POST(request: Request) {
         }
 
         const now = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+
+        // [턴 열기] ON 시점의 시세로 물려받은 보유 종목의 기준가를 스냅샷한다(MTM 리셋).
+        // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 현재가로 채워진다.
+        let turn: any = { id: new Date().toISOString(), started_at: now, capital: budgetNum, opening_basis: {} };
+        try {
+            const { positions, realized_pnl } = await getPositions();
+            turn.capital = budgetNum + realized_pnl;   // 턴 시작 유효자본 = 이 턴에 실제로 굴릴 돈
+            const prices = await getLivePrices();
+            const basis: Record<string, number> = {};
+            for (const code of Object.keys(positions)) {
+                const px = Number(prices[code]) || 0;
+                if (px > 0) basis[code] = px;
+            }
+            turn.opening_basis = basis;
+        } catch (e) {
+            console.error('[program] 턴 열기 스냅샷 실패(기본값으로 진행):', e);
+        }
+
         const next = {
             ...content,
             enabled: true,
             selected_sim: sim,
             budget: budgetNum,
+            turn,
             updated_at: now,
             updated_by: (token as any).email || (token as any).name || 'user',
         };

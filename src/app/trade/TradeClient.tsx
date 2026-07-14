@@ -608,7 +608,9 @@ function TradeContent() {
                             <Text size="xs" c="red" fw={700}>● 실계좌 자동 운용 중</Text>
                         )}
                     </Group>
-                    <Group grow mb="md" align="flex-end">
+                    {/* 계좌 전체 지표 — 프로그램 지표와 같은 4칸 격자를 써서 열이 세로로 정렬된다 */}
+                    <Divider mb="sm" label="계좌 전체" labelPosition="left" />
+                    <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md" mb="md">
                         <Stack gap={2}>
                             <Text size="xs" c="dimmed">예수금 (잔고)</Text>
                             <Text fw={700} size="lg">{(Number(deposit) || 0).toLocaleString()} 원</Text>
@@ -629,75 +631,82 @@ function TradeContent() {
                             <Text size="xs" c="dimmed">보유 종목 총액</Text>
                             <Text fw={700} size="lg">{Math.round(totalEval).toLocaleString()} 원</Text>
                         </Stack>
-                    </Group>
+                    </SimpleGrid>
                     {programHasData && (
-                        <Group grow mb="md" align="flex-end">
-                            <Stack gap={2}>
-                                <Text size="xs" c="dimmed">프로그램 매매 수익률</Text>
-                                {programLedgerOk ? (
-                                    <Text fw={800} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
-                                        {programTotalPnl >= 0 ? '+' : ''}{programTotalPnlRate.toFixed(2)}%
+                        <>
+                            <Divider mb="sm" label="프로그램 매매" labelPosition="left" />
+                            <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md" mb="md">
+                                <Stack gap={2}>
+                                    <Text size="xs" c="dimmed">수익률 (누적)</Text>
+                                    {programLedgerOk ? (
+                                        <Text fw={800} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
+                                            {programTotalPnl >= 0 ? '+' : ''}{programTotalPnlRate.toFixed(2)}%
+                                        </Text>
+                                    ) : (
+                                        <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
+                                    )}
+                                </Stack>
+                                <Stack gap={2}>
+                                    <Text size="xs" c="dimmed">평가손익 (누적)</Text>
+                                    {programLedgerOk ? (
+                                        <Text fw={700} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
+                                            {programTotalPnl >= 0 ? '+' : ''}{Math.round(programTotalPnl).toLocaleString()} 원
+                                        </Text>
+                                    ) : (
+                                        <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
+                                    )}
+                                </Stack>
+                                <Stack gap={2}>
+                                    <Text size="xs" c="dimmed">보유 종목 총액</Text>
+                                    {programLedgerOk ? (
+                                        <Text fw={700} size="lg">{Math.round(programHoldingsValue).toLocaleString()} 원</Text>
+                                    ) : (
+                                        <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
+                                    )}
+                                </Stack>
+                                <Stack gap={2}>
+                                    <Text size="xs" c="dimmed">
+                                        턴당 수익률{hasTurn && !turnIsLive ? ' (직전 턴)' : ''}
                                     </Text>
-                                ) : (
-                                    <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
-                                )}
-                            </Stack>
-                            <Stack gap={2}>
-                                <Text size="xs" c="dimmed">프로그램 매매 평가손익</Text>
-                                {programLedgerOk ? (
-                                    <Text fw={700} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
-                                        {programTotalPnl >= 0 ? '+' : ''}{Math.round(programTotalPnl).toLocaleString()} 원
-                                    </Text>
-                                ) : (
-                                    <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
-                                )}
-                            </Stack>
-                            <Stack gap={2}>
-                                <Text size="xs" c="dimmed">프로그램 매매 보유 종목 총액</Text>
-                                {programLedgerOk ? (
-                                    <Text fw={700} size="lg">{Math.round(programHoldingsValue).toLocaleString()} 원</Text>
-                                ) : (
-                                    <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
-                                )}
-                            </Stack>
-                        </Group>
+                                    {!hasTurn ? (
+                                        <Text size="sm" c="dimmed" mt={4}>턴 없음 — 껐다 켜면 시작</Text>
+                                    ) : !turnMeasurable ? (
+                                        <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
+                                    ) : (
+                                        <>
+                                            <Text fw={800} size="lg" c={turnPnl >= 0 ? 'red' : 'blue'}>
+                                                {turnPnl >= 0 ? '+' : ''}{turnRate.toFixed(2)}%
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {turnPnl >= 0 ? '+' : ''}{Math.round(turnPnl).toLocaleString()} 원 / 원금 {Math.round(turnCapital).toLocaleString()} 원
+                                            </Text>
+                                        </>
+                                    )}
+                                </Stack>
+                            </SimpleGrid>
+                        </>
                     )}
                     {hasTurn && (
-                        <Group grow mb="md" align="flex-start">
-                            <Stack gap={2}>
-                                <Text size="xs" c="dimmed">
-                                    프로그램 매매 턴당 수익률{turnIsLive ? '' : ' (직전 턴)'}
-                                </Text>
-                                {turnMeasurable ? (
-                                    <>
-                                        <Text fw={800} size="lg" c={turnPnl >= 0 ? 'red' : 'blue'}>
-                                            {turnPnl >= 0 ? '+' : ''}{turnRate.toFixed(2)}%
-                                        </Text>
-                                        <Text size="xs" c="dimmed">
-                                            {turnPnl >= 0 ? '+' : ''}{Math.round(turnPnl).toLocaleString()} 원 / 원금 {Math.round(turnCapital).toLocaleString()} 원
-                                        </Text>
-                                    </>
-                                ) : (
-                                    <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
-                                )}
-                            </Stack>
-                            <Stack gap={2}>
-                                <Text size="xs" c="dimmed">턴당 SIM별 수익률</Text>
-                                {!turnMeasurable ? (
-                                    <Text size="sm" c="dimmed">측정 불가</Text>
-                                ) : turnTagRows.length === 0 ? (
-                                    <Text size="sm" c="dimmed">—</Text>
-                                ) : turnTagRows.map(([tag, pnl]) => (
-                                    <Group key={tag} gap={6} justify="space-between" wrap="nowrap">
-                                        <Text size="sm" truncate>{tagLabel(tag)}</Text>
-                                        <Text size="sm" fw={700} c={pnl >= 0 ? 'red' : 'blue'} style={{ whiteSpace: 'nowrap' }}>
-                                            {pnl >= 0 ? '+' : ''}{(turnCapital > 0 ? (pnl / turnCapital) * 100 : 0).toFixed(2)}%
-                                            {' '}({pnl >= 0 ? '+' : ''}{Math.round(pnl).toLocaleString()})
-                                        </Text>
-                                    </Group>
-                                ))}
-                            </Stack>
-                        </Group>
+                        <Stack gap={6} mb="md">
+                            <Text size="xs" c="dimmed">턴당 SIM별 수익률 (기여도 — 합계 = 턴 수익률)</Text>
+                            {!turnMeasurable ? (
+                                <Text size="sm" c="dimmed">측정 불가</Text>
+                            ) : turnTagRows.length === 0 ? (
+                                <Text size="sm" c="dimmed">아직 확정된 손익이 없습니다</Text>
+                            ) : (
+                                <Group gap="xs" wrap="wrap">
+                                    {turnTagRows.map(([tag, pnl]) => (
+                                        <Badge key={tag} size="lg" radius="sm" variant="light"
+                                            color={pnl >= 0 ? 'red' : 'blue'}
+                                            style={{ textTransform: 'none', fontWeight: 600 }}>
+                                            {tagLabel(tag)} {pnl >= 0 ? '+' : ''}
+                                            {(turnCapital > 0 ? (pnl / turnCapital) * 100 : 0).toFixed(2)}%
+                                            {' · '}{pnl >= 0 ? '+' : ''}{Math.round(pnl).toLocaleString()}원
+                                        </Badge>
+                                    ))}
+                                </Group>
+                            )}
+                        </Stack>
                     )}
                     <Divider mb="xs" label="보유 포트폴리오 (일괄 매도 가능)" labelPosition="center" />
                     {renderPortfolioTable(holdings, true, 'calc(100vh - 320px)')}

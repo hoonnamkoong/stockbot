@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { fetchTradeableSims } from '@/lib/manifest-sims';
 import { getRealPortfolio } from '@/lib/kis-api';
-import { computeTurnPnl, type ProgramTurn, type ProgramPosition } from '@/lib/program-turn';
+import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult } from '@/lib/program-turn';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,11 +48,28 @@ async function putConfig(content: any, sha: string | null, message: string) {
     if (!res.ok) throw new Error(`config write ${res.status}: ${await res.text()}`);
 }
 
+/**
+ * 표시용 계산이 kill-switch를 지연시키지 못하게 하는 하드 데드라인.
+ * fetch 자체를 취소하진 못하지만(매달린 소켓은 그대로 뜬다), 핸들러는 폴백을 들고
+ * 즉시 putConfig로 진행한다 → OFF 지연이 상수로 묶인다.
+ */
+function withDeadline<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+    return Promise.race([
+        p.catch(() => fallback),
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+    ]);
+}
+
+/** 턴 동결/스냅샷 등 '표시용' 계산 전체에 걸리는 상한(ms). putConfig에는 걸지 않는다. */
+const DISPLAY_DEADLINE_MS = 2500;
+
 // ── 프로그램 매매 원장(program_positions.json) 읽기 전용 조회 ────────────
 // 표시 전용 데이터이므로 실패해도 GET 전체를 막지 않고 빈 원장으로 대체한다(fail-safe).
+// 단 ok로 '실패'와 '정상적으로 비어 있음'을 구분한다 — 동결 시 pnl:0으로 박제되면 안 되므로.
 const POSITIONS_PATH = 'program_positions.json';
 
 async function getPositions(): Promise<{
+    ok: boolean;
     positions: Record<string, ProgramPosition>;
     realized_pnl: number;
     turn: ProgramTurn | null;
@@ -63,33 +80,61 @@ async function getPositions(): Promise<{
         const res = await fetch(url, {
             headers: { Authorization: `token ${GITHUB_PAT}`, Accept: 'application/vnd.github.v3+json' },
             cache: 'no-store',
+            signal: AbortSignal.timeout(3000),
         });
-        if (!res.ok) return empty; // 404(미실행) 등은 빈 원장으로 취급
+        if (res.status === 404) return { ok: true, ...empty }; // 원장 미생성 = 정상(빈 원장)
+        if (!res.ok) return { ok: false, ...empty };           // 그 외 HTTP 실패 = 조회 불가
         const data = await res.json();
         const content = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
         return {
+            ok: true,
             positions: content.positions && typeof content.positions === 'object' ? content.positions : {},
             realized_pnl: Number(content.realized_pnl) || 0,
             turn: content.turn && content.turn.id ? content.turn : null,
         };
     } catch {
-        return empty; // 네트워크 실패 등도 non-blocking
+        return { ok: false, ...empty }; // 네트워크/파싱 실패 — non-blocking이되 '실패'로 신호
     }
 }
 
-/** 프로그램 원장 종목의 현재가 맵. 실패 시 빈 맵(표시 전용이므로 non-blocking). */
-async function getLivePrices(): Promise<Record<string, number>> {
+/** 프로그램 원장 종목의 현재가 맵. 실패는 ok:false로 신호(빈 맵과 구분). */
+async function getLivePrices(): Promise<{ ok: boolean; prices: Record<string, number> }> {
     try {
         const p: any = await getRealPortfolio();
-        if (p?.error) return {};
-        const map: Record<string, number> = {};
+        if (p?.error) return { ok: false, prices: {} };
+        const prices: Record<string, number> = {};
         for (const h of p?.holdings || []) {
-            if (h?.code) map[h.code] = Number(h.price) || 0;
+            if (h?.code) prices[h.code] = Number(h.price) || 0;
         }
-        return map;
+        return { ok: true, prices };
     } catch {
-        return {};
+        return { ok: false, prices: {} };
     }
+}
+
+/**
+ * OFF 시점의 턴 손익 동결값을 만든다. 실패는 pnl:null + degraded로 정직하게 남긴다.
+ * throw하지 않는다(getPositions/getLivePrices가 total). 호출부가 데드라인으로 감싼다.
+ */
+async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string): Promise<LastTurnResult> {
+    const base = { id: cfgTurn.id as string, ended_at: endedAt, sim, capital: Number(cfgTurn.capital) || 0 };
+
+    const { ok: ledgerOk, positions, turn } = await getPositions();
+    if (!ledgerOk) return { ...base, pnl: null, by_tag: {}, degraded: 'ledger_unavailable' };
+
+    // 원장의 턴 id가 config와 다르면 이번 턴에 파이썬이 한 번도 안 돌았다(장 외 ON→OFF 등).
+    // 이건 실패가 아니라 '거래가 없었다'는 뜻 — pnl:0이 정답이며 degraded를 붙이면 안 된다.
+    const matched = turn && turn.id === cfgTurn.id ? turn : null;
+    if (!matched) return { ...base, pnl: 0, by_tag: {} };
+
+    const capital = Number(matched.capital) || base.capital;
+    const held = Object.keys(positions).length > 0;
+    const { ok: pricesOk, prices } = await getLivePrices();
+    // 보유 종목이 없으면 시세가 없어도 확정분(by_tag)만으로 손익이 정확하다.
+    if (held && !pricesOk) return { ...base, capital, pnl: null, by_tag: {}, degraded: 'prices_unavailable' };
+
+    const { pnl, byTag } = computeTurnPnl(matched, positions, prices);
+    return { ...base, capital, pnl, by_tag: byTag };
 }
 
 // ── PIN 무차별 대입 방어 (파일 기반 카운터, secret repo) ─────────────────
@@ -204,28 +249,19 @@ export async function POST(request: Request) {
             const now = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
             // [턴 동결] OFF를 누른 순간의 턴 손익을 박제한다. OFF 이후의 시세 변동은
             // 어느 턴의 성과도 아니므로 섞이지 않는다.
-            // 실패해도 OFF(kill-switch)는 무조건 진행한다 — 표시용 계산이 정지를 막아선 안 된다.
-            let lastTurnResult: any = content.last_turn_result ?? null;
-            try {
-                const { positions, turn } = await getPositions();
-                const cfgTurn = content.turn;
-                if (cfgTurn?.id) {
-                    // 원장의 턴 id가 config와 다르면 이번 턴에 파이썬이 한 번도 안 돌았다(장 외 ON→OFF 등).
-                    const matched = turn && turn.id === cfgTurn.id ? turn : null;
-                    const { pnl, byTag } = matched
-                        ? computeTurnPnl(matched, positions, await getLivePrices())
-                        : { pnl: 0, byTag: {} };
-                    lastTurnResult = {
-                        id: cfgTurn.id,
-                        ended_at: now,
-                        sim: content.selected_sim ?? null,
-                        capital: Number(matched?.capital) || Number(cfgTurn.capital) || 0,
-                        pnl,
-                        by_tag: byTag,
-                    };
-                }
-            } catch (e) {
-                console.error('[program] 턴 동결 실패(무시):', e);
+            // 계산 전체에 하드 데드라인을 건다 — 실패든 hang이든 kill-switch를 지연/차단할 수 없다.
+            // 계산이 불가능했으면 pnl:0이 아니라 pnl:null+degraded로 남긴다(가짜 0원 턴 금지).
+            let lastTurnResult: LastTurnResult | null = content.last_turn_result ?? null;
+            const cfgTurn = content.turn;
+            if (cfgTurn?.id) {
+                const sim: string | null = content.selected_sim ?? null;
+                const capital = Number(cfgTurn.capital) || 0;
+                const frozen = await withDeadline(freezeTurn(cfgTurn, sim, now), DISPLAY_DEADLINE_MS, null);
+                lastTurnResult = frozen ?? {
+                    // 데드라인 초과 = 원장을 확인하지 못했다 → 조회 실패와 동일 취급
+                    id: cfgTurn.id, ended_at: now, sim, capital,
+                    pnl: null, by_tag: {}, degraded: 'ledger_unavailable',
+                };
             }
             const next = { ...content, enabled: false, updated_at: now,
                 updated_by: (token as any).email || (token as any).name || 'user',
@@ -265,20 +301,20 @@ export async function POST(request: Request) {
 
         // [턴 열기] ON 시점의 시세로 물려받은 보유 종목의 기준가를 스냅샷한다(MTM 리셋).
         // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 현재가로 채워진다.
-        let turn: any = { id: new Date().toISOString(), started_at: now, capital: budgetNum, opening_basis: {} };
-        try {
+        // ON은 fail-open이지만 OFF와 같은 hang 노출이 있으므로 동일 데드라인을 건다.
+        // (진행된 만큼만 turn에 반영되고, 나머지는 기본값 그대로 ON 진행)
+        const turn: any = { id: new Date().toISOString(), started_at: now, capital: budgetNum, opening_basis: {} };
+        await withDeadline((async () => {
             const { positions, realized_pnl } = await getPositions();
             turn.capital = budgetNum + realized_pnl;   // 턴 시작 유효자본 = 이 턴에 실제로 굴릴 돈
-            const prices = await getLivePrices();
+            const { prices } = await getLivePrices();
             const basis: Record<string, number> = {};
             for (const code of Object.keys(positions)) {
                 const px = Number(prices[code]) || 0;
                 if (px > 0) basis[code] = px;
             }
             turn.opening_basis = basis;
-        } catch (e) {
-            console.error('[program] 턴 열기 스냅샷 실패(기본값으로 진행):', e);
-        }
+        })(), DISPLAY_DEADLINE_MS, undefined);
 
         const next = {
             ...content,

@@ -546,7 +546,7 @@ function TradeContent() {
         // 턴 손익: ON이면 원장 turn으로 실시간(항상 측정 가능), OFF면 동결된 직전 턴.
         // 직전 턴은 pnl === null이면 OFF 시점 조회 실패로 '측정 불가' — 0으로 그리지 않는다.
         const liveTurn = programTurn ? computeTurnPnl(programTurn, programPositions, priceMap) : null;
-        const turnIsLive = !!programTurn;
+        const turnIsLive = programEnabled && !!programTurn;
         const hasTurn = !!programTurn || !!programLastTurn;
         const turnMeasurable = turnIsLive || programLastTurn?.pnl != null;
         const turnCapital = programTurn?.capital ?? programLastTurn?.capital ?? 0;

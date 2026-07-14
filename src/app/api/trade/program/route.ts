@@ -215,6 +215,11 @@ export async function GET(request: Request) {
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
         const { positions, realized_pnl, turn } = await getPositions();
+        // 원장 turn은 파이썬만 쓰고 OFF 시 지워지지 않는다 → config와 대조해 stale을 걸러낸다.
+        // ON이고 config가 연 턴과 id가 같을 때만 '진행 중인 턴'이다. 그 외(OFF 후,
+        // 턴 교체 후 파이썬 미실행)의 원장 turn은 stale — 동결값(last_turn_result)이 진실이다.
+        const cfgTurnId = content.turn?.id ?? null;
+        const liveTurn = content.enabled && cfgTurnId && turn?.id === cfgTurnId ? turn : null;
         return NextResponse.json({
             enabled: !!content.enabled,
             selected_sim: content.selected_sim ?? null,
@@ -224,7 +229,7 @@ export async function GET(request: Request) {
             sims, // 프론트 드롭다운 재사용
             positions, // 프로그램 원장 포지션(code -> {name, quantity, avg_price, tag})
             realized_pnl, // 프로그램 누적 실현손익(원)
-            turn, // 진행 중인 턴(원장) — 프론트가 실시간 손익 계산
+            turn: liveTurn, // 진행 중인 턴(config와 원장이 같은 턴을 가리킬 때만) — 프론트가 실시간 손익 계산
             last_turn_result: content.last_turn_result ?? null, // OFF 시 동결된 직전 턴
         });
     } catch (error: any) {

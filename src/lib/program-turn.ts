@@ -29,7 +29,7 @@ export type LastTurnResult = {
     capital: number;
     pnl: number | null;
     by_tag: Record<string, number>;
-    degraded?: 'ledger_unavailable' | 'prices_unavailable';
+    degraded?: 'ledger_unavailable' | 'prices_unavailable' | 'timeout';
 };
 
 /**

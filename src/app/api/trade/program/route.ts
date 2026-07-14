@@ -130,8 +130,11 @@ async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string): Pr
     const capital = Number(matched.capital) || base.capital;
     const held = Object.keys(positions).length > 0;
     const { ok: pricesOk, prices } = await getLivePrices();
+    // 보유 종목이 있는데 그중 어느 것도 양수 시세를 못 얻었으면 사실상 조회 실패다
+    // (getLivePrices는 성공 응답에 빈 holdings/0가만 와도 ok:true를 주므로 별도로 걸러야 한다).
+    const noUsablePrice = held && !Object.keys(positions).some((c) => Number(prices[c]) > 0);
     // 보유 종목이 없으면 시세가 없어도 확정분(by_tag)만으로 손익이 정확하다.
-    if (held && !pricesOk) return { ...base, capital, pnl: null, by_tag: {}, degraded: 'prices_unavailable' };
+    if (held && (!pricesOk || noUsablePrice)) return { ...base, capital, pnl: null, by_tag: {}, degraded: 'prices_unavailable' };
 
     const { pnl, byTag } = computeTurnPnl(matched, positions, prices);
     return { ...base, capital, pnl, by_tag: byTag };
@@ -258,9 +261,9 @@ export async function POST(request: Request) {
                 const capital = Number(cfgTurn.capital) || 0;
                 const frozen = await withDeadline(freezeTurn(cfgTurn, sim, now), DISPLAY_DEADLINE_MS, null);
                 lastTurnResult = frozen ?? {
-                    // 데드라인 초과 = 원장을 확인하지 못했다 → 조회 실패와 동일 취급
+                    // 데드라인 초과 = 원장이 멀쩡한데 조회가 느렸을 수도 있다 → ledger_unavailable과 구분
                     id: cfgTurn.id, ended_at: now, sim, capital,
-                    pnl: null, by_tag: {}, degraded: 'ledger_unavailable',
+                    pnl: null, by_tag: {}, degraded: 'timeout',
                 };
             }
             const next = { ...content, enabled: false, updated_at: now,
@@ -303,18 +306,24 @@ export async function POST(request: Request) {
         // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 현재가로 채워진다.
         // ON은 fail-open이지만 OFF와 같은 hang 노출이 있으므로 동일 데드라인을 건다.
         // (진행된 만큼만 turn에 반영되고, 나머지는 기본값 그대로 ON 진행)
-        const turn: any = { id: new Date().toISOString(), started_at: now, capital: budgetNum, opening_basis: {} };
-        await withDeadline((async () => {
-            const { positions, realized_pnl } = await getPositions();
-            turn.capital = budgetNum + realized_pnl;   // 턴 시작 유효자본 = 이 턴에 실제로 굴릴 돈
+        // IIFE는 turn을 in-place mutate하지 않고 값을 반환한다 — 이 await 완료 전에는
+        // turn이 아직 존재하지 않으므로, 데드라인이 이겨 백그라운드에서 계속 도는 fetch가
+        // 나중에 끝나도 이미 구성된 turn을 건드릴 수 없다.
+        const opened = await withDeadline((async () => {
+            const { ok: ledgerOk, positions, realized_pnl } = await getPositions();
+            // 조회 실패/데드라인 초과 시 capital은 falsy(0)로 남긴다 — 그럴듯한 값을 지어내는 대신
+            // 파이썬의 `cfg_turn.get('capital') or effective_budget` 폴백이 채우게 한다.
+            const capital = ledgerOk ? budgetNum + realized_pnl : 0;   // 턴 시작 유효자본 = 이 턴에 실제로 굴릴 돈
             const { prices } = await getLivePrices();
             const basis: Record<string, number> = {};
             for (const code of Object.keys(positions)) {
                 const px = Number(prices[code]) || 0;
                 if (px > 0) basis[code] = px;
             }
-            turn.opening_basis = basis;
-        })(), DISPLAY_DEADLINE_MS, undefined);
+            return { capital, opening_basis: basis };
+        })(), DISPLAY_DEADLINE_MS, { capital: 0, opening_basis: {} });
+
+        const turn: any = { id: new Date().toISOString(), started_at: now, capital: opened.capital, opening_basis: opened.opening_basis };
 
         const next = {
             ...content,

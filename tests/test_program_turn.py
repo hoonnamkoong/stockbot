@@ -146,3 +146,25 @@ def test_turn_pnl_sum_equals_cumulative_realized_pnl():
     # ── 불변식
     cumulative_realized = (3700 - 3000) * 10      # program_trader의 realized_pnl 계산식
     assert turn1_pnl + turn2_pnl == cumulative_realized == 7000
+
+
+# ── 활성 태그 결정 (program_trader) ──────────────────────────────────
+from src.pipeline.workers.program_trader import _resolve_active_tag
+
+
+def test_normal_sim_tag_is_sim_id():
+    """일반 심은 자기 id가 곧 태그다 — 턴 안에서 바뀌지 않는다."""
+    assert _resolve_active_tag("sim5_sideways", {}) == "sim5_sideways"
+    assert _resolve_active_tag("sim7_report_follower", {"active_regime": "BULL"}) == "sim7_report_follower"
+
+
+def test_sim10_tag_follows_active_regime():
+    """Sim10만 하위 전략으로 분해된다. active_regime은 Sim10이 run() 중 스냅샷에 쓴 값."""
+    assert _resolve_active_tag("sim10_orchestrator", {"active_regime": "BULL"}) == "sim4_bull_daytrading"
+    assert _resolve_active_tag("sim10_orchestrator", {"active_regime": "SIDEWAYS"}) == "sim5_sideways"
+    assert _resolve_active_tag("sim10_orchestrator", {"active_regime": "BEAR"}) == "cash"
+
+
+def test_sim10_unknown_regime_falls_back_to_sim_id():
+    """국면을 못 읽었으면(스냅샷 오염 등) 심 id로 폴백 — 손익이 유실되지 않는다."""
+    assert _resolve_active_tag("sim10_orchestrator", {}) == "sim10_orchestrator"

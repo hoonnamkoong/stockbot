@@ -34,6 +34,10 @@ import base64
 import requests
 from datetime import datetime, timedelta
 
+from src.pipeline.workers.program_turn import (
+    REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
+)
+
 # config·원장 모두 비공개 레포에 있다. config는 프론트가 유일 writer(파이프라인은 읽기만),
 # 원장은 이 모듈이 유일 writer.
 _SECRET_OWNER = 'hoonnamkoong'
@@ -75,7 +79,8 @@ def _read_config_fresh(log=print) -> dict | None:
 
 
 def _default_ledger() -> dict:
-    return {'positions': {}, 'last_run': None, 'sim': None, 'realized_pnl': 0, 'cooldown_codes': {}}
+    return {'positions': {}, 'last_run': None, 'sim': None, 'realized_pnl': 0,
+            'cooldown_codes': {}, 'turn': {}}
 
 
 def _read_ledger_fresh(log=print) -> tuple[dict | None, str | None]:
@@ -103,6 +108,7 @@ def _read_ledger_fresh(log=print) -> tuple[dict | None, str | None]:
         d.setdefault('positions', {})
         d.setdefault('realized_pnl', 0)
         d.setdefault('cooldown_codes', {})
+        d.setdefault('turn', {})
         return d, payload.get('sha')
     except Exception as e:
         log(f'[Program] 원장 조회 예외: {e} (fail-closed)')
@@ -142,6 +148,18 @@ def _write_ledger(ledger: dict, sha: str | None, log=print) -> bool:
     except Exception as e:
         log(f'[Program] 원장 기록 예외: {e}')
         return False
+
+
+def _resolve_active_tag(sim_id: str, snapshot: dict) -> str:
+    """턴 회계용 활성 전략 태그.
+
+    Sim10은 Sim0 국면에 따라 하위 전략(Sim4-1/Sim5/현금)을 갈아타므로 그 하위 전략을
+    태그로 쓴다. active_regime은 Sim10이 run() 중 self.state(=스냅샷)에 써둔 값이라
+    Sim10을 수정하지 않고 읽기만 하면 된다. 나머지 심은 자기 id가 곧 태그다.
+    """
+    if sim_id != 'sim10_orchestrator':
+        return sim_id
+    return REGIME_TAG.get(snapshot.get('active_regime'), sim_id)
 
 
 def _recently_ran(ledger: dict, now_kst: datetime) -> bool:
@@ -361,6 +379,23 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             if cp > p.get('peak_price', 0):
                 p['peak_price'] = cp  # 트레일링용 고점 갱신
 
+    # 7-b. [턴 회계] config가 연 턴을 원장에 반영. 표시 전용 — 실패해도 매매는 계속한다.
+    turn = ledger.get('turn') or {}
+    try:
+        cfg_turn = cfg.get('turn') or {}
+        if cfg_turn.get('id') and turn.get('id') != cfg_turn['id']:
+            turn = new_turn(
+                cfg_turn['id'],
+                cfg_turn.get('capital') or effective_budget,
+                positions,
+                cfg_turn.get('opening_basis'),
+                current_prices,
+            )
+            log(f"[Program] 새 턴 시작: {cfg_turn['id']} (자본 {turn['capital']:,.0f})")
+    except Exception as e:
+        log_error(f'[Program] 턴 열기 실패(무시): {e}')
+        turn = {}
+
     # 8. 실계좌 스냅샷 state 구성 (cash = effective_budget − 프로그램 기투자 원가)
     invested_cost = sum(p['avg_price'] * p['quantity'] for p in positions.values())
     snapshot_portfolio = {c: dict(p) for c, p in positions.items()}
@@ -386,12 +421,23 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         log_error(f'[Program] 심 실행 예외: {e} — 주문 없이 종료')
         return
 
+    # [턴 회계] 활성 전략 확정. Sim10이면 이번 run의 국면(하위 전략)이 스냅샷에 들어있다.
+    # 전략이 바뀌었으면 직전 전략의 평가손익을 락인하고 기준가를 리셋한다(MTM).
+    active_tag = sim_id
+    try:
+        active_tag = _resolve_active_tag(sim_id, snapshot)
+        if turn:
+            switch_tag(turn, positions, active_tag, current_prices)
+    except Exception as e:
+        log_error(f'[Program] 턴 태그 전환 실패(무시): {e}')
+
     if not orders:
         log(f'[Program] {sim_id}: 주문 없음')
         ledger['positions'] = positions
         ledger['cooldown_codes'] = snapshot.get('cooldown_codes', {})
         ledger['last_run'] = now_kst.isoformat()
         ledger['sim'] = sim_id
+        ledger['turn'] = turn
         _write_ledger(ledger, ledger_sha, log)
         return
 
@@ -424,7 +470,19 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 if side == 'sell' and code in positions:
                     realized_delta = qty * (price - positions[code]['avg_price'])
                     ledger['realized_pnl'] = round(ledger.get('realized_pnl', 0) + realized_delta, 2)
+                # [턴 회계] 표시 전용 별도 트랙(기준가 대비). 실패해도 매매·원장은 계속한다.
+                prev_qty = positions.get(code, {}).get('quantity', 0)
+                try:
+                    if turn:
+                        if side == 'sell':
+                            record_sell(turn, code, qty, price)
+                        else:
+                            record_buy(turn, code, qty, price, prev_qty)
+                except Exception as e:
+                    log_error(f'[Program] 턴 체결 기록 실패(무시): {e}')
                 _apply_order_to_positions(positions, o, today)
+                if turn and side == 'buy' and code in positions:
+                    positions[code]['tag'] = active_tag
                 append_order_history({
                     'executed_at': now_kst.isoformat(), 'side': side, 'code': code,
                     'name': o.get('name', ''), 'qty': qty, 'price': price,
@@ -445,6 +503,12 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     ledger['cooldown_codes'] = snapshot.get('cooldown_codes', {})
     ledger['last_run'] = now_kst.isoformat()
     ledger['sim'] = sim_id
+    try:
+        if turn:
+            prune_basis(turn, positions)
+    except Exception as e:
+        log_error(f'[Program] 턴 기준가 정리 실패(무시): {e}')
+    ledger['turn'] = turn
     _write_ledger(ledger, ledger_sha, log)
     log(f'[Program] 완료: {executed}/{len(orders)}건 체결 (sim={sim_id})')
 

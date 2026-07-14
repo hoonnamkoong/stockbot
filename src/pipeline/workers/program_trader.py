@@ -394,7 +394,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             log(f"[Program] 새 턴 시작: {cfg_turn['id']} (자본 {turn['capital']:,.0f})")
     except Exception as e:
         log_error(f'[Program] 턴 열기 실패(무시): {e}')
-        turn = {}
+        turn = ledger.get('turn') or {}  # 기존 턴 레코드를 날리지 않는다(다음 실행이 재시도)
 
     # 8. 실계좌 스냅샷 state 구성 (cash = effective_budget − 프로그램 기투자 원가)
     invested_cost = sum(p['avg_price'] * p['quantity'] for p in positions.values())
@@ -475,7 +475,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                     if turn:
                         prev_qty = positions.get(code, {}).get('quantity', 0)
                         if side == 'sell':
-                            record_sell(turn, code, qty, price)
+                            record_sell(turn, positions, code, qty, price)
                         else:
                             record_buy(turn, code, qty, price, prev_qty)
                 except Exception as e:

@@ -97,12 +97,38 @@ def test_record_buy_weights_basis_on_add_on():
     assert turn["basis"]["005930"] == 1100.0     # (1000*10 + 1200*10) / 20
 
 
-def test_record_sell_credits_active_tag_against_basis():
-    """매도 손익은 평단이 아니라 기준가 대비로 활성 태그에 귀속된다."""
+def test_record_sell_credits_holding_tag_against_basis():
+    """매도 손익은 평단이 아니라 기준가 대비로, 그 종목을 들고 있던 태그에 귀속된다."""
+    positions = {"005930": _pos(10, 3000, tag="sim5_sideways")}
     turn = {"id": "t2", "capital": 1_000_000, "basis": {"005930": 3500},
             "by_tag": {}, "active_tag": "sim5_sideways"}
-    record_sell(turn, "005930", qty=10, price=3700)
+    record_sell(turn, positions, "005930", qty=10, price=3700)
     assert turn["by_tag"]["sim5_sideways"] == 2000.0    # (3700-3500)*10
+
+
+def test_record_sell_credits_stale_tag_when_switch_skipped_it():
+    """스위칭 때 시세가 없어 옛 태그·옛 기준가에 남은 종목은, 팔릴 때도 옛 태그 몫이다.
+
+    활성 태그(sim5)에 귀속하면 기준가는 sim4 시절 것(3000)인데 손익은 sim5가 가져가
+    SIM별 분해가 엇갈린다. 표시 계산(TS)도 pos.tag를 쓰므로 기준을 일치시킨다.
+    """
+    positions = {"005930": _pos(10, 3000, tag="sim4_bull_daytrading")}
+    turn = {"id": "t1", "capital": 1_000_000, "basis": {"005930": 3000},
+            "by_tag": {}, "active_tag": "sim4_bull_daytrading"}
+    switch_tag(turn, positions, "sim5_sideways", {})     # 시세 없음 → 이 종목은 sim4에 남음
+    assert positions["005930"]["tag"] == "sim4_bull_daytrading"
+
+    record_sell(turn, positions, "005930", qty=10, price=3700)
+    assert turn["by_tag"] == {"sim4_bull_daytrading": 7000.0}   # (3700-3000)*10, sim5 몫 아님
+
+
+def test_record_sell_falls_back_to_active_tag_when_untagged():
+    """태그가 없는 포지션(원장 마이그레이션 전 등)은 활성 태그로 폴백 — 손익이 유실되지 않는다."""
+    positions = {"005930": _pos(10, 3000)}               # tag 없음
+    turn = {"id": "t2", "capital": 1_000_000, "basis": {"005930": 3500},
+            "by_tag": {}, "active_tag": "sim5_sideways"}
+    record_sell(turn, positions, "005930", qty=10, price=3700)
+    assert turn["by_tag"]["sim5_sideways"] == 2000.0
 
 
 def test_prune_basis_drops_sold_out_codes():
@@ -136,7 +162,7 @@ def test_turn_pnl_sum_equals_cumulative_realized_pnl():
     turn2 = new_turn("t2", 1_005_000, positions,
                      opening_basis={"005930": off_price}, current_prices={})
     switch_tag(turn2, positions, "sim5_sideways", {"005930": off_price})
-    record_sell(turn2, "005930", qty=10, price=3700)
+    record_sell(turn2, positions, "005930", qty=10, price=3700)
     del positions["005930"]
     prune_basis(turn2, positions)
     turn2_pnl = sum(turn2["by_tag"].values())

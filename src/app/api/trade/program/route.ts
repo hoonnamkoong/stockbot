@@ -29,6 +29,9 @@ async function getConfig(): Promise<{ sha: string | null; content: any }> {
     const res = await fetch(url, {
         headers: { Authorization: `token ${GITHUB_PAT}`, Accept: 'application/vnd.github.v3+json' },
         cache: 'no-store',
+        // 상한이 없으면 GitHub이 매달릴 때 함수가 서버리스 타임아웃에 조용히 죽고,
+        // OFF(kill-switch)가 아예 기록되지 않는다. 빠르게 실패시켜 사용자가 즉시 재시도하게 한다.
+        signal: AbortSignal.timeout(5000),
     });
     if (res.status === 404) return { sha: null, content: { ...DEFAULT_CONFIG } };
     if (!res.ok) throw new Error(`config read ${res.status}`);
@@ -214,7 +217,7 @@ export async function GET(request: Request) {
         const validIds = new Set(sims.map((s) => s.id));
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
-        const { positions, realized_pnl, turn } = await getPositions();
+        const { ok: ledgerOk, positions, realized_pnl, turn } = await getPositions();
         // 원장 turn은 파이썬만 쓰고 OFF 시 지워지지 않는다 → config와 대조해 stale을 걸러낸다.
         // ON이고 config가 연 턴과 id가 같을 때만 '진행 중인 턴'이다. 그 외(OFF 후,
         // 턴 교체 후 파이썬 미실행)의 원장 turn은 stale — 동결값(last_turn_result)이 진실이다.
@@ -227,6 +230,7 @@ export async function GET(request: Request) {
             selected_valid: selectedValid,
             updated_at: content.updated_at ?? null,
             sims, // 프론트 드롭다운 재사용
+            ledger_ok: ledgerOk, // 원장 조회 성공 여부 — false면 아래 값들은 '측정 불가'(0이 아님)
             positions, // 프로그램 원장 포지션(code -> {name, quantity, avg_price, tag})
             realized_pnl, // 프로그램 누적 실현손익(원)
             turn: liveTurn, // 진행 중인 턴(config와 원장이 같은 턴을 가리킬 때만) — 프론트가 실시간 손익 계산

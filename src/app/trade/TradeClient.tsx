@@ -94,6 +94,7 @@ function TradeContent() {
     const [programPin, setProgramPin] = useState('');
     const [programPositions, setProgramPositions] = useState<Record<string, { name: string; quantity: number; avg_price: number; tag?: string }>>({});
     const [programRealizedPnl, setProgramRealizedPnl] = useState(0);
+    const [programLedgerOk, setProgramLedgerOk] = useState(true);
     const [programTurn, setProgramTurn] = useState<ProgramTurn | null>(null);
     const [programLastTurn, setProgramLastTurn] = useState<LastTurnResult | null>(null);
 
@@ -217,6 +218,7 @@ function TradeContent() {
             setProgramValid(d.selected_valid !== false);
             setProgramPositions(d.positions && typeof d.positions === 'object' ? d.positions : {});
             setProgramRealizedPnl(Number(d.realized_pnl) || 0);
+            setProgramLedgerOk(d.ledger_ok !== false);
             setProgramTurn(d.turn && d.turn.id ? d.turn : null);
             setProgramLastTurn(d.last_turn_result ?? null);
         } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
@@ -632,19 +634,31 @@ function TradeContent() {
                         <Group grow mb="md" align="flex-end">
                             <Stack gap={2}>
                                 <Text size="xs" c="dimmed">프로그램 매매 수익률</Text>
-                                <Text fw={800} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
-                                    {programTotalPnl >= 0 ? '+' : ''}{programTotalPnlRate.toFixed(2)}%
-                                </Text>
+                                {programLedgerOk ? (
+                                    <Text fw={800} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
+                                        {programTotalPnl >= 0 ? '+' : ''}{programTotalPnlRate.toFixed(2)}%
+                                    </Text>
+                                ) : (
+                                    <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
+                                )}
                             </Stack>
                             <Stack gap={2}>
                                 <Text size="xs" c="dimmed">프로그램 매매 평가손익</Text>
-                                <Text fw={700} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
-                                    {programTotalPnl >= 0 ? '+' : ''}{Math.round(programTotalPnl).toLocaleString()} 원
-                                </Text>
+                                {programLedgerOk ? (
+                                    <Text fw={700} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
+                                        {programTotalPnl >= 0 ? '+' : ''}{Math.round(programTotalPnl).toLocaleString()} 원
+                                    </Text>
+                                ) : (
+                                    <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
+                                )}
                             </Stack>
                             <Stack gap={2}>
                                 <Text size="xs" c="dimmed">프로그램 매매 보유 종목 총액</Text>
-                                <Text fw={700} size="lg">{Math.round(programHoldingsValue).toLocaleString()} 원</Text>
+                                {programLedgerOk ? (
+                                    <Text fw={700} size="lg">{Math.round(programHoldingsValue).toLocaleString()} 원</Text>
+                                ) : (
+                                    <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
+                                )}
                             </Stack>
                         </Group>
                     )}

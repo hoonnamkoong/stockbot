@@ -306,17 +306,21 @@ export async function getRealPortfolio(): Promise<any> {
 
         let res: any = null;
         let lastError = '';
-        const maxRetries = 5; 
+        const maxRetries = 5;
         const delays = [1500, 2500, 3500, 4500, 6000]; // 재시도 지연 시간 대폭 강화
 
         let currentFK = "";
         let currentNK = "";
+        // 페이지별 보유 종목을 누적한다. res를 덮어쓰기만 하면 마지막 페이지만 남아
+        // 앞 페이지 종목이 통째로 유실된다(보유 종목이 페이지 경계를 넘을 때 발현).
+        const allRows: any[] = [];
 
         for (let i = 0; i <= maxRetries; i++) {
             res = await fetchBalance(currentFK, currentNK);
-            
+            if (Array.isArray(res.data.output1)) allRows.push(...res.data.output1);
+
             // 1. 성공 시 즉시 중단
-            if (res.data.rt_cd === '0') break; 
+            if (res.data.rt_cd === '0') break;
 
             // 2. 추가 데이터(페이지네이션)가 있는 경우 (7: 실시간, 9: 과거 등)
             if ((res.data.rt_cd === '7' || res.data.rt_cd === '9') && i < maxRetries) {
@@ -351,7 +355,7 @@ export async function getRealPortfolio(): Promise<any> {
             };
         }
 
-        const output1 = res.data.output1 || [];
+        const output1 = allRows;
         const output2 = res.data.output2?.[0] || {};
 
         // Normalize to match frontend expectations:

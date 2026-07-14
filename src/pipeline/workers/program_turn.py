@@ -74,11 +74,19 @@ def record_buy(turn: dict, code: str, qty: int, price: float, prev_qty: int) -> 
         basis[code] = price
 
 
-def record_sell(turn: dict, code: str, qty: int, price: float) -> None:
-    """매도 체결 반영. 평단이 아니라 '기준가' 대비 손익을 활성 태그에 귀속한다."""
-    tag = turn.get('active_tag')
+def record_sell(turn: dict, positions: dict, code: str, qty: int, price: float) -> None:
+    """매도 체결 반영. 평단이 아니라 '기준가' 대비 손익을 그 종목을 들고 있던 태그에 귀속한다.
+
+    활성 태그가 아니라 positions[code]['tag']를 쓰는 이유: switch_tag는 시세를 못 구한 종목을
+    의도적으로 직전 태그·기준가에 남겨둔다. 그런 종목의 매도를 활성 태그에 귀속하면 기준가는
+    옛것인데 손익은 새 태그가 가져가 SIM별 분해가 엇갈린다. 표시 계산(TS computeTurnPnl)도
+    미실현을 pos.tag에 귀속하므로 양쪽 기준을 일치시킨다.
+    """
     basis = turn.get('basis', {})
-    if not tag or code not in basis:
+    if code not in basis:
+        return
+    tag = (positions.get(code) or {}).get('tag') or turn.get('active_tag')
+    if not tag:
         return
     by_tag = turn.setdefault('by_tag', {})
     by_tag[tag] = round(by_tag.get(tag, 0.0) + (float(price) - basis[code]) * qty, 2)

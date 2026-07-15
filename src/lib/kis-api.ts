@@ -525,8 +525,10 @@ export function matchRealizedRoi(
             if (need <= 0) break;
             if (e.sellQty <= 0) continue;
             const take = Math.min(need, e.sellQty);
-            pnlSum += Math.round(e.roiAmount * (take / e.sellQty));
+            const takenAmt = Math.round(e.roiAmount * (take / e.sellQty));
+            pnlSum += takenAmt;
             rateWeighted += (parseFloat(e.roiPct) || 0) * (take / totalQty);
+            e.roiAmount -= takenAmt; // 남은 금액을 소진 수량과 동기화(과다계상 방지)
             e.sellQty -= take;
             need -= take;
         }
@@ -596,9 +598,11 @@ export async function getRealizedProfitBuckets(
             const code: string = item.pdno;
             const dt: string = item.trad_dt;                 // yyyymmdd
             const sellQty = Number(item.sll_qty || 0);       // 매도수량
-            const roiAmount = Number(item.rlzt_pfls || 0);   // 실현손익(원)
-            const rate = Number(item.pfls_rt || 0);          // 손익률(%)
             if (!code || !dt || sellQty <= 0) continue;
+            if (item.rlzt_pfls == null || item.pfls_rt == null) continue; // 필드 부재 = 측정 실패, 가짜 0 금지
+            const roiAmount = Number(item.rlzt_pfls);        // 실현손익(원)
+            const rate = Number(item.pfls_rt);               // 손익률(%)
+            if (Number.isNaN(roiAmount) || Number.isNaN(rate)) continue;
             const key = `${code}_${dt}`;
             const roiPct = (rate >= 0 ? '+' : '') + rate.toFixed(1);
             const entry: ProfitEntry = { sellQty, roiPct, roiAmount };

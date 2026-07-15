@@ -475,6 +475,148 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
         }
     }
 
+// --- Realized ROI 조인 (일별체결 SELL 행 ↔ 기간별매매손익 버킷) ---
+export type RealFill = {
+    action: 'BUY' | 'SELL';
+    code: string;
+    time: string;
+    qty: string | number;
+    roi?: string;
+    roiAmount?: number;
+    [k: string]: any;
+};
+
+export type ProfitEntry = { sellQty: number; roiPct: string; roiAmount: number };
+
+/**
+ * 각 SELL 체결 행에 실현손익(roi %, roiAmount 원)을 FIFO로 매칭한다.
+ * 원가를 확보 못 한 SELL은 값을 붙이지 않는다(측정 불가). BUY는 그대로 통과.
+ */
+export function matchRealizedRoi(
+    fills: RealFill[],
+    buckets: Map<string, ProfitEntry[]>,
+): RealFill[] {
+    // 소진 상태를 훼손하지 않도록 버킷을 얕게 복제
+    const remaining = new Map<string, ProfitEntry[]>();
+    buckets.forEach((v, k) => {
+        remaining.set(k, v.map(e => ({ ...e })));
+    });
+
+    const signedRate = (r: number): string =>
+        (r >= 0 ? '+' : '') + r.toFixed(1);
+
+    return fills.map((f) => {
+        const out: RealFill = { ...f };
+        if (f.action !== 'SELL') return out;
+
+        const yyyymmdd = String(f.time).slice(0, 10).replace(/-/g, '');
+        const key = `${f.code}_${yyyymmdd}`;
+        const entries = remaining.get(key);
+        let need = Number(f.qty) || 0;
+        if (!entries || need <= 0) return out;
+
+        const available = entries.reduce((s, e) => s + e.sellQty, 0);
+        if (available < need) return out; // 원가 부족 → 측정 불가
+
+        let pnlSum = 0;
+        let rateWeighted = 0;
+        const totalQty = need;
+        for (const e of entries) {
+            if (need <= 0) break;
+            if (e.sellQty <= 0) continue;
+            const take = Math.min(need, e.sellQty);
+            const takenAmt = Math.round(e.roiAmount * (take / e.sellQty));
+            pnlSum += takenAmt;
+            rateWeighted += (parseFloat(e.roiPct) || 0) * (take / totalQty);
+            e.roiAmount -= takenAmt; // 남은 금액을 소진 수량과 동기화(과다계상 방지)
+            e.sellQty -= take;
+            need -= take;
+        }
+        out.roiAmount = pnlSum;
+        out.roi = signedRate(rateWeighted);
+        return out;
+    });
+}
+
+/**
+ * 기간별 매매손익현황(TTTC8715R)으로 매도 건별 실현손익을 조회해
+ * `종목코드_매매일자(yyyymmdd)` 키의 버킷 Map으로 반환한다.
+ * 모의투자 미지원/조회 실패 시 빈 Map(→ 전체 "측정 불가").
+ */
+export async function getRealizedProfitBuckets(
+    fromDateStr: string,
+    toDateStr: string,
+): Promise<Map<string, ProfitEntry[]>> {
+    const buckets = new Map<string, ProfitEntry[]>();
+    try {
+        const config = getKISConfig();
+        if (config.IS_VIRTUAL) {
+            console.warn('[KIS-API] 모의투자: 기간별매매손익(TTTC8715R) 미지원 가능 → 실현손익 생략');
+        }
+        const token = await getAccessToken();
+        const fullAccount = (config.ACCOUNT_NO || '').replace(/[-\s]/g, '').trim();
+        const CANO = fullAccount.slice(0, 8);
+        const ACNT_PRDT_CD = fullAccount.slice(8, 10) || '01';
+
+        const res = await axios.get(
+            `${config.BASE_URL}/uapi/domestic-stock/v1/trading/inquire-period-trade-profit`,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'authorization': `Bearer ${token}`,
+                    'appkey': config.APP_KEY,
+                    'appsecret': config.APP_SECRET,
+                    'tr_id': 'TTTC8715R',
+                    'custtype': 'P',
+                },
+                params: {
+                    CANO,
+                    ACNT_PRDT_CD,
+                    SORT_DVSN: '00',
+                    PDNO: '',
+                    INQR_STRT_DT: fromDateStr,
+                    INQR_END_DT: toDateStr,
+                    CBLC_DVSN: '00',
+                    CTX_AREA_FK100: '',
+                    CTX_AREA_NK100: '',
+                },
+                timeout: 10000,
+            },
+        );
+
+        if (res.data.rt_cd !== '0') {
+            console.error(`[KIS-API] 매매손익 조회 실패: ${res.data.msg1}`);
+            return buckets;
+        }
+
+        const output1: any[] = res.data.output1 || [];
+        console.log(`[KIS-API] 매매손익 ${output1.length}건 조회 완료`);
+        if (output1[0]) console.log('[KIS-API] 매매손익 샘플 키:', JSON.stringify(output1[0]));
+
+        for (const item of output1) {
+            // ↓ 필드명은 첫 실호출 로그로 확정 (초안: KIS 문서 기준)
+            const code: string = item.pdno;
+            const dt: string = item.trad_dt;                 // yyyymmdd
+            const sellQty = Number(item.sll_qty || 0);       // 매도수량
+            if (!code || !dt || sellQty <= 0) continue;
+            if (item.rlzt_pfls == null || item.pfls_rt == null) continue; // 필드 부재 = 측정 실패, 가짜 0 금지
+            const roiAmount = Number(item.rlzt_pfls);        // 실현손익(원)
+            const rate = Number(item.pfls_rt);               // 손익률(%)
+            if (Number.isNaN(roiAmount) || Number.isNaN(rate)) continue;
+            const key = `${code}_${dt}`;
+            const roiPct = (rate >= 0 ? '+' : '') + rate.toFixed(1);
+            const entry: ProfitEntry = { sellQty, roiPct, roiAmount };
+            const arr = buckets.get(key);
+            if (arr) arr.push(entry); else buckets.set(key, [entry]);
+        }
+        return buckets;
+    } catch (e: any) {
+        const msg = e.response?.data?.msg1 || e.message;
+        console.error('[KIS-API] getRealizedProfitBuckets Error:', msg);
+        return buckets; // 빈 Map → 측정 불가
+    }
+}
+
 /**
  * [V50.1] KIS 당일/기간별 체결 내역 조회
  * API: /uapi/domestic-stock/v1/trading/inquire-daily-ccld (TTTC8001R)
@@ -538,18 +680,21 @@ export async function getRealTradeHistory(startDate?: string, endDate?: string):
         const output1: any[] = res.data.output1 || [];
         console.log(`[KIS-API] 체결 내역 ${output1.length}건 조회 완료`);
 
-        return output1.map((item: any) => ({
+        const fills = output1.map((item: any) => ({
             time: `${item.ord_dt?.slice(0,4)}-${item.ord_dt?.slice(4,6)}-${item.ord_dt?.slice(6,8)} ${item.ord_tmd?.slice(0,2)}:${item.ord_tmd?.slice(2,4)}:${item.ord_tmd?.slice(4,6)}`,
             symbol:       `${item.prdt_name}(${item.pdno})`,   // 종목명(코드)
             code:         item.pdno,
             name:         item.prdt_name,
-            action:       item.sll_buy_dvsn_cd === '01' ? 'SELL' : 'BUY',
+            action:       (item.sll_buy_dvsn_cd === '01' ? 'SELL' : 'BUY') as 'SELL' | 'BUY',
             price:        item.avg_prvs || item.ccld_avg_unpr || '0',  // 체결평균가
             qty:          item.tot_ccld_qty || '0',                     // 체결수량
             amount:       item.tot_ccld_amt || '0',                     // 체결금액
-            roi:          item.evlu_pfls_rt || '-',                     // 평가손익률
             type:         'real',
         }));
+
+        // 매도 건에 실현손익(roi %, roiAmount 원) 조인
+        const buckets = await getRealizedProfitBuckets(fromDateStr, toDateStr);
+        return matchRealizedRoi(fills, buckets);
     } catch (e: any) {
         const msg = e.response?.data?.msg1 || e.message;
         console.error('[KIS-API] getRealTradeHistory Error:', msg);

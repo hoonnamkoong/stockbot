@@ -475,6 +475,67 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
         }
     }
 
+// --- Realized ROI 조인 (일별체결 SELL 행 ↔ 기간별매매손익 버킷) ---
+export type RealFill = {
+    action: 'BUY' | 'SELL';
+    code: string;
+    time: string;
+    qty: string | number;
+    roi?: string;
+    roiAmount?: number;
+    [k: string]: any;
+};
+
+export type ProfitEntry = { sellQty: number; roiPct: string; roiAmount: number };
+
+/**
+ * 각 SELL 체결 행에 실현손익(roi %, roiAmount 원)을 FIFO로 매칭한다.
+ * 원가를 확보 못 한 SELL은 값을 붙이지 않는다(측정 불가). BUY는 그대로 통과.
+ */
+export function matchRealizedRoi(
+    fills: RealFill[],
+    buckets: Map<string, ProfitEntry[]>,
+): RealFill[] {
+    // 소진 상태를 훼손하지 않도록 버킷을 얕게 복제
+    const remaining = new Map<string, ProfitEntry[]>();
+    buckets.forEach((v, k) => {
+        remaining.set(k, v.map(e => ({ ...e })));
+    });
+
+    const signedRate = (r: number): string =>
+        (r >= 0 ? '+' : '') + r.toFixed(1);
+
+    return fills.map((f) => {
+        const out: RealFill = { ...f };
+        if (f.action !== 'SELL') return out;
+
+        const yyyymmdd = String(f.time).slice(0, 10).replace(/-/g, '');
+        const key = `${f.code}_${yyyymmdd}`;
+        const entries = remaining.get(key);
+        let need = Number(f.qty) || 0;
+        if (!entries || need <= 0) return out;
+
+        const available = entries.reduce((s, e) => s + e.sellQty, 0);
+        if (available < need) return out; // 원가 부족 → 측정 불가
+
+        let pnlSum = 0;
+        let rateWeighted = 0;
+        const totalQty = need;
+        for (const e of entries) {
+            if (need <= 0) break;
+            if (e.sellQty <= 0) continue;
+            const take = Math.min(need, e.sellQty);
+            pnlSum += Math.round(e.roiAmount * (take / e.sellQty));
+            rateWeighted += (parseFloat(e.roiPct) || 0) * (take / totalQty);
+            e.sellQty -= take;
+            need -= take;
+        }
+        out.roiAmount = pnlSum;
+        out.roi = signedRate(rateWeighted);
+        return out;
+    });
+}
+
 /**
  * [V50.1] KIS 당일/기간별 체결 내역 조회
  * API: /uapi/domestic-stock/v1/trading/inquire-daily-ccld (TTTC8001R)

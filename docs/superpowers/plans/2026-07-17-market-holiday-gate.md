@@ -12,7 +12,12 @@
 
 ## Global Constraints
 
-- 개장 판정 소스는 **KIS `chk-holiday` 하나**다. `holidays` 패키지는 코드·의존성에서 완전히 제거한다.
+- 개장 판정 소스는 **KIS `chk-holiday` 하나**다. **휴장 판정 경로**(`src/pipeline/context.py`)와
+  스크래퍼 의존성(`scripts/requirements-scraper.txt`)에서 `holidays` 패키지를 제거한다.
+  **저장소 전체 제거가 아니다** — `src/analyzer_5days.py`의 `get_recent_working_days()`도
+  `holidays.KR()`을 쓰고 같은 결함(2026-07-17을 영업일로 계산)을 갖지만, 그 모듈은
+  스크래퍼 런타임 import 체인에 없고(import 그래프 추적으로 확인) `analyze_cumulative()`는
+  파이프라인 어디서도 호출되지 않는다. 이번 스코프 밖이다 (아래 "범위 밖" 참조).
 - 개장 판정에는 **`opnd_yn`(개장일여부)만** 쓴다. `tr_day_yn`·`bzdy_yn`·`bzdy_tp_cd`는 쓰지 않는다 (`bzdy_tp_cd`는 응답 스펙에 없는 필드다).
 - `is_trading_day()`는 **3값**을 반환한다: `True`(개장) / `False`(휴장) / `None`(판정 불가). **`None`은 개장이 아니다.**
 - 실거래 게이트(`is_market_hours`, `is_after_market_close`)는 판정 불가 시 **닫히는**(False) 방향이어야 하고, 반환 타입은 `bool`로 좁힌다.
@@ -1012,15 +1017,21 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 Run: `python -m pytest tests/ -q`
 Expected: 전부 PASS. 실패가 있으면 이번 변경과 무관한 기존 실패인지 `git stash`로 확인한다.
 
-- [ ] **Step 2: holidays 잔재가 없는지 확인한다**
+- [ ] **Step 2: 휴장 판정 경로에 holidays 잔재가 없는지 확인한다**
 
-Run: `grep -rn "holidays" src/ scripts/`
-Expected: **`scripts/scraper_legacy_v49.py`의 두 줄(42-43)만** 남는다. 이 파일은
-V49 시절 죽은 레거시로, 2026년 공휴일을 하드코딩한 리스트를 갖고 있고
-(`07-17`이 없어 이번 사고와 같은 종류의 결함이 있다) 현재 파이프라인은
-이 파일을 import하지 않는다. **이번 스코프가 아니므로 손대지 않는다.**
+Run: `grep -rn "import holidays\|from holidays" src/ scripts/`
 
-`src/`와 `scripts/requirements-scraper.txt`에서는 매치가 없어야 한다.
+Expected: 아래 **두 곳만** 남는다. 둘 다 이번 스코프 밖이며 **손대지 않는다.**
+
+| 위치 | 왜 남기나 |
+|---|---|
+| `src/analyzer_5days.py:12` | `get_recent_working_days()`가 `holidays.KR()`로 5영업일 계산. 같은 결함(2026-07-17을 영업일로 봄)이 있지만 **스크래퍼 런타임 import 체인에 없고** `analyze_cumulative()`는 파이프라인 어디서도 호출되지 않는다 (import 그래프 추적 + grep 확인). 별도 이슈. |
+| `scripts/scraper_legacy_v49.py:42-43` | V49 시절 죽은 레거시. 2026년 공휴일 하드코딩 리스트(`07-17` 없음). 현재 파이프라인이 import하지 않는다. |
+
+`src/pipeline/context.py`와 `scripts/requirements-scraper.txt`에서는 매치가 **없어야** 한다.
+
+`scripts/requirements.txt`(스크래퍼용이 아닌 별도 파일)의 `holidays==0.86` 핀도
+`analyzer_5days.py`가 쓰므로 **그대로 둔다** — 여기서 빼면 그 모듈이 ImportError로 죽는다.
 
 - [ ] **Step 3: 달력 파일이 배포 제외 목록에 걸리지 않는지 확인한다**
 

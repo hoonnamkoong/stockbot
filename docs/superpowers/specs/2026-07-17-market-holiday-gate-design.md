@@ -142,11 +142,24 @@ holidays 0.86
 | 달력에 오늘 있음 | 그 값 사용 |
 | 달력 없음/오늘 없음 → 재조회 성공 | 판정 + 달력 갱신 |
 | 재조회 실패 (토큰 없음/API 오류/네트워크) | `None` → 중단 + 경고 텔레그램 |
-| `force_run: true` (workflow_dispatch) | 게이트 우회 (기존 동작 유지) |
+| `FORCE_RUN=true` (workflow_dispatch) | 게이트 우회 → `True` |
 
-경고 텔레그램은 매 런 발송한다. Tasker가 매시간 트리거하므로 KIS 장애가
-길어지면 반복되지만, "봇이 멈췄다"는 놓치면 안 되는 신호다. 중복 억제는
-실제로 성가실 때 넣는다 (YAGNI).
+### FORCE_RUN — fail-closed의 수동 탈출구
+
+`scraper.yml`이 `FORCE_RUN` env를 넘기지만 **현재 코드는 아무도 읽지 않는다**
+(죽은 환경변수). fail-closed를 도입하면 KIS 장애 시 봇을 수동으로 돌릴
+수단이 사라지므로, 이번에 `is_trading_day()` 머리에서 이 값을 읽어 게이트를
+우회한다. 워크플로우 input·env 배관은 이미 있으므로 코드만 읽으면 된다.
+
+### 경고 발송은 `should_notify()`를 우회한다
+
+`should_notify()`는 정각(0~2분) 런에만 발송을 허용한다. 경고가 이 게이트를
+타면 15/30/45분 런에서 침묵해 장애를 놓친다. 판정 불가 경고는
+`TelegramManager.send_message()`를 직접 호출한다.
+
+경고는 매 런 발송한다. Tasker가 매시간 트리거하므로 KIS 장애가 길어지면
+반복되지만, "봇이 멈췄다"는 놓치면 안 되는 신호다. 중복 억제는 실제로
+성가실 때 넣는다 (YAGNI).
 
 ## 테스트
 
@@ -164,14 +177,18 @@ holidays 0.86
 - 경고 중복 억제 로직
 - `eod_data.yml` / `monthly_report.yml` 등 다른 워크플로우의 휴장 게이트
 - 기존 `tr_day_yn` / `bzdy_yn` 활용 (개장 판정엔 `opnd_yn`만 쓴다)
+- **`src/analyzer_5days.py`의 `holidays` 사용** — `get_recent_working_days()`가 `holidays.KR()`로
+  5영업일을 계산해 같은 결함(2026-07-17을 영업일로 봄)을 갖는다. 다만 스크래퍼 런타임 import
+  체인에 없고 `analyze_cumulative()`가 파이프라인 어디서도 호출되지 않아 이번 사고와 무관하다.
+  `holidays` 제거는 **휴장 판정 경로 한정**이다 (저장소 전체가 아니다).
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
 | `src/market_calendar.py` | 신규. 달력 조회·저장·판정 |
-| `src/pipeline/context.py` | `bzdy_tp_cd` 제거 → `opnd_yn`. holidays 폴백 제거. `return True` → `None` |
-| `src/pipeline/orchestrator.py` | `None` 판정 시 경고 텔레그램 후 종료 |
+| `src/pipeline/context.py` | `bzdy_tp_cd` 제거 → `opnd_yn`. holidays 폴백 제거. `return True` → `None`. `FORCE_RUN` 우회. `is_market_hours`/`is_after_market_close` 반환 타입 좁히기 |
+| `src/pipeline/orchestrator.py` | `None` 판정 시 경고 텔레그램 후 종료 (`should_notify()` 우회) |
 | `.github/workflows/token_refresh.yml` | 달력 갱신 + db-data push 스텝 추가 |
 | `scripts/requirements-scraper.txt` | `holidays` 제거 |
 | `tests/` | 위 테스트 추가 |

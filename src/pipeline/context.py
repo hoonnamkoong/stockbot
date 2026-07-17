@@ -76,83 +76,44 @@ class PipelineContext:
         elif h < 16: return 120
         return 130
 
-    def is_trading_day(self) -> bool:
-        """오늘이 거래일인지 확인합니다 (KIS API 우선, holidays 패키지 폴백)."""
+    def is_trading_day(self):
+        """오늘이 개장일인지 판정한다.
+
+        True=개장, False=휴장, None=판정 불가.
+
+        [주의] None은 개장이 아니다. 호출부는 fail-closed로 닫아야 한다.
+        판정 실패를 True로 폴백하면 휴장일에 봇이 돈다 (2026-07-17 사고).
+
+        판정 소스는 KIS chk-holiday 하나다. holidays 패키지는 신규 지정·
+        임시공휴일을 모르므로(0.86이 2026-07-17을 놓쳤다) 쓰지 않는다.
+        """
+        if os.environ.get('FORCE_RUN', '').strip().lower() == 'true':
+            self.log("[FORCE_RUN] 휴장일 게이트를 우회합니다.")
+            return True
+
         if self.now_kst.weekday() >= 5:
             return False
 
-        # KIS API로 거래일 확인 (1차)
+        from src.market_calendar import load_calendar, lookup, refresh_calendar
+
+        result = lookup(load_calendar(), self.today_str)
+        if result is not None:
+            return result
+
+        # 달력에 오늘이 없다 (07시 갱신 런 실패 등) → 직접 조회
+        self.log(f"[휴장 판정] 달력에 {self.today_str}이 없어 직접 조회합니다.")
         try:
-            result = self._check_trading_day_via_kis()
-            if result is not None:
-                if not result:
-                    self.log(f"[KIS API] 오늘({self.today_display})은 비거래일입니다.")
-                return result
+            days = refresh_calendar(self.today_str)
         except Exception as e:
-            self.log(f"[경고] KIS API 거래일 확인 실패, holidays 폴백: {e}")
-
-        # holidays 패키지로 공휴일 확인 (폴백)
-        try:
-            import holidays
-            if self.now_kst.strftime('%Y-%m-%d') in holidays.KR():
-                self.log(f"[공휴일] 달력상 법정 공휴일입니다: {self.now_kst.strftime('%Y-%m-%d')}")
-                return False
-        except Exception as e:
-            self.log(f"[경고] holidays 패키지 확인 실패: {e}")
-
-        return True
-
-    def _check_trading_day_via_kis(self):
-        """KIS chk-holiday API로 오늘이 거래일인지 확인합니다. 실패 시 None 반환."""
-        import json
-        import requests
-
-        app_key = os.environ.get('KIS_APP_KEY', '').strip()
-        app_secret = os.environ.get('KIS_APP_SECRET', '').strip()
-        if not app_key or not app_secret:
+            self.log(f"[휴장 판정 실패] chk-holiday 조회 실패: {e}")
             return None
 
-        # token_manager.py가 사전에 실행되어 캐시를 보장함
-        token_path = 'data/kis_token_cache.json'
-        try:
-            with open(token_path, 'r', encoding='utf-8') as f:
-                access_token = json.load(f).get('access_token')
-        except Exception:
-            return None
-        if not access_token:
-            return None
-
-        url = "https://openapi.koreainvestment.com:9443/uapi/domestic-stock/v1/quotations/chk-holiday"
-        headers = {
-            "content-type": "application/json; charset=utf-8",
-            "authorization": f"Bearer {access_token}",
-            "appkey": app_key,
-            "appsecret": app_secret,
-            "tr_id": "CTCA0903R",
-            "custtype": "P",
-        }
-        params = {"BASS_DT": self.today_str, "CTX_AREA_NK": "", "CTX_AREA_FK": ""}
-
-        res = requests.get(url, headers=headers, params=params, timeout=5)
-        data = res.json()
-
-        if data.get('rt_cd') != '0':
-            self.log(f"[KIS API] chk-holiday 오류: {data.get('msg1', '')}")
-            return None
-
-        output = data.get('output', [])
-        entry = next((x for x in output if x.get('bass_dt') == self.today_str), output[0] if output else None)
-        if not entry:
-            return None
-
-        bzdy_tp_cd = entry.get('bzdy_tp_cd', '')
-        self.log(f"[KIS API] 거래일 조회: {self.today_str} bzdy_tp_cd={bzdy_tp_cd}")
-        if bzdy_tp_cd:
-            return bzdy_tp_cd == '1'
-        tr_day_yn = entry.get('tr_day_yn', '')
-        if tr_day_yn:
-            return tr_day_yn == 'Y'
-        return None
+        result = lookup(days, self.today_str)
+        if result is None:
+            self.log(f"[휴장 판정 실패] 조회한 달력에 {self.today_str}이 없습니다.")
+        else:
+            self.log(f"[휴장 판정] {self.today_str} 개장={result}")
+        return result
 
     def should_notify(self) -> bool:
         """
@@ -179,9 +140,11 @@ class PipelineContext:
         [주의] 실거래 게이트다 (trade_engine의 allow_buy, program_trader).
         장은 15:30에 닫지만 이 상한은 15:50이다. 마감 후 판정에는
         is_after_market_close()를 쓸 것 — 여기를 낮추면 매수 허용 시간대가 바뀐다.
+
+        거래일 판정 불가(None)면 닫는다. 거래일인지 모르는 채로 매수하지 않는다.
         """
-        return (
-            self.is_trading_day() and
+        return bool(
+            self.is_trading_day() is True and
             9 <= self.now_kst.hour < 16 and
             not (self.now_kst.hour == 15 and self.now_kst.minute >= 50)
         )
@@ -191,12 +154,14 @@ class PipelineContext:
 
         is_market_hours()와 15:30~15:49 구간이 겹친다. 둘을 함께 쓰는 곳은
         이쪽을 먼저 판정해야 한다.
+
+        거래일 판정 불가(None)면 닫는다.
         """
         if self.now_kst.weekday() >= 5:
             return False
         if (self.now_kst.hour, self.now_kst.minute) < MARKET_CLOSE_HHMM:
             return False
-        return self.is_trading_day()
+        return self.is_trading_day() is True
 
     def log(self, msg: str) -> None:
         """타임스탬프가 포함된 로그를 출력합니다."""

@@ -128,3 +128,76 @@ def test_holidays_package_not_imported():
     source = inspect.getsource(context)
     assert 'import holidays' not in source
     assert 'from holidays' not in source
+
+
+# ── 오케스트레이터 게이트 ──
+
+def _stub_workers(monkeypatch):
+    """Stage 1이 돌면 테스트가 네트워크를 탄다. 돌면 즉시 실패시킨다."""
+    from src.pipeline import orchestrator
+
+    def _boom(*a, **k):
+        raise AssertionError("게이트가 열려 파이프라인이 진행됐다")
+
+    monkeypatch.setattr(orchestrator, 'DataFetcherWorker', _boom)
+    monkeypatch.setattr(orchestrator, 'StorageManager', lambda *a, **k: None)
+
+
+def test_pipeline_stops_and_warns_when_undetermined(monkeypatch):
+    """판정 불가면 중단하고 경고를 보낸다."""
+    from src.pipeline import orchestrator
+
+    _stub_workers(monkeypatch)
+    sent = []
+    monkeypatch.setattr(orchestrator, '_notify_holiday_check_failed',
+                        lambda ctx: sent.append(ctx.today_str))
+    monkeypatch.setattr(PipelineContext, 'is_trading_day', lambda self: None)
+
+    ctx = ctx_at(datetime(2026, 7, 20, 10, 0))
+    orchestrator.run_pipeline(ctx)   # 예외 없이 조용히 끝나야 한다
+
+    assert sent == ['20260720']
+
+
+def test_pipeline_stops_without_warning_on_holiday(monkeypatch):
+    """휴장은 정상 상태다 — 경고를 보내지 않는다."""
+    from src.pipeline import orchestrator
+
+    _stub_workers(monkeypatch)
+    sent = []
+    monkeypatch.setattr(orchestrator, '_notify_holiday_check_failed',
+                        lambda ctx: sent.append(ctx.today_str))
+    monkeypatch.setattr(PipelineContext, 'is_trading_day', lambda self: False)
+
+    orchestrator.run_pipeline(ctx_at(datetime(2026, 7, 17, 10, 0)))
+
+    assert sent == []
+
+
+def test_warning_bypasses_should_notify(monkeypatch):
+    """경고는 should_notify()의 정각 제한을 타지 않는다.
+
+    15/30/45분 런에서 침묵하면 장애를 놓친다.
+    """
+    from src.pipeline import orchestrator
+
+    monkeypatch.setattr(PipelineContext, 'should_notify',
+                        lambda self: (_ for _ in ()).throw(
+                            AssertionError("경고는 should_notify를 호출하면 안 된다")))
+
+    messages = []
+
+    class _FakeTelegram:
+        def send_message(self, text, parse_mode="HTML"):
+            messages.append(text)
+            return True
+
+    monkeypatch.setattr('src.telegram_manager.TelegramManager',
+                        lambda *a, **k: _FakeTelegram())
+
+    ctx = ctx_at(datetime(2026, 7, 20, 10, 45))   # 정각이 아닌 런
+    orchestrator._notify_holiday_check_failed(ctx)
+
+    assert len(messages) == 1
+    assert '휴장 판정 실패' in messages[0]
+    assert 'FORCE_RUN' in messages[0] or 'force_run' in messages[0]

@@ -32,6 +32,25 @@ def active_only(items: list) -> list:
     return [x for x in items if _status_of(x) == '활성']
 
 
+def _notify_holiday_check_failed(ctx: PipelineContext) -> None:
+    """거래일 판정 불가를 알린다.
+
+    should_notify()의 정각(0~2분) 제한을 일부러 우회한다 — 이건 리포트가
+    아니라 "봇이 멈췄다"는 장애 신호이고, 15/30/45분 런에서 침묵하면
+    장애를 놓친다.
+    """
+    try:
+        from src.telegram_manager import TelegramManager
+        TelegramManager().send_message(
+            f"⚠️ <b>휴장 판정 실패</b>\n\n"
+            f"{ctx.today_display} — 거래일 여부를 확인하지 못해 봇을 정지했습니다.\n"
+            f"KIS chk-holiday 조회에 실패했습니다.\n\n"
+            f"수동 실행: scraper.yml → Run workflow → FORCE_RUN=true"
+        )
+    except Exception as e:
+        ctx.log(f"[경고] 판정 실패 알림 발송에 실패했습니다: {e}")
+
+
 def run_pipeline(ctx: PipelineContext) -> None:
     """
     StockBot 메인 파이프라인을 실행합니다.
@@ -44,7 +63,14 @@ def run_pipeline(ctx: PipelineContext) -> None:
     ctx.log("=" * 50)
 
     # ── 휴장일 체크 ──────────────────────────────────────────
-    if not ctx.is_trading_day():
+    # is_trading_day()는 3값이다. None(판정 불가)을 휴장과 뭉뚱그리면
+    # 조용히 멈추고, True로 폴백하면 휴장일에 돈다. 둘 다 갈라서 처리한다.
+    trading = ctx.is_trading_day()
+    if trading is None:
+        ctx.log(f"[중단] 거래일 여부를 판정할 수 없습니다({ctx.today_display}).")
+        _notify_holiday_check_failed(ctx)
+        return
+    if not trading:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 파이프라인을 종료합니다.")
         return
 

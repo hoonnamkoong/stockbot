@@ -201,3 +201,52 @@ def test_warning_bypasses_should_notify(monkeypatch):
     assert len(messages) == 1
     assert '휴장 판정 실패' in messages[0]
     assert 'FORCE_RUN' in messages[0] or 'force_run' in messages[0]
+
+
+def test_warning_includes_real_buy_risk_disclosure(monkeypatch):
+    """경고가 '수동 실행하라'고만 하면, KIS 점검으로 판정 불가일 때
+
+    운영자가 실제 휴장일에도 그대로 실행해 실매수가 나갈 수 있다.
+    경고문에 실매수 위험 고지가 반드시 포함돼야 한다.
+    """
+    from src.pipeline import orchestrator
+
+    messages = []
+
+    class _FakeTelegram:
+        def send_message(self, text, parse_mode="HTML"):
+            messages.append(text)
+            return True
+
+    monkeypatch.setattr('src.telegram_manager.TelegramManager',
+                        lambda *a, **k: _FakeTelegram())
+
+    ctx = ctx_at(datetime(2026, 7, 20, 10, 45))
+    orchestrator._notify_holiday_check_failed(ctx)
+
+    assert len(messages) == 1
+    assert '실매수' in messages[0]
+    assert '휴장일이 아님을' in messages[0] or '휴장일이 아닌지' in messages[0]
+
+
+def test_warning_send_failure_is_logged(monkeypatch):
+    """send_message가 False를 반환하면(예: 텔레그램 자격증명 없음) 조용히
+
+    사라지지 않고 ctx.log에 남아야 한다.
+    """
+    from src.pipeline import orchestrator
+
+    class _FailingTelegram:
+        def send_message(self, text, parse_mode="HTML"):
+            return False
+
+    monkeypatch.setattr('src.telegram_manager.TelegramManager',
+                        lambda *a, **k: _FailingTelegram())
+
+    logs = []
+    ctx = ctx_at(datetime(2026, 7, 20, 10, 45))
+    ctx.log = lambda msg: logs.append(msg)
+
+    orchestrator._notify_holiday_check_failed(ctx)
+
+    assert any('발송에 실패' in m for m in logs)

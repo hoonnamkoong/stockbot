@@ -41,12 +41,16 @@ def _notify_holiday_check_failed(ctx: PipelineContext) -> None:
     """
     try:
         from src.telegram_manager import TelegramManager
-        TelegramManager().send_message(
+        sent = TelegramManager().send_message(
             f"⚠️ <b>휴장 판정 실패</b>\n\n"
             f"{ctx.today_display} — 거래일 여부를 확인하지 못해 봇을 정지했습니다.\n"
             f"KIS chk-holiday 조회에 실패했습니다.\n\n"
-            f"수동 실행: scraper.yml → Run workflow → FORCE_RUN=true"
+            f"수동 실행: scraper.yml → Run workflow → force_run 체크\n"
+            f"⚠️ <b>먼저 오늘이 휴장일이 아님을 직접 확인한 뒤에만 사용하세요.</b>\n"
+            f"이 옵션은 휴장일 게이트를 완전히 우회하며, 켜면 실매수 주문이 나갑니다."
         )
+        if not sent:
+            ctx.log("[경고] 판정 실패 알림 발송에 실패했습니다: send_message가 False를 반환했습니다.")
     except Exception as e:
         ctx.log(f"[경고] 판정 실패 알림 발송에 실패했습니다: {e}")
 

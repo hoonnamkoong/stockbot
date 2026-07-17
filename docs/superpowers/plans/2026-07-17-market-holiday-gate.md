@@ -1021,14 +1021,17 @@ Expected: 전부 PASS. 실패가 있으면 이번 변경과 무관한 기존 실
 
 Run: `grep -rn "import holidays\|from holidays" src/ scripts/`
 
-Expected: 아래 **두 곳만** 남는다. 둘 다 이번 스코프 밖이며 **손대지 않는다.**
+Expected: **`src/analyzer_5days.py:12` 한 곳만** 매치한다. 이번 스코프 밖이며 **손대지 않는다.**
 
-| 위치 | 왜 남기나 |
-|---|---|
-| `src/analyzer_5days.py:12` | `get_recent_working_days()`가 `holidays.KR()`로 5영업일 계산. 같은 결함(2026-07-17을 영업일로 봄)이 있지만 **스크래퍼 런타임 import 체인에 없고** `analyze_cumulative()`는 파이프라인 어디서도 호출되지 않는다 (import 그래프 추적 + grep 확인). 별도 이슈. |
-| `scripts/scraper_legacy_v49.py:42-43` | V49 시절 죽은 레거시. 2026년 공휴일 하드코딩 리스트(`07-17` 없음). 현재 파이프라인이 import하지 않는다. |
+`get_recent_working_days()`가 `holidays.KR()`로 5영업일을 계산해 같은 결함(2026-07-17을 영업일로
+봄)을 갖지만, **스크래퍼 런타임 import 체인에 없고** `analyze_cumulative()`는 파이프라인
+어디서도 호출되지 않는다 (import 그래프 추적 + grep 확인). 별도 이슈다.
 
 `src/pipeline/context.py`와 `scripts/requirements-scraper.txt`에서는 매치가 **없어야** 한다.
+
+**`scripts/scraper_legacy_v49.py:42-43`은 이 패턴에 걸리지 않는다** — `import`가 아니라
+`holidays_2026`이라는 로컬 변수에 2026년 공휴일을 하드코딩한 리스트다(`07-17` 없음, 같은 종류의
+결함). V49 시절 죽은 레거시로 현재 파이프라인이 import하지 않으므로 역시 손대지 않는다.
 
 `scripts/requirements.txt`(스크래퍼용이 아닌 별도 파일)의 `holidays==0.86` 핀도
 `analyzer_5days.py`가 쓰므로 **그대로 둔다** — 여기서 빼면 그 모듈이 ImportError로 죽는다.

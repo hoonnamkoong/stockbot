@@ -38,7 +38,7 @@ jobs:
         run: python scripts/token_manager.py
 
       # 토큰이 발급된 직후에만 달력을 받을 수 있다 (chk-holiday도 토큰이 필요).
-      # 달력은 3개월치라, 이 런이 하루 실패해도 이전 저장분에 오늘이 들어있다.
+      # 달력은 여러 날치(실측 24일)라, 이 런이 하루 실패해도 이전 저장분에 오늘이 들어있다.
       - name: Update market calendar
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}

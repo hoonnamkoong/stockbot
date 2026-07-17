@@ -11,6 +11,8 @@ on:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -34,3 +36,26 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           FORCE_TOKEN_REFRESH: 'true'
         run: python scripts/token_manager.py
+
+      # 토큰이 발급된 직후에만 달력을 받을 수 있다 (chk-holiday도 토큰이 필요).
+      # 달력은 3개월치라, 이 런이 하루 실패해도 이전 저장분에 오늘이 들어있다.
+      - name: Update market calendar
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+        run: PYTHONPATH=. python scripts/update_market_calendar.py
+
+      # 달력은 자격증명이 아니므로 public db-data에 둔다.
+      # 스크래퍼가 시작 시 `git checkout db-data -- data/`로 읽어간다.
+      - name: Deploy calendar to db-data
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git clone --branch db-data --depth 1 \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo
+          mkdir -p db_data_repo/data
+          cp data/market_calendar.json db_data_repo/data/
+          cd db_data_repo
+          git add data/market_calendar.json
+          git diff --staged --quiet || git commit -m "chore(calendar): 개장일 달력 갱신 [skip ci]"
+          git push origin db-data

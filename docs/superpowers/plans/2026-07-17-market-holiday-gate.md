@@ -183,11 +183,15 @@ API 호출과 파일 저장을 붙인다.
 **Interfaces:**
 - Consumes: `parse_calendar(api_response: dict) -> dict[str, str]` (Task 1)
 - Produces:
-  - `fetch_calendar(access_token: str, app_key: str, app_secret: str, base_date: str) -> dict[str, str]` — 실패 시 `RuntimeError`
+  - `fetch_calendar(access_token: str, app_key: str, app_secret: str, base_date: str) -> dict[str, str]`
+    — **실패 시 예외.** `rt_cd != '0'`과 빈 달력은 `RuntimeError`, HTTP·타임아웃·연결
+    오류는 `requests` 예외(`HTTPError` 등), 본문이 JSON이 아니면 `JSONDecodeError`가
+    그대로 전파된다. 호출부는 예외 **클래스를 좁혀 잡지 말 것** — `except Exception`으로
+    받아 판정 불가(`None`)로 귀결시킨다 (Task 3이 그렇게 한다).
   - `load_calendar(path: str = CALENDAR_PATH) -> dict[str, str]` — 실패 시 `{}`
   - `save_calendar(days: dict, path: str = CALENDAR_PATH) -> None`
   - `load_access_token(path: str = TOKEN_CACHE_PATH) -> str | None`
-  - `refresh_calendar(base_date: str) -> dict[str, str]` — 조회+저장. 실패 시 `RuntimeError`
+  - `refresh_calendar(base_date: str) -> dict[str, str]` — 조회+저장. 실패 시 예외(위와 동일)
   - 상수 `CALENDAR_PATH = 'data/market_calendar.json'`
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**

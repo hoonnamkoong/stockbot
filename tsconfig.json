@@ -38,6 +38,7 @@
     "exclude": [
         "node_modules",
         "frontend",
-        "_legacy_backups"
+        "_legacy_backups",
+        "**/*.test.ts"
     ]
 }

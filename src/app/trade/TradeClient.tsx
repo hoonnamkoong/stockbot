@@ -98,6 +98,11 @@ function TradeContent() {
     const [programTurn, setProgramTurn] = useState<ProgramTurn | null>(null);
     const [programLastTurn, setProgramLastTurn] = useState<LastTurnResult | null>(null);
 
+    // 시뮬레이터 리셋
+    const [resetCash, setResetCash] = useState<number | ''>(3000000);
+    const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+    const [resetBusy, setResetBusy] = useState(false);
+
     const pinContainerRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
 
@@ -347,6 +352,29 @@ function TradeContent() {
         fetchHistory();
         setOrderLoading(false);
         setBulkActionType(null);
+    };
+
+    const handleReset = async () => {
+        if (typeof resetCash !== 'number' || !Number.isInteger(resetCash) || resetCash < 100000 || resetCash > 1000000000) {
+            showNotify('리셋 불가', '예수금은 10만 ~ 10억 사이 정수여야 합니다.', 'red');
+            setResetConfirmOpen(false);
+            return;
+        }
+        setResetBusy(true);
+        try {
+            const res = await fetch('/api/simulation/reset', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cash: resetCash }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+            showNotify('리셋 완료', `${data.sims.length}개 시뮬레이터를 ${resetCash.toLocaleString()}원으로 초기화했습니다. 대시보드 반영까지 잠시 걸릴 수 있습니다.`, 'green');
+        } catch (e: any) {
+            showNotify('리셋 실패', e?.message ?? String(e), 'red');
+        } finally {
+            setResetBusy(false);
+            setResetConfirmOpen(false);
+        }
     };
 
     const cancelReservation = async (id: string) => {
@@ -770,6 +798,24 @@ function TradeContent() {
                     <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>8-Track 지능형 시뮬레이션</Title>
                     <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
                 </Group>
+                <Paper p="sm" withBorder radius="md" style={{ background: 'var(--mantine-color-red-0)' }}>
+                    <Group justify="space-between" wrap="wrap" gap="sm">
+                        <Text size="sm" fw={700} c="red">시뮬레이터 리셋</Text>
+                        <Group gap="sm" wrap="wrap">
+                            <NumberInput
+                                size="xs" w={160}
+                                placeholder="예수금(원)"
+                                value={resetCash}
+                                onChange={(v) => setResetCash(typeof v === 'number' ? v : '')}
+                                min={100000} max={1000000000} step={100000} thousandSeparator=","
+                                disabled={resetBusy}
+                            />
+                            <Button color="red" size="xs" onClick={() => setResetConfirmOpen(true)} disabled={resetBusy} loading={resetBusy}>
+                                전체 리셋
+                            </Button>
+                        </Group>
+                    </Group>
+                </Paper>
                 <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
                     {simConfigs.map((sim) => {
                         const stats = geminiBalance[sim.key]?.raw || {};
@@ -931,6 +977,20 @@ function TradeContent() {
                     <Group mt="md">
                         <Button variant="default" onClick={() => setPinModalOpen(false)}>취소</Button>
                         <Button color="blue" onClick={bulkActionType ? confirmBulkOrder : confirmOrder} disabled={pin.length !== 4}>확인</Button>
+                    </Group>
+                </Stack>
+            </Modal>
+
+            <Modal opened={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} title="정말 초기화할까요?" centered zIndex={2000}>
+                <Stack>
+                    <Text size="sm">
+                        9개 시뮬레이터(Sim1~7, Sim10)를{' '}
+                        <b>{typeof resetCash === 'number' ? resetCash.toLocaleString() : '-'}원</b>으로 초기화하고
+                        모든 거래기록을 삭제합니다. <b style={{ color: '#fa5252' }}>되돌릴 수 없습니다.</b>
+                    </Text>
+                    <Group justify="flex-end">
+                        <Button variant="default" onClick={() => setResetConfirmOpen(false)} disabled={resetBusy}>취소</Button>
+                        <Button color="red" onClick={handleReset} disabled={resetBusy} loading={resetBusy}>초기화</Button>
                     </Group>
                 </Stack>
             </Modal>

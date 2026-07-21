@@ -224,14 +224,15 @@ class DataFetcherWorker(BaseWorker):
                 details['current_price'] = int(data_rows[0][1].get_text().replace(',', '').strip() or 0)
 
                 # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
-                sparkline = []
-                for r in data_rows[:5]:
+                # [Sim5] range_history: 최근 20영업일 종가 (채널 산출용). 동일 페이지라 추가 콜 0.
+                closes = []
+                for r in data_rows[:20]:
                     try:
-                        price_str = r[1].get_text().replace(',', '').strip()
-                        sparkline.append(int(price_str))
+                        closes.append(int(r[1].get_text().replace(',', '').strip()))
                     except:
                         pass
-                details['sparkline_price'] = sparkline[::-1]
+                details['sparkline_price'] = closes[:5][::-1]
+                details['range_history'] = closes[::-1]
         except Exception as e:
             print(f"   [DataFetcher] 외인비중 수집 실패 {code}: {e}")
 

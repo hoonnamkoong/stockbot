@@ -111,6 +111,7 @@ def build_candidates(stocks, prices, day_idx):
             'consecutive_days':    1,
             'sentiment':           '',
             'sparkline_price':     sparkline,
+            'range_history':       sparkline,
         })
     return candidates
 

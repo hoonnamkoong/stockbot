@@ -4,12 +4,13 @@ import os
 from .base_simulator import BaseSimulator, get_kst_now
 from .sim4_bull_daytrading import decide_bull_daytrade
 from .sim5_sideways_swing import decide_sideways
+from .sim6_bear_hedge import decide_sim6, INVERSE_UNIVERSE
 
 
 class Sim10OrchestratorSimulator(BaseSimulator):
     """[Sim 10] 메타-얼로케이터 — Sim0 국면에 따라 검증된 하위 전략 로직을 자기 자본으로 실행.
 
-    BULL → Sim4-1(단타), SIDEWAYS → Sim5(눌림목), BEAR → 현금(전량 청산).
+    BULL → Sim4-1(단타), SIDEWAYS → Sim5(눌림목), BEAR → Sim6(인버스 ETF 추세추종).
     자체 종목 선정을 하지 않는다. 300만원 독립 운용.
     """
 
@@ -26,7 +27,7 @@ class Sim10OrchestratorSimulator(BaseSimulator):
             return "SIDEWAYS", 50.0
 
     def get_universe(self):
-        """국면 연동 유니버스. BULL은 Sim4-1과 동일(KIS 등락률 상위 30), 그 외 공통 버즈."""
+        """국면 연동 유니버스. BULL=KIS 등락률 상위 30, BEAR=인버스 ETF 고정, SIDEWAYS=공통 버즈."""
         regime, _ = self._read_regime()
         if regime == "BULL":
             try:
@@ -34,6 +35,8 @@ class Sim10OrchestratorSimulator(BaseSimulator):
                 return KISDataProvider().get_fluctuation_rank(market='0001', sort='0', limit=30)
             except Exception:
                 return None
+        if regime == "BEAR":
+            return [dict(e) for e in INVERSE_UNIVERSE]
         return None
 
     def _log_regime(self, regime, bull_score):
@@ -58,12 +61,16 @@ class Sim10OrchestratorSimulator(BaseSimulator):
             orders = decide_bull_daytrade(self._view(), candidates, current_prices)
         elif regime == "SIDEWAYS":
             orders = decide_sideways(self._view(), candidates, current_prices)
-        else:  # BEAR: 전량 청산 + 신규매수 없음
-            orders = [{'action': 'SELL', 'code': code, 'price': current_prices.get(code, 0),
-                       'quantity': None, 'reason': "[Sim10-BEAR] 현금 보유 전량 청산",
-                       'cooldown': 1, 'mark_partial': False}
-                      for code in list(self.state["portfolio"].keys())
-                      if current_prices.get(code, 0) > 0]
+        else:  # BEAR: 인버스 ETF 추세추종 + 직전 국면 잔여 보유 청산
+            orders = decide_sim6(self._view(), candidates, current_prices)
+            inverse_codes = {e['code'] for e in INVERSE_UNIVERSE}
+            for code in list(self.state["portfolio"].keys()):
+                if code in inverse_codes:
+                    continue
+                px = current_prices.get(code, 0)
+                if px > 0 and not any(o['code'] == code for o in orders):
+                    orders.append({'action': 'SELL', 'code': code, 'price': px, 'quantity': None,
+                                   'reason': "[Sim10-BEAR] 국면전환 잔여 청산", 'cooldown': 1, 'mark_partial': False})
 
         self._apply(orders, current_prices)
         self._log_regime(regime, bull_score)

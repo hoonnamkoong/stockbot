@@ -16,7 +16,7 @@
 REGIME_TAG = {
     'BULL': 'sim4_bull_daytrading',
     'SIDEWAYS': 'sim5_sideways',
-    'BEAR': 'cash',
+    'BEAR': 'sim6',
 }
 
 

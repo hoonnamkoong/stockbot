@@ -1,7 +1,9 @@
 import pytest
 from src.strategy.simulators.sim0_libero import (
     calculate_kospi_trend, normalize_foreigner_score,
-    calculate_decline_ratio, collect_signals, ensemble_breadth
+    calculate_decline_ratio, collect_signals, ensemble_breadth,
+    score_saturation, score_volatility, score_input_agreement,
+    score_timeframe, calculate_confidence
 )
 
 
@@ -152,3 +154,115 @@ class TestEnsembleBreadth:
         result = ensemble_breadth(signals_zero)
         assert result == 0
         assert 0 <= result <= 100
+
+
+class TestScoreSaturation:
+    def test_score_saturation_saturation(self):
+        """포화 상태 (0점 또는 100점 근처)"""
+        assert score_saturation(5.0) == 0.2   # 5점 = 포화
+        assert score_saturation(95.0) == 0.2  # 95점 = 포화
+
+    def test_score_saturation_extreme(self):
+        """극단값 (포화는 아니지만 극좌표)"""
+        assert score_saturation(15.0) == 0.5  # 15점 = 극단
+        assert score_saturation(85.0) == 0.5  # 85점 = 극단
+
+    def test_score_saturation_normal(self):
+        """정상 범위"""
+        assert score_saturation(50.0) == 0.9  # 50점 = 정상
+        assert score_saturation(30.0) == 0.9
+
+    def test_score_saturation_boundaries(self):
+        """경계값 정확성 (0.1/0.2/0.8/0.9 정규화 경계)"""
+        assert score_saturation(10.0) == 0.5  # 정규화 0.1 = 극단 경계
+        assert score_saturation(90.0) == 0.5  # 정규화 0.9 = 극단 경계
+        assert score_saturation(20.0) == 0.5  # 정규화 0.2 = 극단 경계
+        assert score_saturation(80.0) == 0.5  # 정규화 0.8 = 극단 경계
+
+    def test_score_saturation_boundary(self):
+        """포화 경계값 정확성 검증 (0.2 / 0.5 / 0.9 경계)"""
+        # 정확히 경계값일 때
+        assert score_saturation(10.0) == 0.5   # 0.1 정확히 = 0.5(극단)
+        assert score_saturation(20.0) == 0.5   # 0.2 정확히 = 0.5(극단)
+        assert score_saturation(80.0) == 0.5   # 0.8 정확히 = 0.5(극단)
+        assert score_saturation(90.0) == 0.5   # 0.9 정확히 = 0.5(극단)
+
+        # 경계 바로 안쪽
+        assert score_saturation(21.0) == 0.9   # 0.21 > 0.2 = 0.9(정상)
+        assert score_saturation(79.0) == 0.9   # 0.79 < 0.8 = 0.9(정상)
+
+
+class TestScoreVolatility:
+    def test_score_volatility_high(self):
+        """높은 진동 (std > 25)"""
+        recent = [{'breadth': 20}, {'breadth': 80}, {'breadth': 30}]
+        score = score_volatility(recent)
+        assert score == 0.3
+
+    def test_score_volatility_low(self):
+        """낮은 진동 (std < 15)"""
+        recent = [{'breadth': 50}, {'breadth': 52}, {'breadth': 51}]
+        score = score_volatility(recent)
+        assert score == 0.9
+
+
+class TestScoreInputAgreement:
+    def test_score_input_agreement_all_bull(self):
+        """모든 신호 상승"""
+        signals = {
+            'breadth': 70,
+            'kospi_trend': 20,
+            'foreigner_score': 80,
+            'decline_ratio': 30
+        }
+        score = score_input_agreement(signals)
+        assert score == 0.9
+
+    def test_score_input_agreement_half(self):
+        """50% 일치"""
+        signals = {
+            'breadth': 70,
+            'kospi_trend': 20,
+            'foreigner_score': 30,  # < 50 (하락 신호)
+            'decline_ratio': 70     # >= 50 (하락 신호)
+        }
+        score = score_input_agreement(signals)
+        assert score == 0.5
+
+
+class TestScoreTimeframe:
+    def test_score_timeframe_progression(self):
+        """시간 경과에 따른 증가"""
+        assert score_timeframe('09:00') == 0.5
+        assert score_timeframe('12:00') == 0.7
+        assert score_timeframe('15:00') == 0.9
+
+
+class TestCalculateConfidence:
+    def test_calculate_confidence_normal(self):
+        """일반적인 신뢰도 계산"""
+        signals = {
+            'breadth': 50,
+            'kospi_trend': 0,
+            'foreigner_score': 50,
+            'decline_ratio': 50
+        }
+        recent = [{'breadth': 50}]
+        conf = calculate_confidence(50, recent, '12:00', signals)
+
+        # sat=0.9, vol=0.9(데이터부족), agreement=0.7(decline_ratio=50은 상승신호 아님 → 3개일치),
+        # timeframe=0.7 → 0.9 * (0.6 + 0.2*0.9 + 0.1*0.7 + 0.1*0.7) = 0.9 * 0.92 = 0.828
+        assert 0.8 < conf <= 1.0
+
+    def test_calculate_confidence_extreme(self):
+        """극단 포화 + 높은 진동 → 신뢰도 낮음"""
+        recent = [{'breadth': 10}, {'breadth': 90}]
+        signals = {
+            'breadth': 5,
+            'kospi_trend': -50,
+            'foreigner_score': 10,
+            'decline_ratio': 80
+        }
+        conf = calculate_confidence(5, recent, '09:00', signals)
+        # sat=0.2(포화) * (0.6 + ...) ≤ 0.2 * 1.0 = 0.2
+        assert conf < 0.4

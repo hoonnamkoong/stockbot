@@ -1,3 +1,5 @@
+import statistics
+
 from .base_simulator import BaseSimulator, get_kst_now
 
 
@@ -102,6 +104,127 @@ def ensemble_breadth(signals):
     )
 
     return min(100, max(0, final))
+
+
+def score_saturation(final_breadth):
+    """예측이 극단값인가 (포화 감지)
+
+    Returns: float (0.0 ~ 1.0)
+    - 포화(0~0.1 또는 0.9~1.0 정규화 후): 0.2
+    - 극단값(0.1~0.2 또는 0.8~0.9): 0.5
+    - 정상 범위(0.2~0.8): 0.9
+    """
+    normalized = final_breadth / 100.0
+
+    if normalized < 0.1 or normalized > 0.9:
+        return 0.2
+    elif (0.1 <= normalized <= 0.2) or (0.8 <= normalized <= 0.9):
+        return 0.5
+    else:
+        return 0.9
+
+
+def score_volatility(recent_logs):
+    """최근 3시간 예측 진동 (표준편차)
+
+    Args:
+        recent_logs: list of {'breadth': float} (최근 3시간)
+
+    Returns: float (0.0 ~ 1.0)
+    - 표준편차 > 25: 0.3 (높은 진동)
+    - 표준편차 15~25: 0.6 (중간)
+    - 표준편차 < 15: 0.9 (낮은 진동)
+    """
+    if len(recent_logs) < 2:
+        return 0.9  # 데이터 부족하면 안정적으로 판단
+
+    breadths = [log.get('breadth', 50) for log in recent_logs]
+    std = statistics.stdev(breadths)
+
+    if std > 25:
+        return 0.3
+    elif std >= 15:
+        return 0.6
+    else:
+        return 0.9
+
+
+def score_input_agreement(signals):
+    """4개 신호 일치도 (방향 일치)
+
+    Args:
+        signals: {'breadth': float, 'kospi_trend': float, 'foreigner_score': float, 'decline_ratio': float}
+
+    Returns: float (0.0 ~ 1.0)
+    - 모두 상승/하락 방향 (모두 >= 50 또는 모두 < 50): 0.9
+    - 3개 일치: 0.7
+    - 2개 이하: 0.5
+    """
+    breadth = signals.get('breadth', 50)
+    kospi_trend = signals.get('kospi_trend', 0)
+    foreigner_score = signals.get('foreigner_score', 50)
+    decline_ratio = signals.get('decline_ratio', 50)
+
+    # 상승 신호 카운트 (50 이상은 상승 신호)
+    bullish = sum([
+        breadth >= 50,
+        kospi_trend >= 0,  # kospi_trend는 -100~100 범위에서 0 기준
+        foreigner_score >= 50,
+        decline_ratio < 50  # 낙폭 < 50 = 상승 신호
+    ])
+
+    if bullish == 4 or bullish == 0:  # 모두 일치
+        return 0.9
+    elif bullish == 3 or bullish == 1:  # 3개 일치
+        return 0.7
+    else:  # 2개씩 갈림
+        return 0.5
+
+
+def score_timeframe(current_hour):
+    """시간 경과에 따른 안정도
+
+    Args:
+        current_hour: str ("09:00", "10:00", ... "15:00")
+
+    Returns: float (0.0 ~ 1.0)
+    - 09:00: 0.5 (아침, 불안정)
+    - 10:00~14:00: 선형 증가
+    - 15:00: 0.9 (장 종료, 안정)
+    """
+    hour_map = {
+        '09:00': 0.5,
+        '10:00': 0.6,
+        '11:00': 0.7,
+        '12:00': 0.7,
+        '13:00': 0.8,
+        '14:00': 0.85,
+        '15:00': 0.9,
+    }
+    return hour_map.get(current_hour, 0.7)
+
+
+def calculate_confidence(final_breadth, recent_logs, current_hour, signals):
+    """신뢰도 계산 (포화 최우선)
+
+    confidence = saturation * (0.6 + 0.2*volatility + 0.1*input_agreement + 0.1*timeframe)
+
+    Args:
+        final_breadth: float (0~100)
+        recent_logs: list of {'breadth': float}
+        current_hour: str
+        signals: dict with 4 keys
+
+    Returns: float (0.0 ~ 1.0)
+    """
+    sat = score_saturation(final_breadth)
+    vol = score_volatility(recent_logs)
+    agreement = score_input_agreement(signals)
+    timeframe = score_timeframe(current_hour)
+
+    confidence = sat * (0.6 + 0.2 * vol + 0.1 * agreement + 0.1 * timeframe)
+
+    return min(1.0, max(0.0, confidence))
 
 
 def _median(xs):

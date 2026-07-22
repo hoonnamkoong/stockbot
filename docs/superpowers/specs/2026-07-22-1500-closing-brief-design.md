@@ -103,7 +103,7 @@ if self.ctx.should_notify() and self.ctx.now_kst.hour == 15:
 ## 메시지 형식
 
 ```
-📅 15:00 마감 브리핑  07/22 (화)
+📅 15:00 마감 브리핑  07/22 (수)
 
 💼 실전 계좌 (KIS)
   예수금          1,240,000원

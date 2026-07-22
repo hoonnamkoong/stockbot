@@ -73,6 +73,37 @@ def collect_signals(market_data, kospi_data, foreigner_data):
     }
 
 
+def ensemble_breadth(signals):
+    """4개 신호의 가중평균으로 최종 국면 강도 점수 생성
+
+    final_breadth = 0.5 * breadth + 0.2 * kospi_trend_normalized + 0.2 * foreigner_score + 0.1 * decline_ratio
+
+    Args:
+        signals: {'breadth': float (0-100), 'kospi_trend': float (-100~100),
+                  'foreigner_score': float (0-100), 'decline_ratio': float (0-100)}
+
+    Returns:
+        float (0~100): 최종 breadth 점수
+    """
+    breadth = signals.get('breadth', 50)
+    kospi_trend = signals.get('kospi_trend', 0)
+    foreigner_score = signals.get('foreigner_score', 50)
+    decline_ratio = signals.get('decline_ratio', 50)
+
+    # kospi_trend를 -100~100에서 0~100으로 정규화
+    kospi_normalized = (kospi_trend + 100) / 2
+    kospi_normalized = min(100, max(0, kospi_normalized))
+
+    final = (
+        0.5 * breadth +
+        0.2 * kospi_normalized +
+        0.2 * foreigner_score +
+        0.1 * decline_ratio
+    )
+
+    return min(100, max(0, final))
+
+
 def _median(xs):
     if not xs:
         return 0.0

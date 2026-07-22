@@ -40,7 +40,10 @@ class TelegramManager:
                 print("[TelegramManager] Retrying as Plain Text...")
                 payload.pop('parse_mode', None)
                 try:
-                    requests.post(self.api_base, json=payload, timeout=10)
+                    retry_res = requests.post(self.api_base, json=payload, timeout=10)
+                    # [Fix] raise_for_status 누락 시 401/400 거부도 "성공"으로 보고돼
+                    # 호출부의 발송 실패 감지가 무력화된다 (메시지는 안 갔는데 True).
+                    retry_res.raise_for_status()
                     print("[TelegramManager] Retry successful.")
                     return True
                 except Exception as e2:

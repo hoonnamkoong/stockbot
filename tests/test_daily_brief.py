@@ -202,3 +202,46 @@ def test_brief_only_at_15h_notify_round():
     assert should_send_brief(should_notify=True,  hour=14) is False
     assert should_send_brief(should_notify=True,  hour=9)  is False
     assert should_send_brief(should_notify=False, hour=15) is False
+
+
+# --- 픽스 2: send_message 실패를 발송 완료로 기록하지 않는다 -----------------
+
+import pytest
+from src.pipeline.context import PipelineContext
+from src.pipeline.workers.notifier import NotifierWorker
+
+
+class _FakeTelegram:
+    """실제 TelegramManager 대체용 최소 스텁. send_message 반환값만 통제한다."""
+    def __init__(self, result: bool):
+        self._result = result
+        self.sent_text = None
+
+    def send_message(self, text, parse_mode="HTML"):
+        self.sent_text = text
+        return self._result
+
+
+def _fake_balance():
+    return {'deposit': 0, 'holdings': []}
+
+
+def test_send_daily_brief_raises_when_telegram_send_fails(monkeypatch):
+    """send_message가 False(발송 실패)면 _send_daily_brief는 예외를 던져야 한다
+    (safe_run이 fallback을 타도록). 실패를 '발송 완료'로 로그하면 안 된다."""
+    monkeypatch.setattr('src.trade.balance.get_balance', _fake_balance)
+    worker = NotifierWorker(PipelineContext(), storage=None)
+    worker.tg = _FakeTelegram(result=False)
+
+    with pytest.raises(Exception):
+        worker._send_daily_brief()
+
+
+def test_send_daily_brief_succeeds_when_telegram_send_succeeds(monkeypatch):
+    """send_message가 True면 예외 없이 통과해야 한다."""
+    monkeypatch.setattr('src.trade.balance.get_balance', _fake_balance)
+    worker = NotifierWorker(PipelineContext(), storage=None)
+    worker.tg = _FakeTelegram(result=True)
+
+    worker._send_daily_brief()  # 예외 없이 통과해야 함
+    assert worker.tg.sent_text is not None

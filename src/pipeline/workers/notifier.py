@@ -137,7 +137,9 @@ class NotifierWorker(BaseWorker):
             balance = {'error': f'잔고 조회 예외: {e}', 'holdings': []}
 
         sims = collect_sim_brief('data', self.ctx.now_kst.strftime('%Y-%m-%d'))
-        self.tg.send_message(build_daily_brief(balance, sims, self.ctx.now_kst))
+        sent = self.tg.send_message(build_daily_brief(balance, sims, self.ctx.now_kst))
+        if not sent:
+            raise RuntimeError("마감 브리핑 텔레그램 발송 실패")
         self.log("15:00 마감 브리핑 발송 완료")
 
     def _brief_fallback(self) -> None:

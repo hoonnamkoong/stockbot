@@ -127,3 +127,37 @@ def test_collect_state_without_raw_stats_is_unmeasurable(tmp_path):
     rows = collect_sim_brief(str(tmp_path), '2026-07-22')
     bear = next(r for r in rows if 'Sim 6' in r['label'])
     assert bear['profit_rate'] is None
+
+
+def test_corrupted_state_json_logs_error_and_returns_none(tmp_path, capsys):
+    """손상된 JSON 파일(파싱 실패)이면 stdout에 로그를 남기고 profit_rate는 None."""
+    _write(tmp_path, 'sim_psych_state.json', '{')  # 불완전한 JSON
+    _write(tmp_path, 'trade_history_sim_psych.csv',
+           'timestamp,symbol,action,price,quantity,total_amount,reason\n')
+
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    psych = next(r for r in rows if 'Sim 1' in r['label'])
+
+    # profit_rate은 여전히 None이어야 함 (반환값 계약 유지)
+    assert psych['profit_rate'] is None
+
+    # stdout에 [Brief] 접두로 오류 로그가 있어야 함
+    captured = capsys.readouterr()
+    assert '[Brief]' in captured.out
+    assert 'sim_psych_state.json' in captured.out or '파일' in captured.out or '오류' in captured.out
+
+
+def test_missing_state_json_silent_no_log(tmp_path, capsys):
+    """파일이 없으면(FileNotFoundError) stdout에 아무 로그도 남기지 않음 (정상 상황)."""
+    _write(tmp_path, 'trade_history_sim_psych.csv',
+           'timestamp,symbol,action,price,quantity,total_amount,reason\n')
+
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    psych = next(r for r in rows if 'Sim 1' in r['label'])
+
+    # profit_rate은 None 반환
+    assert psych['profit_rate'] is None
+
+    # stdout에 로그가 없어야 함 (정상이므로)
+    captured = capsys.readouterr()
+    assert '[Brief]' not in captured.out

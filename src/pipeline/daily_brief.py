@@ -85,6 +85,9 @@ def _read_profit_rate(path: str):
 
     재계산하지 않는다. cash+invested로 구하면 invested가 매입원가라서
     대시보드(실시간 시세 평가)와 다른 값이 나온다.
+
+    파일이 없으면(FileNotFoundError) 조용히 None을 반환한다(정상: 아직 상태 파일 없음).
+    다른 예외(파싱 오류, 권한 오류, 인코딩 오류)는 [Brief] 로그를 남기고 None을 반환한다.
     """
     try:
         with open(path, 'r', encoding='utf-8-sig') as f:
@@ -92,7 +95,10 @@ def _read_profit_rate(path: str):
         if not isinstance(raw, dict) or 'profit_rate' not in raw:
             return None
         return float(raw['profit_rate'])
-    except Exception:
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        print(f"[Brief] 상태 파일 읽기 실패: {path} — {type(e).__name__}: {e}")
         return None
 
 
@@ -104,7 +110,10 @@ def _count_today_tickers(path: str, today_str: str) -> int:
                 row['symbol'] for row in csv.DictReader(f)
                 if (row.get('timestamp') or '').startswith(today_str) and row.get('symbol')
             })
-    except Exception:
+    except FileNotFoundError:
+        return 0
+    except Exception as e:
+        print(f"[Brief] 거래이력 읽기 실패: {path} — {type(e).__name__}: {e}")
         return 0
 
 

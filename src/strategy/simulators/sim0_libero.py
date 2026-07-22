@@ -1,6 +1,78 @@
 from .base_simulator import BaseSimulator, get_kst_now
 
 
+def calculate_kospi_trend(kospi_price, kospi_ma5):
+    """KOSPI 추세 = (KOSPI / 5일MA - 1) * 100
+
+    Returns: -100 ~ 100 범위로 클립된 추세값
+    """
+    if kospi_ma5 <= 0:
+        return 0.0
+    trend = ((kospi_price / kospi_ma5) - 1) * 100
+    return min(100, max(-100, trend))
+
+
+def normalize_foreigner_score(foreigner_buy_amount, historical_max=100000000000):
+    """외국인 순매수액을 0~100으로 정규화
+
+    Args:
+        foreigner_buy_amount: 외국인 순매수액 (음수 허용)
+        historical_max: 과거 최대값 기준 (학습 데이터에서 산출)
+
+    Returns: 0 ~ 100 (0 = 최대 매도, 50 = 중립, 100 = 최대 매수)
+    """
+    normalized = (foreigner_buy_amount / historical_max) * 50 + 50
+    return min(100, max(0, normalized))
+
+
+def calculate_decline_ratio(declining_count, rising_count):
+    """낙폭장 비율 = 낙폭종목 / (낙폭 + 상승) * 100
+
+    Returns: 0 ~ 100 (0 = 모두 상승, 100 = 모두 낙폭)
+    """
+    total = declining_count + rising_count
+    if total == 0:
+        return 50.0
+    ratio = (declining_count / total) * 100
+    return ratio
+
+
+def collect_signals(market_data, kospi_data, foreigner_data):
+    """4개 입력 신호 수집
+
+    Args:
+        market_data: {'breadth': float (0-100), 'declining': int, 'rising': int}
+        kospi_data: {'price': float, 'ma5': float}
+        foreigner_data: {'buy_amount': float}
+
+    Returns:
+        {'breadth': float, 'kospi_trend': float, 'foreigner_score': float, 'decline_ratio': float}
+    """
+    breadth = market_data.get('breadth', 50.0)
+    breadth = min(100, max(0, breadth))
+
+    kospi_trend = calculate_kospi_trend(
+        kospi_data.get('price', 0),
+        kospi_data.get('ma5', 1)
+    )
+
+    foreigner_score = normalize_foreigner_score(
+        foreigner_data.get('buy_amount', 0)
+    )
+
+    decline_ratio = calculate_decline_ratio(
+        market_data.get('declining', 0),
+        market_data.get('rising', 1)
+    )
+
+    return {
+        'breadth': breadth,
+        'kospi_trend': kospi_trend,
+        'foreigner_score': foreigner_score,
+        'decline_ratio': decline_ratio
+    }
+
+
 def _median(xs):
     if not xs:
         return 0.0

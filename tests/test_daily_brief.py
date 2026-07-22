@@ -99,9 +99,10 @@ def _write(tmp_path, name, text):
     (tmp_path / name).write_text(text, encoding='utf-8')
 
 
-def test_collect_reads_raw_stats_and_counts_distinct_tickers(tmp_path):
+def test_collect_reads_state_and_counts_distinct_tickers(tmp_path):
+    # cash=2,967,000 / initial_cash=3,000,000, 포트폴리오 없음 → -1.1%
     _write(tmp_path, 'sim_psych_state.json',
-           json.dumps({'raw_stats': {'profit_rate': -1.11}}))
+           json.dumps({'cash': 2_967_000, 'initial_cash': 3_000_000, 'portfolio': {}}))
     _write(tmp_path, 'trade_history_sim_psych.csv',
            'timestamp,symbol,action,price,quantity,total_amount,reason\n'
            '2026-07-22 09:10:00,금호타이어(073240),BUY,6270,47,294690,x\n'
@@ -111,7 +112,7 @@ def test_collect_reads_raw_stats_and_counts_distinct_tickers(tmp_path):
 
     rows = collect_sim_brief(str(tmp_path), '2026-07-22')
     psych = next(r for r in rows if 'Sim 1' in r['label'])
-    assert psych['profit_rate'] == -1.11
+    assert abs(psych['profit_rate'] - (-1.1)) < 1e-9
     assert psych['ticker_count'] == 2   # 같은 종목 2회 = 1종목, 어제 건은 제외
 
 
@@ -122,11 +123,41 @@ def test_collect_missing_files_are_unmeasurable_not_zero(tmp_path):
     assert all(r['ticker_count'] == 0 for r in rows)     # CSV 없음 = 거래 없음
 
 
-def test_collect_state_without_raw_stats_is_unmeasurable(tmp_path):
+def test_collect_state_without_initial_cash_is_unmeasurable(tmp_path):
+    """initial_cash가 없으면 분모를 만들 수 없어 여전히 None (raw_stats 유무는 무관)."""
     _write(tmp_path, 'sim_bear_state.json', json.dumps({'cash': 3000000}))
     rows = collect_sim_brief(str(tmp_path), '2026-07-22')
     bear = next(r for r in rows if 'Sim 6' in r['label'])
     assert bear['profit_rate'] is None
+
+
+def test_collect_state_with_zero_initial_cash_is_unmeasurable(tmp_path):
+    _write(tmp_path, 'sim_bear_state.json',
+           json.dumps({'cash': 0, 'initial_cash': 0, 'portfolio': {}}))
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    bear = next(r for r in rows if 'Sim 6' in r['label'])
+    assert bear['profit_rate'] is None
+
+
+def test_collect_uses_state_initial_cash_as_denominator(tmp_path):
+    """버그 본체: 리셋으로 initial_cash가 5,000,000이 되면 분모도 5,000,000이어야 한다
+    (파이썬 calculate_stats가 생성자 기본값 3,000,000을 계속 쓰던 버그의 회귀 테스트)."""
+    _write(tmp_path, 'sim_bull_state.json',
+           json.dumps({'cash': 4_500_000, 'initial_cash': 5_000_000, 'portfolio': {}}))
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    bull = next(r for r in rows if 'Sim 4)' in r['label'])
+    # (4,500,000 - 5,000,000) / 5,000,000 * 100 = -10.0%
+    # 만약 분모가 옛 버그처럼 3,000,000으로 고정됐다면 -16.67%가 나온다.
+    assert abs(bull['profit_rate'] - (-10.0)) < 1e-9
+
+
+def test_collect_reset_state_is_zero_not_unmeasurable(tmp_path):
+    """리셋 직후(raw_stats 없음, cash==initial_cash, 빈 포트폴리오)는 측정 불가가 아니라 0%."""
+    _write(tmp_path, 'sim_risk_state.json',
+           json.dumps({'cash': 3_000_000, 'initial_cash': 3_000_000, 'portfolio': {}}))
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    risk = next(r for r in rows if 'Sim 3' in r['label'])
+    assert risk['profit_rate'] == 0.0
 
 
 def test_corrupted_state_json_logs_error_and_returns_none(tmp_path, capsys):

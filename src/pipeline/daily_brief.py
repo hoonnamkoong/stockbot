@@ -80,21 +80,39 @@ SIM_BRIEF_TARGETS = [
 ]
 
 
-def _read_profit_rate(path: str):
-    """state의 raw_stats.profit_rate를 읽는다. 없으면 None(=모름).
+def _profit_rate_from_state(path: str):
+    """대시보드(stats/route.ts:34-49)와 동일한 식으로 수익률을 계산한다.
 
-    재계산하지 않는다. cash+invested로 구하면 invested가 매입원가라서
-    대시보드(실시간 시세 평가)와 다른 값이 나온다.
+    raw_stats.profit_rate는 읽지 않는다 — 파이썬 쪽 calculate_stats가
+    initial_cash를 상태 파일에서 되읽지 않아 생성자 기본값(3,000,000)으로
+    고정되는 버그가 있어, 리셋으로 initial_cash를 바꾼 경우 대시보드와
+    분모가 달라진다. 대신 cash/portfolio/initial_cash로 그때그때 재계산해서
+    대시보드와 항상 같은 값을 낸다.
 
+    portfolio 평가액은 raw_stats.current_prices를 우선하고, 없으면 종목별
+    current_price → avg_price → 0 순으로 폴백한다(대시보드 || 체인과 동일 순서).
+
+    initial_cash이 없거나 0 이하이면 분모를 만들 수 없으므로 None(=모름).
     파일이 없으면(FileNotFoundError) 조용히 None을 반환한다(정상: 아직 상태 파일 없음).
     다른 예외(파싱 오류, 권한 오류, 인코딩 오류)는 [Brief] 로그를 남기고 None을 반환한다.
     """
     try:
         with open(path, 'r', encoding='utf-8-sig') as f:
-            raw = json.load(f).get('raw_stats')
-        if not isinstance(raw, dict) or 'profit_rate' not in raw:
+            state = json.load(f)
+
+        initial_cash = state.get('initial_cash')
+        if not initial_cash or initial_cash <= 0:
             return None
-        return float(raw['profit_rate'])
+
+        current_prices = (state.get('raw_stats') or {}).get('current_prices') or {}
+        portfolio_value = 0
+        for code, item in (state.get('portfolio') or {}).items():
+            price = current_prices.get(code) or item.get('current_price') or item.get('avg_price') or 0
+            qty = item.get('quantity') or item.get('qty') or 0
+            portfolio_value += price * qty
+
+        total_asset = (state.get('cash') or 0) + portfolio_value
+        return (total_asset - initial_cash) / initial_cash * 100
     except FileNotFoundError:
         return None
     except Exception as e:
@@ -122,7 +140,7 @@ def collect_sim_brief(data_dir: str, today_str: str) -> list[dict]:
     return [
         {
             'label': label,
-            'profit_rate': _read_profit_rate(os.path.join(data_dir, state_file)),
+            'profit_rate': _profit_rate_from_state(os.path.join(data_dir, state_file)),
             'ticker_count': _count_today_tickers(os.path.join(data_dir, csv_file), today_str),
         }
         for label, state_file, csv_file in SIM_BRIEF_TARGETS

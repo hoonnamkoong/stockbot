@@ -144,7 +144,7 @@ def test_corrupted_state_json_logs_error_and_returns_none(tmp_path, capsys):
     # stdout에 [Brief] 접두로 오류 로그가 있어야 함
     captured = capsys.readouterr()
     assert '[Brief]' in captured.out
-    assert 'sim_psych_state.json' in captured.out or '파일' in captured.out or '오류' in captured.out
+    assert 'sim_psych_state.json' in captured.out
 
 
 def test_missing_state_json_silent_no_log(tmp_path, capsys):

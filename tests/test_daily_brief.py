@@ -81,3 +81,49 @@ def test_brief_sim_without_raw_stats_marked_unmeasurable():
     msg = build_daily_brief(OK_BALANCE, sims, NOW)
     assert '측정 불가' in msg
     assert '하락 줍줍형 (Sim 6)' in msg
+
+
+import json
+from src.pipeline.daily_brief import collect_sim_brief, SIM_BRIEF_TARGETS
+
+
+def test_targets_cover_nine_sims():
+    assert len(SIM_BRIEF_TARGETS) == 9
+    states = [t[1] for t in SIM_BRIEF_TARGETS]
+    assert 'sim_psych_state.json' in states
+    assert 'sim_orchestrator_state.json' in states
+    assert 'sim_libero_state.json' not in states   # 분석기는 제외
+
+
+def _write(tmp_path, name, text):
+    (tmp_path / name).write_text(text, encoding='utf-8')
+
+
+def test_collect_reads_raw_stats_and_counts_distinct_tickers(tmp_path):
+    _write(tmp_path, 'sim_psych_state.json',
+           json.dumps({'raw_stats': {'profit_rate': -1.11}}))
+    _write(tmp_path, 'trade_history_sim_psych.csv',
+           'timestamp,symbol,action,price,quantity,total_amount,reason\n'
+           '2026-07-22 09:10:00,금호타이어(073240),BUY,6270,47,294690,x\n'
+           '2026-07-22 14:10:00,금호타이어(073240),SELL,6400,47,300800,x\n'
+           '2026-07-22 11:00:00,LG디스플레이(034220),BUY,10160,29,294640,x\n'
+           '2026-07-21 11:00:00,대우건설(047040),BUY,14800,19,281200,x\n')
+
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    psych = next(r for r in rows if 'Sim 1' in r['label'])
+    assert psych['profit_rate'] == -1.11
+    assert psych['ticker_count'] == 2   # 같은 종목 2회 = 1종목, 어제 건은 제외
+
+
+def test_collect_missing_files_are_unmeasurable_not_zero(tmp_path):
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    assert len(rows) == 9
+    assert all(r['profit_rate'] is None for r in rows)   # 상태 없음 = 모름
+    assert all(r['ticker_count'] == 0 for r in rows)     # CSV 없음 = 거래 없음
+
+
+def test_collect_state_without_raw_stats_is_unmeasurable(tmp_path):
+    _write(tmp_path, 'sim_bear_state.json', json.dumps({'cash': 3000000}))
+    rows = collect_sim_brief(str(tmp_path), '2026-07-22')
+    bear = next(r for r in rows if 'Sim 6' in r['label'])
+    assert bear['profit_rate'] is None

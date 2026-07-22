@@ -529,3 +529,110 @@ class LiberoSimulator(BaseSimulator):
         self.state['calibration_log'] = log[-90:]
         self.save_state()
         print(f"[Libero] 캘리브레이션: libero={libero_breadth:.1f}% / actual={actual_kospi_breadth:.1f}% / gap={libero_breadth - actual_kospi_breadth:+.1f}%")
+
+
+# ──────────────────────────────────────────────────
+# 상태 JSON 포맷 변경 & 마이그레이션
+# ──────────────────────────────────────────────────
+
+def init_state_v2():
+    """새 상태 JSON 초기화
+
+    Returns:
+        dict: 새 포맷 상태
+    """
+    return {
+        "current_regime": "SIDEWAYS",
+        "confidence": 0.5,
+        "instant_regime": "SIDEWAYS",
+        "hourly_regime_log": [],
+        "calibration_log": []
+    }
+
+
+def _determine_regime_from_breadth(breadth):
+    """breadth에서 국면 판정
+
+    Args:
+        breadth: float (0-100)
+
+    Returns:
+        str: "BULL", "SIDEWAYS", "BEAR"
+    """
+    if breadth >= 60:
+        return "BULL"
+    elif breadth <= 40:
+        return "BEAR"
+    else:
+        return "SIDEWAYS"
+
+
+def load_state_with_migration(state_path):
+    """기존 상태를 새 포맷으로 로드/변환
+
+    기존 필드 유지:
+    - current_regime, confidence (존재하면 그대로)
+    - intraday_score_log → hourly_regime_log 변환
+    - calibration_log (그대로)
+
+    Args:
+        state_path: str - 상태 파일 경로
+
+    Returns:
+        dict: 새 포맷 상태
+    """
+    import json
+    import os
+
+    if not os.path.exists(state_path):
+        return init_state_v2()
+
+    try:
+        with open(state_path, 'r', encoding='utf-8-sig') as f:
+            old_state = json.load(f)
+    except Exception:
+        return init_state_v2()
+
+    # 새 상태 초기화
+    new_state = init_state_v2()
+
+    # 기존 국면, 신뢰도 복사
+    if 'current_regime' in old_state:
+        new_state['current_regime'] = old_state['current_regime']
+    if 'confidence' in old_state:
+        new_state['confidence'] = old_state['confidence']
+
+    # intraday_score_log → hourly_regime_log 변환
+    if 'intraday_score_log' in old_state:
+        for entry in old_state['intraday_score_log']:
+            regime = _determine_regime_from_breadth(entry.get('breadth', 50))
+            new_log_entry = {
+                'hour': entry.get('hour', '09:00'),
+                'regime': regime,
+                'confidence': entry.get('confidence', 0.5),
+                'breadth': entry.get('breadth', 50.0),
+                'inputs': {}  # 기존 데이터는 inputs 없음
+            }
+            new_state['hourly_regime_log'].append(new_log_entry)
+
+    # calibration_log 그대로 복사
+    if 'calibration_log' in old_state:
+        new_state['calibration_log'] = old_state['calibration_log']
+
+    return new_state
+
+
+def save_state_v2(state, state_path):
+    """새 포맷으로 상태 저장
+
+    Args:
+        state: dict - 상태 객체
+        state_path: str - 저장할 파일 경로
+    """
+    import json
+    import os
+
+    os.makedirs(os.path.dirname(state_path), exist_ok=True)
+
+    with open(state_path, 'w', encoding='utf-8') as f:
+        json.dump(state, f, indent=2, ensure_ascii=False)

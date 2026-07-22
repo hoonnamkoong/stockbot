@@ -1,9 +1,13 @@
 import pytest
+import json
+import tempfile
+import os
 from src.strategy.simulators.sim0_libero import (
     calculate_kospi_trend, normalize_foreigner_score,
     calculate_decline_ratio, collect_signals, ensemble_breadth,
     score_saturation, score_volatility, score_input_agreement,
-    score_timeframe, calculate_confidence
+    score_timeframe, calculate_confidence,
+    init_state_v2, load_state_with_migration, save_state_v2
 )
 
 
@@ -266,3 +270,96 @@ class TestCalculateConfidence:
         conf = calculate_confidence(5, recent, '09:00', signals)
         # sat=0.2(포화) * (0.6 + ...) ≤ 0.2 * 1.0 = 0.2
         assert conf < 0.4
+
+
+class TestStateV2Migration:
+    """상태 JSON 포맷 변경 및 마이그레이션 테스트"""
+
+    def test_init_state_v2(self):
+        """새 상태 초기화"""
+        state = init_state_v2()
+        assert state['current_regime'] == 'SIDEWAYS'
+        assert state['confidence'] == 0.5
+        assert isinstance(state['hourly_regime_log'], list)
+        assert isinstance(state['calibration_log'], list)
+        assert len(state['hourly_regime_log']) == 0
+        assert len(state['calibration_log']) == 0
+
+    def test_load_state_nonexistent(self):
+        """없는 파일은 초기 상태 반환"""
+        state = load_state_with_migration('/nonexistent/path/state.json')
+        assert state == init_state_v2()
+
+    def test_load_state_preserves_regime(self):
+        """기존 국면 정보 보존"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({
+                'current_regime': 'BULL',
+                'confidence': 0.8,
+                'intraday_score_log': []
+            }, f)
+            f.flush()
+            temp_path = f.name
+
+        try:
+            state = load_state_with_migration(temp_path)
+            assert state['current_regime'] == 'BULL'
+            assert state['confidence'] == 0.8
+        finally:
+            os.unlink(temp_path)
+
+    def test_load_state_converts_intraday_to_hourly(self):
+        """intraday_score_log → hourly_regime_log 변환 및 국면 판정"""
+        old_log = [
+            {'hour': '09:00', 'breadth': 70.0, 'confidence': 0.7},
+            {'hour': '10:00', 'breadth': 30.0, 'confidence': 0.5}
+        ]
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({'intraday_score_log': old_log}, f)
+            f.flush()
+            temp_path = f.name
+
+        try:
+            state = load_state_with_migration(temp_path)
+            assert len(state['hourly_regime_log']) == 2
+            assert state['hourly_regime_log'][0]['regime'] == 'BULL'
+            assert state['hourly_regime_log'][0]['breadth'] == 70.0
+            assert state['hourly_regime_log'][0]['confidence'] == 0.7
+            assert state['hourly_regime_log'][1]['regime'] == 'BEAR'
+            assert state['hourly_regime_log'][1]['breadth'] == 30.0
+        finally:
+            os.unlink(temp_path)
+
+    def test_save_state_v2_format(self):
+        """저장된 상태가 올바른 포맷"""
+        state = init_state_v2()
+        state['current_regime'] = 'BULL'
+        state['confidence'] = 0.75
+        state['hourly_regime_log'] = [
+            {
+                'hour': '09:00',
+                'regime': 'SIDEWAYS',
+                'confidence': 0.45,
+                'breadth': 25.0,
+                'inputs': {}
+            }
+        ]
+
+        with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as f:
+            temp_path = f.name
+
+        try:
+            save_state_v2(state, temp_path)
+
+            with open(temp_path, 'r', encoding='utf-8') as rf:
+                loaded = json.load(rf)
+
+            assert loaded['current_regime'] == 'BULL'
+            assert loaded['confidence'] == 0.75
+            assert len(loaded['hourly_regime_log']) == 1
+            assert loaded['hourly_regime_log'][0]['hour'] == '09:00'
+            assert loaded['hourly_regime_log'][0]['regime'] == 'SIDEWAYS'
+            assert loaded['hourly_regime_log'][0]['breadth'] == 25.0
+        finally:
+            os.unlink(temp_path)

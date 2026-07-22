@@ -127,3 +127,8 @@ def collect_sim_brief(data_dir: str, today_str: str) -> list[dict]:
         }
         for label, state_file, csv_file in SIM_BRIEF_TARGETS
     ]
+
+
+def should_send_brief(should_notify: bool, hour: int) -> bool:
+    """15시 정각 회차에서만 True. should_notify() 게이트는 건드리지 않는다."""
+    return bool(should_notify) and hour == 15

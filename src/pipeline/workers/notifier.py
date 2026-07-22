@@ -16,6 +16,7 @@ from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData, SyncState
 from src.data.storage_manager import StorageManager
 from src.telegram_manager import TelegramManager
+from src.pipeline.daily_brief import build_daily_brief, collect_sim_brief, should_send_brief
 
 
 class NotifierWorker(BaseWorker):
@@ -53,6 +54,10 @@ class NotifierWorker(BaseWorker):
             )
         else:
             self.log(f"발송 스킵 (이벤트: {self.ctx.github_event}, 분: {self.ctx.start_minute})")
+
+        # 2-1. 15:00 마감 브리핑 (실전 계좌 + 심별 현황)
+        if should_send_brief(self.ctx.should_notify(), self.ctx.now_kst.hour):
+            self.safe_run(self._send_daily_brief, self._brief_fallback)
 
         # 3. reported_codes 상태 업데이트 (현재 수집 종목 추가)
         if self.ctx.should_notify():
@@ -118,6 +123,28 @@ class NotifierWorker(BaseWorker):
             self.tg.send_message(
                 f"[{self.ctx.now_kst.strftime('%m/%d %H:%M')}] 리포트 발송 중 오류\n"
                 f"수집 종목: {len(all_stocks)}개 / 보고 대상: {len(final_picks)}개"
+            )
+        except Exception:
+            pass
+
+    def _send_daily_brief(self) -> None:
+        """15:00 마감 브리핑을 별도 메시지로 발송."""
+        from src.trade.balance import get_balance
+
+        try:
+            balance = get_balance()
+        except Exception as e:
+            balance = {'error': f'잔고 조회 예외: {e}', 'holdings': []}
+
+        sims = collect_sim_brief('data', self.ctx.now_kst.strftime('%Y-%m-%d'))
+        self.tg.send_message(build_daily_brief(balance, sims, self.ctx.now_kst))
+        self.log("15:00 마감 브리핑 발송 완료")
+
+    def _brief_fallback(self) -> None:
+        """브리핑 조립·발송 실패. 숫자를 지어내지 않고 실패만 알린다."""
+        try:
+            self.tg.send_message(
+                f"[{self.ctx.now_kst.strftime('%m/%d %H:%M')}] 마감 브리핑 생성 실패"
             )
         except Exception:
             pass

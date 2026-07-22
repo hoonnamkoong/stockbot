@@ -161,3 +161,13 @@ def test_missing_state_json_silent_no_log(tmp_path, capsys):
     # stdout에 로그가 없어야 함 (정상이므로)
     captured = capsys.readouterr()
     assert '[Brief]' not in captured.out
+
+
+from src.pipeline.daily_brief import should_send_brief
+
+
+def test_brief_only_at_15h_notify_round():
+    assert should_send_brief(should_notify=True,  hour=15) is True
+    assert should_send_brief(should_notify=True,  hour=14) is False
+    assert should_send_brief(should_notify=True,  hour=9)  is False
+    assert should_send_brief(should_notify=False, hour=15) is False

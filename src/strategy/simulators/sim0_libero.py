@@ -636,3 +636,64 @@ def save_state_v2(state, state_path):
 
     with open(state_path, 'w', encoding='utf-8') as f:
         json.dump(state, f, indent=2, ensure_ascii=False)
+
+
+def determine_regime(final_breadth):
+    """3상태 국면 판정
+
+    Args:
+        final_breadth: float (0-100)
+
+    Returns:
+        str: "BULL", "SIDEWAYS", "BEAR"
+    """
+    if final_breadth >= 60:
+        return "BULL"
+    elif final_breadth <= 40:
+        return "BEAR"
+    else:
+        return "SIDEWAYS"
+
+
+def update_hourly(current_hour, state, market_data, kospi_data, foreigner_data):
+    """매시간 갱신
+
+    1. 신호 수집
+    2. 앙상블 계산
+    3. 국면 판정
+    4. 신뢰도 계산
+    5. 로그 추가 (최대 7개)
+    6. current_regime, confidence 갱신
+
+    Args:
+        current_hour: str ("09:00", "10:00", ... "15:00")
+        state: dict - 상태 객체
+        market_data: {'breadth': float (0-100), 'declining': int, 'rising': int}
+        kospi_data: {'price': float, 'ma5': float}
+        foreigner_data: {'buy_amount': float}
+
+    Returns:
+        dict: {'regime': str, 'confidence': float}
+    """
+    signals = collect_signals(market_data, kospi_data, foreigner_data)
+    final_breadth = ensemble_breadth(signals)
+    regime = determine_regime(final_breadth)
+    recent_logs = state.get('hourly_regime_log', [])[-3:]
+    confidence = calculate_confidence(final_breadth, recent_logs, current_hour, signals)
+
+    log_entry = {
+        'hour': current_hour,
+        'regime': regime,
+        'confidence': confidence,
+        'breadth': final_breadth,
+        'inputs': signals
+    }
+    state['hourly_regime_log'].append(log_entry)
+
+    if len(state['hourly_regime_log']) > 7:
+        state['hourly_regime_log'] = state['hourly_regime_log'][-7:]
+
+    state['current_regime'] = regime
+    state['confidence'] = confidence
+
+    return {'regime': regime, 'confidence': confidence}

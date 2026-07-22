@@ -7,7 +7,8 @@ from src.strategy.simulators.sim0_libero import (
     calculate_decline_ratio, collect_signals, ensemble_breadth,
     score_saturation, score_volatility, score_input_agreement,
     score_timeframe, calculate_confidence,
-    init_state_v2, load_state_with_migration, save_state_v2
+    init_state_v2, load_state_with_migration, save_state_v2,
+    determine_regime, update_hourly
 )
 
 
@@ -363,3 +364,56 @@ class TestStateV2Migration:
             assert loaded['hourly_regime_log'][0]['breadth'] == 25.0
         finally:
             os.unlink(temp_path)
+
+
+class TestUpdateHourly:
+    """매시간 갱신 함수 테스트"""
+
+    def test_update_hourly_creates_log(self):
+        """로그 생성 및 상태 갱신 검증"""
+        state = init_state_v2()
+        result = update_hourly(
+            '09:00', state,
+            {'breadth': 75, 'declining': 20, 'rising': 80},
+            {'price': 2500, 'ma5': 2400},
+            {'buy_amount': 50000000000}
+        )
+
+        assert result['regime'] == 'BULL'
+        assert 0 <= result['confidence'] <= 1
+        assert len(state['hourly_regime_log']) == 1
+        assert state['current_regime'] == 'BULL'
+        assert state['hourly_regime_log'][0]['hour'] == '09:00'
+        assert state['hourly_regime_log'][0]['regime'] == 'BULL'
+
+    def test_update_hourly_multiple_calls(self):
+        """여러 시간 갱신"""
+        state = init_state_v2()
+        for i, hour in enumerate(['09:00', '10:00', '11:00']):
+            update_hourly(
+                hour, state,
+                {'breadth': 50 + (i * 10), 'declining': 30, 'rising': 70},
+                {'price': 2500, 'ma5': 2400},
+                {'buy_amount': 50000000000}
+            )
+
+        assert len(state['hourly_regime_log']) == 3
+        assert state['hourly_regime_log'][0]['hour'] == '09:00'
+        assert state['hourly_regime_log'][1]['hour'] == '10:00'
+        assert state['hourly_regime_log'][2]['hour'] == '11:00'
+
+    def test_update_hourly_max_7_entries(self):
+        """최대 7개 로그 유지"""
+        state = init_state_v2()
+        for i in range(10):
+            hour_val = 9 + i // 60
+            min_val = i % 60
+            update_hourly(
+                f'{hour_val:02d}:{min_val:02d}', state,
+                {'breadth': 50, 'declining': 30, 'rising': 70},
+                {'price': 2500, 'ma5': 2400},
+                {'buy_amount': 0}
+            )
+
+        assert len(state['hourly_regime_log']) <= 7
+        assert len(state['hourly_regime_log']) == 7

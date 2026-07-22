@@ -26,6 +26,16 @@ class TestKospiTrend:
         trend = calculate_kospi_trend(0, 2000)
         assert trend == -100
 
+    def test_kospi_trend_zero_ma5(self):
+        """kospi_ma5 = 0일 때 0.0 반환 (0 나눗셈 방지)"""
+        trend = calculate_kospi_trend(2500, 0)
+        assert trend == 0.0
+
+    def test_kospi_trend_negative_clipped(self):
+        """극도 약세(-100%)를 -100으로 클립"""
+        trend_extreme = calculate_kospi_trend(0, 2500)
+        assert trend_extreme == -100
+
 
 class TestForeignerScore:
     def test_foreigner_score_max_buy(self):

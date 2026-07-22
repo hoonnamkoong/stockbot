@@ -9,6 +9,18 @@ from src.trade.auth import get_access_token, load_env
 # [Rule 4.3] KIS API를 통한 계좌 잔고 및 보유 종목 조회를 담당하는 모듈입니다.
 # 실전 및 모의 투자 계좌를 지원하며, 에러 7(조회이후 자료변경) 발생 시의 자동 재시도 로직을 포함합니다.
 
+def _parse_holding(item: dict) -> dict:
+    """KIS inquire-balance output1 한 행을 내부 holdings 형식으로 변환."""
+    return {
+        "code": item.get('pdno'),
+        "name": item.get('prdt_name'),
+        "qty": int(item.get('hldg_qty', 0)),
+        "avg_price": float(item.get('pchs_avg_pric', 0)),   # 매입 평균가
+        "current_price": float(item.get('prpr', 0)),        # 현재가
+        "profit_rate": float(item.get('evlu_pfls_rt', 0)),  # 수익률
+        "pl_amount": int(float(item.get('evlu_pfls_amt', 0) or 0)),  # 평가손익(원)
+    }
+
 def get_balance():
     """
     현재 계좌의 잔고 현황과 보유 종목 리스트를 반환합니다.
@@ -105,14 +117,7 @@ def get_balance():
             for item in output1:
                 # 보유 수량이 있는 종목만 필터링
                 if int(item.get('hldg_qty', 0)) > 0:
-                    holdings.append({
-                        "code": item.get('pdno'),
-                        "name": item.get('prdt_name'),
-                        "qty": int(item.get('hldg_qty', 0)),
-                        "avg_price": float(item.get('pchs_avg_pric', 0)), # 매입 평균가
-                        "current_price": float(item.get('prpr', 0)), # 현재가
-                        "profit_rate": float(item.get('evlu_pfls_rt', 0)) # 수익률
-                    })
+                    holdings.append(_parse_holding(item))
             
             return {
                 "deposit": int(output2.get('dnca_tot_amt', 0)), # 예수금

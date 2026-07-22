@@ -37,11 +37,20 @@ KIS 잔고조회(TTTC8434R) 응답을 쓴다. 대시보드는 같은 데이터�
 
 `get_balance()`가 현재 반환하는 holdings에는 `evlu_pfls_amt`가 없다(수익률 `evlu_pfls_rt`만 있음). 종목별 평가손익을 합산할 수 없으므로 **`pl_amount` 필드를 추가한다.** 이것이 이 작업에서 유일하게 기존 파일에 손대는 부분이다.
 
-### 심별 수익률 — `data/sim_*_state.json`의 `raw_stats.profit_rate`
+### 심별 수익률 — `data/sim_*_state.json`에서 대시보드와 같은 식으로 산출
 
-[`base_simulator.py`](../../../src/strategy/simulators/base_simulator.py) `save_state()`가 매 런마다 `calculate_stats(current_prices)` 결과를 `state['raw_stats']`에 저장한다. `profit_rate = (NAV − initial_cash) / initial_cash × 100`이고 NAV는 실시간 시세로 평가된 값이다. 대시보드의 `/api/simulation/stats`도 이 필드를 그대로 읽는다.
+**대시보드는 상태 파일의 `raw_stats.profit_rate`를 쓰지 않는다.** [`stats/route.ts`](../../../src/app/api/simulation/stats/route.ts)가 live 상태로 다시 계산해 그 필드를 덮어쓴다.
 
-**재계산하지 않는다.** `cash + invested`로 직접 구하면 `invested`가 매입원가라서 대시보드와 다른 값이 나온다.
+```
+portfolio_value = Σ (raw_stats.current_prices[code] or item.current_price or item.avg_price) × item.quantity
+profit_rate     = (state.cash + portfolio_value − state.initial_cash) / state.initial_cash × 100
+```
+
+브리핑도 **이 식을 그대로 쓴다.** `raw_stats.profit_rate`를 읽으면 안 되는 이유는 분모가 어긋나기 때문이다: [`base_simulator.py`](../../../src/strategy/simulators/base_simulator.py) `calculate_stats()`는 분모로 `self.initial_cash`를 쓰는데, `load_state()`가 `setdefault`만 하고 상태 파일의 `initial_cash`를 `self.initial_cash`로 되읽지 않는다. 그래서 파이썬 쪽 분모는 생성자 기본값 300만에 고정된다. 리셋 버튼은 10만~10억을 허용하므로, 300만이 아닌 금액으로 리셋하는 순간 텔레그램과 웹이 다른 수익률을 말하게 된다.
+
+**`cash + invested`로 구하지도 않는다.** `invested`는 매입원가라서 실시간 시세 평가가 되지 않는다.
+
+측정 불가(`None`) 조건: 상태 파일 없음, 파일 읽기 실패, `initial_cash`가 없거나 0 이하(분모를 만들 수 없음).
 
 ### 금일 거래 종목 수 — `data/trade_history_*.csv`
 

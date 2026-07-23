@@ -247,6 +247,16 @@ def _pstdev(xs):
     return (sum((x - mu) ** 2 for x in xs) / len(xs)) ** 0.5
 
 
+def classify_by_score(bull_score, theta_bull, theta_bear):
+    """bull_score(0~100)를 3상태 국면으로 매핑. AND게이트 대체.
+    경계값은 각각 BULL/BEAR에 포함(>=, <=)."""
+    if bull_score >= theta_bull:
+        return "BULL"
+    if bull_score <= theta_bear:
+        return "BEAR"
+    return "SIDEWAYS"
+
+
 class LiberoSimulator(BaseSimulator):
     """
     [Sim 0] 리베로 (Libero) — 시장 국면 감지기 + 전략 추천.

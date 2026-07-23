@@ -22,6 +22,33 @@ def _median(xs):
     return float(s[m]) if n % 2 else (s[m - 1] + s[m]) / 2.0
 
 
+def breadth_from_csv_text(text: str, expected_date: str) -> float | None:
+    """KOSPI top100 CSV 텍스트(행: 'YYYYMMDD,종가,종가,...')의 최근 2행으로
+    전일 대비 상승 종목 비율(%)을 산출한다.
+
+    마지막 행 날짜가 expected_date(YYYYMMDD)와 다르면 CSV가 아직 오늘 종가를
+    반영하지 못한 것(stale) → None을 반환한다. 얼어붙은 값을 정답으로 기록하면
+    채점(calibration)이 오염되므로, '측정 불가'는 0/이전값이 아니라 None이다."""
+    lines = [l for l in text.split('\n') if l.strip()]
+    if len(lines) < 3:  # 헤더 + 데이터 최소 2행
+        return None
+    prev_cols = lines[-2].split(',')
+    curr_cols = lines[-1].split(',')
+    if curr_cols[0].strip() != str(expected_date):
+        return None  # stale: 오늘 종가 미반영 → 정답 없음
+    ups, total = 0, 0
+    for p_str, c_str in zip(prev_cols[1:], curr_cols[1:]):
+        try:
+            p, c = float(p_str.strip()), float(c_str.strip())
+            if p > 0:
+                total += 1
+                if c > p:
+                    ups += 1
+        except ValueError:
+            continue
+    return round(ups / total * 100, 1) if total > 0 else None
+
+
 def _adx(series):
     if len(series) < 2:
         return 0.0
@@ -458,28 +485,16 @@ class TradeEngineWorker(BaseWorker):
         return breadth
 
     def _get_actual_breadth_from_csv(self, csv_path: str = 'output/kospi_top100_close.csv') -> float | None:
-        """KOSPI top100 CSV의 최근 2행으로 오늘 실제 브레드스(상승 종목 비율%) 산출."""
+        """KOSPI top100 CSV의 최근 2행으로 오늘 실제 브레드스(상승 종목 비율%) 산출.
+        CSV 마지막 행이 오늘 날짜가 아니면(stale) None — 얼어붙은 값을 정답으로 쓰지 않는다."""
         try:
             with open(csv_path, 'r', encoding='utf-8-sig') as f:
-                lines = [l for l in f.read().split('\n') if l.strip()]
-            if len(lines) < 3:  # 헤더 + 데이터 최소 2행
-                return None
-            prev_cols = lines[-2].split(',')
-            curr_cols = lines[-1].split(',')
-            ups, total = 0, 0
-            for p_str, c_str in zip(prev_cols[1:], curr_cols[1:]):
-                try:
-                    p, c = float(p_str.strip()), float(c_str.strip())
-                    if p > 0:
-                        total += 1
-                        if c > p:
-                            ups += 1
-                except ValueError:
-                    continue
-            return round(ups / total * 100, 1) if total > 0 else None
+                text = f.read()
         except Exception as e:
             self.log_error(f"KOSPI 브레드스 CSV 산출 실패: {e}")
             return None
+        expected_date = self.ctx.now_kst.strftime('%Y%m%d')
+        return breadth_from_csv_text(text, expected_date)
 
     def _fetch_portfolio_prices(self, codes: list) -> dict:
         """

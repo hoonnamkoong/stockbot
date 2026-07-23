@@ -36,6 +36,7 @@ interface Holding {
 
 interface BalanceData {
     deposit: number;
+    deposit_d2?: number;
     total_asset: number;
     holdings: Holding[];
     error?: string;
@@ -661,7 +662,14 @@ function TradeContent() {
                     <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md" mb="md">
                         <Stack gap={2}>
                             <Text size="xs" c="dimmed">예수금 (잔고)</Text>
-                            <Text fw={700} size="lg">{(Number(deposit) || 0).toLocaleString()} 원</Text>
+                            <Text fw={700} size="lg">
+                                {(Number(deposit) || 0).toLocaleString()} 원
+                                {balance?.deposit_d2 != null && (
+                                    <Text span size="sm" c="dimmed" fw={400}>
+                                        {' '}(D+2 {(Number(balance.deposit_d2) || 0).toLocaleString()} 원)
+                                    </Text>
+                                )}
+                            </Text>
                         </Stack>
                         <Stack gap={2}>
                             <Text size="xs" c="dimmed">총 자산수익률</Text>

@@ -166,7 +166,8 @@ export interface HoldingsItem {
 
 export interface PortfolioData {
     deposit: number;
-    cash?: number; 
+    deposit_d2?: number;  // D+2 예수금 (매도대금 정산 반영, 가수도정산금액)
+    cash?: number;
     total_asset: number;
     holdings: HoldingsItem[] | Record<string, any>;
     trade_log?: any[];
@@ -373,6 +374,7 @@ export async function getRealPortfolio(): Promise<any> {
 
         const portfolio = {
             deposit: parseInt(output2.dnca_tot_amt || '0'),
+            deposit_d2: parseInt(output2.prvs_rcdl_excc_amt || '0'),  // D+2 예수금(가수도정산금액): 매도대금 D+2 편입분 반영
             total_value: parseInt(output2.tot_evlu_amt || '0'),
             total_profit: parseInt(output2.evlu_amt_smtl_amt || '0'),
             profit_rate: parseFloat(output2.evlu_pftd_rt || '0'),

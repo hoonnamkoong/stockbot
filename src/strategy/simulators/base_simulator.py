@@ -481,12 +481,27 @@ class BaseSimulator:
         }
         return {"raw": raw, "normalized": norm, "portfolio": self.state['portfolio']}
 
-    def _view(self):
+    def calc_nav(self, current_prices=None):
+        """사이징 기준 자본 = 현금 + 보유 평가액.
+
+        분모를 initial_cash로 고정하면 수익금이 영구 유휴 현금으로 남고(재투자 불가),
+        손실 후에는 반대로 과투입된다. 시세 조회 실패는 0이 아니라 취득원가로 폴백한다
+        (0 폴백 시 NAV가 꺼져 사이징이 근거 없이 쪼그라듦).
+        """
+        current_prices = current_prices or {}
+        equity = 0
+        for code, item in self.state['portfolio'].items():
+            px = current_prices.get(code) or item.get('avg_price', item.get('price', 0))
+            equity += item['quantity'] * px
+        return self.state['cash'] + equity
+
+    def _view(self, current_prices=None):
         """decide 함수에 넘길 읽기 전용 상태 뷰."""
         return {
             'portfolio': self.state['portfolio'],
             'cash': self.state['cash'],
             'initial_cash': self.initial_cash,
+            'nav': self.calc_nav(current_prices),
             'cooldown_codes': self.state.get('cooldown_codes', {}),
             'market_index_healthy': self.state.get('market_index_healthy', True),
         }

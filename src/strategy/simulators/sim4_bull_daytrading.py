@@ -27,6 +27,7 @@ def _partial_days(p_item, today):   # sim4-1 고유(base에 없음)
 
 
 MAX_HOLDINGS = 6
+POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% 투입)
 
 
 def decide_bull_daytrade(view, candidates, current_prices):
@@ -75,7 +76,7 @@ def decide_bull_daytrade(view, candidates, current_prices):
     # 2. 진입
     if not view['market_index_healthy']:
         return orders
-    target_amount = view['initial_cash'] * 0.15
+    target_amount = view['nav'] * POSITION_WEIGHT
     held = len(portfolio) - len(sold)
     for stock in candidates:
         if held >= MAX_HOLDINGS:
@@ -126,7 +127,7 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_bull_daytrade(self._view(), candidates, current_prices)
+        orders = decide_bull_daytrade(self._view(current_prices), candidates, current_prices)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

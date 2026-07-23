@@ -7,7 +7,8 @@ class BullMomentumSimulator(BaseSimulator):
     - 고유동성 + 강한 기간 모멘텀 종목에 진입해 불타기로 비중 확대.
     - 고정 익절 없음: 트레일링 스탑으로만 청산하여 상승을 끝까지 라이딩.
     """
-    MAX_HOLDINGS = 5
+    MAX_HOLDINGS = 6
+    POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% 투입)
 
     def __init__(self, initial_cash=3000000):
         super().__init__("Bull", initial_cash)
@@ -87,7 +88,7 @@ class BullMomentumSimulator(BaseSimulator):
         if not self.state.get('market_index_healthy', True):
             return self.calculate_stats(current_prices)
 
-        target_amount = self.initial_cash / 8
+        target_amount = self.calc_nav(current_prices) * self.POSITION_WEIGHT
         for stock in candidates:
             if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
             code = stock['code']

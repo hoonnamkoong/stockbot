@@ -9,9 +9,9 @@ class ReportFollowerSimulator(BaseSimulator):
     Stage 3: run()으로 포트폴리오 청산 조건 체크.
     Stage 3.6: buy_from_report()로 신규 매수 신호 처리.
     """
-    MAX_HOLDINGS = 5
+    MAX_HOLDINGS = 6
     WEIGHT_MIN   = 0.10
-    WEIGHT_MAX   = 0.20
+    WEIGHT_MAX   = 0.15  # 0.15 × 6 = 최대 90% 투입
     GATE         = 45.0
 
     def __init__(self, initial_cash=3_000_000):
@@ -72,6 +72,9 @@ class ReportFollowerSimulator(BaseSimulator):
         """
         weight = self._calc_weight(bull_score)
         holdings_count = len(self.state['portfolio'])
+        # 잔여현금 기준으로 사이징하면 매수할수록 분모가 줄어 뒤쪽 픽이 기하급수로 작아진다
+        # (weight 12% 기준 5번째 픽 = 첫 픽의 60%). NAV 기준으로 고정해 픽 간 비중을 균등화.
+        nav = self.calc_nav()
 
         for pick in strong_picks:
             if holdings_count >= self.MAX_HOLDINGS:
@@ -88,7 +91,7 @@ class ReportFollowerSimulator(BaseSimulator):
                 print(f"[Sim7] 이미 보유 중 — 스킵: {name}({code})")
                 continue
 
-            qty = int(self.state['cash'] * weight / price)
+            qty = int(nav * weight / price)
             if qty <= 0:
                 print(f"[Sim7] 현금 부족 — 스킵: {name}({code})")
                 continue

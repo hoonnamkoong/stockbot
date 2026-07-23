@@ -120,7 +120,7 @@ class BearHedgeSimulator(BaseSimulator):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
         if self._read_regime() == "BEAR":
-            orders = decide_sim6(self._view(), candidates, current_prices)
+            orders = decide_sim6(self._view(current_prices), candidates, current_prices)
         else:
             # 비(非)하락장: 인버스 매수 금지 + 보유분 전량 청산(국면 이탈)
             orders = [{'action': 'SELL', 'code': code, 'price': current_prices.get(code, 0),

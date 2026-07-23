@@ -58,11 +58,11 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         self.state["active_bull_score"] = round(bull_score, 1)
 
         if regime == "BULL":
-            orders = decide_bull_daytrade(self._view(), candidates, current_prices)
+            orders = decide_bull_daytrade(self._view(current_prices), candidates, current_prices)
         elif regime == "SIDEWAYS":
-            orders = decide_sideways(self._view(), candidates, current_prices)
+            orders = decide_sideways(self._view(current_prices), candidates, current_prices)
         else:  # BEAR: 인버스 ETF 추세추종 + 직전 국면 잔여 보유 청산
-            orders = decide_sim6(self._view(), candidates, current_prices)
+            orders = decide_sim6(self._view(current_prices), candidates, current_prices)
             inverse_codes = {e['code'] for e in INVERSE_UNIVERSE}
             for code in list(self.state["portfolio"].keys()):
                 if code in inverse_codes:

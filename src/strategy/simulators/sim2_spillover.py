@@ -79,7 +79,7 @@ class SectorSpilloverSimulator(BaseSimulator):
         # 2. 진입 로직 (MFHS2 통합 스코어링 기반 진입)
         if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
         
-        target_amount = self.initial_cash / 10
+        target_amount = self.calc_nav(current_prices) / 10
 
         for stock in candidates:
             code = stock['code']

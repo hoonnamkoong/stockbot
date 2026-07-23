@@ -4,8 +4,8 @@ from datetime import date
 from src.strategy.simulators.sim5_sideways_swing import decide_sideways
 
 
-def _view(portfolio, cash=3_000_000, healthy=True):
-    return {'portfolio': portfolio, 'cash': cash, 'initial_cash': 3_000_000,
+def _view(portfolio, cash=3_000_000, healthy=True, nav=3_000_000):
+    return {'portfolio': portfolio, 'cash': cash, 'initial_cash': 3_000_000, 'nav': nav,
             'cooldown_codes': {}, 'market_index_healthy': healthy}
 
 

@@ -57,7 +57,7 @@ class PsychDivergenceSimulator(BaseSimulator):
         # 2. 진입 로직 (시장 지수 + 유동성 + 심리 괴리)
         if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
 
-        target_amount = self.initial_cash / 10
+        target_amount = self.calc_nav(current_prices) / 10
         for stock in candidates:
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue

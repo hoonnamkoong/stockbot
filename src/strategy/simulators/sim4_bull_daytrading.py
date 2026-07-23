@@ -26,7 +26,7 @@ def _partial_days(p_item, today):   # sim4-1 고유(base에 없음)
         return 0
 
 
-MAX_HOLDINGS = 4
+MAX_HOLDINGS = 6
 
 
 def decide_bull_daytrade(view, candidates, current_prices):
@@ -75,7 +75,7 @@ def decide_bull_daytrade(view, candidates, current_prices):
     # 2. 진입
     if not view['market_index_healthy']:
         return orders
-    target_amount = view['initial_cash'] / 10
+    target_amount = view['initial_cash'] * 0.15
     held = len(portfolio) - len(sold)
     for stock in candidates:
         if held >= MAX_HOLDINGS:

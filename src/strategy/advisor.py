@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 # --- Trade Module Imports ---
 from src.trade.auth import get_access_token, load_env
 from src.trade.balance import get_balance
+from src.data import usage_log
 
 class GeminiAgent:
     """
@@ -68,6 +69,32 @@ class GeminiAgent:
 
     # [V8.6.0] 동적 모델 업데이트 로직 폐기 (Fixed Engine 체제)
 
+    # 배치 호출자가 이 값을 채우면 기록 책임이 그쪽으로 넘어간다. 응답 종목 수는
+    # 파싱을 끝내야 알 수 있어 호출 직후에는 기록할 수 없기 때문이다.
+    # 비어 있으면(리포트 등 단발 호출) _log_usage가 그 자리에서 기록한다.
+    _usage_ctx: dict = {}
+    _last_usage: dict = {}
+
+    def _log_usage(self, model_name, prompt, response):
+        """Gemini 호출 1건을 계측한다.
+
+        SDK가 usage_metadata를 주지 않으면 토큰 칸은 비워 둔다. 0으로 채우면
+        '측정값 0'과 '측정 불가'가 구분되지 않는다. 그 경우를 대비해 프롬프트
+        길이(req_chars)를 항상 함께 남긴다.
+        """
+        um = getattr(response, 'usage_metadata', None)
+        record = {
+            'event': 'batch_call',
+            'model': model_name,
+            'req_chars': len(prompt) if prompt else 0,
+            'prompt_tokens': getattr(um, 'prompt_token_count', '') if um else '',
+            'output_tokens': getattr(um, 'candidates_token_count', '') if um else '',
+            'total_tokens': getattr(um, 'total_token_count', '') if um else '',
+        }
+        GeminiAgent._last_usage = record
+        if not GeminiAgent._usage_ctx:
+            usage_log.append(record)
+
     def _call_gemini_safe(self, prompt, model_type='batch', generation_config=None):
         """
         [V8.6.0 Fail-Fast] 고정 모델 체제. 429 발생 시 즉시 중단 및 블랙리스트 등록
@@ -82,9 +109,11 @@ class GeminiAgent:
             return None
 
         try:
-            return self.client.models.generate_content(
+            response = self.client.models.generate_content(
                 model=target_name, contents=prompt, config=generation_config
             )
+            self._log_usage(target_name, prompt, response)
+            return response
         except Exception as e:
             err_msg = str(e)
             if ("429" in err_msg or "Quota" in err_msg or "ResourceExhausted" in err_msg):
@@ -145,6 +174,11 @@ class GeminiAgent:
                 }}
             ]
             """
+            group_before = len(all_results)
+            GeminiAgent._usage_ctx = {
+                'req_stocks': len(cleaned_batch),
+                'req_posts': sum(len(s.get('posts', [])) for s in group),
+            }
             try:
                 response = self._call_gemini_safe(
                     prompt,
@@ -172,6 +206,16 @@ class GeminiAgent:
                         all_results.update(parsed)
             except Exception as e:
                 print(f"[GeminiAgent] Group Batch 분석 오류: {e}")
+            finally:
+                # 응답 종목 수를 붙여 기록한다. 요청보다 적으면 flash-lite가 긴
+                # JSON 배열에서 종목을 조용히 누락시킨 것이므로, 배치 크기를
+                # 올려도 되는지 판단하려면 이 값이 필요하다.
+                record = dict(GeminiAgent._last_usage)
+                record.update(GeminiAgent._usage_ctx)
+                record['resp_stocks'] = len(all_results) - group_before
+                usage_log.append(record)
+                GeminiAgent._usage_ctx = {}
+                GeminiAgent._last_usage = {}
 
         final_results = {}
         for s in batch_data:

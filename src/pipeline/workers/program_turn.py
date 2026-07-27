@@ -4,10 +4,13 @@
 
 기존 원장의 realized_pnl은 평단(avg_price) 기준으로 누적되며 effective_budget(복리)의
 근거다 — 여기에는 절대 손대지 않는다. 턴 회계는 그와 분리된 별도 트랙으로, 기준가(basis)
-기준으로 집계한다. 기준가는 턴 시작·전략 스위칭 시점에 그 순간 시세로 리셋된다(MTM).
+기준으로 집계한다. 기준가는 턴 시작 시점에 **매입 평단**으로 seed된다(ON 시점 시세로
+리셋하지 않는다). 전략 스위칭 시점에는 직전 태그 구간을 락인하며 기준가를 그 순간 시세로
+리셋한다 — 하지만 seed가 평단이므로 구간 손익의 합은 평단 기준으로 telescoping된다.
 
-이렇게 하면 이전 턴이 만든 미실현 이익이 새 턴 성과로 둔갑하지 않고, 턴별 손익의 합은
-평단 기준 누적 실현손익과 정확히 일치한다.
+이렇게 하면 ON 전부터 보유한 종목도 원래 매입가부터 손익이 계산되어, 턴 손익이 KIS
+종목별 ROI와 정합한다. (이전 턴이 만든 미실현이 실현되는 턴에 온전히 귀속되므로, 구
+MTM-리셋 설계가 지키던 '턴별 손익 합 = 누적 실현손익' 불변식은 더 이상 성립하지 않는다.)
 
 이 모듈은 I/O를 하지 않는다. 원장 dict을 받아 제자리에서 갱신할 뿐이다.
 """
@@ -22,16 +25,13 @@ REGIME_TAG = {
 
 def new_turn(turn_id: str, capital: float, positions: dict,
              opening_basis: dict | None = None, current_prices: dict | None = None) -> dict:
-    """새 턴을 연다. 물려받은 보유 종목의 기준가를 턴 시작 시세로 재설정한다(MTM).
+    """새 턴을 연다. 물려받은 보유 종목의 기준가를 **매입 평단(avg_price)**으로 잡는다.
 
-    기준가 우선순위: opening_basis(프론트가 ON 시점에 찍은 스냅샷) > current_prices > 평단.
+    ON 시점 시세로 리셋(MTM)하지 않는다 — ON 전부터 보유한 종목도 원래 매입가부터 손익을
+    재야 KIS 종목별 ROI와 턴 손익이 정합하기 때문이다. opening_basis/current_prices는 구
+    스냅샷-리셋 방식의 잔재로, 호출부 호환을 위해 시그니처만 남기고 의도적으로 무시한다.
     """
-    opening_basis = opening_basis or {}
-    current_prices = current_prices or {}
-    basis = {}
-    for code, p in positions.items():
-        px = opening_basis.get(code) or current_prices.get(code) or p.get('avg_price', 0)
-        basis[code] = float(px)
+    basis = {code: float(p.get('avg_price', 0)) for code, p in positions.items()}
     return {'id': turn_id, 'capital': float(capital), 'basis': basis,
             'by_tag': {}, 'active_tag': None}
 

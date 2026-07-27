@@ -1,7 +1,9 @@
 """프로그램 매매 턴 회계 순수 함수 테스트.
 
-턴 = 프로그램 ON부터 OFF까지. 기준가(basis)는 턴 시작·스위칭 시점에 MTM 리셋된다.
-핵심 불변식: 모든 턴의 손익 합 = 평단 기준 누적 실현손익.
+턴 = 프로그램 ON부터 OFF까지. 기준가(basis)는 턴 시작 시점에 **매입 평단**으로 seed된다
+(ON 시점 시세로 리셋하지 않는다). 그래서 ON 전부터 보유한 종목도 원래 매입가부터 손익을
+재고, 턴 손익이 KIS 종목별 ROI와 정합한다. 스위칭 시에는 여전히 직전 태그 구간을 락인하고
+기준가를 리셋하지만, seed가 평단이므로 구간 합은 평단 기준으로 telescoping된다.
 """
 
 from src.pipeline.workers.program_turn import (
@@ -16,34 +18,33 @@ def _pos(qty, avg, tag=None):
     return p
 
 
-def test_new_turn_uses_opening_basis_over_current_price():
-    """ON 시점 스냅샷(opening_basis)이 있으면 그것을 기준가로 쓴다."""
+def test_new_turn_uses_avg_price_ignoring_on_snapshot():
+    """(B) 기준가 = 매입 평단. ON 시점 시세 스냅샷(opening_basis/current)은 무시한다.
+
+    턴 손익을 원래 매입가부터 계산해 KIS 종목별 ROI와 정합시키기 위함.
+    """
     positions = {"005930": _pos(10, 3000)}
     turn = new_turn("t1", 1_200_000, positions,
                     opening_basis={"005930": 3500}, current_prices={"005930": 3600})
-    assert turn["basis"]["005930"] == 3500
+    assert turn["basis"]["005930"] == 3000.0        # 평단, ON 시세(3500/3600) 아님
     assert turn["capital"] == 1_200_000
     assert turn["by_tag"] == {}
     assert turn["active_tag"] is None
 
 
-def test_new_turn_falls_back_to_current_price():
-    """opening_basis가 비어 있으면(ON 시 잔고 조회 실패) 현재가로 채운다."""
+def test_new_turn_uses_avg_price_even_with_no_snapshot():
+    """스냅샷이 없어도 평단을 기준가로 쓴다(현재가 폴백 아님)."""
     positions = {"005930": _pos(10, 3000)}
-    turn = new_turn("t1", 1_000_000, positions, opening_basis={}, current_prices={"005930": 3600})
-    assert turn["basis"]["005930"] == 3600
+    turn = new_turn("t1", 1_000_000, positions)
+    assert turn["basis"]["005930"] == 3000.0
 
 
-def test_first_tag_assignment_keeps_opening_basis():
-    """턴 첫 실행(active_tag=None)은 기준가를 덮어쓰지 않는다.
-
-    ON 시점(3500)부터 첫 실행(3600) 사이의 변동은 첫 태그의 몫이어야 한다.
-    여기서 기준가를 3600으로 리셋하면 그 100원이 어느 턴에도 안 잡힌다.
-    """
+def test_first_tag_assignment_keeps_avg_basis():
+    """턴 첫 실행(active_tag=None)은 기준가를 덮어쓰지 않는다 — 평단을 유지한다."""
     positions = {"005930": _pos(10, 3000)}
-    turn = new_turn("t1", 1_000_000, positions, {"005930": 3500}, {})
+    turn = new_turn("t1", 1_000_000, positions)      # basis = 평단 3000
     switch_tag(turn, positions, "sim4_bull_daytrading", {"005930": 3600})
-    assert turn["basis"]["005930"] == 3500          # 리셋되지 않음
+    assert turn["basis"]["005930"] == 3000.0         # 리셋되지 않음(평단 유지)
     assert turn["active_tag"] == "sim4_bull_daytrading"
     assert positions["005930"]["tag"] == "sim4_bull_daytrading"
     assert turn["by_tag"] == {}                      # 락인할 직전 태그가 없음
@@ -139,39 +140,40 @@ def test_prune_basis_drops_sold_out_codes():
     assert "000660" in turn["basis"]
 
 
-def test_turn_pnl_sum_equals_cumulative_realized_pnl():
-    """핵심 불변식: 턴별 손익의 합 = 평단 기준 누적 실현손익.
+def test_carried_in_position_pnl_measured_from_avg_price():
+    """(B) ON 전부터 보유한 종목은 매입 평단부터 손익을 잰다 — ON 시세로 리셋하지 않는다.
 
-    턴1(sim4): 3000에 10주 매수 → OFF 시점 3500 (미실현 +5000, 턴1 몫으로 동결)
-    턴2(sim5): 기준가 3500으로 리셋 → 3700에 전량 매도 (턴2 몫 +2000)
-    평단 기준 누적 실현손익 = (3700-3000)*10 = +7000 = 5000 + 2000
+    3000에 10주 산 종목을 안 팔고 다음 턴으로 넘긴 뒤, ON 시점 시세가 3500이어도
+    턴은 평단 3000으로 열린다. 3700에 전량 매도하면 턴 실현손익 = (3700-3000)*10 = 7000.
+    (구 설계는 ON 시세 3500으로 리셋해 2000만 잡았다 — 이제 KIS 종목별 ROI와 정합.)
     """
-    positions = {"005930": _pos(10, 3000)}
-
-    # ── 턴1: 매수 후 미실현 상태로 OFF
-    turn1 = new_turn("t1", 1_000_000, {}, {}, {})
-    switch_tag(turn1, {}, "sim4_bull_daytrading", {})
-    record_buy(turn1, "005930", qty=10, price=3000, prev_qty=0)
-    positions["005930"]["tag"] = "sim4_bull_daytrading"
-    # OFF 시점 동결(TS의 computeTurnPnl과 동일한 계산): by_tag + 보유분 미실현
-    off_price = 3500
-    turn1_pnl = sum(turn1["by_tag"].values()) + (off_price - turn1["basis"]["005930"]) * 10
-    assert turn1_pnl == 5000
-
-    # ── 턴2: 기준가가 OFF 시점 시세로 리셋되어 시작
-    turn2 = new_turn("t2", 1_005_000, positions,
-                     opening_basis={"005930": off_price}, current_prices={})
-    switch_tag(turn2, positions, "sim5_sideways", {"005930": off_price})
-    record_sell(turn2, positions, "005930", qty=10, price=3700)
+    positions = {"005930": _pos(10, 3000, tag="sim4_bull_daytrading")}
+    # 라우트가 ON 시점 시세(3500) 스냅샷을 넘겨도 무시하고 평단으로 연다.
+    turn = new_turn("t2", 1_000_000, positions, opening_basis={"005930": 3500})
+    switch_tag(turn, positions, "sim5_sideways", {"005930": 3600})   # 첫 태그 배정
+    record_sell(turn, positions, "005930", qty=10, price=3700)
     del positions["005930"]
-    prune_basis(turn2, positions)
-    turn2_pnl = sum(turn2["by_tag"].values())
-    assert turn2_pnl == 2000
-    assert turn2["by_tag"]["sim5_sideways"] == 2000
+    prune_basis(turn, positions)
 
-    # ── 불변식
-    cumulative_realized = (3700 - 3000) * 10      # program_trader의 realized_pnl 계산식
-    assert turn1_pnl + turn2_pnl == cumulative_realized == 7000
+    assert turn["by_tag"]["sim5_sideways"] == 7000.0        # (3700-3000)*10, 평단 기준
+    assert sum(turn["by_tag"].values()) == 7000.0
+
+
+def test_intra_turn_switch_still_telescopes_to_avg_basis():
+    """스위칭이 있어도 턴 총손익은 평단 기준으로 일관된다(구간 분할 합 = 전체).
+
+    평단 3000 → sim4 구간(3000→3500, +5000) 락인 후 sim5로 전환 →
+    sim5 구간(3500→3700, +2000) 매도. 합 = 7000 = (3700-3000)*10.
+    """
+    positions = {"005930": _pos(10, 3000, tag="sim4_bull_daytrading")}
+    turn = new_turn("t1", 1_000_000, positions)              # basis = 평단 3000
+    switch_tag(turn, positions, "sim4_bull_daytrading", {"005930": 3000})  # 첫 태그
+    switch_tag(turn, positions, "sim5_sideways", {"005930": 3500})         # sim4 락인 +5000
+    record_sell(turn, positions, "005930", qty=10, price=3700)            # sim5 +2000
+
+    assert turn["by_tag"]["sim4_bull_daytrading"] == 5000.0
+    assert turn["by_tag"]["sim5_sideways"] == 2000.0
+    assert sum(turn["by_tag"].values()) == 7000.0            # 평단 기준 전체와 일치
 
 
 # ── 활성 태그 결정 (program_trader) ──────────────────────────────────

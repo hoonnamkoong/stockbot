@@ -17,6 +17,7 @@ from src.pipeline.context import PipelineContext
 from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
 from src.data.storage_manager import StorageManager
+from src.data import usage_log
 from src.strategy import analyzer
 
 # 동시 요청량은 게시글 임계값과 무관해야 한다. 임계값에 묶어두면 오후로 갈수록
@@ -56,6 +57,7 @@ class DataFetcherWorker(BaseWorker):
     def __init__(self, ctx: PipelineContext, storage: StorageManager):
         super().__init__(ctx)
         self.storage = storage
+        self._reset_body_stats()
 
     def run(self) -> list[StockData]:
         """
@@ -191,6 +193,11 @@ class DataFetcherWorker(BaseWorker):
                 print(f"   [DataFetcher] Pydantic 변환 실패 {s.get('code')}: {e}")
 
         self.log(f"수집 완료: {len(results)}개 종목 통과")
+        usage_log.append({
+            'event': 'run_summary',
+            'body_ok': self.body_ok,
+            'body_fail': self.body_fail,
+        })
         return results
 
     # ── 내부 수집 메서드들 (기존 scraper.py에서 이전) ──────────────
@@ -398,14 +405,34 @@ class DataFetcherWorker(BaseWorker):
             'failed_pages': failed_pages,
         }
 
+    def _reset_body_stats(self) -> None:
+        """본문 수집 성공/실패 카운터를 초기화한다. 스레드풀에서 갱신되므로 락을 둔다."""
+        import threading
+        self.body_ok = 0
+        self.body_fail = 0
+        self._body_lock = threading.Lock()
+
     def _get_post_body(self, code: str, nid: str) -> str:
-        """게시글 본문을 수집합니다."""
+        """게시글 본문을 수집합니다.
+
+        성공/실패를 센다. Gemini 프롬프트에 본문이 실제로 실리는 비율을 모르면
+        '본문을 줄여 표본을 늘릴지'를 판단할 수 없다. 실패해도 ""를 반환하므로
+        호출부에서는 구분이 안 된다.
+        """
         url = f"https://finance.naver.com/item/board_read.naver?code={code}&nid={nid}"
+        text = ""
         try:
             res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
             soup = BeautifulSoup(res.content, 'html.parser')
             body = soup.select_one('#body')
-            if body: return body.get_text(strip=True)
+            if body:
+                text = body.get_text(strip=True)
         except:
             pass
-        return ""
+
+        with self._body_lock:
+            if text:
+                self.body_ok += 1
+            else:
+                self.body_fail += 1
+        return text

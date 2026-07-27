@@ -18,6 +18,7 @@ from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
 from src.data.storage_manager import StorageManager
 from src.data import usage_log
+from src.data import post_archive
 from src.strategy import analyzer
 
 # 동시 요청량은 게시글 임계값과 무관해야 한다. 임계값에 묶어두면 오후로 갈수록
@@ -129,6 +130,10 @@ class DataFetcherWorker(BaseWorker):
 
                 s['recent_posts_count'] = count
                 s['status'] = status
+                # 상위 5개로 자르기 전에 당일 전체 제목을 아카이브 큐에 담는다.
+                # 열망 사전 검증에는 전수가 필요하고, 여기가 전수가 존재하는
+                # 유일한 지점이다.
+                self._queue_titles(s, stats['new_posts'])
                 if status == '활성':
                     posts = sorted(stats['new_posts'], key=lambda x: x['likes'], reverse=True)[:5]
                     for p in posts:
@@ -193,6 +198,8 @@ class DataFetcherWorker(BaseWorker):
                 print(f"   [DataFetcher] Pydantic 변환 실패 {s.get('code')}: {e}")
 
         self.log(f"수집 완료: {len(results)}개 종목 통과")
+        added = post_archive.append(self._title_rows)
+        self.log(f"제목 아카이브: 신규 {added}건 / 수집 {len(self._title_rows)}건")
         usage_log.append({
             'event': 'run_summary',
             'body_ok': self.body_ok,
@@ -411,6 +418,26 @@ class DataFetcherWorker(BaseWorker):
         self.body_ok = 0
         self.body_fail = 0
         self._body_lock = threading.Lock()
+        self._title_rows = []
+
+    def _queue_titles(self, stock: dict, new_posts: list) -> None:
+        """당일 전체 게시글 제목을 아카이브 큐에 담는다.
+
+        여기서 바로 파일에 쓰지 않는 이유: process_one이 스레드풀에서 돌아
+        동시 append가 CSV를 깨뜨린다. run() 끝에서 한 번에 flush한다.
+        """
+        rows = [{
+            'date': self.ctx.today_str,
+            'code': stock.get('code', ''),
+            'name': stock.get('name', ''),
+            'nid': p.get('nid', ''),
+            'title': p.get('title', ''),
+            'likes': p.get('likes', 0),
+        } for p in (new_posts or [])]
+        if not rows:
+            return
+        with self._body_lock:
+            self._title_rows.extend(rows)
 
     def _get_post_body(self, code: str, nid: str) -> str:
         """게시글 본문을 수집합니다.

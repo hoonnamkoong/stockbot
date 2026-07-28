@@ -157,8 +157,8 @@ class GeminiAgent:
             if stock.get('posts') and not kept:
                 # 전부 잡담이면 물어볼 게 없다. 캐시에는 넣지 않는다 —
                 # 사전 판정은 재계산이 공짜라 캐시를 채울 이유가 없다.
-                cached_hits[code] = {"sentiment": 0, "summary": "열망 표현만 (사전 판정)",
-                                     "keywords": []}
+                cached_hits[code] = {"sentiment": 0, "fact_score": 0.0,
+                                     "summary": "열망 표현만 (사전 판정)", "keywords": []}
                 noise_only += 1
                 continue
 
@@ -177,10 +177,13 @@ class GeminiAgent:
             group = pending[i:i + GROUP_SIZE]
             cleaned_batch = []
             for stock in group:
-                # 추천수가 높은 본문(Body)을 요약에 활용 (글자 수 제한 준수)
                 # [W3] 사전이 걸러낸 글은 빼고 보낸다.
                 posts = kept_posts.get(stock.get('code'), stock.get('posts', []))
-                posts_text = "\n".join([f"[{p.get('title')}] {GeminiAgent.clean_text(str(p.get('body', '')))}" for p in posts])
+                # 제목만 보낸다. 본문 수집 성공률이 0%(0/3,165)라 예전 형식은
+                # 글마다 '[제목] '처럼 빈 대괄호가 붙어 토큰만 쓰고, 모델에는
+                # '본문이 있는데 비었다'는 잘못된 신호가 됐다.
+                posts_text = "\n".join(
+                    GeminiAgent.clean_text(str(p.get('title', ''))) for p in posts)
                 cleaned_batch.append({
                     "code": stock.get('code'),
                     "name": stock.get('name'),
@@ -197,15 +200,25 @@ class GeminiAgent:
             2. 다음 핵심 키워드를 반드시 우대하여 분석에 포함: '분석', '추세', '전망', '공시', '뉴스', '따르면', '의하면'.
             3. summary는 내용이 풍부할 경우 2~3문장의 명사형 요약 가능. (예: 외인 매수세 유입에 따른 추세 전환 전망. 공시 기반 신규 수주 확인.)
             4. keywords는 3개 이내 핵심 전문 용어만 추출.
+            5. fact_score는 '검증 가능한 근거가 실제로 있는 정도'다. 0.0~1.0 실수.
+               공시·실적·수주·뉴스 인용처럼 확인 가능한 사실이 있으면 높이고,
+               기대·전망·소문·감정 표현뿐이면 0에 가깝게 준다.
+               감정 점수(sentiment)와 독립이다 — 강한 호재 기대라도 근거가 없으면 낮다.
 
             [분석 대상 데이터]
             {json.dumps(cleaned_batch, ensure_ascii=False)}
-            
-            각 종목별로 다음 JSON 배열 형식으로만 응답하세요:
+
+            [응답 규칙]
+            - 입력한 {len(cleaned_batch)}개 종목 **전부**에 대해, 정확히 {len(cleaned_batch)}개의 객체를 반환하세요.
+            - 내용이 부실한 종목도 생략하지 말고 sentiment 0, fact_score 0.0으로 채워 반환하세요.
+            - code는 입력에 주어진 값을 그대로 사용하세요.
+
+            다음 JSON 배열 형식으로만 응답하세요:
             [
                 {{
                     "code": "005930",
                     "sentiment": 점수(-10 ~ 10),
+                    "fact_score": 0.0 ~ 1.0,
                     "summary": "초간결 명사 요약",
                     "keywords": ["키워드1", "키워드2"]
                 }}
@@ -271,7 +284,7 @@ class GeminiAgent:
             final_results[code] = (
                 all_results.get(code)
                 or cached_hits.get(code)
-                or {"sentiment": 0, "summary": "분석 오류", "keywords": []}
+                or {"sentiment": 0, "fact_score": 0.0, "summary": "분석 오류", "keywords": []}
             )
 
         return final_results

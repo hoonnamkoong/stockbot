@@ -27,6 +27,8 @@ STOCK_WORKERS = 8   # 동시에 분석할 종목 수
 PAGE_WORKERS = 8    # 종목당 동시에 긁을 토론방 페이지 수
 PAGE_RETRIES = 3
 PAGE_RETRY_WAIT = 0.5
+POST_LIMIT = 30       # 종목당 LLM에 넘길 게시글 수 (공감 상위). 2026-07-28: 5 → 30
+BODY_FETCH_LIMIT = 5  # 본문 수집 시도 상한. 성공률 0%라 상한을 따라 올리지 않는다
 
 
 def classify(count: int, threshold: int, adopted: set, code: str = '') -> str | None:
@@ -136,8 +138,14 @@ class DataFetcherWorker(BaseWorker):
                 # 유일한 지점이다.
                 self._queue_titles(s, stats['new_posts'])
                 if status == '활성':
-                    posts = sorted(stats['new_posts'], key=lambda x: x['likes'], reverse=True)[:5]
-                    for p in posts:
+                    ranked = sorted(stats['new_posts'], key=lambda x: x['likes'], reverse=True)
+                    # 상위 5개는 하루 글의 0.3%·공감 총량의 2.0%만 담는다(2026-07-28 실측).
+                    # 공감 감쇠가 완만해(1~5위 12.8 → 21~30위 5.4) 5는 근거 없는 컷이었다.
+                    # 30으로 올린 근거: 30위까지는 공감 0인 글이 하나도 없다(31위부터 등장).
+                    posts = ranked[:POST_LIMIT]
+                    # 본문은 상위 5개만 시도한다. 수집 성공률이 0%(0/3,165)라
+                    # 상한을 따라 올리면 실패하는 HTTP 요청만 6배가 된다.
+                    for p in posts[:BODY_FETCH_LIMIT]:
                         p['body'] = self._get_post_body(s['code'], p['nid'])
                     s['posts'] = posts
                 else:

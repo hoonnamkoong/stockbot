@@ -213,3 +213,52 @@ def test_routing_stats_are_logged(monkeypatch, tmp_path):
     assert s['posts_dropped'] == '2'        # 가즈아 + 존버
     assert s['noise_only_stocks'] == '1'    # B는 통째로 스킵
     assert s['cache_miss'] == '1'           # A만 호출
+
+
+# ── 프롬프트 (2026-07-28 개정) ────────────────────────────
+def test_prompt_sends_titles_without_empty_body_brackets(monkeypatch, tmp_path):
+    """본문 수집 성공률이 0%라 예전 형식은 '[제목] '처럼 빈 대괄호만 붙었다."""
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    batch = [{'code': '005930', 'name': '삼성전자',
+              'posts': [{'nid': '1', 'title': '3분기 공시', 'body': ''}]}]
+    make_agent(ANSWER, calls).analyze_batch_discovery(batch)
+
+    assert '3분기 공시' in calls[0]
+    assert '[3분기 공시]' not in calls[0]
+
+
+def test_prompt_demands_exact_object_count(monkeypatch, tmp_path):
+    """상한을 올리면 프롬프트가 길어져 flash-lite가 종목을 조용히 누락시킨다."""
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    batch = [{'code': f'{i:06d}', 'name': f'종목{i}',
+              'posts': [{'nid': str(i), 'title': '공시 확인'}]} for i in range(3)]
+    make_agent(json.dumps([]), calls).analyze_batch_discovery(batch)
+
+    assert '정확히 3개의 객체' in calls[0]
+
+
+def test_prompt_requests_fact_score(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    make_agent(ANSWER, calls).analyze_batch_discovery(BATCH)
+    assert 'fact_score' in calls[0]
+
+
+def test_local_results_carry_fact_score(monkeypatch, tmp_path):
+    """사전 판정·분석 실패 경로도 같은 스키마를 내야 Sim1 분기가 안 깨진다."""
+    _isolate(monkeypatch, tmp_path)
+    noise = [{'code': 'A', 'name': 'a', 'posts': [{'nid': '1', 'title': '가즈아 대박'}]}]
+    out = make_agent(ANSWER, []).analyze_batch_discovery(noise)
+    assert out['A']['fact_score'] == 0.0
+
+    bad = make_agent('깨진 응답', []).analyze_batch_discovery(BATCH)
+    assert bad['005930']['fact_score'] == 0.0
+
+
+def test_post_limit_is_thirty():
+    """공감 상위 30 — 30위까지는 공감 0인 글이 없다(2026-07-28 실측)."""
+    from src.pipeline.workers import data_fetcher
+    assert data_fetcher.POST_LIMIT == 30
+    assert data_fetcher.BODY_FETCH_LIMIT == 5, "본문은 성공률 0%라 상한을 따라 올리지 않는다"

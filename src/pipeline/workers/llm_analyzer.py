@@ -91,6 +91,11 @@ class LLMAnalyzerWorker(BaseWorker):
                 s['posts_summary'] = ai.get('summary', '분석 오류')
                 s['sentiment'] = str(ai.get('sentiment', 'Neutral'))
                 s['keywords'] = ai.get('keywords', [])
+                # [Sim1] 팩트 근거 강도. 진입 필터가 아니라 보유기간·목표가 분기용이다.
+                try:
+                    s['fact_score'] = float(ai.get('fact_score', 0.0))
+                except (TypeError, ValueError):
+                    s['fact_score'] = 0.0
 
             # Fallback: AI 결과가 비어있는 경우
             if s.get('posts_summary') in [None, "분석 대기중", "분석 오류", "AI 분석 불가", ""]:

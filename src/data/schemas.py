@@ -37,10 +37,12 @@ class StockData(BaseModel):
     market: MarketType = MarketType.UNKNOWN
     price: int = 0
     recent_posts_count: int = 0
+    unique_posters: int = 0     # [Sim8] 당일 게시글의 고유 작성자 수 (도배 배제)
     foreign_rate: float = 0.0
     foreign_change: float = 0.0
     inst_net_buy: int = 0
     prev_close: int = 0
+    open_price: int = 0         # [Sim9] 당일 시가 (갭 산출용, KIS stck_oprc)
     prev_foreign_rate: float = 0.0
     posts_summary: str = "분석 대기중"
     sentiment: str = "Neutral"
@@ -80,7 +82,7 @@ class StockData(BaseModel):
     w52_lwpr: int = 0             # 52주 최저가
     mkt_cap: int = 0              # 시가총액 (억원)
 
-    @field_validator('price', 'prev_close', 'current_price', 'volume', 'amount', mode='before')
+    @field_validator('price', 'prev_close', 'open_price', 'current_price', 'volume', 'amount', mode='before')
     @classmethod
     def parse_int_field(cls, v):
         """'50,000원', '5만' 같은 문자열을 정수로 자동 정제합니다."""

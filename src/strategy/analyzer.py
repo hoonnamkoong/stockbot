@@ -43,10 +43,12 @@ def analyze_discussion_trend(data_list):
         'price': '현재가',
         'foreign_rate': '외인비중',
         'prev_close': '전일종가',
+        'open_price': '시가',       # [Sim9] 갭 산출용. 스냅샷 근사가 아닌 실제 시가를 축적한다.
         'prev_foreign_rate': '전일외인',
         'change_rate': '등락률',
         'foreign_change': '외인변화',
         'recent_posts_count': '게시물', # Vercel 대시보드와 맞춤
+        'unique_posters': '고유작성자',  # [Sim8] 도배 배제용 군중 폭
         'posts_summary': '게시물_요약',
         'sentiment_score': '감정',
         'keywords': '키워드',
@@ -56,8 +58,9 @@ def analyze_discussion_trend(data_list):
     
     # 2. 존재하는 컬럼만 선택하여 순서 지정
     desired_order = [
-        'name', 'price', 'change_rate', 'foreign_change', 'recent_posts_count', 'foreign_rate', 'market',
-        'prev_close', 'prev_foreign_rate', 'posts_summary',
+        'name', 'price', 'change_rate', 'foreign_change', 'recent_posts_count', 'unique_posters',
+        'foreign_rate', 'market',
+        'prev_close', 'open_price', 'prev_foreign_rate', 'posts_summary',
         'sentiment_score', 'keywords', 'consecutive_days', 'status', 'code'
     ]
     

@@ -175,3 +175,45 @@ def test_healthy_run_persists_both(monkeypatch):
     assert w._persist([{'code': '002990'}]) is True
     assert calls == ['save_data']
     assert len(w.storage.saved) == 1
+
+
+# ── [Sim8] 고유 작성자 수 ──────────────────────────────
+def _rows_with_writers(pairs):
+    """[(nid, 글쓴이)] → 게시판 표 HTML. 실제 컬럼 순서는 날짜/제목/글쓴이/조회/공감/비공감."""
+    rows = "".join(
+        f'<tr><td>{TODAY} 09:00</td>'
+        f'<td class="title"><a href="/item/board_read.naver?code=1&nid={nid}">글</a></td>'
+        f'<td>{writer}</td><td>1</td><td>3</td><td>0</td></tr>'
+        for nid, writer in pairs
+    )
+    old = ('<tr><td>2026.07.09 23:00</td>'
+           '<td class="title"><a href="/item/board_read.naver?code=1&nid=1">옛글</a></td>'
+           '<td>x</td><td>y</td><td>0</td></tr>')
+    return f'<table class="type2">{rows}{old}</table>'
+
+
+def test_unique_posters_counts_distinct_writers(worker, monkeypatch):
+    """도배(한 사람이 3글)와 관심(3명이 1글씩)을 구분해야 심8의 군중축이 의미를 갖는다."""
+    def behavior(page, attempt):
+        if page == 1:
+            return _rows_with_writers([('101', '갑'), ('102', '갑'), ('103', '을')])
+        return _rows_with_writers([])
+
+    install_fake_session(monkeypatch, behavior)
+    stats = stats_for(worker)
+
+    assert stats['recent_posts_count'] == 3
+    assert stats['unique_posters'] == 2
+
+
+def test_writer_does_not_leak_into_posts(worker, monkeypatch):
+    """posts는 엑셀·LLM 프롬프트로 흘러간다. 필요 없는 필드를 실어 보내지 않는다."""
+    def behavior(page, attempt):
+        if page == 1:
+            return _rows_with_writers([('101', '갑')])
+        return _rows_with_writers([])
+
+    install_fake_session(monkeypatch, behavior)
+    stats = stats_for(worker)
+
+    assert stats['new_posts'] and all('writer' not in p for p in stats['new_posts'])

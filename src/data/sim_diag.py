@@ -43,8 +43,11 @@ def _today() -> str:
     return datetime.now(timezone(timedelta(hours=9))).strftime('%Y%m%d')
 
 
-def _move_stale_if_needed(path) -> None:
+def _move_stale_if_needed(path) -> bool:
     """기존 파일 헤더가 현재 COLUMNS와 다르면 옆으로 옮긴다.
+
+    성공하면 True를 반환한다. 실패하면 False를 반환하며, 이 경우 정규 경로를
+    건드리지 않아 "열이 조용히 어긋나는" 사고를 방지한다.
 
     append는 빈 파일일 때만 헤더를 쓴다. 컬럼이 늘어난 뒤 옛 파일에 이어 쓰면
     열이 조용히 어긋나 로그 전체가 못 쓰게 된다.
@@ -53,14 +56,14 @@ def _move_stale_if_needed(path) -> None:
     다음 호출에서는 정규 경로의 헤더가 이미 일치하므로 다시 이동이 일어나지 않는다.
     """
     if not os.path.exists(path) or os.path.getsize(path) == 0:
-        return
+        return True
     try:
         with open(path, encoding='utf-8') as f:
             head = f.readline().strip().lstrip('﻿').split(',')
     except Exception:
-        return
+        return True
     if head == COLUMNS:
-        return
+        return True
     # 옛 헤더를 가진 파일을 옆으로 옮긴다
     base, ext = os.path.splitext(path)
     for i in range(1, 100):
@@ -68,11 +71,12 @@ def _move_stale_if_needed(path) -> None:
         if not os.path.exists(alt):
             try:
                 os.rename(path, alt)
+                return True
             except Exception:
-                # 파일 잠김 등으로 옮기 실패해도 로깅이 죽으면 안 됨
-                pass
-            return
-    # range 소진 시 (거의 일어나지 않음) — 어쩔 수 없음
+                # 파일 잠김 등으로 옮기 실패 — 정규 경로를 건드리지 않음
+                return False
+    # range 소진 시 — 이동 불가
+    return False
 
 
 def append(sim: str, records: list, path: str = None) -> int:
@@ -84,7 +88,9 @@ def append(sim: str, records: list, path: str = None) -> int:
         return 0
     try:
         path = path or month_path(sim)
-        _move_stale_if_needed(path)
+        if not _move_stale_if_needed(path):
+            # 옛 파일을 비켜놓지 못했으면 로그를 쓰지 않아 데이터 정합성 유지
+            return 0
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
         ts = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')
         is_new = not os.path.exists(path) or os.path.getsize(path) == 0

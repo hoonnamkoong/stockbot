@@ -7,6 +7,7 @@ import csv
 import os
 import sys
 import tempfile
+from unittest import mock
 
 sys.path.insert(0, '.')
 
@@ -89,11 +90,43 @@ def test_append_still_works_on_fresh_file():
         check('신규 파일에 정상 기록', n == 1 and rows[0]['decision'] == 'entry')
 
 
+def test_rename_failure_prevents_data_corruption():
+    """rename 실패 시 정규 경로에 로그를 쓰지 않아 데이터 정합성을 유지한다."""
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, 'sim1_diag_2026-07.csv')
+        # 구 헤더로 기존 파일 작성
+        with open(path, 'w', newline='', encoding='utf-8') as f:
+            f.write('ts,sim,code\nold,sim1,005930\n')
+
+        # 옛 내용 읽기
+        with open(path, encoding='utf-8') as f:
+            old_content = f.read()
+
+        # os.rename을 실패하게 mock
+        with mock.patch('os.rename', side_effect=OSError('Permission denied')):
+            n = sim_diag.append('sim1', [{'code': '005931', 'd_sov': '2.0'}], path=path)
+
+        # append가 0을 반환 (로그 안 씀)
+        check('rename 실패 시 append는 0을 반환',
+              n == 0)
+
+        # 옛 파일의 내용이 그대로 (새 행 추가 안 됨)
+        with open(path, encoding='utf-8') as f:
+            new_content = f.read()
+        check('옛 파일에 새 행이 추가되지 않음',
+              old_content == new_content)
+
+        # 예외가 호출자에게 전파되지 않음
+        check('예외가 시뮬레이터를 죽이지 않음',
+              True)  # 위의 append 호출이 예외 없이 완료됨
+
+
 if __name__ == '__main__':
     test_new_columns_exist()
     test_header_rotation_on_mismatch()
     test_no_repeat_rotation_on_consecutive_calls()
     test_append_still_works_on_fresh_file()
+    test_rename_failure_prevents_data_corruption()
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} 통과")
     sys.exit(1 if failed else 0)

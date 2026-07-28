@@ -83,22 +83,24 @@ def history_terms(rows, prev_day, last_run, today, hhmm):
     lz = (last_run or {}).get('z', {})
     days_ago = _days_between((prev_day or {}).get('date'), today)
     usable = bool(pz) and days_ago is not None and 0 < days_ago <= HIST_MAX_DAYS
-    accel_ok = str(hhmm) >= ACCEL_START_HHMM
+    accel_ok = bool(hhmm) and str(hhmm) >= ACCEL_START_HHMM
 
     raw = {}
     for r in rows:
         c = r['code']
         p = pz.get(c) if usable else None
         r['hist_days_ago'] = days_ago if days_ago is not None else ''
-        r['hist_missing'] = 0 if p else 1
+        # z_sov는 1순위 항(d_sov)의 재료다 — 이 값의 유무로 결측을 판정한다.
+        r['hist_missing'] = 0 if (p and p.get('z_sov') is not None) else 1
         if p:
-            raw[c] = ((r.get('z_sov') or 0) - p['z_sov'], (r.get('z_hype') or 0) - p['z_hype'])
-            r['accel_d1'] = (r.get('z_posters') or 0) - p['z_posters']
+            raw[c] = ((r.get('z_sov') or 0) - (p.get('z_sov') or 0),
+                      (r.get('z_hype') or 0) - (p.get('z_hype') or 0))
+            r['accel_d1'] = (r.get('z_posters') or 0) - (p.get('z_posters') or 0)
         else:
             r['accel_d1'] = 0
 
         l = lz.get(c)
-        r['accel'] = ((r.get('z_posters') or 0) - l['z_posters']) if (l and accel_ok) else 0
+        r['accel'] = ((r.get('z_posters') or 0) - (l.get('z_posters') or 0)) if (l and accel_ok) else 0
 
     # 델타의 횡단면 z는 이력 있는 종목만으로 만든다.
     # 결측의 0을 분포에 넣으면 z가 왜곡된다.
@@ -122,10 +124,11 @@ def build_snapshot(rows, today, ts):
     오전에 60~77% 어긋난다(실측)."""
     z = {}
     for r in rows:
-        if r.get('z_sov') is None or r.get('z_posters') is None or r.get('z_hype') is None:
-            continue
-        z[r['code']] = {'z_sov': r['z_sov'], 'z_posters': r['z_posters'],
-                        'z_hype': r['z_hype']}
+        # 셋 중 하나가 퇴화(z_hype가 흔하다)해도 나머지 값은 담는다 —
+        # 결측은 그 항만 흡수하지, 종목 전체를 폐기하지 않는다.
+        vals = {k: r.get(k) for k in ('z_sov', 'z_posters', 'z_hype') if r.get(k) is not None}
+        if vals:
+            z[r['code']] = vals
     return {'date': today, 'ts': ts, 'z': z}
 
 
@@ -187,12 +190,6 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
     cand_by_code = {s.get('code'): s for s in candidates if s.get('code')}
     feat = _features(candidates)
 
-    rows = list(feat.values())
-    # 승격 판정은 run()이 이미 끝냈다. 여기서 다시 해석하지 않는다.
-    history_terms(rows, view.get('psych_prev_day'), view.get('psych_last_run'),
-                  today, hhmm)
-    snapshot = build_snapshot(rows, today, ts)
-
     # 1. 청산 — ATR 기반 동적 익절/손절 + 트레일링 (기존 유지)
     for code in list(portfolio.keys()):
         p = portfolio[code]
@@ -224,6 +221,13 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
                            'reason': f"[심리] 동적 손절가 이탈 (ATR 기반, {pr:+.1f}%)",
                            'cooldown': 3, 'mark_partial': False})
             sold.add(code)
+
+    rows = list(feat.values())
+    # 승격 판정은 run()이 이미 끝냈다. 여기서 다시 해석하지 않는다.
+    # 청산 루프 아래에 둔다 — 여기서 예외가 나도 매도 주문은 이미 나간 뒤다.
+    history_terms(rows, view.get('psych_prev_day'), view.get('psych_last_run'),
+                  today, hhmm)
+    snapshot = build_snapshot(rows, today, ts)
 
     # 2. 진입
     if not view['market_index_healthy']:
@@ -381,7 +385,8 @@ class PsychDivergenceSimulator(BaseSimulator):
             ts=now.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.state['psych_prev_day'] = prev_day
-        self.state['psych_snapshot'] = snapshot
+        if snapshot.get('z'):
+            self.state['psych_snapshot'] = snapshot
 
         self._apply(orders, current_prices)
         sim_diag.append('sim1', diags)

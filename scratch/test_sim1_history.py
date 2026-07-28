@@ -204,30 +204,52 @@ def test_accel_suppressed_before_0930():
 def test_delta_z_excludes_missing():
     """z(d_sov)는 이력 있는 종목만으로 계산한다.
 
-    결측 종목의 0을 분포에 넣으면 z가 왜곡된다. 이력 종목 10개(_zmap의
-    MIN_SAMPLE)의 d_sov가 전부 같으면 분산 0이라 z는 만들어지지 않고,
-    ignition4는 z(d_sov) 항 없이 계산된다.
+    이전 버전은 이력 10종목의 d_sov를 전부 1.0으로 통일해 분산이 0이 되고
+    `_zmap`이 `{}`를 반환했다 — 그래서 raw 멤버십(포함/제외)만 확인할 뿐
+    실제 z 분포가 결측 종목에 흔들리지 않는지는 전혀 검증하지 못하는
+    공허한 테스트였다(구현이 결측의 0을 분포에 섞도록 바뀌어도 통과했다).
+
+    이번 버전은 이력 종목의 d_sov를 서로 다르게 만들어(분산 > 0) `_zmap`이
+    실제 값을 반환하게 하고, 결측 종목(NEW)이 있든 없든 이력 종목들의
+    ignition4가 동일한지를 비교한다. NEW의 0-델타가 분포에 섞이면 평균·표준편차가
+    바뀌어 이 비교가 깨진다.
     """
-    codes = {f"H{i}": (1.0, 0.5, 0.2) for i in range(10)}
-    prev_day = _snap('20260727', **codes)
-    rows = [{'code': f"H{i}", 'z_sov': 2.0, 'z_posters': 1.0,
-             'z_hype': 0.7, 'z_likes': 0.4} for i in range(10)]
-    rows.append({'code': 'NEW', 'z_sov': 2.0, 'z_posters': 1.0,
-                 'z_hype': 0.7, 'z_likes': 0.4})
-    sp.history_terms(rows, prev_day, None, '20260728', '1030')
-    new_row = rows[-1]
+    prev_day = _snap('20260727', **{f"H{i}": (i * 0.1, 0.5, 0.2) for i in range(10)})
+
+    def _rows(include_new):
+        rows = [{'code': f"H{i}", 'z_sov': 1.0 + i * 0.2, 'z_posters': 1.0,
+                 'z_hype': 0.7, 'z_likes': 0.4} for i in range(10)]
+        if include_new:
+            rows.append({'code': 'NEW', 'z_sov': 2.0, 'z_posters': 1.0,
+                        'z_hype': 0.7, 'z_likes': 0.4})
+        return rows
+
+    with_new = _rows(True)
+    without_new = _rows(False)
+    sp.history_terms(with_new, prev_day, None, '20260728', '1030')
+    sp.history_terms(without_new, prev_day, None, '20260728', '1030')
+
+    new_row = with_new[-1]
     check('결측 종목의 d_sov는 0', new_row['d_sov'] == 0)
-    check('이력 종목의 d_sov는 1.0', abs(rows[0]['d_sov'] - 1.0) < 1e-9)
-    check('모든 행에 ignition4가 있다', all('ignition4' in r for r in rows))
+    hist_with = [r['ignition4'] for r in with_new if r['code'] != 'NEW']
+    hist_without = [r['ignition4'] for r in without_new]
+    check('결측 종목이 섞여도 이력 종목의 ignition4는 그대로다(분포에서 실제로 제외됨)',
+          all(abs(a - b) < 1e-9 for a, b in zip(hist_with, hist_without)))
+    check('모든 행에 ignition4가 있다', all('ignition4' in r for r in with_new))
 
 
 def test_build_snapshot():
+    """(Important 1 반영) 한 항이 None이어도 나머지 항은 스냅샷에 남는다 —
+    이전에는 AND 조건이 종목 전체를 통째로 버렸다."""
     rows = [{'code': 'A', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6},
-            {'code': 'B', 'z_sov': None, 'z_posters': 0.3, 'z_hype': 0.1}]
+            {'code': 'B', 'z_sov': None, 'z_posters': 0.3, 'z_hype': 0.1},
+            {'code': 'C', 'z_sov': None, 'z_posters': None, 'z_hype': None}]
     snap = sp.build_snapshot(rows, '20260728', '2026-07-28 10:30:00')
     check('스냅샷 날짜', snap['date'] == '20260728')
     check('스냅샷에 z만 담긴다', set(snap['z']['A']) == {'z_sov', 'z_posters', 'z_hype'})
-    check('z가 None인 종목은 담지 않는다', 'B' not in snap['z'])
+    check('z_sov만 None인 종목은 나머지 항만 담고 살아남는다',
+          'B' in snap['z'] and set(snap['z']['B']) == {'z_posters', 'z_hype'})
+    check('셋 다 None인 종목만 통째로 빠진다', 'C' not in snap['z'])
 
 
 def test_none_z_values_no_crash():
@@ -250,6 +272,48 @@ def test_none_z_values_no_crash():
     check('z_posters=None이어도 accel은 0 기준으로 계산(크래시 없음)',
           abs(r['accel'] - (0 - 0.9)) < 1e-9)
     check('ignition4도 크래시 없이 계산된다', abs(r['ignition4'] - 0.0) < 1e-9)
+
+
+def test_build_snapshot_keeps_other_terms_when_z_hype_degenerate():
+    """z_hype 하나가 퇴화(None)해도 z_sov·z_posters는 스냅샷에 남아야 한다.
+
+    hype는 게시글 제목에서 나오는데(data_fetcher.py), status != '활성'인
+    후보는 posts=[]를 받아 hype_score가 정확히 0.0이 된다. 후보 전부가
+    그 상태면(개장 직후·글이 얇은 런·스크랩 부분 실패) z_hype 분산이 0 →
+    `_zmap`이 {} → 모든 행의 z_hype가 None이 된다. 이전 버전은 이때 z_sov·
+    z_posters가 정상 계산됐어도 AND 조건 때문에 종목 자체를 스냅샷에서
+    통째로 버렸다(Important 1)."""
+    rows = [{'code': f"C{i}", 'z_sov': 1.0 + i * 0.1, 'z_posters': 0.5 + i * 0.1,
+             'z_hype': None} for i in range(12)]
+    snap = sp.build_snapshot(rows, '20260728', '2026-07-28 09:05:00')
+    check('z_hype 전멸에도 스냅샷에 종목 전부가 담긴다', len(snap['z']) == 12)
+    check('z_sov·z_posters는 보존되고 z_hype만 빠진다',
+          all(set(snap['z'][f"C{i}"]) == {'z_sov', 'z_posters'} for i in range(12)))
+
+    # 다음 런에서 이 스냅샷이 전일값으로 쓰이면 d_sov가 정상 계산돼야 한다
+    # (버려졌다면 hist_missing=1·d_sov=0으로 결측 취급됐을 것이다).
+    today_rows = [{'code': f"C{i}", 'z_sov': 2.0 + i * 0.1, 'z_posters': 1.0,
+                  'z_hype': 0.3, 'z_likes': 0.4} for i in range(12)]
+    sp.history_terms(today_rows, snap, None, '20260729', '1030')
+    check('z_hype가 빠진 전일 스냅샷이어도 hist_missing=0(z_sov는 있다)',
+          all(r['hist_missing'] == 0 for r in today_rows))
+    check('d_sov = 오늘 − 전일(z_sov 기준)이 정상 계산된다',
+          abs(today_rows[0]['d_sov'] - 1.0) < 1e-9)
+
+
+def test_history_terms_tolerates_partial_prev_entry():
+    """전일 스냅샷의 한 종목에 z_hype 키 자체가 없어도(z_hype 퇴화 런의
+    산물) 크래시 없이 d_sov는 계산되고, 없는 z_hype는 중립 0 기준으로
+    처리된다(그 항만 결측 흡수 — hist_missing은 z_sov 유무로만 판정)."""
+    prev_day = {'date': '20260727', 'ts': '15:30',
+                'z': {'A': {'z_sov': 1.0, 'z_posters': 0.5}}}  # z_hype 키 없음
+    rows = [{'code': 'A', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6, 'z_likes': 0.4}]
+    sp.history_terms(rows, prev_day, None, '20260728', '1030')
+    r = rows[0]
+    check('z_hype 없는 전일 항목도 hist_missing=0(z_sov 기준)', r['hist_missing'] == 0)
+    check('d_sov는 정상 계산(1.5-1.0)', abs(r['d_sov'] - 0.5) < 1e-9)
+    check('d_hype는 전일 z_hype 결측을 0으로 흡수(0.6-0)',
+          abs(r['d_hype'] - 0.6) < 1e-9)
 
 
 # ── Task 3: 배선 + 진입 불변 회귀 ──────────────────────────
@@ -306,6 +370,35 @@ def test_entry_decisions_unchanged_by_history():
           any(d['d_sov'] != 0 for d in d2))
 
 
+def test_empty_candidates_do_not_wipe_snapshot():
+    """정상 스냅샷이 state에 있는 상태에서 빈 후보 런이 돌아도 psych_snapshot이
+    비워지면 안 된다(Important 2). 승격은 '그날 마지막 런의 스냅샷'을 전일값
+    으로 만들기 때문에, 하루 중 마지막 한 번의 빈 런이 그날 축적한 이력
+    전부를 무효화할 수 있었다.
+
+    실제 data/sim_psych_state.json은 절대 건드리지 않는다 — 인스턴스 생성
+    직후 state_file·log_file·csv_file을 임시 디렉터리로 즉시 교체하고,
+    그 뒤에만 reset_state()/save_state()로 파일을 쓴다.
+    """
+    from src.strategy.simulators.sim1_psych import PsychDivergenceSimulator
+    with tempfile.TemporaryDirectory() as d:
+        sim = PsychDivergenceSimulator(initial_cash=3_000_000)
+        sim.state_file = os.path.join(d, 'sim_psych_state.json')
+        sim.log_file = os.path.join(d, 'sim_psych_log.json')
+        sim.csv_file = os.path.join(d, 'trade_history_sim_psych.csv')
+        sim.reset_state()  # 격리된 경로로 클린 상태 시작(실제 파일 미사용)
+
+        good_snapshot = {'date': '20260727', 'ts': '15:30:00',
+                         'z': {'005930': {'z_sov': 1.0, 'z_posters': 1.0, 'z_hype': 1.0}}}
+        sim.state['psych_snapshot'] = good_snapshot
+        sim.save_state()
+
+        sim.run([], current_prices={})  # 후보 0개 런
+
+        check('빈 후보 런에도 기존 psych_snapshot이 그대로 유지된다',
+              sim.state['psych_snapshot'] == good_snapshot)
+
+
 if __name__ == '__main__':
     test_new_columns_exist()
     test_header_rotation_on_mismatch()
@@ -322,8 +415,11 @@ if __name__ == '__main__':
     test_delta_z_excludes_missing()
     test_build_snapshot()
     test_none_z_values_no_crash()
+    test_build_snapshot_keeps_other_terms_when_z_hype_degenerate()
+    test_history_terms_tolerates_partial_prev_entry()
     test_decide_returns_snapshot()
     test_entry_decisions_unchanged_by_history()
+    test_empty_candidates_do_not_wipe_snapshot()
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} 통과")
     sys.exit(1 if failed else 0)

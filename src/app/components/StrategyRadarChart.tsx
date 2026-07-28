@@ -22,7 +22,10 @@ interface LiberoInfo {
 }
 
 // 전략 시리즈 정의 (단일 소스)
-const SERIES = [
+// paper: tradeable=false인 관찰 단계 전략. 순위표에서 실전 전략과 구분해 표시한다.
+type Series = { key: string; label: string; color: string; desc: string; paper?: boolean };
+
+const SERIES: Series[] = [
   { key: 'sim1',            label: '심리 괴리형 (Sim 1)',   color: '#228be6', desc: 'Buzz 급증·가격 정체 종목 매집' },
   { key: 'sim2',            label: '수급 동승형 (Sim 2)',   color: '#7950f2', desc: '외인 수급 + 감정 발산 스코어' },
   { key: 'sim3',            label: '스마트 리스크형 (Sim 3)', color: '#fa5252', desc: '추세 돌파 / 횡보 반등 + 트레일링' },
@@ -31,12 +34,16 @@ const SERIES = [
   { key: 'sim5',            label: '추세 눌림목형 (Sim 5)',  color: '#f08c00', desc: '상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절' },
   { key: 'sim6',            label: '하락 줍줍형 (Sim 6)',   color: '#0c8599', desc: '폭락 후 데드캣 반등 2.5% 빠른 익절' },
   { key: 'sim7',            label: '리포트 팔로워 (Sim 7)', color: '#e64980', desc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩' },
+  { key: 'sim8',            label: '선행 매집형 (Sim 8)',   color: '#1971c2', desc: '52주 앵커 구간 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩', paper: true },
+  { key: 'sim9',            label: '갭소진 반등 (Sim 9)',   color: '#e8590c', desc: '갭 +3% 후 장중 -3% 급락을 14:30 이후 매수 · 익일 청산', paper: true },
+  { key: 'sim9_1',          label: '돈치안 돌파 (Sim 9-1)', color: '#087f5b', desc: '20일 채널 상단 돌파 추종 · 10일 채널 이탈 / 2ATR 청산', paper: true },
   { key: 'sim10',           label: '오케스트레이터 (Sim 10)', color: '#ae3ec9', desc: 'Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용' },
 ];
 
 const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
 const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5'].includes(s.key));
-const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim7', 'sim10'].includes(s.key));
+const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim7', 'sim8'].includes(s.key));
+const SERIES_G4 = SERIES.filter(s => ['sim9', 'sim9_1', 'sim10'].includes(s.key));
 
 // 나우캐스트 시간축: 장 시간대 고정 슬롯 (sim0_libero의 _hour_label과 동일한 'HH:00' 포맷)
 const HOUR_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'];
@@ -384,6 +391,7 @@ export default function StrategyRadarChart() {
                 <Group gap={6} wrap="nowrap">
                   <span style={{ width: 9, height: 9, borderRadius: '50%', background: r.color, flexShrink: 0 }} />
                   <Text size="xs">{r.label}</Text>
+                  {r.paper && <Badge size="xs" variant="light" color="gray">관찰</Badge>}
                 </Group>
               </Table.Td>
               <Table.Td ta="right" fw={700} c={r.profit_rate >= 0 ? 'teal' : 'red'}>{pct(r.profit_rate)}</Table.Td>
@@ -413,8 +421,15 @@ export default function StrategyRadarChart() {
           onToggle={toggleSeries}
         />
         <RadarPanel
-          title="Sim 6~7·10 (줍줍·리포트·오케스트레이터)"
+          title="Sim 6~8 (줍줍·리포트·선행매집)"
           series={SERIES_G3}
+          data={data}
+          hidden={hidden}
+          onToggle={toggleSeries}
+        />
+        <RadarPanel
+          title="Sim 9~10 (갭소진·돈치안·오케스트레이터)"
+          series={SERIES_G4}
           data={data}
           hidden={hidden}
           onToggle={toggleSeries}
@@ -442,7 +457,8 @@ export default function StrategyRadarChart() {
                     background: s.color, marginTop: 4, flexShrink: 0,
                   }} />
                   <Text size="xs" c="dimmed">
-                    <b style={{ color: s.color }}>{s.label}</b> — {s.desc}
+                    <b style={{ color: s.color }}>{s.label}</b>
+                    {s.paper && <span style={{ color: '#868e96' }}> (관찰)</span>} — {s.desc}
                   </Text>
                 </Group>
               ))}

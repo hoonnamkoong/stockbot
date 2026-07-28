@@ -18,6 +18,10 @@ export async function GET() {
             { id: 'sim5',            file: 'sim_sideways_state.json' },
             { id: 'sim6',            file: 'sim_bear_state.json' },
             { id: 'sim7',            file: 'sim_reportfollower_state.json' },
+            // 페이퍼 관찰 단계(tradeable: false) — 실전 승격 전 성과만 축적한다
+            { id: 'sim8',            file: 'sim_accumulation_state.json' },
+            { id: 'sim9',            file: 'sim_gapfade_state.json' },
+            { id: 'sim9_1',          file: 'sim_donchian_state.json' },
             { id: 'sim10',           file: 'sim_orchestrator_state.json' },
         ];
 

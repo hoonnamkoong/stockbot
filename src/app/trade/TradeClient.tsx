@@ -798,12 +798,16 @@ function TradeContent() {
             { id: 'sim5',              key: 'sim5',              label: '추세 눌림목형 (Sim 5)',    color: 'orange', type: 'sim_sideways' },
             { id: 'sim6',              key: 'sim6',              label: '하락 줍줍형 (Sim 6)',      color: 'cyan',   type: 'sim_bear' },
             { id: 'sim7',              key: 'sim7',              label: '리포트 팔로워 (Sim 7)',    color: 'pink',   type: 'sim7_report_follower' },
+            // 페이퍼 관찰 단계(tradeable: false) — 실전 승격 전
+            { id: 'sim8',              key: 'sim8',              label: '선행 매집형 (Sim 8)',      color: 'indigo', type: 'sim8_accumulation' },
+            { id: 'sim9',              key: 'sim9',              label: '갭소진 반등 (Sim 9)',      color: 'orange', type: 'sim9_gap_fade' },
+            { id: 'sim9_1',            key: 'sim9_1',            label: '돈치안 돌파 (Sim 9-1)',    color: 'teal',   type: 'sim9_1_donchian' },
             { id: 'sim10',             key: 'sim10',             label: '오케스트레이터 (Sim 10)',   color: 'violet', type: 'sim10_orchestrator' },
         ];
         return (
             <Stack gap="xl">
                 <Group justify="space-between">
-                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>8-Track 지능형 시뮬레이션</Title>
+                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>{simConfigs.length}-Track 지능형 시뮬레이션</Title>
                     <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
                 </Group>
                 <Paper p="sm" withBorder radius="md" style={{ background: 'var(--mantine-color-red-0)' }}>

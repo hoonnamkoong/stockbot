@@ -27,6 +27,9 @@ COLUMNS = [
     'posts', 'unique_posters', 'posts_per_poster', 'avg_posts', 'buzz_ratio',
     'total_likes', 'likes_per_post', 'sov', 'z_posters', 'z_sov', 'z_likes',
     'ignition', 'hype_score', 'fact_score',
+    # ── 이력 파생 (진입에는 아직 쓰지 않는다. Phase 2 입력) ──
+    'z_hype', 'd_sov', 'd_hype', 'accel', 'accel_d1',
+    'hist_missing', 'hist_days_ago', 'ignition4',
 ]
 
 
@@ -40,6 +43,29 @@ def _today() -> str:
     return datetime.now(timezone(timedelta(hours=9))).strftime('%Y%m%d')
 
 
+def _rotate_if_stale(path) -> str:
+    """기존 파일 헤더가 현재 COLUMNS와 다르면 옆으로 치우고 새 파일을 쓰게 한다.
+
+    append는 빈 파일일 때만 헤더를 쓴다. 컬럼이 늘어난 뒤 옛 파일에 이어 쓰면
+    열이 조용히 어긋나 로그 전체가 못 쓰게 된다.
+    """
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        return path
+    try:
+        with open(path, encoding='utf-8') as f:
+            head = f.readline().strip().lstrip('﻿').split(',')
+    except Exception:
+        return path
+    if head == COLUMNS:
+        return path
+    base, ext = os.path.splitext(path)
+    for i in range(1, 100):
+        alt = f"{base}_v{i}{ext}"
+        if not os.path.exists(alt):
+            return alt
+    return path
+
+
 def append(sim: str, records: list, path: str = None) -> int:
     """진단 행들을 추가한다. 추가된 행 수 반환.
 
@@ -49,6 +75,7 @@ def append(sim: str, records: list, path: str = None) -> int:
         return 0
     try:
         path = path or month_path(sim)
+        path = _rotate_if_stale(path)
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
         ts = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')
         is_new = not os.path.exists(path) or os.path.getsize(path) == 0

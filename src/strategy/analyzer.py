@@ -51,6 +51,15 @@ def analyze_discussion_trend(data_list):
         'foreign_change': '외인변화',
         'recent_posts_count': '게시물', # Vercel 대시보드와 맞춤
         'unique_posters': '고유작성자',  # [Sim8] 도배 배제용 군중 폭
+        # ── 백테스트 전용 컬럼 ─────────────────────────────
+        # 아래 5개가 없어서 심8은 '리포트 엑셀(=추천 상위 2종목)'로 검증할 수밖에 없었다.
+        # 유니버스가 어긋나면 횡단면 z가 다른 값이 되어 신호 재현 자체가 깨진다.
+        # 심9의 거래대금 필터, 심9-1의 거래대금 z도 같은 이유로 검증 불가였다.
+        'amount': '거래대금',
+        'w52_hgpr': '52주최고',
+        'w52_lwpr': '52주최저',
+        'frgn_fake_ntby_qty': '외인추정순매수',
+        'orgn_fake_ntby_qty': '기관추정순매수',
         'posts_summary': '게시물_요약',
         'sentiment_score': '감정',
         'keywords': '키워드',
@@ -62,7 +71,9 @@ def analyze_discussion_trend(data_list):
     desired_order = [
         'name', 'price', 'change_rate', 'foreign_change', 'recent_posts_count', 'unique_posters',
         'foreign_rate', 'market',
-        'prev_close', 'open_price', 'day_high', 'day_low', 'prev_foreign_rate', 'posts_summary',
+        'prev_close', 'open_price', 'day_high', 'day_low', 'prev_foreign_rate',
+        'amount', 'w52_hgpr', 'w52_lwpr', 'frgn_fake_ntby_qty', 'orgn_fake_ntby_qty',
+        'posts_summary',
         'sentiment_score', 'keywords', 'consecutive_days', 'status', 'code'
     ]
     

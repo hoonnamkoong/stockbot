@@ -67,7 +67,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: python scripts/token_manager.py
 
-      - name: Fetch KOSPI top100 close CSV
+      - name: Fetch KOSPI top100 close + OHLCV CSV
         if: steps.gate.outputs.run == 'true'
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
@@ -86,10 +86,17 @@ jobs:
           git clone --branch db-data --depth 1 \
             https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_repo
           cp output/kospi_top100_close.csv db_repo/data/
+          # OHLCV는 종가 CSV와 같은 호출에서 나온다. 없으면 수집 코드가 퇴행한 것이므로
+          # 조용히 넘기지 않고 로그를 남긴다(종가 배포 자체는 계속한다).
+          if [ -f output/ohlcv_top100.csv ]; then
+            cp output/ohlcv_top100.csv db_repo/data/
+          else
+            echo "[OHLCV] 파일 없음 - 종가만 배포한다"
+          fi
           cd db_repo
-          git add data/kospi_top100_close.csv
+          git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv
           if ! git diff --cached --quiet; then
-            git commit -m "data: KOSPI top100 종가 CSV 갱신 $(date +'%Y-%m-%d KST')"
+            git commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')"
             git push origin db-data
             echo "[KOSPI CSV] db-data 배포 완료"
           else

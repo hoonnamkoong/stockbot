@@ -129,6 +129,7 @@ class DataFetcherWorker(BaseWorker):
                     return None, False, pages
 
                 s['recent_posts_count'] = count
+                s['unique_posters'] = stats['unique_posters']
                 s['status'] = status
                 # 상위 5개로 자르기 전에 당일 전체 제목을 아카이브 큐에 담는다.
                 # 열망 사전 검증에는 전수가 필요하고, 여기가 전수가 존재하는
@@ -214,7 +215,7 @@ class DataFetcherWorker(BaseWorker):
         details = {
             'foreign_rate': 0.0, 'foreign_change': 0.0,
             'foreign_net_buy': 0, 'prev_close': 0, 'prev_foreign_rate': 0.0,
-            'current_price': 0,
+            'current_price': 0, 'open_price': 0, 'day_high': 0, 'day_low': 0,
         }
         url = f"https://finance.naver.com/item/frgn.naver?code={code}"
         try:
@@ -287,6 +288,15 @@ class DataFetcherWorker(BaseWorker):
                             details['foreign_rate'] = float(out['hts_frgn_ehrt'])
                         if out.get('stck_sdpr'):
                             details['prev_close'] = int(out['stck_sdpr'])
+                        # [Sim9] 시가: 갭(=시가/전일종가) 산출용. 전일종가와 같은 응답 블록이라 추가 콜 0.
+                        if out.get('stck_oprc'):
+                            details['open_price'] = int(out['stck_oprc'])
+                        # [Sim9] 당일 고가/저가: 진입가가 그날 변동폭의 어디인지(일중 위치) 산출용.
+                        # 저가 근처에서 마감한 되밀림만 다음날 되돌아온다(실측).
+                        for _src, _dst in (('stck_hgpr', 'day_high'), ('stck_lwpr', 'day_low')):
+                            if out.get(_src):
+                                try: details[_dst] = int(out[_src])
+                                except (ValueError, TypeError): pass
                         # 신규 밸류에이션/52주 필드 (추가 API 호출 없이 동일 응답에서 파싱)
                         for _f in ('per', 'pbr'):
                             if out.get(_f):
@@ -367,7 +377,9 @@ class DataFetcherWorker(BaseWorker):
                 if not nid: continue
                 try: likes = int(cols[4].get_text(strip=True))
                 except: likes = 0
-                posts.append({'nid': nid.group(1), 'title': tag.get_text(strip=True), 'likes': likes})
+                writer = cols[2].get_text(strip=True)
+                posts.append({'nid': nid.group(1), 'title': tag.get_text(strip=True),
+                              'likes': likes, 'writer': writer})
             return posts, stop
 
         def fetch_page(p_idx):
@@ -405,8 +417,15 @@ class DataFetcherWorker(BaseWorker):
                     if stop: stop_all = True
                 if stop_all: break
 
+        # [Sim8] 고유 작성자 수 — 한 사람의 도배와 다수의 관심을 구분하는 축.
+        # writer 키는 여기서 떼어낸다. posts는 엑셀·LLM 프롬프트로 흘러가므로
+        # 필요 없는 필드를 실어 보내지 않는다.
+        writers = {p.pop('writer', '') for p in new_posts}
+        writers.discard('')
+
         return {
             'recent_posts_count': len(unique_nids),
+            'unique_posters': len(writers),
             'new_posts': new_posts,
             'total_pages': total_pages,
             'failed_pages': failed_pages,

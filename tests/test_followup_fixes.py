@@ -38,7 +38,9 @@ def test_discussion_stats_returns_only_live_keys(monkeypatch):
 
     stats = object.__new__(DataFetcherWorker)._get_discussion_stats('002990', TODAY)
 
-    assert set(stats) == {'recent_posts_count', 'new_posts', 'total_pages', 'failed_pages'}
+    # unique_posters는 Sim8 선행매집의 군중축 소비자가 있다(2026-07-28 추가).
+    assert set(stats) == {'recent_posts_count', 'unique_posters', 'new_posts',
+                          'total_pages', 'failed_pages'}
 
 
 # ── 2. adopted_registry.save()는 원자적이어야 한다 ──

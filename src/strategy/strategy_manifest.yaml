@@ -114,4 +114,23 @@ simulators:
     active: true
     tradeable: true
 
-  # Sim8, Sim9는 예비 슬롯
+  - id: "sim8_accumulation"
+    module: "src.strategy.simulators.sim8_accumulation"
+    class: "AccumulationSimulator"
+    description: "Sim8 선행매집 — 52주 앵커 구간의 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩"
+    active: true
+    tradeable: false  # 과거 검증 불가(엑셀에 52주·수급추정 컬럼 없음) — 페이퍼 관찰 단계
+
+  - id: "sim9_gap_fade"
+    module: "src.strategy.simulators.sim9_gap_fade"
+    class: "GapFadeSimulator"
+    description: "Sim9 갭소진 반등 — 갭>=+3% & 장중<=-3%를 14:30 이후 매수 + 익일 청산(타임스탑 1일)"
+    active: true
+    tradeable: false  # 실측 시가가 09:02 근사였음 — 실제 시가로 재검증 후 승격
+
+  - id: "sim9_1_donchian"
+    module: "src.strategy.simulators.sim9_1_donchian"
+    class: "DonchianBreakoutSimulator"
+    description: "Sim9-1 돈치안 채널 돌파 — 20일 채널 상단 돌파 + 10일 채널 이탈/2*ATR 청산 (Sim5의 정반대)"
+    active: true
+    tradeable: false  # 과거 검증 불가(엑셀 유니버스가 동적이라 20일 채널 신호 4건) — 페이퍼 관찰

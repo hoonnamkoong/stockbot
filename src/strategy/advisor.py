@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 # --- Trade Module Imports ---
 from src.trade.auth import get_access_token, load_env
 from src.trade.balance import get_balance
-from src.data import usage_log, gemini_cache
+from src.data import usage_log, gemini_cache, hype_dict
 
 class GeminiAgent:
     """
@@ -141,17 +141,36 @@ class GeminiAgent:
         # [W1] 당일 캐시 — 프롬프트는 (종목, 상위 글 제목들)로만 결정되므로
         # nid 집합이 같으면 답도 같다. 하루 39런 동안 같은 글을 다시 묻지 않는다.
         cache = gemini_cache.load()
-        cached_hits, pending = {}, []
+        cached_hits, pending, kept_posts = {}, [], {}
+        dropped_posts, noise_only = 0, 0
         for stock in batch_data:
-            key = gemini_cache.make_key(stock.get('code'), stock.get('posts'))
+            code = stock.get('code')
+            key = gemini_cache.make_key(code, stock.get('posts'))
             if key in cache:
-                cached_hits[stock.get('code')] = cache[key]
-            else:
-                pending.append(stock)
+                cached_hits[code] = cache[key]
+                continue
+
+            # [W3] 사전 라우팅 — 프롬프트가 어차피 0점 처리하는 열망·항복 표현뿐인
+            # 글은 보내지 않는다. 팩트 힌트가 있으면 사전이 앞질러 판단하지 않는다.
+            kept, dropped = hype_dict.filter_posts(stock.get('posts'))
+            dropped_posts += dropped
+            if stock.get('posts') and not kept:
+                # 전부 잡담이면 물어볼 게 없다. 캐시에는 넣지 않는다 —
+                # 사전 판정은 재계산이 공짜라 캐시를 채울 이유가 없다.
+                cached_hits[code] = {"sentiment": 0, "summary": "열망 표현만 (사전 판정)",
+                                     "keywords": []}
+                noise_only += 1
+                continue
+
+            kept_posts[code] = kept
+            pending.append(stock)
+
         usage_log.append({
             'event': 'cache_summary',
-            'cache_hit': len(cached_hits),
+            'cache_hit': len(cached_hits) - noise_only,
             'cache_miss': len(pending),
+            'posts_dropped': dropped_posts,
+            'noise_only_stocks': noise_only,
         })
 
         for i in range(0, len(pending), GROUP_SIZE):
@@ -159,7 +178,9 @@ class GeminiAgent:
             cleaned_batch = []
             for stock in group:
                 # 추천수가 높은 본문(Body)을 요약에 활용 (글자 수 제한 준수)
-                posts_text = "\n".join([f"[{p.get('title')}] {GeminiAgent.clean_text(str(p.get('body', '')))}" for p in stock.get('posts', [])])
+                # [W3] 사전이 걸러낸 글은 빼고 보낸다.
+                posts = kept_posts.get(stock.get('code'), stock.get('posts', []))
+                posts_text = "\n".join([f"[{p.get('title')}] {GeminiAgent.clean_text(str(p.get('body', '')))}" for p in posts])
                 cleaned_batch.append({
                     "code": stock.get('code'),
                     "name": stock.get('name'),
@@ -193,7 +214,10 @@ class GeminiAgent:
             group_before = len(all_results)
             GeminiAgent._usage_ctx = {
                 'req_stocks': len(cleaned_batch),
-                'req_posts': sum(len(s.get('posts', [])) for s in group),
+                # 사전 라우팅 후 실제로 보낸 글 수. 원본 수를 적으면
+                # '글 1개당 토큰'이 실제보다 낮게 나온다.
+                'req_posts': sum(len(kept_posts.get(s.get('code'), s.get('posts', [])))
+                                 for s in group),
             }
             try:
                 response = self._call_gemini_safe(

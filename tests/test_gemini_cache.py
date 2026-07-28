@@ -138,3 +138,78 @@ def test_cache_stats_are_logged(monkeypatch, tmp_path):
     rows = list(csv.DictReader(open(tmp_path / 'usage.csv', encoding='utf-8')))
     stats = [r for r in rows if r['event'] == 'cache_summary']
     assert [(r['cache_hit'], r['cache_miss']) for r in stats] == [('0', '1'), ('1', '0')]
+
+
+# ── [W3] 사전 라우팅 ─────────────────────────────────────
+from src.data import hype_dict
+
+
+def test_dict_flags_hype_only_title():
+    assert hype_dict.is_noise('가즈아 대박 쩜상 간다')
+
+
+def test_dict_flags_capitulation():
+    """항복군은 부호가 반대지만 팩트가 없기는 마찬가지다."""
+    assert hype_dict.is_noise('존버중 물렸다 반토막')
+
+
+def test_dict_keeps_fact_bearing_title():
+    """팩트 힌트가 있으면 사전이 프롬프트보다 앞질러 판단하지 않는다."""
+    assert not hype_dict.is_noise('공시 나왔다 가즈아')
+    assert not hype_dict.is_noise('증권사 전망 분석')
+
+
+def test_dict_keeps_plain_title():
+    assert not hype_dict.is_noise('오늘 거래량 왜 이래')
+
+
+def test_political_group_is_not_in_dictionary():
+    """정치 잡담은 종목 고정효과였다(정치글 79건 중 75건이 대형주 2곳). 폐기됨."""
+    assert not hype_dict.is_noise('이재명 대통령 정권 얘기')
+
+
+def test_noise_posts_are_dropped_from_prompt(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    batch = [{'code': '005930', 'name': '삼성전자', 'posts': [
+        {'nid': '1', 'title': '가즈아 대박'},          # 잡담 → 제외
+        {'nid': '2', 'title': '3분기 공시 나왔다'},     # 팩트 → 전송
+    ]}]
+    make_agent(ANSWER, calls).analyze_batch_discovery(batch)
+
+    assert len(calls) == 1
+    prompt = calls[0]
+    assert '3분기 공시' in prompt
+    assert '가즈아 대박' not in prompt
+
+
+def test_all_noise_stock_skips_llm(monkeypatch, tmp_path):
+    """전부 잡담이면 물어볼 게 없다 — 호출 자체를 하지 않는다."""
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    batch = [{'code': '005930', 'name': '삼성전자', 'posts': [
+        {'nid': '1', 'title': '가즈아 대박'},
+        {'nid': '2', 'title': '몰빵 간다'},
+    ]}]
+    out = make_agent(ANSWER, calls).analyze_batch_discovery(batch)
+
+    assert calls == []
+    assert out['005930']['sentiment'] == 0
+    assert '사전 판정' in out['005930']['summary']
+
+
+def test_routing_stats_are_logged(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    batch = [
+        {'code': 'A', 'name': 'a', 'posts': [{'nid': '1', 'title': '가즈아'},
+                                             {'nid': '2', 'title': '공시 확인'}]},
+        {'code': 'B', 'name': 'b', 'posts': [{'nid': '3', 'title': '존버 물렸다'}]},
+    ]
+    make_agent(ANSWER, calls).analyze_batch_discovery(batch)
+
+    rows = list(csv.DictReader(open(tmp_path / 'usage.csv', encoding='utf-8')))
+    s = [r for r in rows if r['event'] == 'cache_summary'][0]
+    assert s['posts_dropped'] == '2'        # 가즈아 + 존버
+    assert s['noise_only_stocks'] == '1'    # B는 통째로 스킵
+    assert s['cache_miss'] == '1'           # A만 호출

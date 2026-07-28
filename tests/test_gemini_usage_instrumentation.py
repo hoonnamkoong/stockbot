@@ -23,6 +23,14 @@ class FakeResponse:
         self.usage_metadata = usage
 
 
+@pytest.fixture(autouse=True)
+def isolate_cache(tmp_path, monkeypatch):
+    """analyze_batch_discovery가 data/gemini_cache.json에 쓴다. 격리하지 않으면
+    레포 data/를 오염시키고, 남은 캐시가 다음 실행의 호출 수를 바꿔버린다."""
+    monkeypatch.setattr(advisor_mod.gemini_cache, 'DEFAULT_PATH',
+                        str(tmp_path / 'cache.json'))
+
+
 def read_rows(path):
     return list(csv.DictReader(open(path, encoding='utf-8')))
 

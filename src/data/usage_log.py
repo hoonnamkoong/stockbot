@@ -30,6 +30,8 @@ COLUMNS = [
     'body_fail',       # 본문 수집 실패 건수
     'cache_hit',       # nid 집합 캐시 적중 종목 수 (재분석 회피)
     'cache_miss',      # 캐시 미스로 실제 호출한 종목 수
+    'posts_dropped',   # 사전 라우팅으로 제외한 게시글 수
+    'noise_only_stocks',  # 전부 잡담이라 호출 자체를 건너뛴 종목 수
 ]
 
 

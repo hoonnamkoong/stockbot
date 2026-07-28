@@ -157,11 +157,15 @@ def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
     return results
 
 
-# ── 4. 종목별 일별 종가 100건 ─────────────────────────
-def fetch_daily_close(code: str, token: str, count: int = 100) -> list[dict]:
+# ── 4. 종목별 일별 OHLCV 100건 ────────────────────────
+def fetch_daily_ohlcv(code: str, token: str, count: int = 100) -> list[dict]:
     """
     KIS 국내주식 기간별 시세 (TR: FHKST03010100)
     최대 100건 반환. count=100이면 1회 호출로 충분.
+
+    같은 응답에 시가·고가·저가·거래량·거래대금이 다 들어 있다. 종가만 쓰고 버리면
+    심9-1의 고가 채널·진짜 ATR, 심9의 실제 시가를 영영 못 만든다. 전부 보존한다.
+    (추가 API 콜 0 — 이미 하던 호출의 응답을 덜 버리는 것뿐이다.)
     """
     today     = datetime.now().strftime("%Y%m%d")
     start_dt  = (datetime.now() - timedelta(days=200)).strftime("%Y%m%d")  # 여유있게 200일 전
@@ -190,7 +194,15 @@ def fetch_daily_close(code: str, token: str, count: int = 100) -> list[dict]:
         date  = row.get("stck_bsop_date", "")
         close = row.get("stck_clpr", "")
         if date and close:
-            records.append({"date": date, "close": close})
+            records.append({
+                "date":   date,
+                "open":   row.get("stck_oprc", ""),
+                "high":   row.get("stck_hgpr", ""),
+                "low":    row.get("stck_lwpr", ""),
+                "close":  close,
+                "volume": row.get("acml_vol", ""),
+                "amount": row.get("acml_tr_pbmn", ""),
+            })
 
     # 내림차순(최신→오래된) → 오름차순으로 뒤집기
     records.reverse()
@@ -209,12 +221,14 @@ def main():
     # Wide 형태 CSV: 행=날짜, 열=종목코드
     # 먼저 모든 날짜 수집
     all_data: dict[str, dict[str, str]] = {}   # {code: {date: close}}
+    all_ohlcv: dict[str, list[dict]] = {}      # {code: [OHLCV 레코드]}
     all_dates: set[str] = set()
 
-    print(f"\n[STEP 2] {len(stocks)}개 종목 종가 수집 중...")
+    print(f"\n[STEP 2] {len(stocks)}개 종목 OHLCV 수집 중...")
     for i, s in enumerate(stocks, 1):
         code = s["code"]
-        records = fetch_daily_close(code, token, count=100)
+        records = fetch_daily_ohlcv(code, token, count=100)
+        all_ohlcv[code] = records
         all_data[code] = {r["date"]: r["close"] for r in records}
         all_dates.update(all_data[code].keys())
 
@@ -239,6 +253,26 @@ def main():
             writer.writerow(row)
 
     print(f"\n[완료] {out_path} 저장 ({len(sorted_dates)}행 × {len(stocks)+1}열)")
+
+    # OHLCV long 형태 CSV: 한 행 = 한 종목의 하루.
+    # wide로 만들면 종목당 6열이 되어 600열짜리 표가 된다. 백테스트도 long이 편하다.
+    date_set = set(sorted_dates)
+    ohlcv_path = Path("output/ohlcv_top100.csv")
+    with ohlcv_path.open("w", newline="", encoding="utf-8-sig") as f:
+        cols = ["date", "code", "name", "open", "high", "low", "close", "volume", "amount"]
+        writer = csv.DictWriter(f, fieldnames=cols)
+        writer.writeheader()
+        n = 0
+        for s in stocks:
+            for r in all_ohlcv.get(s["code"], []):
+                if r["date"] not in date_set:
+                    continue
+                writer.writerow({"date": r["date"], "code": s["code"], "name": s["name"],
+                                 "open": r["open"], "high": r["high"], "low": r["low"],
+                                 "close": r["close"], "volume": r["volume"],
+                                 "amount": r["amount"]})
+                n += 1
+    print(f"[완료] {ohlcv_path} 저장 ({n}행)")
 
     # 요약 출력
     print("\n=== 거래대금 상위 10 ===")

@@ -252,6 +252,60 @@ def test_none_z_values_no_crash():
     check('ignition4도 크래시 없이 계산된다', abs(r['ignition4'] - 0.0) < 1e-9)
 
 
+# ── Task 3: 배선 + 진입 불변 회귀 ──────────────────────────
+def _cand(code, posts, posters, likes, price=10000, change='+1.00%'):
+    return {'code': code, 'name': code, 'price': price, 'amount': 5_000_000_000,
+            'recent_posts_count': posts, 'unique_posters': posters,
+            'total_likes': likes, 'avg_posts': 10, 'change_rate': change,
+            'sparkline_price': [price] * 5, 'tick_power': 200, 'posts': []}
+
+
+def _view(**kw):
+    v = {'portfolio': {}, 'cash': 3000000, 'initial_cash': 3000000,
+         'nav': 3000000, 'cooldown_codes': {}, 'market_index_healthy': True,
+         'psych_prev_day': None, 'psych_last_run': None}
+    v.update(kw)
+    return v
+
+
+def test_decide_returns_snapshot():
+    cands = [_cand(f"{i:06d}", 50 + i * 7, 20 + i, 100 + i * 5) for i in range(12)]
+    prices = {c['code']: c['price'] for c in cands}
+    orders, diags, snap = sp.decide_psych(_view(), cands, prices,
+                                          today='20260728', hhmm='1030',
+                                          ts='2026-07-28 10:30:00')
+    check('3-tuple 반환', isinstance(snap, dict) and 'z' in snap)
+    check('스냅샷 날짜가 주입값', snap['date'] == '20260728')
+    check('diag에 이력 컬럼이 실린다',
+          all('d_sov' in d and 'ignition4' in d and 'hist_missing' in d for d in diags))
+
+
+def test_entry_decisions_unchanged_by_history():
+    """★ 진입 불변 회귀 — 이력이 있든 없든 진입/청산 결정이 같아야 한다.
+
+    이번 변경은 기록만 한다. ignition(3항)과 decision이 달라지면 실패다.
+    """
+    cands = [_cand(f"{i:06d}", 50 + i * 7, 20 + i, 100 + i * 5) for i in range(12)]
+    prices = {c['code']: c['price'] for c in cands}
+
+    o1, d1, snap1 = sp.decide_psych(_view(), cands, prices, today='20260728',
+                                    hhmm='1030', ts='t1')
+    prev = {'date': '20260727', 'ts': 't0',
+            'z': {c['code']: {'z_sov': -2.0, 'z_posters': -2.0, 'z_hype': -2.0}
+                  for c in cands}}
+    o2, d2, _ = sp.decide_psych(_view(psych_prev_day=prev, psych_last_run=prev),
+                                cands, prices, today='20260728',
+                                hhmm='1030', ts='t1')
+
+    check('주문이 동일', o1 == o2)
+    check('진입 결정이 동일', [d['decision'] for d in d1] == [d['decision'] for d in d2])
+    check('skip 사유가 동일', [d['reason'] for d in d1] == [d['reason'] for d in d2])
+    check('3항 ignition이 동일',
+          [d['ignition'] for d in d1] == [d['ignition'] for d in d2])
+    check('이력이 붙으면 d_sov는 달라진다(계산은 되고 있다)',
+          any(d['d_sov'] != 0 for d in d2))
+
+
 if __name__ == '__main__':
     test_new_columns_exist()
     test_header_rotation_on_mismatch()
@@ -268,6 +322,8 @@ if __name__ == '__main__':
     test_delta_z_excludes_missing()
     test_build_snapshot()
     test_none_z_values_no_crash()
+    test_decide_returns_snapshot()
+    test_entry_decisions_unchanged_by_history()
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} 통과")
     sys.exit(1 if failed else 0)

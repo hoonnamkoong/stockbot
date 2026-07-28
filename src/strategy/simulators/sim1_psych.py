@@ -175,13 +175,23 @@ def _features(candidates):
     return feat
 
 
-def decide_psych(view, candidates, current_prices):
-    """[Sim1] 심리 괴리형 결정. (orders, diags) 반환. 순수 함수."""
+def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=None):
+    """[Sim1] 심리 괴리형 결정. (orders, diags, snapshot) 반환. 순수 함수.
+
+    today·hhmm·ts는 주입받는다. 순수함수가 date.today()를 부르면
+    백테스트에서 스냅샷 롤오버가 영영 돌지 않는다.
+    """
     orders, diags = [], []
     portfolio = view['portfolio']
     sold = set()
     cand_by_code = {s.get('code'): s for s in candidates if s.get('code')}
     feat = _features(candidates)
+
+    rows = list(feat.values())
+    # 승격 판정은 run()이 이미 끝냈다. 여기서 다시 해석하지 않는다.
+    history_terms(rows, view.get('psych_prev_day'), view.get('psych_last_run'),
+                  today, hhmm)
+    snapshot = build_snapshot(rows, today, ts)
 
     # 1. 청산 — ATR 기반 동적 익절/손절 + 트레일링 (기존 유지)
     for code in list(portfolio.keys()):
@@ -217,7 +227,7 @@ def decide_psych(view, candidates, current_prices):
 
     # 2. 진입
     if not view['market_index_healthy']:
-        return orders, diags
+        return orders, diags, snapshot
 
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len([c for c in portfolio if c not in sold])
@@ -248,6 +258,12 @@ def decide_psych(view, candidates, current_prices):
             'z_likes': _fmt(f.get('z_likes')), 'ignition': _fmt(f.get('ignition')),
             'hype_score': f"{f.get('hype', 0):.3f}",
             'fact_score': stock.get('fact_score', 0),
+            'z_hype': _fmt(f.get('z_hype')),
+            'd_sov': _fmt(f.get('d_sov')), 'd_hype': _fmt(f.get('d_hype')),
+            'accel': _fmt(f.get('accel')), 'accel_d1': _fmt(f.get('accel_d1')),
+            'hist_missing': f.get('hist_missing', 1),
+            'hist_days_ago': f.get('hist_days_ago', ''),
+            'ignition4': _fmt(f.get('ignition4')),
         }
 
         skip = _skip_reason(stock, view, code, price, amount, change_rate,
@@ -271,7 +287,7 @@ def decide_psych(view, candidates, current_prices):
                        'reason': f"[심리] 관심 폭발 + 가격 정체 "
                                  f"(작성자 {int(f.get('posters', 0))}명, "
                                  f"배수 {buzz_ratio:.1f}x, ADX {adx:.1f})"})
-    return orders, diags
+    return orders, diags, snapshot
 
 
 def _fmt(v):
@@ -344,9 +360,29 @@ class PsychDivergenceSimulator(BaseSimulator):
         super().__init__("Psych", initial_cash)
 
     def run(self, candidates, current_prices=None):
+        from datetime import datetime, timedelta, timezone
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders, diags = decide_psych(self._view(current_prices), candidates, current_prices)
+
+        now = datetime.now(timezone(timedelta(hours=9)))
+        today = now.strftime('%Y%m%d')
+
+        # 승격은 여기 한 곳에서만 판정한다.
+        prev_day, last_run = resolve_history(self.state.get('psych_prev_day'),
+                                             self.state.get('psych_snapshot'),
+                                             today)
+        view = self._view(current_prices)
+        view['psych_prev_day'] = prev_day
+        view['psych_last_run'] = last_run
+
+        orders, diags, snapshot = decide_psych(
+            view, candidates, current_prices,
+            today=today, hhmm=now.strftime('%H%M'),
+            ts=now.strftime('%Y-%m-%d %H:%M:%S'))
+
+        self.state['psych_prev_day'] = prev_day
+        self.state['psych_snapshot'] = snapshot
+
         self._apply(orders, current_prices)
         sim_diag.append('sim1', diags)
         self.save_state(current_prices)

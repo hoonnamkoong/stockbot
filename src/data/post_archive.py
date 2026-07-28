@@ -18,11 +18,35 @@ DATA_DIR = 'data'
 
 
 def month_path(date_str: str) -> str:
-    """'2026-07-27' → 'data/post_titles_2026-07.csv'"""
-    return os.path.join(DATA_DIR, f"post_titles_{date_str[:7]}.csv")
+    """'2026-07-27' 또는 '20260727' → 'data/post_titles_2026-07.csv'
+
+    호출부가 넘기는 ctx.today_str이 '%Y%m%d'라 [:7] 슬라이스는 '2026072'가 됐다.
+    월이 아니라 10일 단위로 파일이 쪼개지고 있었다(2026-07-28 발견,
+    db-data에 post_titles_2026072.csv로 남아 있다). 구분자 유무와 무관하게
+    앞 6자리 숫자를 연·월로 읽는다.
+    """
+    digits = ''.join(ch for ch in str(date_str) if ch.isdigit())
+    if len(digits) < 6:
+        return os.path.join(DATA_DIR, "post_titles_unknown.csv")
+    return os.path.join(DATA_DIR, f"post_titles_{digits[:4]}-{digits[4:6]}.csv")
 
 
-def _existing_nids(path: str) -> set:
+def _legacy_paths(path: str) -> list:
+    """같은 달의 옛 이름 파일들. 파일명 버그로 흩어진 것을 중복 판정에 포함한다.
+
+    이게 없으면 이미 아카이브된 글이 새 파일에 다시 들어가 사전 검증의
+    빈도 통계가 부풀려진다 — 이 모듈이 nid로 거르는 이유 그대로다.
+    """
+    import glob
+    base = os.path.basename(path)                      # post_titles_2026-07.csv
+    if not base.startswith('post_titles_') or '-' not in base:
+        return []
+    ym = base[len('post_titles_'):-len('.csv')]        # 2026-07
+    pattern = os.path.join(DATA_DIR, f"post_titles_{ym.replace('-', '')}*.csv")
+    return [p for p in glob.glob(pattern) if p != path]
+
+
+def _read_nids(path: str) -> set:
     if not os.path.exists(path):
         return set()
     try:
@@ -30,6 +54,13 @@ def _existing_nids(path: str) -> set:
             return {r['nid'] for r in csv.DictReader(f) if r.get('nid')}
     except Exception:
         return set()
+
+
+def _existing_nids(path: str) -> set:
+    nids = _read_nids(path)
+    for legacy in _legacy_paths(path):
+        nids |= _read_nids(legacy)
+    return nids
 
 
 def append(records: list, path: str = None) -> int:

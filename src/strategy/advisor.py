@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 # --- Trade Module Imports ---
 from src.trade.auth import get_access_token, load_env
 from src.trade.balance import get_balance
-from src.data import usage_log
+from src.data import usage_log, gemini_cache
 
 class GeminiAgent:
     """
@@ -137,9 +137,25 @@ class GeminiAgent:
         # 종목 수가 많을 경우 10개씩 그룹화하여 API 호출
         GROUP_SIZE = 10
         all_results = {}
-        
-        for i in range(0, len(batch_data), GROUP_SIZE):
-            group = batch_data[i:i + GROUP_SIZE]
+
+        # [W1] 당일 캐시 — 프롬프트는 (종목, 상위 글 제목들)로만 결정되므로
+        # nid 집합이 같으면 답도 같다. 하루 39런 동안 같은 글을 다시 묻지 않는다.
+        cache = gemini_cache.load()
+        cached_hits, pending = {}, []
+        for stock in batch_data:
+            key = gemini_cache.make_key(stock.get('code'), stock.get('posts'))
+            if key in cache:
+                cached_hits[stock.get('code')] = cache[key]
+            else:
+                pending.append(stock)
+        usage_log.append({
+            'event': 'cache_summary',
+            'cache_hit': len(cached_hits),
+            'cache_miss': len(pending),
+        })
+
+        for i in range(0, len(pending), GROUP_SIZE):
+            group = pending[i:i + GROUP_SIZE]
             cleaned_batch = []
             for stock in group:
                 # 추천수가 높은 본문(Body)을 요약에 활용 (글자 수 제한 준수)
@@ -217,11 +233,23 @@ class GeminiAgent:
                 GeminiAgent._usage_ctx = {}
                 GeminiAgent._last_usage = {}
 
+        # [W1] 이번에 새로 받은 결과만 캐시에 넣는다. 실패 응답('분석 오류')을
+        # 캐시하면 하루 종일 그 종목이 오답으로 굳으므로 성공분만 저장한다.
+        for s in pending:
+            code = s.get('code')
+            if code in all_results:
+                cache[gemini_cache.make_key(code, s.get('posts'))] = all_results[code]
+        gemini_cache.save(cache)
+
         final_results = {}
         for s in batch_data:
             code = s.get('code')
-            final_results[code] = all_results.get(code, {"sentiment": 0, "summary": "분석 오류", "keywords": []})
-            
+            final_results[code] = (
+                all_results.get(code)
+                or cached_hits.get(code)
+                or {"sentiment": 0, "summary": "분석 오류", "keywords": []}
+            )
+
         return final_results
 
 class StrategyAdvisor:

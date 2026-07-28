@@ -17,7 +17,7 @@ DEFAULT_PATH = os.path.join('data', 'gemini_usage.csv')
 
 COLUMNS = [
     'timestamp',
-    'event',           # batch_call | run_summary
+    'event',           # batch_call | run_summary | cache_summary
     'model',
     'prompt_tokens',
     'output_tokens',
@@ -28,7 +28,31 @@ COLUMNS = [
     'req_chars',       # 프롬프트 길이 (토큰 미보고 시 대체 지표)
     'body_ok',         # 본문 수집 성공 건수
     'body_fail',       # 본문 수집 실패 건수
+    'cache_hit',       # nid 집합 캐시 적중 종목 수 (재분석 회피)
+    'cache_miss',      # 캐시 미스로 실제 호출한 종목 수
 ]
+
+
+def _ensure_header(path: str) -> None:
+    """옛 헤더로 만들어진 파일에 새 컬럼 행을 덧붙이면 열이 어긋난다.
+
+    헤더가 다르면 기존 행을 살린 채 새 헤더로 다시 쓴다. 이 로그는 비용·표본
+    결정의 근거라, 조용히 밀린 열 하나가 판단을 통째로 뒤집을 수 있다.
+    """
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        return
+    try:
+        with open(path, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            if reader.fieldnames == COLUMNS:
+                return
+            rows = list(reader)
+        with open(path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=COLUMNS)
+            writer.writeheader()
+            writer.writerows({c: r.get(c, '') for c in COLUMNS} for r in rows)
+    except Exception:
+        pass
 
 
 def append(record: dict, path: str | None = None) -> None:
@@ -41,6 +65,7 @@ def append(record: dict, path: str | None = None) -> None:
     """
     try:
         path = path or DEFAULT_PATH
+        _ensure_header(path)
         row = {c: record.get(c, '') for c in COLUMNS}
         if not row['timestamp']:
             row['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

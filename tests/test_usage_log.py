@@ -61,3 +61,23 @@ def test_write_failure_is_swallowed(tmp_path):
     """계측 실패가 스크래퍼 런을 죽이면 안 된다."""
     bad = tmp_path / 'nonexistent_dir' / 'x.csv'
     usage_log.append({'event': 'batch_call'}, path=str(bad))  # 예외가 나면 테스트 실패
+
+
+def test_old_header_is_migrated(tmp_path):
+    """컬럼이 늘어난 뒤 옛 헤더 파일에 그냥 덧붙이면 열이 밀린다.
+    이 로그는 비용·표본 결정의 근거라 조용히 밀린 열 하나가 판단을 뒤집는다."""
+    path = tmp_path / 'gemini_usage.csv'
+    old_cols = ['timestamp', 'event', 'model']
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        w = csv.DictWriter(f, fieldnames=old_cols)
+        w.writeheader()
+        w.writerow({'timestamp': 'T0', 'event': 'batch_call', 'model': 'flash-lite'})
+
+    usage_log.append({'event': 'cache_summary', 'cache_hit': 7, 'cache_miss': 2},
+                     path=str(path))
+
+    rows = list(csv.DictReader(open(path, encoding='utf-8')))
+    assert len(rows) == 2
+    assert set(rows[0].keys()) == set(usage_log.COLUMNS)
+    assert rows[0]['model'] == 'flash-lite' and rows[0]['cache_hit'] == ''
+    assert rows[1]['cache_hit'] == '7' and rows[1]['cache_miss'] == '2'

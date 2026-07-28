@@ -112,3 +112,40 @@ def test_worker_queue_handles_empty(monkeypatch):
 
     w._queue_titles({'code': 'c', 'name': 'n'}, [])
     assert w._title_rows == []
+
+
+# ── 파일명 (2026-07-28 버그 수정) ────────────────────────
+def test_month_path_accepts_compact_date():
+    """호출부가 넘기는 ctx.today_str이 '%Y%m%d'다. [:7]로 자르면 '2026072'가
+    되어 월이 아니라 10일 단위로 파일이 쪼개졌다."""
+    assert post_archive.month_path('20260728').endswith('post_titles_2026-07.csv')
+
+
+def test_month_path_accepts_dashed_date():
+    assert post_archive.month_path('2026-07-28').endswith('post_titles_2026-07.csv')
+
+
+def test_month_path_groups_whole_month():
+    """같은 달의 1일과 28일이 한 파일이어야 한다."""
+    assert post_archive.month_path('20260701') == post_archive.month_path('20260728')
+
+
+def test_dedupes_against_legacy_filename(tmp_path, monkeypatch):
+    """옛 이름으로 이미 아카이브된 글이 새 파일에 다시 들어가면 안 된다."""
+    monkeypatch.setattr(post_archive, 'DATA_DIR', str(tmp_path))
+    legacy = tmp_path / 'post_titles_2026072.csv'
+    with open(legacy, 'w', newline='', encoding='utf-8') as f:
+        w = csv.DictWriter(f, fieldnames=post_archive.COLUMNS)
+        w.writeheader()
+        w.writerow({'date': '20260728', 'code': '005930', 'name': '삼성전자',
+                    'nid': '777', 'title': '옛글', 'likes': 1})
+
+    added = post_archive.append([
+        {'date': '20260728', 'code': '005930', 'name': '삼성전자',
+         'nid': '777', 'title': '옛글', 'likes': 1},
+        {'date': '20260728', 'code': '005930', 'name': '삼성전자',
+         'nid': '888', 'title': '새글', 'likes': 2},
+    ])
+    assert added == 1
+    r = rows(tmp_path / 'post_titles_2026-07.csv')
+    assert [x['nid'] for x in r] == ['888']

@@ -29,23 +29,54 @@ def test_new_columns_exist():
 
 
 def test_header_rotation_on_mismatch():
-    """헤더가 다른 기존 파일이 있으면 새 파일로 회전한다."""
+    """헤더가 다른 기존 파일이 있으면 옆으로 옮기고 정규 경로에 새로 쓴다."""
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, 'sim1_diag_2026-07.csv')
+        # 구 헤더로 기존 파일 작성
         with open(path, 'w', newline='', encoding='utf-8') as f:
-            f.write('ts,sim,code\nold,sim1,005930\n')      # 구 헤더
+            f.write('ts,sim,code\nold,sim1,005930\n')
+
+        # 첫 번째 append: 헤더 불일치 감지 → 옛 파일 옮김 → 정규 경로에 새 헤더 쓰기
         sim_diag.append('sim1', [{'code': '005930', 'd_sov': '1.5'}], path=path)
 
+        # 정규 경로에 새 헤더와 새 행이 쓰임
         with open(path, encoding='utf-8') as f:
-            head = f.readline().strip().split(',')
-        check('헤더 불일치 시 기존 파일을 덮지 않는다', head == ['ts', 'sim', 'code'])
-
-        rotated = [n for n in os.listdir(d) if n != os.path.basename(path)]
-        check('회전 파일이 생성된다', len(rotated) == 1)
-        with open(os.path.join(d, rotated[0]), encoding='utf-8') as f:
             rows = list(csv.DictReader(f))
-        check('회전 파일에 새 컬럼이 기록된다',
+        check('정규 경로에 새 헤더와 새 행이 기록됨',
               len(rows) == 1 and rows[0]['d_sov'] == '1.5')
+
+        # 옛 파일이 옆으로 옮겨짐
+        rotated = [n for n in os.listdir(d) if n != os.path.basename(path)]
+        check('옛 파일이 옆으로 옮겨짐', len(rotated) == 1)
+        with open(os.path.join(d, rotated[0]), encoding='utf-8') as f:
+            old_rows = list(csv.DictReader(f))
+        check('옛 파일에 구 데이터가 그대로 남아있음',
+              len(old_rows) == 1 and old_rows[0]['code'] == '005930')
+
+
+def test_no_repeat_rotation_on_consecutive_calls():
+    """연속 호출에서 파일이 더 늘어나지 않는다 (회귀 방지)."""
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, 'sim1_diag_2026-07.csv')
+        # 구 헤더로 기존 파일 작성
+        with open(path, 'w', newline='', encoding='utf-8') as f:
+            f.write('ts,sim,code\nold,sim1,005930\n')
+
+        # 3회 연속 append
+        sim_diag.append('sim1', [{'code': '005930', 'd_sov': '1.5'}], path=path)
+        sim_diag.append('sim1', [{'code': '005931', 'd_sov': '2.0'}], path=path)
+        sim_diag.append('sim1', [{'code': '005932', 'd_sov': '2.5'}], path=path)
+
+        # 파일은 정확히 2개여야 함 (정규 경로 1개 + 옛 파일 1개)
+        files = os.listdir(d)
+        check('연속 호출 후 파일 개수는 2개 (회전 1회만)',
+              len(files) == 2)
+
+        # 정규 경로에 3행 모두 기록됨
+        with open(path, encoding='utf-8') as f:
+            rows = list(csv.DictReader(f))
+        check('정규 경로에 3행 모두 기록됨',
+              len(rows) == 3)
 
 
 def test_append_still_works_on_fresh_file():
@@ -61,6 +92,7 @@ def test_append_still_works_on_fresh_file():
 if __name__ == '__main__':
     test_new_columns_exist()
     test_header_rotation_on_mismatch()
+    test_no_repeat_rotation_on_consecutive_calls()
     test_append_still_works_on_fresh_file()
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} 통과")

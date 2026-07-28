@@ -43,27 +43,36 @@ def _today() -> str:
     return datetime.now(timezone(timedelta(hours=9))).strftime('%Y%m%d')
 
 
-def _rotate_if_stale(path) -> str:
-    """기존 파일 헤더가 현재 COLUMNS와 다르면 옆으로 치우고 새 파일을 쓰게 한다.
+def _move_stale_if_needed(path) -> None:
+    """기존 파일 헤더가 현재 COLUMNS와 다르면 옆으로 옮긴다.
 
     append는 빈 파일일 때만 헤더를 쓴다. 컬럼이 늘어난 뒤 옛 파일에 이어 쓰면
     열이 조용히 어긋나 로그 전체가 못 쓰게 된다.
+
+    이 함수는 **한 번만** 옛 파일을 옆으로 옮기고, 정규 경로는 비워둔다.
+    다음 호출에서는 정규 경로의 헤더가 이미 일치하므로 다시 이동이 일어나지 않는다.
     """
     if not os.path.exists(path) or os.path.getsize(path) == 0:
-        return path
+        return
     try:
         with open(path, encoding='utf-8') as f:
             head = f.readline().strip().lstrip('﻿').split(',')
     except Exception:
-        return path
+        return
     if head == COLUMNS:
-        return path
+        return
+    # 옛 헤더를 가진 파일을 옆으로 옮긴다
     base, ext = os.path.splitext(path)
     for i in range(1, 100):
         alt = f"{base}_v{i}{ext}"
         if not os.path.exists(alt):
-            return alt
-    return path
+            try:
+                os.rename(path, alt)
+            except Exception:
+                # 파일 잠김 등으로 옮기 실패해도 로깅이 죽으면 안 됨
+                pass
+            return
+    # range 소진 시 (거의 일어나지 않음) — 어쩔 수 없음
 
 
 def append(sim: str, records: list, path: str = None) -> int:
@@ -75,7 +84,7 @@ def append(sim: str, records: list, path: str = None) -> int:
         return 0
     try:
         path = path or month_path(sim)
-        path = _rotate_if_stale(path)
+        _move_stale_if_needed(path)
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
         ts = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')
         is_new = not os.path.exists(path) or os.path.getsize(path) == 0

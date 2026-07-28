@@ -46,6 +46,89 @@ def _zmap(pairs):
     return {c: (v - mu) / sd for c, v in pairs}
 
 
+HIST_MAX_DAYS = 5            # 주말 낀 연휴(금~화)까지는 '전일'로 인정한다
+ACCEL_START_HHMM = '0930'    # 개장 30분은 z가 90분위 2.46z로 요동한다(실측)
+
+
+def resolve_history(prev_day, snapshot, today):
+    """(prev_day, last_run) 결정. 순수함수.
+
+    직전 런 스냅샷의 날짜가 오늘이 아니면 그것이 곧 전일 마지막 런이다.
+    이 사실 하나로 승격이 끝나므로 '당일 마지막'을 따로 추적할 필요가 없다.
+    """
+    if snapshot and snapshot.get('date') != today:
+        return snapshot, None
+    return prev_day, snapshot
+
+
+def _days_between(older, newer):
+    """'YYYYMMDD' 두 개의 일수 차. 못 읽으면 None."""
+    from datetime import datetime
+    try:
+        a = datetime.strptime(str(older), '%Y%m%d')
+        b = datetime.strptime(str(newer), '%Y%m%d')
+    except (ValueError, TypeError):
+        return None
+    return (b - a).days
+
+
+def history_terms(rows, prev_day, last_run, today, hhmm):
+    """rows에 이력 파생값을 제자리로 채운다.
+
+    결측은 중립 0이다. 매일 후보의 38~48%가 신규 유입이라(실측) 이건
+    예외 처리가 아니라 절반의 정책이다. fail-closed는 Sim1이 노리는
+    '새로 터진 관심'을 구조적으로 배제한다.
+    """
+    pz = (prev_day or {}).get('z', {})
+    lz = (last_run or {}).get('z', {})
+    days_ago = _days_between((prev_day or {}).get('date'), today)
+    usable = bool(pz) and days_ago is not None and 0 < days_ago <= HIST_MAX_DAYS
+    accel_ok = str(hhmm) >= ACCEL_START_HHMM
+
+    raw = {}
+    for r in rows:
+        c = r['code']
+        p = pz.get(c) if usable else None
+        r['hist_days_ago'] = days_ago if days_ago is not None else ''
+        r['hist_missing'] = 0 if p else 1
+        if p:
+            raw[c] = (r.get('z_sov', 0) - p['z_sov'], r.get('z_hype', 0) - p['z_hype'])
+            r['accel_d1'] = r.get('z_posters', 0) - p['z_posters']
+        else:
+            r['accel_d1'] = 0
+
+        l = lz.get(c)
+        r['accel'] = (r.get('z_posters', 0) - l['z_posters']) if (l and accel_ok) else 0
+
+    # 델타의 횡단면 z는 이력 있는 종목만으로 만든다.
+    # 결측의 0을 분포에 넣으면 z가 왜곡된다.
+    zd_sov = _zmap([(c, v[0]) for c, v in raw.items()])
+    zd_hype = _zmap([(c, v[1]) for c, v in raw.items()])
+    for r in rows:
+        c = r['code']
+        r['d_sov'] = raw[c][0] if c in raw else 0
+        r['d_hype'] = raw[c][1] if c in raw else 0
+        # 설계식 4항. 계산만 하고 진입에는 쓰지 않는다 — 3항과 나란히
+        # 기록해 다음 거래일 로그로 분포·통과율을 비교하기 위한 값이다.
+        parts = [1.0 * (r.get('z_posters') or 0),
+                 1.0 * zd_sov.get(c, 0),
+                 0.7 * zd_hype.get(c, 0),
+                 0.5 * (r.get('z_likes') or 0)]
+        r['ignition4'] = sum(parts)
+
+
+def build_snapshot(rows, today, ts):
+    """이번 런의 z를 스냅샷으로. z 스케일만 담는다 — 원값은 당일 누적이라
+    오전에 60~77% 어긋난다(실측)."""
+    z = {}
+    for r in rows:
+        if r.get('z_sov') is None or r.get('z_posters') is None or r.get('z_hype') is None:
+            continue
+        z[r['code']] = {'z_sov': r['z_sov'], 'z_posters': r['z_posters'],
+                        'z_hype': r['z_hype']}
+    return {'date': today, 'ts': ts, 'z': z}
+
+
 def _features(candidates):
     """후보 횡단면 → 종목별 심리 지표.
 
@@ -75,12 +158,14 @@ def _features(candidates):
     z_posters = _zmap([(r['code'], r['posters']) for r in rows])
     z_sov = _zmap([(r['code'], r['sov']) for r in rows])
     z_likes = _zmap([(r['code'], r['likes_per_post']) for r in rows])
+    z_hype = _zmap([(r['code'], r['hype']) for r in rows])
     feat = {}
     for r in rows:
         c = r['code']
         r['z_posters'] = z_posters.get(c)
         r['z_sov'] = z_sov.get(c)
         r['z_likes'] = z_likes.get(c)
+        r['z_hype'] = z_hype.get(c)
         # 관측 가능한 항만 합산한 잠정 점화 지표. 임계값은 아직 걸지 않는다 —
         # d_sov·accel(이력 필요)이 빠져 있어 스케일이 설계안과 다르다.
         # 로그로 분포를 본 뒤 임계값을 정한다.

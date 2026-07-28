@@ -121,12 +121,130 @@ def test_rename_failure_prevents_data_corruption():
               True)  # 위의 append 호출이 예외 없이 완료됨
 
 
+# ── Task 2: 스냅샷 승격 · 파생 3항 ─────────────────────────
+from src.strategy.simulators import sim1_psych as sp
+
+
+def _snap(date, ts='15:37', **codes):
+    """{code: (z_sov, z_posters, z_hype)} → 스냅샷 dict"""
+    return {'date': date, 'ts': ts,
+            'z': {c: {'z_sov': v[0], 'z_posters': v[1], 'z_hype': v[2]}
+                  for c, v in codes.items()}}
+
+
+def test_promote_on_date_change():
+    """직전 런이 어제 것이면 그것이 전일 확정값으로 승격된다."""
+    old_prev = _snap('20260724', A=(0.1, 0.1, 0.1))
+    yesterday = _snap('20260727', A=(1.0, 1.0, 1.0))
+    prev, last = sp.resolve_history(old_prev, yesterday, '20260728')
+    check('날짜가 바뀌면 직전 런이 prev_day로 승격', prev is yesterday)
+    check('그날 첫 런에는 직전 런이 없다', last is None)
+
+
+def test_no_promote_same_day():
+    """같은 날 두 번째 런에서는 prev_day가 유지된다."""
+    prev_day = _snap('20260727', A=(1.0, 1.0, 1.0))
+    same_day = _snap('20260728', ts='10:21', A=(2.0, 2.0, 2.0))
+    prev, last = sp.resolve_history(prev_day, same_day, '20260728')
+    check('같은 날엔 prev_day 유지', prev is prev_day)
+    check('같은 날엔 직전 런이 살아 있다', last is same_day)
+
+
+def test_first_ever_run():
+    prev, last = sp.resolve_history(None, None, '20260728')
+    check('이력이 아예 없으면 둘 다 None', prev is None and last is None)
+
+
+def test_derived_terms_basic():
+    prev_day = _snap('20260727', A=(1.0, 0.5, 0.2))
+    last_run = _snap('20260728', ts='10:21', A=(1.4, 0.9, 0.3))
+    rows = [{'code': 'A', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6, 'z_likes': 0.4}]
+    sp.history_terms(rows, prev_day, last_run, '20260728', '1030')
+    r = rows[0]
+    check('d_sov = 오늘 − 전일', abs(r['d_sov'] - 0.5) < 1e-9)
+    check('d_hype = 오늘 − 전일', abs(r['d_hype'] - 0.4) < 1e-9)
+    check('accel = 오늘 − 직전 런', abs(r['accel'] - 0.3) < 1e-9)
+    check('accel_d1 = 오늘 − 전일', abs(r['accel_d1'] - 0.7) < 1e-9)
+    check('이력 있으면 hist_missing=0', r['hist_missing'] == 0)
+    check('hist_days_ago = 1', r['hist_days_ago'] == 1)
+
+
+def test_missing_history_is_neutral_zero():
+    prev_day = _snap('20260727', A=(1.0, 0.5, 0.2))
+    rows = [{'code': 'B', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6, 'z_likes': 0.4}]
+    sp.history_terms(rows, prev_day, None, '20260728', '1030')
+    r = rows[0]
+    check('신규 유입은 d_sov=0', r['d_sov'] == 0)
+    check('신규 유입은 d_hype=0', r['d_hype'] == 0)
+    check('신규 유입은 hist_missing=1', r['hist_missing'] == 1)
+
+
+def test_stale_history_treated_missing():
+    """5일 초과 이력은 '전일'이라 부를 수 없다."""
+    prev_day = _snap('20260720', A=(1.0, 0.5, 0.2))
+    rows = [{'code': 'A', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6, 'z_likes': 0.4}]
+    sp.history_terms(rows, prev_day, None, '20260728', '1030')
+    check('8일 전 이력은 결측 취급', rows[0]['hist_missing'] == 1 and rows[0]['d_sov'] == 0)
+    check('hist_days_ago는 그대로 기록', rows[0]['hist_days_ago'] == 8)
+
+
+def test_accel_suppressed_before_0930():
+    prev_day = _snap('20260727', A=(1.0, 0.5, 0.2))
+    last_run = _snap('20260728', ts='09:15', A=(1.4, 0.9, 0.3))
+    rows = [{'code': 'A', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6, 'z_likes': 0.4}]
+    sp.history_terms(rows, prev_day, last_run, '20260728', '0915')
+    check('09:30 이전 accel=0', rows[0]['accel'] == 0)
+    check('09:30 이전에도 accel_d1은 계산', abs(rows[0]['accel_d1'] - 0.7) < 1e-9)
+
+    rows2 = [{'code': 'A', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6, 'z_likes': 0.4}]
+    sp.history_terms(rows2, prev_day, last_run, '20260728', '0930')
+    check('09:30부터 accel 정상', abs(rows2[0]['accel'] - 0.3) < 1e-9)
+
+
+def test_delta_z_excludes_missing():
+    """z(d_sov)는 이력 있는 종목만으로 계산한다.
+
+    결측 종목의 0을 분포에 넣으면 z가 왜곡된다. 이력 종목 10개(_zmap의
+    MIN_SAMPLE)의 d_sov가 전부 같으면 분산 0이라 z는 만들어지지 않고,
+    ignition4는 z(d_sov) 항 없이 계산된다.
+    """
+    codes = {f"H{i}": (1.0, 0.5, 0.2) for i in range(10)}
+    prev_day = _snap('20260727', **codes)
+    rows = [{'code': f"H{i}", 'z_sov': 2.0, 'z_posters': 1.0,
+             'z_hype': 0.7, 'z_likes': 0.4} for i in range(10)]
+    rows.append({'code': 'NEW', 'z_sov': 2.0, 'z_posters': 1.0,
+                 'z_hype': 0.7, 'z_likes': 0.4})
+    sp.history_terms(rows, prev_day, None, '20260728', '1030')
+    new_row = rows[-1]
+    check('결측 종목의 d_sov는 0', new_row['d_sov'] == 0)
+    check('이력 종목의 d_sov는 1.0', abs(rows[0]['d_sov'] - 1.0) < 1e-9)
+    check('모든 행에 ignition4가 있다', all('ignition4' in r for r in rows))
+
+
+def test_build_snapshot():
+    rows = [{'code': 'A', 'z_sov': 1.5, 'z_posters': 1.2, 'z_hype': 0.6},
+            {'code': 'B', 'z_sov': None, 'z_posters': 0.3, 'z_hype': 0.1}]
+    snap = sp.build_snapshot(rows, '20260728', '2026-07-28 10:30:00')
+    check('스냅샷 날짜', snap['date'] == '20260728')
+    check('스냅샷에 z만 담긴다', set(snap['z']['A']) == {'z_sov', 'z_posters', 'z_hype'})
+    check('z가 None인 종목은 담지 않는다', 'B' not in snap['z'])
+
+
 if __name__ == '__main__':
     test_new_columns_exist()
     test_header_rotation_on_mismatch()
     test_no_repeat_rotation_on_consecutive_calls()
     test_append_still_works_on_fresh_file()
     test_rename_failure_prevents_data_corruption()
+    test_promote_on_date_change()
+    test_no_promote_same_day()
+    test_first_ever_run()
+    test_derived_terms_basic()
+    test_missing_history_is_neutral_zero()
+    test_stale_history_treated_missing()
+    test_accel_suppressed_before_0930()
+    test_delta_z_excludes_missing()
+    test_build_snapshot()
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} 통과")
     sys.exit(1 if failed else 0)

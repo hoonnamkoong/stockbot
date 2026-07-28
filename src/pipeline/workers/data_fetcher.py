@@ -132,6 +132,7 @@ class DataFetcherWorker(BaseWorker):
 
                 s['recent_posts_count'] = count
                 s['unique_posters'] = stats['unique_posters']
+                s['total_likes'] = stats['total_likes']
                 s['status'] = status
                 # 상위 5개로 자르기 전에 당일 전체 제목을 아카이브 큐에 담는다.
                 # 열망 사전 검증에는 전수가 필요하고, 여기가 전수가 존재하는
@@ -431,9 +432,14 @@ class DataFetcherWorker(BaseWorker):
         writers = {p.pop('writer', '') for p in new_posts}
         writers.discard('')
 
+        # [Sim1] 당일 전체 글의 공감 총량. 전수 스캔 중이라 추가 비용이 없는데
+        # 지금까지는 상위 N개만 남기고 나머지 likes를 버리고 있었다.
+        total_likes = sum(int(p.get('likes', 0) or 0) for p in new_posts)
+
         return {
             'recent_posts_count': len(unique_nids),
             'unique_posters': len(writers),
+            'total_likes': total_likes,
             'new_posts': new_posts,
             'total_pages': total_pages,
             'failed_pages': failed_pages,

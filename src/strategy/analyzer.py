@@ -52,6 +52,7 @@ def analyze_discussion_trend(data_list):
         'recent_posts_count': '게시물', # Vercel 대시보드와 맞춤
         'unique_posters': '고유작성자',  # [Sim8] 도배 배제용 군중 폭
         'fact_score': '팩트점수',        # [Sim1] 보유기간·목표가 분기용
+        'total_likes': '공감총량',       # [Sim1] 관심의 깊이 (글 수와 별개 축)
         # ── 백테스트 전용 컬럼 ─────────────────────────────
         # 아래 5개가 없어서 심8은 '리포트 엑셀(=추천 상위 2종목)'로 검증할 수밖에 없었다.
         # 유니버스가 어긋나면 횡단면 z가 다른 값이 되어 신호 재현 자체가 깨진다.
@@ -71,7 +72,7 @@ def analyze_discussion_trend(data_list):
     # 2. 존재하는 컬럼만 선택하여 순서 지정
     desired_order = [
         'name', 'price', 'change_rate', 'foreign_change', 'recent_posts_count', 'unique_posters',
-        'foreign_rate', 'market',
+        'total_likes', 'foreign_rate', 'market',
         'prev_close', 'open_price', 'day_high', 'day_low', 'prev_foreign_rate',
         'amount', 'w52_hgpr', 'w52_lwpr', 'frgn_fake_ntby_qty', 'orgn_fake_ntby_qty',
         'posts_summary',

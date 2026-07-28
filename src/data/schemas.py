@@ -39,6 +39,7 @@ class StockData(BaseModel):
     recent_posts_count: int = 0
     unique_posters: int = 0     # [Sim8] 당일 게시글의 고유 작성자 수 (도배 배제)
     fact_score: float = 0.0     # [Sim1] Gemini가 매긴 팩트 근거 강도 (0~1)
+    total_likes: int = 0        # [Sim1] 당일 전체 게시글의 공감 총량
     foreign_rate: float = 0.0
     foreign_change: float = 0.0
     inst_net_buy: int = 0

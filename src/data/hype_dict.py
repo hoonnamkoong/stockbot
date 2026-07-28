@@ -58,6 +58,20 @@ def is_noise(text: str) -> bool:
     return bool(_HYPE_RE.search(t) or _CAPIT_RE.search(t))
 
 
+def hype_score(titles) -> float:
+    """열망 히트율 − 항복 히트율. -1.0 ~ +1.0.
+
+    Sim1 열망축이 쓴다. 항복군을 빼는 이유: 상투가 아니라 바닥권 신호라
+    부호가 반대다(lift 0.30~0.60, 임계 전 구간에서 재현).
+    """
+    ts = [str(t or '') for t in (titles or []) if str(t or '').strip()]
+    if not ts:
+        return 0.0
+    hype = sum(1 for t in ts if _HYPE_RE.search(t))
+    capit = sum(1 for t in ts if _CAPIT_RE.search(t))
+    return (hype - capit) / len(ts)
+
+
 def filter_posts(posts: list) -> tuple:
     """(보낼 글, 걸러낸 수). 제목만 본다 — 본문은 100% 수집 실패 중이다."""
     kept = [p for p in (posts or []) if not is_noise(p.get('title', ''))]

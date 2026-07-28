@@ -241,7 +241,8 @@ class BaseSimulator:
         if updated:
             self.save_state()
 
-    def calculate_atr(self, sparkline_price: list, period: int = 5) -> float:
+    @staticmethod
+    def calculate_atr(sparkline_price: list, period: int = 5) -> float:
         """[V60.1 Patch] 변동성(ATR) 계산 및 하한값(Fallback) 설정"""
         if len(sparkline_price) < 2:
             return 1.0 # 최소 변동폭 1원 설정 (나누기 0 방지)

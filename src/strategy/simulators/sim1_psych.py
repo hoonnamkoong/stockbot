@@ -92,13 +92,13 @@ def history_terms(rows, prev_day, last_run, today, hhmm):
         r['hist_days_ago'] = days_ago if days_ago is not None else ''
         r['hist_missing'] = 0 if p else 1
         if p:
-            raw[c] = (r.get('z_sov', 0) - p['z_sov'], r.get('z_hype', 0) - p['z_hype'])
-            r['accel_d1'] = r.get('z_posters', 0) - p['z_posters']
+            raw[c] = ((r.get('z_sov') or 0) - p['z_sov'], (r.get('z_hype') or 0) - p['z_hype'])
+            r['accel_d1'] = (r.get('z_posters') or 0) - p['z_posters']
         else:
             r['accel_d1'] = 0
 
         l = lz.get(c)
-        r['accel'] = (r.get('z_posters', 0) - l['z_posters']) if (l and accel_ok) else 0
+        r['accel'] = ((r.get('z_posters') or 0) - l['z_posters']) if (l and accel_ok) else 0
 
     # 델타의 횡단면 z는 이력 있는 종목만으로 만든다.
     # 결측의 0을 분포에 넣으면 z가 왜곡된다.

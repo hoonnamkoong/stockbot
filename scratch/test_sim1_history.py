@@ -230,6 +230,28 @@ def test_build_snapshot():
     check('z가 None인 종목은 담지 않는다', 'B' not in snap['z'])
 
 
+def test_none_z_values_no_crash():
+    """`_zmap`이 표본 부족(<MIN_SAMPLE)·분산 0으로 {}를 반환하면 오늘 행의
+    z_sov·z_posters·z_hype가 (키는 있되) None으로 남는다. 개장 초반·후보가
+    적은 날 실제로 벌어지는 상황이며, 이 경우도 크래시 없이 중립 0을
+    기준으로 파생값을 계산해야 한다(`.get(key, 0)`은 키가 존재하면 저장된
+    None을 그대로 돌려줘 크래시를 낸다 — `.get(key) or 0`이어야 한다)."""
+    prev_day = _snap('20260727', A=(1.0, 0.5, 0.2))
+    last_run = _snap('20260728', ts='10:21', A=(1.4, 0.9, 0.3))
+    rows = [{'code': 'A', 'z_sov': None, 'z_posters': None, 'z_hype': None, 'z_likes': None}]
+    sp.history_terms(rows, prev_day, last_run, '20260728', '1030')
+    r = rows[0]
+    check('z_sov=None이어도 d_sov는 0 기준으로 계산(크래시 없음)',
+          abs(r['d_sov'] - (0 - 1.0)) < 1e-9)
+    check('z_hype=None이어도 d_hype는 0 기준으로 계산(크래시 없음)',
+          abs(r['d_hype'] - (0 - 0.2)) < 1e-9)
+    check('z_posters=None이어도 accel_d1은 0 기준으로 계산(크래시 없음)',
+          abs(r['accel_d1'] - (0 - 0.5)) < 1e-9)
+    check('z_posters=None이어도 accel은 0 기준으로 계산(크래시 없음)',
+          abs(r['accel'] - (0 - 0.9)) < 1e-9)
+    check('ignition4도 크래시 없이 계산된다', abs(r['ignition4'] - 0.0) < 1e-9)
+
+
 if __name__ == '__main__':
     test_new_columns_exist()
     test_header_rotation_on_mismatch()
@@ -245,6 +267,7 @@ if __name__ == '__main__':
     test_accel_suppressed_before_0930()
     test_delta_z_excludes_missing()
     test_build_snapshot()
+    test_none_z_values_no_crash()
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} 통과")
     sys.exit(1 if failed else 0)

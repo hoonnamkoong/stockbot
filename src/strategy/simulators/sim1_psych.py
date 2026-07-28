@@ -46,6 +46,92 @@ def _zmap(pairs):
     return {c: (v - mu) / sd for c, v in pairs}
 
 
+HIST_MAX_DAYS = 5            # 주말 낀 연휴(금~화)까지는 '전일'로 인정한다
+ACCEL_START_HHMM = '0930'    # 개장 30분은 z가 90분위 2.46z로 요동한다(실측)
+
+
+def resolve_history(prev_day, snapshot, today):
+    """(prev_day, last_run) 결정. 순수함수.
+
+    직전 런 스냅샷의 날짜가 오늘이 아니면 그것이 곧 전일 마지막 런이다.
+    이 사실 하나로 승격이 끝나므로 '당일 마지막'을 따로 추적할 필요가 없다.
+    """
+    if snapshot and snapshot.get('date') != today:
+        return snapshot, None
+    return prev_day, snapshot
+
+
+def _days_between(older, newer):
+    """'YYYYMMDD' 두 개의 일수 차. 못 읽으면 None."""
+    from datetime import datetime
+    try:
+        a = datetime.strptime(str(older), '%Y%m%d')
+        b = datetime.strptime(str(newer), '%Y%m%d')
+    except (ValueError, TypeError):
+        return None
+    return (b - a).days
+
+
+def history_terms(rows, prev_day, last_run, today, hhmm):
+    """rows에 이력 파생값을 제자리로 채운다.
+
+    결측은 중립 0이다. 매일 후보의 38~48%가 신규 유입이라(실측) 이건
+    예외 처리가 아니라 절반의 정책이다. fail-closed는 Sim1이 노리는
+    '새로 터진 관심'을 구조적으로 배제한다.
+    """
+    pz = (prev_day or {}).get('z', {})
+    lz = (last_run or {}).get('z', {})
+    days_ago = _days_between((prev_day or {}).get('date'), today)
+    usable = bool(pz) and days_ago is not None and 0 < days_ago <= HIST_MAX_DAYS
+    accel_ok = bool(hhmm) and str(hhmm) >= ACCEL_START_HHMM
+
+    raw = {}
+    for r in rows:
+        c = r['code']
+        p = pz.get(c) if usable else None
+        r['hist_days_ago'] = days_ago if days_ago is not None else ''
+        # z_sov는 1순위 항(d_sov)의 재료다 — 이 값의 유무로 결측을 판정한다.
+        r['hist_missing'] = 0 if (p and p.get('z_sov') is not None) else 1
+        if p:
+            raw[c] = ((r.get('z_sov') or 0) - (p.get('z_sov') or 0),
+                      (r.get('z_hype') or 0) - (p.get('z_hype') or 0))
+            r['accel_d1'] = (r.get('z_posters') or 0) - (p.get('z_posters') or 0)
+        else:
+            r['accel_d1'] = 0
+
+        l = lz.get(c)
+        r['accel'] = ((r.get('z_posters') or 0) - (l.get('z_posters') or 0)) if (l and accel_ok) else 0
+
+    # 델타의 횡단면 z는 이력 있는 종목만으로 만든다.
+    # 결측의 0을 분포에 넣으면 z가 왜곡된다.
+    zd_sov = _zmap([(c, v[0]) for c, v in raw.items()])
+    zd_hype = _zmap([(c, v[1]) for c, v in raw.items()])
+    for r in rows:
+        c = r['code']
+        r['d_sov'] = raw[c][0] if c in raw else 0
+        r['d_hype'] = raw[c][1] if c in raw else 0
+        # 설계식 4항. 계산만 하고 진입에는 쓰지 않는다 — 3항과 나란히
+        # 기록해 다음 거래일 로그로 분포·통과율을 비교하기 위한 값이다.
+        parts = [1.0 * (r.get('z_posters') or 0),
+                 1.0 * zd_sov.get(c, 0),
+                 0.7 * zd_hype.get(c, 0),
+                 0.5 * (r.get('z_likes') or 0)]
+        r['ignition4'] = sum(parts)
+
+
+def build_snapshot(rows, today, ts):
+    """이번 런의 z를 스냅샷으로. z 스케일만 담는다 — 원값은 당일 누적이라
+    오전에 60~77% 어긋난다(실측)."""
+    z = {}
+    for r in rows:
+        # 셋 중 하나가 퇴화(z_hype가 흔하다)해도 나머지 값은 담는다 —
+        # 결측은 그 항만 흡수하지, 종목 전체를 폐기하지 않는다.
+        vals = {k: r.get(k) for k in ('z_sov', 'z_posters', 'z_hype') if r.get(k) is not None}
+        if vals:
+            z[r['code']] = vals
+    return {'date': today, 'ts': ts, 'z': z}
+
+
 def _features(candidates):
     """후보 횡단면 → 종목별 심리 지표.
 
@@ -75,12 +161,14 @@ def _features(candidates):
     z_posters = _zmap([(r['code'], r['posters']) for r in rows])
     z_sov = _zmap([(r['code'], r['sov']) for r in rows])
     z_likes = _zmap([(r['code'], r['likes_per_post']) for r in rows])
+    z_hype = _zmap([(r['code'], r['hype']) for r in rows])
     feat = {}
     for r in rows:
         c = r['code']
         r['z_posters'] = z_posters.get(c)
         r['z_sov'] = z_sov.get(c)
         r['z_likes'] = z_likes.get(c)
+        r['z_hype'] = z_hype.get(c)
         # 관측 가능한 항만 합산한 잠정 점화 지표. 임계값은 아직 걸지 않는다 —
         # d_sov·accel(이력 필요)이 빠져 있어 스케일이 설계안과 다르다.
         # 로그로 분포를 본 뒤 임계값을 정한다.
@@ -90,8 +178,12 @@ def _features(candidates):
     return feat
 
 
-def decide_psych(view, candidates, current_prices):
-    """[Sim1] 심리 괴리형 결정. (orders, diags) 반환. 순수 함수."""
+def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=None):
+    """[Sim1] 심리 괴리형 결정. (orders, diags, snapshot) 반환. 순수 함수.
+
+    today·hhmm·ts는 주입받는다. 순수함수가 date.today()를 부르면
+    백테스트에서 스냅샷 롤오버가 영영 돌지 않는다.
+    """
     orders, diags = [], []
     portfolio = view['portfolio']
     sold = set()
@@ -130,9 +222,16 @@ def decide_psych(view, candidates, current_prices):
                            'cooldown': 3, 'mark_partial': False})
             sold.add(code)
 
+    rows = list(feat.values())
+    # 승격 판정은 run()이 이미 끝냈다. 여기서 다시 해석하지 않는다.
+    # 청산 루프 아래에 둔다 — 여기서 예외가 나도 매도 주문은 이미 나간 뒤다.
+    history_terms(rows, view.get('psych_prev_day'), view.get('psych_last_run'),
+                  today, hhmm)
+    snapshot = build_snapshot(rows, today, ts)
+
     # 2. 진입
     if not view['market_index_healthy']:
-        return orders, diags
+        return orders, diags, snapshot
 
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len([c for c in portfolio if c not in sold])
@@ -163,6 +262,12 @@ def decide_psych(view, candidates, current_prices):
             'z_likes': _fmt(f.get('z_likes')), 'ignition': _fmt(f.get('ignition')),
             'hype_score': f"{f.get('hype', 0):.3f}",
             'fact_score': stock.get('fact_score', 0),
+            'z_hype': _fmt(f.get('z_hype')),
+            'd_sov': _fmt(f.get('d_sov')), 'd_hype': _fmt(f.get('d_hype')),
+            'accel': _fmt(f.get('accel')), 'accel_d1': _fmt(f.get('accel_d1')),
+            'hist_missing': f.get('hist_missing', 1),
+            'hist_days_ago': f.get('hist_days_ago', ''),
+            'ignition4': _fmt(f.get('ignition4')),
         }
 
         skip = _skip_reason(stock, view, code, price, amount, change_rate,
@@ -186,7 +291,7 @@ def decide_psych(view, candidates, current_prices):
                        'reason': f"[심리] 관심 폭발 + 가격 정체 "
                                  f"(작성자 {int(f.get('posters', 0))}명, "
                                  f"배수 {buzz_ratio:.1f}x, ADX {adx:.1f})"})
-    return orders, diags
+    return orders, diags, snapshot
 
 
 def _fmt(v):
@@ -259,9 +364,30 @@ class PsychDivergenceSimulator(BaseSimulator):
         super().__init__("Psych", initial_cash)
 
     def run(self, candidates, current_prices=None):
+        from datetime import datetime, timedelta, timezone
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders, diags = decide_psych(self._view(current_prices), candidates, current_prices)
+
+        now = datetime.now(timezone(timedelta(hours=9)))
+        today = now.strftime('%Y%m%d')
+
+        # 승격은 여기 한 곳에서만 판정한다.
+        prev_day, last_run = resolve_history(self.state.get('psych_prev_day'),
+                                             self.state.get('psych_snapshot'),
+                                             today)
+        view = self._view(current_prices)
+        view['psych_prev_day'] = prev_day
+        view['psych_last_run'] = last_run
+
+        orders, diags, snapshot = decide_psych(
+            view, candidates, current_prices,
+            today=today, hhmm=now.strftime('%H%M'),
+            ts=now.strftime('%Y-%m-%d %H:%M:%S'))
+
+        self.state['psych_prev_day'] = prev_day
+        if snapshot.get('z'):
+            self.state['psych_snapshot'] = snapshot
+
         self._apply(orders, current_prices)
         sim_diag.append('sim1', diags)
         self.save_state(current_prices)

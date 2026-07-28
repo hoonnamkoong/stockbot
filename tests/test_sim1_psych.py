@@ -117,23 +117,37 @@ def test_diag_carries_decision_inputs():
     assert d['fact_score'] == 0.5
 
 
-def test_ignition_is_measured_not_gated():
-    """ignition은 아직 임계값을 걸지 않는다 — d_sov·accel이 빠져 스케일이 다르다.
-    낮은 ignition이어도 다른 조건을 만족하면 진입해야 한다."""
+def test_weak_ignition_is_rejected():
+    """다른 조건을 다 만족해도 점화가 약하면 안 산다."""
     # 횡단면 중위권이라 z가 거의 0인 종목. 다만 avg_posts가 낮아 관심 배수는 크다.
     low = _target(recent_posts_count=48, avg_posts=12, unique_posters=34, total_likes=48)
     orders, diags = decide_psych(_view(), [low] + _filler(), {'T001': 1000})
     d = next(x for x in diags if x['code'] == 'T001')
     assert abs(float(d['ignition'])) < 2.5
-    assert [o['code'] for o in _buys(orders)] == ['T001']
+    assert _buys(orders) == [] and d['reason'] == 'weak_ignition'
 
 
-def test_thin_sample_leaves_z_blank_but_still_trades():
-    """z를 못 내도 진입 게이트는 z에 의존하지 않는다(현재는 관측만 한다)."""
+def test_thin_sample_fails_closed():
+    """표본이 얇아 z를 못 내면 통과시키지 않는다.
+    '신호 없음'을 '신호 있음'으로 취급하면 안 된다."""
     orders, diags = decide_psych(_view(), [_target()] + _filler(3), {'T001': 1000})
     d = next(x for x in diags if x['code'] == 'T001')
     assert d['z_posters'] == '' and d['ignition'] == ''
-    assert [o['code'] for o in _buys(orders)] == ['T001']
+    assert _buys(orders) == [] and d['reason'] == 'no_ignition'
+
+
+# ── 사이징 (전 심 통일) ──────────────────────────────────
+def test_position_size_is_fifteen_percent():
+    orders, _ = decide_psych(_view(), [_target()] + _filler(), {'T001': 1000})
+    assert _buys(orders)[0]['quantity'] == int(3_000_000 * 0.15 / 1000)
+
+
+def test_max_six_holdings():
+    """이전에는 보유 상한이 없어 Sim1만 통일에서 빠져 있었다."""
+    cands = [_target(code=f'T{i:03d}', name=f'심리{i}') for i in range(9)] + _filler()
+    orders, diags = decide_psych(_view(), cands, {})
+    assert len(_buys(orders)) == 6
+    assert any(d['reason'] == 'full' for d in diags)
 
 
 # ── 청산 ────────────────────────────────────────────────

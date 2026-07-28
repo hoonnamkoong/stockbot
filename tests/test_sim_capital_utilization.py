@@ -18,6 +18,7 @@ from src.strategy.simulators import (
     sim3_risk,
     sim4_bull_daytrading,
     sim4_bull_momentum,
+    sim1_psych,
     sim5_sideways_swing,
     sim6_bear_hedge,
     sim7_report_follower,
@@ -47,6 +48,7 @@ def _view(portfolio=None, cash=NAV, nav=NAV, healthy=True):
 # ---------------------------------------------------------------- 원인 A: 상한
 # (종목당 비중 × 최대 보유수)가 90% 수준이어야 한다. 미달이면 남은 예수금은 영원히 못 쓴다.
 CAPS = [
+    ("Sim1 심리괴리", sim1_psych.POSITION_WEIGHT, sim1_psych.MAX_HOLDINGS),
     ("Sim3 가치페어", sim3_risk.SmartRiskSimulator.POSITION_WEIGHT, sim3_risk.SmartRiskSimulator.MAX_HOLDINGS),
     ("Sim4 상승모멘텀", sim4_bull_momentum.BullMomentumSimulator.POSITION_WEIGHT,
      sim4_bull_momentum.BullMomentumSimulator.MAX_HOLDINGS),

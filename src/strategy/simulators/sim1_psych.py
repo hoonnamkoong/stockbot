@@ -6,8 +6,19 @@ _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
 
 MIN_AMOUNT = 1_000_000_000
-POSITION_DIVISOR = 10        # 종목당 NAV/10 (전 심 통일값 15%와 다름 — 별도 결정 필요)
+MAX_HOLDINGS = 6             # 전 심 통일 (0.15 × 6 = 최대 90% 투입)
+POSITION_WEIGHT = 0.15
 MIN_SAMPLE = 10              # 횡단면 z 최소 표본. 미달이면 z를 만들지 않는다.
+
+# 점화 임계값 — 잠정값이다.
+# 설계안은 ignition = 1.0*z_posters + 1.0*z(d_sov) + 0.7*z(d_hype) + 0.5*z(likes_per_post)
+# 에 2.5였으나, d_sov·d_hype는 전일 이력이 있어야 만들 수 있다. 지금은 관측 가능한
+# 3항(z_posters + z_sov + z_likes)만 합산한다.
+# 2.5를 그대로 쓰는 근거: 실제 횡단면(881런·14,751 종목-런)에서 통과율이
+# T=1.5→22.0%, 2.5→18.6%, 3.0→17.3%로 거의 평평하다. 관심 분포가 강한 우편향이라
+# 임계값이 결과를 좌우하지 않는다 — 즉 이 값은 위험한 자유도가 아니다.
+# 이력이 붙어 항이 채워지면 재조정할 것.
+IGNITION_MIN = 2.5
 
 BUZZ_RATIO_MIN = 2.2         # 평상시 대비 관심 배수
 BUZZ_COUNT_MIN = 30
@@ -123,7 +134,8 @@ def decide_psych(view, candidates, current_prices):
     if not view['market_index_healthy']:
         return orders, diags
 
-    target_amount = view['nav'] / POSITION_DIVISOR
+    target_amount = view['nav'] * POSITION_WEIGHT
+    held = len([c for c in portfolio if c not in sold])
     for stock in candidates:
         code = stock.get('code')
         if not code:
@@ -154,7 +166,7 @@ def decide_psych(view, candidates, current_prices):
         }
 
         skip = _skip_reason(stock, view, code, price, amount, change_rate,
-                            sparkline, adx, buzz_ratio, f, portfolio, sold)
+                            sparkline, adx, buzz_ratio, f, portfolio, sold, held)
         if skip:
             d['decision'], d['reason'] = 'skip', skip
             diags.append(d)
@@ -168,6 +180,7 @@ def decide_psych(view, candidates, current_prices):
 
         d['decision'], d['reason'] = 'entry', ''
         diags.append(d)
+        held += 1
         orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
                        'price': price, 'quantity': qty, 'cooldown': None,
                        'reason': f"[심리] 관심 폭발 + 가격 정체 "
@@ -181,13 +194,15 @@ def _fmt(v):
 
 
 def _skip_reason(stock, view, code, price, amount, change_rate,
-                 sparkline, adx, buzz_ratio, f, portfolio, sold):
+                 sparkline, adx, buzz_ratio, f, portfolio, sold, held):
     """첫 번째로 걸린 게이트 이름. 통과하면 None.
 
     순서가 곧 로그의 의미다 — 앞쪽 게이트가 뒤쪽을 가린다.
     """
     if code in portfolio or code in sold:
         return 'held'
+    if held >= MAX_HOLDINGS:
+        return 'full'
     if _cooldown_active(view['cooldown_codes'], code):
         return 'cooldown'
     if price <= 0:
@@ -211,6 +226,13 @@ def _skip_reason(stock, view, code, price, amount, change_rate,
         return 'weak_demand'
     if adx < ADX_MIN:
         return 'no_trend'
+    # 점화 강도. 표본이 얇아 z를 못 내면 통과시키지 않는다 —
+    # '신호 없음'을 '신호 있음'으로 취급하면 안 된다(fail-closed).
+    ign = f.get('ignition')
+    if ign is None:
+        return 'no_ignition'
+    if ign < IGNITION_MIN:
+        return 'weak_ignition'
     return None
 
 
@@ -226,10 +248,12 @@ class PsychDivergenceSimulator(BaseSimulator):
         · 도배(한 사람이 여러 글)를 걸러내지 않았다. → posts_per_poster 게이트 추가
     - **후보 전부의 판단 근거를 sim_diag에 남긴다.** 6개월간 실패 원인을 몰랐던
       이유가 이 로그의 부재였다.
-    - ignition(z_posters+z_sov+z_likes)은 계산만 하고 임계값을 걸지 않는다.
-      설계안의 d_sov·accel이 전일 이력을 요구해 아직 만들 수 없고, 항이 빠진
-      채로 임계값 2.5를 그대로 쓰면 스케일이 맞지 않는다. 로그로 분포를 본 뒤
-      정한다.
+    - ignition(z_posters+z_sov+z_likes) >= 2.5. **잠정값**이다 — 설계안의
+      d_sov·d_hype가 전일 이력을 요구해 아직 항이 빠져 있다. 실제 횡단면에서
+      통과율이 T=1.5~3.0 구간 내내 22%→17%로 평평해(관심 분포가 강한 우편향)
+      임계값이 결과를 좌우하지 않는다는 점은 확인했다. 이력이 붙으면 재조정.
+    - 사이징은 전 심 통일값(NAV×15%, 최대 6종목). 이전에는 NAV/10에 보유
+      상한이 없어 Sim1만 통일에서 빠져 있었다.
     """
     def __init__(self, initial_cash=3000000):
         super().__init__("Psych", initial_cash)

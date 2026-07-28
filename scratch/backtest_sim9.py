@@ -54,6 +54,8 @@ pos = {d: i for i, d in enumerate(days)}
 g = df.groupby(["code", "d"])
 panel = pd.DataFrame({
     "open_px": g["현재가"].first(),      # 첫 스냅샷 ≈ 시가 (근사)
+    "day_hi": g["현재가"].max(),         # 스냅샷 기준 일중 고가 (근사)
+    "day_lo": g["현재가"].min(),         # 스냅샷 기준 일중 저가 (근사)
     "last_px": g["현재가"].last(),
     "prev_close": g["전일종가"].last(),
 }).reset_index().sort_values(["code", "d"])
@@ -69,6 +71,7 @@ panel = panel[(panel["open_px"] > 0) & (panel["prev_close"] > 0)]
 open_map = {(r.code, r.d): r.open_px for r in panel.itertuples()}
 prev_map = {(r.code, r.d): r.prev_close for r in panel.itertuples()}
 close_map = {(r.code, r.d): r.close for r in panel.itertuples()}
+range_map = {(r.code, r.d): (r.day_lo, r.day_hi) for r in panel.itertuples()}
 
 win = df[(df["t"] >= T_FROM) & (df["t"] < T_TO)]
 win_last = win.groupby(["code", "d"]).last()          # 그날 체결 가능한 마지막 관측
@@ -109,7 +112,13 @@ for (code, d), row in win_last.iterrows():
     entry_px = float(row["현재가"])
     gap = (op / pc - 1) * 100
     intra = (entry_px / op - 1) * 100
-    if gap >= S.GAP_MIN and intra <= S.INTRA_MAX:
+    if not (gap >= S.GAP_MIN and intra <= S.INTRA_MAX):
+        continue
+    # 일중 위치 — 스냅샷 기준 근사. 실제 고가/저가는 2026-07-28 배선분부터 쌓인다.
+    lo, hi = range_map.get((code, d), (0, 0))
+    if hi <= lo:
+        continue
+    if (entry_px - lo) / (hi - lo) <= S.RANGE_POS_MAX:
         signals.append((d, code, row["종목명"], entry_px, gap, intra, row["chg"]))
 
 sig_df = pd.DataFrame(signals, columns=["d", "code", "name", "entry_px", "gap", "intra", "chg"])

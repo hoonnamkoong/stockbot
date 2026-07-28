@@ -44,6 +44,8 @@ def analyze_discussion_trend(data_list):
         'foreign_rate': '외인비중',
         'prev_close': '전일종가',
         'open_price': '시가',       # [Sim9] 갭 산출용. 스냅샷 근사가 아닌 실제 시가를 축적한다.
+        'day_high': '당일고가',     # [Sim9] 일중 위치 산출용. 임계값이 스냅샷 근사로 정해져 재검증 필요.
+        'day_low': '당일저가',
         'prev_foreign_rate': '전일외인',
         'change_rate': '등락률',
         'foreign_change': '외인변화',
@@ -60,7 +62,7 @@ def analyze_discussion_trend(data_list):
     desired_order = [
         'name', 'price', 'change_rate', 'foreign_change', 'recent_posts_count', 'unique_posters',
         'foreign_rate', 'market',
-        'prev_close', 'open_price', 'prev_foreign_rate', 'posts_summary',
+        'prev_close', 'open_price', 'day_high', 'day_low', 'prev_foreign_rate', 'posts_summary',
         'sentiment_score', 'keywords', 'consecutive_days', 'status', 'code'
     ]
     

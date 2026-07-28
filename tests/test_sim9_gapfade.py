@@ -18,51 +18,68 @@ def _pos(avg, entry_dt, qty=10):
             'entry_date': entry_dt.strftime('%Y-%m-%d')}
 
 
-def _cand(price=960, open_px=1040, prev_close=1000, amount=2_000_000_000):
-    """기본값 = 갭 +4.0%, 장중 -7.7% (진입 조건 충족)"""
+def _cand(price=1000, open_px=1100, prev_close=1000, amount=2_000_000_000,
+          day_high=1120, day_low=990):
+    """기본값 = 갭 +10%, 장중 -9.1%, 일중위치 0.08 (진입 조건 충족)"""
     return [{'code': '222', 'name': '갭주', 'price': price, 'open_price': open_px,
-             'prev_close': prev_close, 'amount': amount}]
+             'prev_close': prev_close, 'amount': amount,
+             'day_high': day_high, 'day_low': day_low}]
 
 
 # ── 진입 ────────────────────────────────────────────────
 def test_entry_on_gap_up_and_intraday_fade():
-    orders = decide_gap_fade(_view({}), _cand(), {'222': 960}, now=NOW_LATE)
+    orders = decide_gap_fade(_view({}), _cand(), {'222': 1000}, now=NOW_LATE)
     buys = [o for o in orders if o['action'] == 'BUY']
     assert len(buys) == 1 and buys[0]['code'] == '222'
 
 
 def test_no_entry_before_1430():
     """되밀림 확정 전 진입 금지 — 시각 게이트가 이 전략의 핵심."""
-    orders = decide_gap_fade(_view({}), _cand(), {'222': 960}, now=NOW_EARLY)
+    orders = decide_gap_fade(_view({}), _cand(), {'222': 1000}, now=NOW_EARLY)
     assert [o for o in orders if o['action'] == 'BUY'] == []
 
 
 def test_no_entry_after_auction_starts():
     """15:20 이후엔 이 가격으로 체결할 수 없다. 백테스트가 거짓이 되는 지점."""
-    orders = decide_gap_fade(_view({}), _cand(), {'222': 960}, now=NOW_AUCTION)
+    orders = decide_gap_fade(_view({}), _cand(), {'222': 1000}, now=NOW_AUCTION)
     assert [o for o in orders if o['action'] == 'BUY'] == []
 
 
 def test_no_entry_when_gap_too_small():
-    # 갭 +2.0% (<3.0), 장중은 충분히 밀림
-    orders = decide_gap_fade(_view({}), _cand(price=950, open_px=1020), {'222': 950}, now=NOW_LATE)
+    # 갭 +4.0% (<7.0), 되밀림·일중위치는 충족
+    orders = decide_gap_fade(_view({}), _cand(price=950, open_px=1040), {'222': 950}, now=NOW_LATE)
     assert [o for o in orders if o['action'] == 'BUY'] == []
 
 
 def test_no_entry_when_fade_too_shallow():
-    # 갭 +4.0%, 장중 -1.0% (>-3.0) — 되밀림 깊이가 주신호다
-    orders = decide_gap_fade(_view({}), _cand(price=1030, open_px=1040), {'222': 1030}, now=NOW_LATE)
+    # 갭 +10%, 장중 -2.7% (>-6.0) — 되밀림 깊이가 주신호다
+    orders = decide_gap_fade(_view({}), _cand(price=1070, open_px=1100, day_high=1120,
+                                              day_low=1060), {'222': 1070}, now=NOW_LATE)
+    assert [o for o in orders if o['action'] == 'BUY'] == []
+
+
+def test_no_entry_when_not_near_day_low():
+    """일중위치 0.5 — 되밀림이 중간에 걸친 종목. 실측 전 구간 최악(-11.5%)."""
+    orders = decide_gap_fade(_view({}), _cand(day_high=1010, day_low=990),
+                             {'222': 1000}, now=NOW_LATE)
+    assert [o for o in orders if o['action'] == 'BUY'] == []
+
+
+def test_no_entry_without_day_range():
+    """고가/저가가 없으면 일중 위치를 판단할 수 없다 — 없는 근거로 사지 않는다."""
+    orders = decide_gap_fade(_view({}), _cand(day_high=0, day_low=0),
+                             {'222': 1000}, now=NOW_LATE)
     assert [o for o in orders if o['action'] == 'BUY'] == []
 
 
 def test_no_entry_when_illiquid():
-    orders = decide_gap_fade(_view({}), _cand(amount=500_000_000), {'222': 960}, now=NOW_LATE)
+    orders = decide_gap_fade(_view({}), _cand(amount=500_000_000), {'222': 1000}, now=NOW_LATE)
     assert [o for o in orders if o['action'] == 'BUY'] == []
 
 
 def test_no_entry_without_open_price():
     """시가가 없으면 갭을 만들어내지 않고 건너뛴다."""
-    orders = decide_gap_fade(_view({}), _cand(open_px=0), {'222': 960}, now=NOW_LATE)
+    orders = decide_gap_fade(_view({}), _cand(open_px=0), {'222': 1000}, now=NOW_LATE)
     assert [o for o in orders if o['action'] == 'BUY'] == []
 
 

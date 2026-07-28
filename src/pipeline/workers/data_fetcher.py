@@ -215,7 +215,7 @@ class DataFetcherWorker(BaseWorker):
         details = {
             'foreign_rate': 0.0, 'foreign_change': 0.0,
             'foreign_net_buy': 0, 'prev_close': 0, 'prev_foreign_rate': 0.0,
-            'current_price': 0, 'open_price': 0,
+            'current_price': 0, 'open_price': 0, 'day_high': 0, 'day_low': 0,
         }
         url = f"https://finance.naver.com/item/frgn.naver?code={code}"
         try:
@@ -291,6 +291,12 @@ class DataFetcherWorker(BaseWorker):
                         # [Sim9] 시가: 갭(=시가/전일종가) 산출용. 전일종가와 같은 응답 블록이라 추가 콜 0.
                         if out.get('stck_oprc'):
                             details['open_price'] = int(out['stck_oprc'])
+                        # [Sim9] 당일 고가/저가: 진입가가 그날 변동폭의 어디인지(일중 위치) 산출용.
+                        # 저가 근처에서 마감한 되밀림만 다음날 되돌아온다(실측).
+                        for _src, _dst in (('stck_hgpr', 'day_high'), ('stck_lwpr', 'day_low')):
+                            if out.get(_src):
+                                try: details[_dst] = int(out[_src])
+                                except (ValueError, TypeError): pass
                         # 신규 밸류에이션/52주 필드 (추가 API 호출 없이 동일 응답에서 파싱)
                         for _f in ('per', 'pbr'):
                             if out.get(_f):

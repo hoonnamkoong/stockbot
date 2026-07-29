@@ -180,9 +180,11 @@ def _psych_carry(paper_state) -> dict:
     psych_snapshot을 옮기면 안 된다 — 그 값은 페이퍼가 방금 이번 런의 z로 덮어썼기
     때문에 프로그램의 accel이 z - 같은 z = 0이 되어 전 종목 0으로 무너진다.
 
-    psych_last_run은 정의상 None이거나 오늘 날짜다(페이퍼의 resolve_history가 승격을
-    이미 끝냈다). 그래서 프로그램 쪽 run()이 다시 resolve_history를 통과해도 재승격이
-    일어나지 않는다 — 이 승계는 멱등이다.
+    이 승계가 멱등인 근거는 "정의상 오늘 날짜"가 아니라 resolve_history 자체다 —
+    페이퍼가 이번 사이클에 안 돌아 어제자 last_run이 남아 있어도, resolve_history가
+    그 값을 다시 승격시켜 페이퍼가 도달했을 결론과 같은 (prev_day, last_run)을
+    만든다. 그래서 프로그램 쪽 run()이 다시 resolve_history를 통과해도 재승격으로
+    입력이 갈라지지 않는다.
 
     Sim1 외의 심은 이 슬롯이 없어 빈 dict가 나온다(현행 동작 유지).
     """

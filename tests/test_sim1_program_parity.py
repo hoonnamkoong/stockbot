@@ -213,3 +213,80 @@ def test_carrying_psych_snapshot_would_collapse_accel():
 
     assert all(float(x['accel']) == 0 for x in d_bad)
     assert any(float(x['accel']) != 0 for x in d_paper)
+
+
+def test_program_adapter_end_to_end_carries_history():
+    """실제 배선 검증 — _make_adapter로 조립한 프로그램 경로가 페이퍼 run()의
+
+    산출물을 실제로 소비하는지 확인한다. 위 파리티 테스트들은 resolve_history/
+    decide_psych를 직접 호출해 수학만 재현할 뿐 run()도 _make_adapter도 타지
+    않는다 — 그래서 _psych_carry의 반환 키 이름, program_trader가 심는
+    'exec_path' 리터럴, sim1_psych.run()이 읽는 키 이름이 어긋나도(예:
+    psych_snapshot을 psych_snapshoot으로 오타) 아무 테스트도 잡지 못한다.
+
+    페이퍼를 같은 날 두 번 돌린다 — 1회차가 어제 스냅샷을 psych_prev_day로
+    승격시키고, 2회차가 1회차의 결과물을 psych_last_run으로 소비한다(참값이
+    None이 아니어야 승계 오류를 구분할 수 있다. history_terms의 hist_missing/
+    d_sov는 psych_prev_day에서만 나오므로 psych_prev_day 하나만 갖고는
+    psych_snapshot 쪽 키 오타를 못 잡는다 — accel은 psych_snapshot/last_run을
+    쓰지만 09:30 게이트가 실벽시계라 여기서 검증하지 않는다. 그래서 carry된
+    psych_snapshot을 paper.state['psych_last_run']과 직접 비교해 오타를 잡는다).
+    """
+    from src.data import sim_diag
+    from src.pipeline.workers.program_trader import _make_adapter, _psych_carry
+    import csv
+    import datetime as _dt
+
+    today = _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=9))).strftime('%Y%m%d')
+    yesterday = (_dt.datetime.strptime(today, '%Y%m%d') - _dt.timedelta(days=1)).strftime('%Y%m%d')
+    cands = [_cand('005930', '삼성전자')] + _filler()
+    prices = {'005930': 1000}
+
+    with tempfile.TemporaryDirectory() as d:
+        paper_dir = os.path.join(d, 'paper')
+        prog_dir = os.path.join(d, 'prog')
+        paper_diag_dir = os.path.join(d, 'paper_diag')
+        prog_diag_dir = os.path.join(d, 'prog_diag')
+        for p in (paper_dir, prog_dir, paper_diag_dir, prog_diag_dir):
+            os.makedirs(p)
+        orig = sim_diag.DATA_DIR
+        try:
+            # 페이퍼 2회 — 실제 run() 결과만 쓴다(수동 조립 금지).
+            sim_diag.DATA_DIR = paper_diag_dir
+            paper = _isolated_sim(paper_dir)
+            paper.state['psych_snapshot'] = _snap(yesterday)
+            paper.run(cands, current_prices=prices)   # 1회차: yesterday → psych_prev_day 승격
+            paper.run(cands, current_prices=prices)   # 2회차: 1회차 산출물 → psych_last_run 소비
+            assert paper.state['psych_last_run'] is not None, \
+                "이 테스트가 오타를 잡으려면 last_run이 실제 값이어야 한다"
+
+            carry = _psych_carry(paper.state)
+            # 핵심 배선 검증: carry된 psych_snapshot이 페이퍼가 실제로 소비한
+            # last_run과 같아야 한다. _psych_carry가 'psych_snapshot' 키를
+            # 오타 내면(예: psych_snapshoot) carry.get('psych_snapshot')은
+            # None이 되어 여기서 즉시 실패한다.
+            assert carry.get('psych_snapshot') == paper.state['psych_last_run']
+            assert carry.get('psych_prev_day') == paper.state['psych_prev_day']
+
+            # 프로그램: 승계한 값을 스냅샷에 심고 _make_adapter로 배선 + 실행.
+            snapshot = {'cash': 3_000_000, 'invested': 0, 'portfolio': {}, 'total_fees': 0,
+                        'history': [3_000_000], 'daily_trades': [], 'peak_nav': 3_000_000,
+                        'market_index_healthy': True, 'cooldown_codes': {},
+                        'exec_path': 'program', **carry}
+            prog = _isolated_sim(prog_dir)
+            _make_adapter(prog, snapshot, today)
+            sim_diag.DATA_DIR = prog_diag_dir
+            prog.run(cands, current_prices=prices)
+
+            # (a) 진단이 프로그램 파일로 갔다(이 디렉터리엔 프로그램 런만 썼다).
+            files = _diag_files(prog_diag_dir)
+            assert any(f.startswith('sim1_program_diag_') for f in files), files
+            assert not any(f.startswith('sim1_diag_') for f in files), files
+
+            # (b) 이력이 실제로 살아남았다 — hist_missing==0인 행이 있어야 한다.
+            prog_file = next(f for f in files if f.startswith('sim1_program_diag_'))
+            with open(os.path.join(prog_diag_dir, prog_file), encoding='utf-8') as f:
+                rows = list(csv.DictReader(f))
+            assert any(r['code'] == '005930' and r['hist_missing'] == '0' for r in rows), rows
+        finally:
+            sim_diag.DATA_DIR = orig

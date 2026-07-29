@@ -385,6 +385,10 @@ class PsychDivergenceSimulator(BaseSimulator):
             ts=now.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.state['psych_prev_day'] = prev_day
+        # 이번 런이 실제로 소비한 직전 런. 페이퍼는 안 읽는다 — 프로그램 매매
+        # 경로가 '페이퍼와 같은 입력'을 승계하기 위한 슬롯이다. psych_snapshot은
+        # 바로 아래에서 이번 런 값으로 덮어써지므로 그걸 넘기면 accel이 0이 된다.
+        self.state['psych_last_run'] = last_run
         if snapshot.get('z'):
             self.state['psych_snapshot'] = snapshot
 

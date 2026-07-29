@@ -31,7 +31,6 @@ def decide_sim6(view, candidates, current_prices):
     orders = []
     portfolio = view['portfolio']
     sold = set()
-    cand_by_code = {s.get('code'): s for s in candidates}
 
     # 1. 청산: 하드손절 / 트레일링(고점 대비 콜백). 고정 익절 없음(추세 라이딩).
     for code in list(portfolio.keys()):
@@ -111,20 +110,29 @@ class BearHedgeSimulator(BaseSimulator):
         """Sim0(리베로)의 현재 국면 판단을 읽는다. 자체 판단이 아니라 Sim0 출력을 소비.
 
         인버스 ETF는 standalone 알파가 없다(국면 전환이 타이밍 신호를 휩쏨). 상승장에서
-        인버스 매수 = 손실이므로, Sim0가 BEAR로 판단할 때만 매매한다. 실패 시 SIDEWAYS(보수).
+        인버스 매수 = 손실이므로, Sim0가 BEAR로 판단할 때만 매매한다.
+
+        판단할 수 없으면 None이다 — 파일 없음·파싱 실패·알 수 없는 값을 SIDEWAYS로
+        뭉개면 '국면이 아니다'와 구분이 안 되고, 비 BEAR 경로는 곧 청산이라
+        일시적 파일 오류가 실제 시장가 매도가 된다.
         """
         import json
         try:
             with open(os.path.join(self.data_dir, "sim_libero_state.json"), "r", encoding="utf-8-sig") as f:
-                regime = json.load(f).get("current_regime", "SIDEWAYS")
-            return regime if regime in ("BULL", "SIDEWAYS", "BEAR") else "SIDEWAYS"
+                regime = json.load(f).get("current_regime")
+            return regime if regime in ("BULL", "SIDEWAYS", "BEAR") else None
         except Exception:
-            return "SIDEWAYS"
+            return None
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        if self._read_regime() == "BEAR":
+        regime = self._read_regime()
+        if regime is None:
+            # 판단 불가 — 매수도 청산도 하지 않고 다음 사이클을 기다린다.
+            self.save_state(current_prices)
+            return self.calculate_stats(current_prices)
+        if regime == "BEAR":
             orders = decide_sim6(self._view(current_prices), candidates, current_prices)
         else:
             # 비(非)하락장: 인버스 매수 금지 + 보유분 전량 청산(국면 이탈)

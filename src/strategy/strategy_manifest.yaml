@@ -44,6 +44,18 @@ strategies:
   #   since: "2026-05-01"
 
 simulators:
+  # 이 순서가 곧 실행 순서다(trade_engine._run_simulators가 그대로 순회).
+  # sim0_libero는 국면(BULL/SIDEWAYS/BEAR)의 생산자이고 sim6_bear·sim10_orchestrator가
+  # 그 결과를 파일로 읽는 소비자다. 생산자가 뒤에 있으면 소비자는 항상 직전 사이클의
+  # 국면으로 판단하므로 맨 앞에 둔다. 리베로는 다른 심의 산출물에 의존하지 않는다
+  # (루프 전에 계산되는 top100 라이브 breadth만 쓴다).
+  - id: "sim0_libero"
+    module: "src.strategy.simulators.sim0_libero"
+    class: "LiberoSimulator"
+    description: "Sim0 리베로 - 시장 국면(BULL/SIDEWAYS/BEAR) 감지 + 전략 추천 (매매 없음)"
+    active: true
+    tradeable: false  # 분석기(IS_ANALYZER) — 매매 없음, 프로그램 선택 불가
+
   - id: "sim_psych"
     module: "src.strategy.simulators.sim1_psych"
     class: "PsychDivergenceSimulator"
@@ -92,13 +104,6 @@ simulators:
     description: "상승 모멘텀 단타 — 분할 익절(+5%/+10%) + 2일/5일 강제청산"
     active: true
     tradeable: true
-
-  - id: "sim0_libero"
-    module: "src.strategy.simulators.sim0_libero"
-    class: "LiberoSimulator"
-    description: "Sim0 리베로 - 시장 국면(BULL/SIDEWAYS/BEAR) 감지 + 전략 추천 (매매 없음)"
-    active: true
-    tradeable: false  # 분석기(IS_ANALYZER) — 매매 없음, 프로그램 선택 불가
 
   - id: "sim7_report_follower"
     module: "src.strategy.simulators.sim7_report_follower"

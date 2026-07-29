@@ -36,6 +36,15 @@ CONSUMERS = {
     'StrategyRadarChart.tsx': os.path.join(ROOT, 'src', 'app', 'components', 'StrategyRadarChart.tsx'),
     'TradeClient.tsx': os.path.join(ROOT, 'src', 'app', 'trade', 'TradeClient.tsx'),
     'program/route.ts': os.path.join(ROOT, 'src', 'app', 'api', 'trade', 'program', 'route.ts'),
+    # 국면 파일(분석기 심의 state_file)을 읽는 넷 + 대시보드 라우트.
+    # 2026-07-30까지 다섯 곳이 파일명을 각자 적고 있었다.
+    'regime_state.py': os.path.join(ROOT, 'src', 'strategy', 'regime_state.py'),
+    'sim6_bear_hedge.py': os.path.join(ROOT, 'src', 'strategy', 'simulators', 'sim6_bear_hedge.py'),
+    'sim10_orchestrator.py': os.path.join(ROOT, 'src', 'strategy', 'simulators', 'sim10_orchestrator.py'),
+    'pipeline/orchestrator.py': os.path.join(ROOT, 'src', 'pipeline', 'orchestrator.py'),
+    'storage_manager.py': os.path.join(ROOT, 'src', 'data', 'storage_manager.py'),
+    'libero-history/route.ts': os.path.join(ROOT, 'src', 'app', 'api', 'simulation',
+                                            'libero-history', 'route.ts'),
 }
 
 

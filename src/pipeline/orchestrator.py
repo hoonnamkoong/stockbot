@@ -6,9 +6,7 @@
 Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 """
 
-import json
-import os
-
+from src.strategy.regime_state import read_regime
 from src.pipeline.context import PipelineContext
 from src.data.storage_manager import StorageManager
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
@@ -22,6 +20,19 @@ def _status_of(item) -> str:
     if isinstance(item, dict):
         return item.get('status', '활성')
     return getattr(item, 'status', '활성')
+
+
+SIM7_BULL_SCORE_MIN = 45.0
+
+
+def sim7_should_buy(strong_picks: list, bull_score) -> bool:
+    """Stage 3.6 게이트 — '강력 매수'가 있고 장이 죽지 않았을 때만 산다.
+
+    bull_score가 None이면 사지 않는다. 예전에는 국면 파일 조회에 실패하면
+    50.0으로 폴백했고, 그 지어낸 점수가 45 게이트를 그대로 통과해 실제 매수가
+    나갔다. 모르는 것은 '보통 장'이 아니다.
+    """
+    return bool(strong_picks) and bull_score is not None and bull_score >= SIM7_BULL_SCORE_MIN
 
 
 def active_only(items: list) -> list:
@@ -135,19 +146,15 @@ def run_pipeline(ctx: PipelineContext) -> None:
             p for p in final_picks
             if '강력 매수' in (p.get('rank_and_recommendation') or '')
         ]
-        bull_score = 50.0
-        try:
-            with open(os.path.join('data', 'sim_libero_state.json'), 'r', encoding='utf-8') as _f:
-                bull_score = float(json.load(_f).get('bull_score', 50.0))
-        except Exception:
-            pass
+        _, bull_score = read_regime('data')
 
-        if strong_picks and bull_score >= 45.0:
+        if sim7_should_buy(strong_picks, bull_score):
             from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator
             ctx.log(f"▶ Stage 3.6: Sim7 강력 매수 처리 ({len(strong_picks)}개 / bull_score={bull_score:.1f})")
             ReportFollowerSimulator().buy_from_report(strong_picks, bull_score=bull_score)
         else:
-            ctx.log(f"▶ Stage 3.6: Sim7 스킵 (강력매수={len(strong_picks)}개 / bull_score={bull_score:.1f})")
+            score_txt = '측정 불가' if bull_score is None else f'{bull_score:.1f}'
+            ctx.log(f"▶ Stage 3.6: Sim7 스킵 (강력매수={len(strong_picks)}개 / bull_score={score_txt})")
     except Exception as _e:
         ctx.log(f"[Warn] Stage 3.6 Sim7 실패: {_e}")
 

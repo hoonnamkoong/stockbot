@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { ANALYZERS } from '@/lib/sim-registry.generated';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,8 @@ export async function GET() {
         let intraday: any = null;
         let intradayScoreLog: any[] = [];
         try {
-            const res = await fetch(`${GITHUB_BASE}/sim_libero_state.json?t=${Date.now()}`, { cache: 'no-store' });
+            // 국면 상태 파일명은 매니페스트의 분석기 심에서 온다(여기 적지 않는다).
+            const res = await fetch(`${GITHUB_BASE}/${ANALYZERS[0].stateFile}?t=${Date.now()}`, { cache: 'no-store' });
             if (res.ok) {
                 const s = await res.json();
                 liberoLog = s.daily_regime_log ?? [];

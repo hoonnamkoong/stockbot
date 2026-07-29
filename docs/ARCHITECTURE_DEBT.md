@@ -15,9 +15,10 @@
 | `a60b26cb` | **CI 도입** + 실거래 TS 첫 테스트 17개 (턴 손익 11, 주문 조립 6) |
 | `5d1495c5` | `manifest-sims.ts` 제거 — 런타임 매니페스트 파싱·fail-open 소멸 |
 | `21b578c5` | 리셋 상태 shape 단일화 — `initial_state()`가 정본, TS는 생성물 |
+| `a1a22f0a` `f85323ba` | 국면 파일 창구 단일화(`regime_state.py`) + Sim7 폴백 제거 |
 
-지금 상태: pytest 446 · node 30 · push마다 CI 자동 실행.
-**아래 4순위(국면 파일 리터럴)부터 이어가면 된다.** 5~6순위는 그 뒤.
+지금 상태: pytest 460 · node 30 · push마다 CI 자동 실행.
+**아래 5순위(대시보드 로드 비용)부터 이어가면 된다.** 6순위는 그 뒤.
 
 **배포 후 아직 눈으로 확인 못 한 것** — 다음 세션 첫 5분에 볼 것:
 1. 심8·심9·심9-1 카드에 매매 기록이 뜨는가 (`5d1495c5` 이전 커밋에서 고친 실버그).
@@ -62,7 +63,7 @@
 | 심 목록·라벨·파일명 | `registry.py` | 6곳 | **해결** (07-30, 생성기) |
 | 매매 가능 심 화이트리스트 | `registry.get_tradeable_simulator_ids()` | `manifest-sims.ts` (자체 YAML 파서) | **해결** (07-30) |
 | 리셋 상태 shape (10키) | `base_simulator.initial_state()` | 생성물 (`sim-registry.generated.ts`) | **해결** (07-30, 생성기) |
-| 국면 파일 경로 | 4곳에 리터럴 | 해결됨 | **미해결(py)** |
+| 국면 파일 경로 | 4곳에 리터럴 | 1곳에 리터럴 | **해결** (07-30, `regime_state.py`) |
 | KIS TR·헤더·필드명 | `kis_data_provider.py`, `balance.py` | `kis-api.ts` | 구조적 |
 | 턴 손익 계산 | `program_turn.py` | `program-turn.ts` | 의도된 이중화 |
 | 수수료율 | `base_simulator.py` 상수 / `virtual_portfolio.py` 인라인 | — | **미해결(py 내부)** |
@@ -122,10 +123,17 @@ TS `buildResetState`로 옮겨 적는다(`sim-reset-targets.ts`는 재수출만)
 파이썬에 키를 늘리고 생성기를 안 돌리면 3개, `reset_state`를 인라인 dict로 되돌리면 2개,
 TS가 shape를 다시 적으면 1개가 실패하는 것을 주입해 확인했다.
 
-### 4순위 — 국면 파일 리터럴 4곳 + `_read_regime` 2벌 ← **여기서 이어간다**
-심 목록과 같은 병의 잔여. registry가 이미 analyzer의 `state_file`을 안다.
+### ~~4순위 — 국면 파일 리터럴 4곳 + `_read_regime` 2벌~~ ✅ 완료 (`a1a22f0a` `f85323ba`)
+`src/strategy/regime_state.py`가 유일한 창구다. 파일명은 매니페스트의 분석기 심에서
+파생하고(분석기가 하나가 아니면 죽는다), 소비자 다섯이 전부 그것을 부른다 —
+py 넷 + 대시보드 라우트 하나(TS도 리터럴이 하나 남아 있었다). 각 소비자의 반환
+계약은 그대로 뒀다(Sim6=스칼라, Sim10=튜플).
 
-### 5순위 — 대시보드 로드 비용
+**딸려 나온 실버그:** Stage 3.6이 국면 조회에 실패하면 `bull_score`를 50.0으로
+폴백했다. 45 게이트를 그대로 통과해 **지어낸 점수로 강력매수 종목을 실제로 샀다.**
+[[no-fabricated-financial-values]]의 교과서적 사례라 같이 고쳤다(별도 커밋).
+
+### 5순위 — 대시보드 로드 비용 ← **여기서 이어간다**
 1회 로드에 GitHub raw 약 25회(stats 13 + history 12), 전부 `no-store`.
 **심 개수에 선형 비례**하는데 레지스트리 작업으로 심 추가가 쉬워진 만큼 곧 커진다.
 심 20개면 41회다. 지금 당장 아프지는 않다.
@@ -168,7 +176,7 @@ CI를 켜자마자 이것이 드러났다(pytest exit 2, 수집 단계 사망). 
 
 **검증 명령 (전부 로컬에서 돌아간다):**
 ```
-python -m pytest tests/ -q          # 446 passed, 4 skipped
+python -m pytest tests/ -q          # 460 passed, 4 skipped
 node --test "src/**/*.test.ts"      # 30 passed
 npx tsc --noEmit
 npm run build
@@ -187,7 +195,9 @@ python scripts/gen_sim_registry.py  # 매니페스트 고쳤으면 반드시
 매니페스트 재fetch, tradeable 불일치). 같은 방식을 계속 쓸 것.
 
 **함정:**
-- `git checkout --`를 정리 명령에 끼워 넣지 말 것. 이번 세션에서 미커밋 편집을 날렸다.
+- `git checkout --`·`git restore`를 정리 명령에 끼워 넣지 말 것. 미커밋 편집을 날린다
+  (07-30에 또 당했다 — 주입 테스트로 망가뜨린 파일을 되돌리려다 아직 커밋 안 한 변경까지
+  같이 날아갔다). **주입은 커밋한 뒤에 할 것.** 그러면 `git restore`가 안전하다.
 - Bash 툴의 작업 디렉터리는 호출 사이에 유지된다. `cd` 후에는 `git -C <repo>`를 쓸 것.
   이번 세션에서 임시 클론에 `cd`한 채 커밋이 엉뚱한 곳에서 돌았다.
 - 파이썬 heredoc에 `/c/Users/...` 경로를 쓰면 못 찾는다(파이썬은 Windows 프로그램).

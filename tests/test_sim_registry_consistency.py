@@ -35,6 +35,7 @@ CONSUMERS = {
     'history/route.ts': os.path.join(ROOT, 'src', 'app', 'api', 'trade', 'history', 'route.ts'),
     'StrategyRadarChart.tsx': os.path.join(ROOT, 'src', 'app', 'components', 'StrategyRadarChart.tsx'),
     'TradeClient.tsx': os.path.join(ROOT, 'src', 'app', 'trade', 'TradeClient.tsx'),
+    'program/route.ts': os.path.join(ROOT, 'src', 'app', 'api', 'trade', 'program', 'route.ts'),
 }
 
 
@@ -146,6 +147,44 @@ def test_consumers_do_not_hardcode_sim_files():
             f'{label}에 심 파일명이 직접 박혀 있다: {found} — '
             '매니페스트에서 파생할 것(파이썬은 registry.get_sim_registry(), '
             'TS는 sim-registry.generated.ts)')
+
+
+def test_no_ts_file_reads_the_manifest_at_runtime():
+    """TS는 매니페스트를 런타임에 받아 파싱하지 않는다 — 생성된 상수를 쓴다.
+
+    manifest-sims.ts가 GitHub main의 매니페스트를 fetch해 정규식으로 긁고 있었다.
+    실패하면 빈 배열을 돌려줘서, 사용자가 심을 골라 프로그램 매매를 켜도 선택이
+    조용히 null이 됐다(2026-07-30 제거). 게다가 심 이름을 description에서 잘라
+    만들어 실전 드롭다운에만 대시보드와 다른 이름이 떴다.
+
+    같은 것이 되살아나면 여기서 걸린다.
+    """
+    ts_files = []
+    for base in ('src/app', 'src/lib'):
+        for dirpath, _, names in os.walk(os.path.join(ROOT, base)):
+            ts_files += [os.path.join(dirpath, n) for n in names
+                         if n.endswith(('.ts', '.tsx'))]
+    # 생성 파일 자신은 헤더에 원천 경로를 적는다 — 읽는 게 아니라 출처 표기다.
+    offenders = [os.path.relpath(p, ROOT).replace('\\', '/') for p in ts_files
+                 if os.path.abspath(p) != os.path.abspath(GENERATED_TS)
+                 and 'strategy_manifest' in _read(p)]
+    assert not offenders, (
+        f'TS가 매니페스트를 직접 읽는다: {offenders} — '
+        'src/lib/sim-registry.generated.ts에서 파생할 것')
+
+
+def test_tradeable_ids_match_python_whitelist():
+    """대시보드 드롭다운과 파이프라인 화이트리스트가 같은 집합이어야 한다.
+
+    어긋나면 화면에서 고를 수 있는데 파이썬이 안 돌리는 심(또는 그 반대)이 생긴다.
+    """
+    from src.strategy.registry import get_tradeable_simulator_ids
+    generated = _read(GENERATED_TS)
+    # tradeableSims()는 SIM_REGISTRY의 tradeable: true 항목이다.
+    ts_ids = {m.group(1) for m in re.finditer(
+        r"\{ id: '([^']+)'.*?tradeable: true \}", generated)}
+    assert ts_ids == set(get_tradeable_simulator_ids()), (
+        f'TS {sorted(ts_ids)} != 파이썬 {sorted(get_tradeable_simulator_ids())}')
 
 
 def test_daily_brief_derives_from_manifest():

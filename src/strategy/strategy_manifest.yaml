@@ -11,8 +11,22 @@
 #
 # [새 시뮬레이터 추가 방법]
 #   1. src/strategy/simulators/sim4_momentum.py 파일 생성
-#   2. 이 파일 simulators 항목에 한 줄 추가
-#   → 다른 파일 수정 불필요
+#   2. 이 파일 simulators 항목에 블록 추가 — 아래 필드를 빠짐없이 채운다
+#        id·module·class·description : 실행에 필요
+#        state_file·csv_file          : BaseSimulator가 super().__init__("Name")으로
+#                                       만드는 경로와 반드시 일치해야 한다
+#                                       (sim_{name.lower()}_state.json)
+#        label·display_order          : 사람이 보는 이름과 순서. display_order는
+#                                       이 파일의 나열 순서(=실행 순서)와 별개다
+#        ui_key                       : 통계 API 응답 키(대시보드가 성과를 찾는 이름)
+#        short_desc·chart_group·color : 대시보드 표시용. color는 Mantine 팔레트
+#                                       이름이고 심마다 달라야 한다(겹치면 순위표
+#                                       범례에서 두 심이 같은 색이 된다)
+#        analyzer: true               : 매매하지 않는 심(리베로)만
+#   3. python scripts/gen_sim_registry.py 실행 → src/lib/sim-registry.generated.ts 갱신
+#   → 다른 파일은 수정 불필요. 파이썬은 registry.get_sim_registry(),
+#     대시보드는 생성된 TS 상수에서 파생한다.
+#   → tests/test_sim_registry_consistency.py가 누락·오타·생성파일 미갱신을 잡는다.
 #
 # [시뮬레이터 임시 비활성화]
 #   해당 시뮬레이터의 active: false 로 변경
@@ -53,6 +67,11 @@ simulators:
     module: "src.strategy.simulators.sim0_libero"
     class: "LiberoSimulator"
     description: "Sim0 리베로 - 시장 국면(BULL/SIDEWAYS/BEAR) 감지 + 전략 추천 (매매 없음)"
+    state_file: "sim_libero_state.json"
+    csv_file: "trade_history_sim_libero.csv"
+    label: "리베로 국면판단 (Sim 0)"
+    display_order: 0
+    analyzer: true   # 매매하지 않는다 — 리셋·브리프 대상에서 제외
     active: true
     tradeable: false  # 분석기(IS_ANALYZER) — 매매 없음, 프로그램 선택 불가
 
@@ -60,6 +79,14 @@ simulators:
     module: "src.strategy.simulators.sim1_psych"
     class: "PsychDivergenceSimulator"
     description: "심리 폭발형 시뮬레이터 (Buzz & 가격 이격 분석)"
+    state_file: "sim_psych_state.json"
+    csv_file: "trade_history_sim_psych.csv"
+    label: "심리 괴리형 (Sim 1)"
+    display_order: 10
+    ui_key: "sim1"
+    short_desc: "Buzz 급증·가격 정체 종목 매집"
+    chart_group: 1
+    color: "blue"
     active: true
     tradeable: true
 
@@ -67,6 +94,14 @@ simulators:
     module: "src.strategy.simulators.sim2_spillover"
     class: "SectorSpilloverSimulator"
     description: "섹터 전이형 시뮬레이터 (대장주 추종 & 순환매)"
+    state_file: "sim_spillover_state.json"
+    csv_file: "trade_history_sim_spillover.csv"
+    label: "수급 동승형 (Sim 2)"
+    display_order: 20
+    ui_key: "sim2"
+    short_desc: "외인 수급 + 감정 발산 스코어"
+    chart_group: 1
+    color: "violet"
     active: true
     tradeable: true
 
@@ -74,6 +109,14 @@ simulators:
     module: "src.strategy.simulators.sim3_risk"
     class: "SmartRiskSimulator"
     description: "스마트 리스크형 시뮬레이터 (추세 추종 & 트레일링 스탑)"
+    state_file: "sim_risk_state.json"
+    csv_file: "trade_history_sim_risk.csv"
+    label: "가치 페어형 (Sim 3)"
+    display_order: 30
+    ui_key: "sim3"
+    short_desc: "추세 돌파 / 횡보 반등 + 트레일링"
+    chart_group: 1
+    color: "red"
     active: true
     tradeable: true
 
@@ -81,20 +124,44 @@ simulators:
     module: "src.strategy.simulators.sim4_bull_momentum"
     class: "BullMomentumSimulator"
     description: "상승장 주도주 탑승형 - 모멘텀 + 불타기 + 고정익절 없이 트레일링 라이딩"
+    state_file: "sim_bull_state.json"
+    csv_file: "trade_history_sim_bull.csv"
+    label: "상승 모멘텀형 (Sim 4)"
+    display_order: 40
+    ui_key: "sim4"
+    short_desc: "주도주 탑승·불타기, 고정익절 없이 라이딩"
+    chart_group: 2
+    color: "green"
     active: true
     tradeable: true
 
   - id: "sim5_sideways"
     module: "src.strategy.simulators.sim5_sideways_swing"
     class: "SidewaysSwingSimulator"
-    description: "추세 눌림목형 - 상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절 (구 횡보스윙)"
+    description: "레인지 저점형 - 20일 채널 저점 +3% 이내 진입 + 상단 근접 후 트레일링 (고정익절 없음)"
+    state_file: "sim_sideways_state.json"
+    csv_file: "trade_history_sim_sideways.csv"
+    label: "추세 눌림목형 (Sim 5)"
+    display_order: 50
+    ui_key: "sim5"
+    short_desc: "20일 채널 저점 +3% 이내 진입 · 상단 근접 후 트레일링"
+    chart_group: 2
+    color: "yellow"
     active: true
     tradeable: true
 
   - id: "sim6_bear"
     module: "src.strategy.simulators.sim6_bear_hedge"
     class: "BearHedgeSimulator"
-    description: "하락장 줍줍형 - 극단적 현금보유 + 데드캣 반등 2.5% 빠른 익절"
+    description: "하락장 인버스형 - KODEX 인버스 추세추종(Sim0 BEAR 게이트) + 트레일링 -10%"
+    state_file: "sim_bear_state.json"
+    csv_file: "trade_history_sim_bear.csv"
+    label: "하락 줍줍형 (Sim 6)"
+    display_order: 60
+    ui_key: "sim6"
+    short_desc: "KODEX 인버스 추세추종 (Sim0 BEAR 게이트) · 트레일링 -10%"
+    chart_group: 3
+    color: "cyan"
     active: true
     tradeable: true
 
@@ -102,6 +169,14 @@ simulators:
     module: "src.strategy.simulators.sim4_bull_daytrading"
     class: "BullMomentumDayTradingSimulator"
     description: "상승 모멘텀 단타 — 분할 익절(+5%/+10%) + 2일/5일 강제청산"
+    state_file: "sim_bulldaytrade_state.json"
+    csv_file: "trade_history_sim_bulldaytrade.csv"
+    label: "상승 단타형 (Sim 4-1)"
+    display_order: 45
+    ui_key: "sim4_daytrading"
+    short_desc: "Sim4 기반 당일 데이트레이딩 — 분할 익절 + 강제청산"
+    chart_group: 2
+    color: "teal"
     active: true
     tradeable: true
 
@@ -109,6 +184,14 @@ simulators:
     module: "src.strategy.simulators.sim7_report_follower"
     class: "ReportFollowerSimulator"
     description: "Sim7 리포트 팔로워 — 딥다이브 강력 매수 종목 자동 매수 + 트레일링 라이딩"
+    state_file: "sim_reportfollower_state.json"
+    csv_file: "trade_history_sim_reportfollower.csv"
+    label: "리포트 팔로워 (Sim 7)"
+    display_order: 70
+    ui_key: "sim7"
+    short_desc: "딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩"
+    chart_group: 3
+    color: "pink"
     active: true
     tradeable: true
 
@@ -116,6 +199,14 @@ simulators:
     module: "src.strategy.simulators.sim10_orchestrator"
     class: "Sim10OrchestratorSimulator"
     description: "Sim10 오케스트레이터 — Sim0 국면(BULL/SIDEWAYS/BEAR)에 따라 전략 파라미터 동적 전환 (300만 독립 운용)"
+    state_file: "sim_orchestrator_state.json"
+    csv_file: "trade_history_sim_orchestrator.csv"
+    label: "오케스트레이터 (Sim 10)"
+    display_order: 100
+    ui_key: "sim10"
+    short_desc: "Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용"
+    chart_group: 4
+    color: "grape"
     active: true
     tradeable: true
 
@@ -123,6 +214,14 @@ simulators:
     module: "src.strategy.simulators.sim8_accumulation"
     class: "AccumulationSimulator"
     description: "Sim8 선행매집 — 52주 앵커 구간의 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩"
+    state_file: "sim_accumulation_state.json"
+    csv_file: "trade_history_sim_accumulation.csv"
+    label: "선행 매집형 (Sim 8)"
+    display_order: 80
+    ui_key: "sim8"
+    short_desc: "52주 앵커 구간 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩"
+    chart_group: 3
+    color: "indigo"
     active: true
     tradeable: false  # 과거 검증 불가(엑셀에 52주·수급추정 컬럼 없음) — 페이퍼 관찰 단계
 
@@ -130,6 +229,14 @@ simulators:
     module: "src.strategy.simulators.sim9_gap_fade"
     class: "GapFadeSimulator"
     description: "Sim9 갭소진 반등 — 갭>=+3% & 장중<=-3%를 14:30 이후 매수 + 익일 청산(타임스탑 1일)"
+    state_file: "sim_gapfade_state.json"
+    csv_file: "trade_history_sim_gapfade.csv"
+    label: "갭소진 반등 (Sim 9)"
+    display_order: 90
+    ui_key: "sim9"
+    short_desc: "갭 +3% 후 장중 -3% 급락을 14:30 이후 매수 · 익일 청산"
+    chart_group: 4
+    color: "orange"
     active: true
     tradeable: false  # 실측 시가가 09:02 근사였음 — 실제 시가로 재검증 후 승격
 
@@ -137,5 +244,13 @@ simulators:
     module: "src.strategy.simulators.sim9_1_donchian"
     class: "DonchianBreakoutSimulator"
     description: "Sim9-1 돈치안 채널 돌파 — 20일 채널 상단 돌파 + 10일 채널 이탈/2*ATR 청산 (Sim5의 정반대)"
+    state_file: "sim_donchian_state.json"
+    csv_file: "trade_history_sim_donchian.csv"
+    label: "돈치안 돌파 (Sim 9-1)"
+    display_order: 95
+    ui_key: "sim9_1"
+    short_desc: "20일 채널 상단 돌파 추종 · 10일 채널 이탈 / 2ATR 청산"
+    chart_group: 4
+    color: "lime"
     active: true
     tradeable: false  # 과거 검증 불가(엑셀 유니버스가 동적이라 20일 채널 신호 4건) — 페이퍼 관찰

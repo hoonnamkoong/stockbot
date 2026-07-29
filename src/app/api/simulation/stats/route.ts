@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { SIM_REGISTRY, ANALYZERS } from '@/lib/sim-registry.generated';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,21 +10,8 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
-        const types = [
-            { id: 'sim1',            file: 'sim_psych_state.json' },
-            { id: 'sim2',            file: 'sim_spillover_state.json' },
-            { id: 'sim3',            file: 'sim_risk_state.json' },
-            { id: 'sim4',            file: 'sim_bull_state.json' },
-            { id: 'sim4_daytrading', file: 'sim_bulldaytrade_state.json' },
-            { id: 'sim5',            file: 'sim_sideways_state.json' },
-            { id: 'sim6',            file: 'sim_bear_state.json' },
-            { id: 'sim7',            file: 'sim_reportfollower_state.json' },
-            // 페이퍼 관찰 단계(tradeable: false) — 실전 승격 전 성과만 축적한다
-            { id: 'sim8',            file: 'sim_accumulation_state.json' },
-            { id: 'sim9',            file: 'sim_gapfade_state.json' },
-            { id: 'sim9_1',          file: 'sim_donchian_state.json' },
-            { id: 'sim10',           file: 'sim_orchestrator_state.json' },
-        ];
+        // 페이퍼 관찰 단계(tradeable: false)도 포함한다 — 실전 승격 전 성과를 축적한다
+        const types = SIM_REGISTRY.map((s) => ({ id: s.uiKey, file: s.stateFile }));
 
         const results: any = {};
         
@@ -70,9 +58,12 @@ export async function GET() {
             }
         }));
 
-        // Sim7 리베로: 매매하지 않는 시장 국면 분석기 → 통계가 아닌 국면 정보를 별도 첨부
+        // 리베로: 매매하지 않는 시장 국면 분석기 → 통계가 아닌 국면 정보를 별도 첨부.
+        // 응답 형태가 이 심에만 있는 필드(current_regime 등)라 목록화하지 않고 id로 짚는다.
+        const libero = ANALYZERS.find((a) => a.id === 'sim0_libero');
         try {
-            const res = await fetch(`${GITHUB_BASE}/sim_libero_state.json?t=${Date.now()}`, { cache: 'no-store' });
+            if (!libero) throw new Error('매니페스트에 sim0_libero 분석기가 없다');
+            const res = await fetch(`${GITHUB_BASE}/${libero.stateFile}?t=${Date.now()}`, { cache: 'no-store' });
             if (res.ok) {
                 const s = await res.json();
                 results.libero = {

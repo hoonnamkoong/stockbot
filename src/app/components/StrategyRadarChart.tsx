@@ -9,6 +9,9 @@ import {
 } from 'recharts';
 import { Card, Text, Group, Loader, Badge, Stack, Table, Divider } from '@mantine/core';
 import { IconDna, IconTrendingUp, IconActivity } from '@tabler/icons-react';
+import {
+  SIM_REGISTRY, chartHex, isPaper, simsInChartGroup, type SimRegistryEntry,
+} from '@/lib/sim-registry.generated';
 
 interface LiberoInfo {
   current_regime: string | null;
@@ -21,43 +24,33 @@ interface LiberoInfo {
   daily_regime_log: { date: string; regime: string; bull_score: number; breadth?: number }[];
 }
 
-// 전략 시리즈 정의 (단일 소스)
+// 전략 시리즈는 매니페스트에서 파생한다(src/lib/sim-registry.generated.ts).
 // paper: tradeable=false인 관찰 단계 전략. 순위표에서 실전 전략과 구분해 표시한다.
 type Series = { key: string; label: string; color: string; desc: string; paper?: boolean };
 
-const SERIES: Series[] = [
-  { key: 'sim1',            label: '심리 괴리형 (Sim 1)',   color: '#228be6', desc: 'Buzz 급증·가격 정체 종목 매집' },
-  { key: 'sim2',            label: '수급 동승형 (Sim 2)',   color: '#7950f2', desc: '외인 수급 + 감정 발산 스코어' },
-  { key: 'sim3',            label: '스마트 리스크형 (Sim 3)', color: '#fa5252', desc: '추세 돌파 / 횡보 반등 + 트레일링' },
-  { key: 'sim4',            label: '상승 모멘텀형 (Sim 4)',  color: '#2f9e44', desc: '주도주 탑승·불타기, 고정익절 없이 라이딩' },
-  { key: 'sim4_daytrading', label: '상승 단타형 (Sim 4-1)', color: '#0ca678', desc: 'Sim4 기반 당일 데이트레이딩 — 빠른 익절' },
-  { key: 'sim5',            label: '추세 눌림목형 (Sim 5)',  color: '#f08c00', desc: '상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절' },
-  { key: 'sim6',            label: '하락 줍줍형 (Sim 6)',   color: '#0c8599', desc: '폭락 후 데드캣 반등 2.5% 빠른 익절' },
-  { key: 'sim7',            label: '리포트 팔로워 (Sim 7)', color: '#e64980', desc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩' },
-  { key: 'sim8',            label: '선행 매집형 (Sim 8)',   color: '#1971c2', desc: '52주 앵커 구간 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩', paper: true },
-  { key: 'sim9',            label: '갭소진 반등 (Sim 9)',   color: '#e8590c', desc: '갭 +3% 후 장중 -3% 급락을 14:30 이후 매수 · 익일 청산', paper: true },
-  { key: 'sim9_1',          label: '돈치안 돌파 (Sim 9-1)', color: '#087f5b', desc: '20일 채널 상단 돌파 추종 · 10일 채널 이탈 / 2ATR 청산', paper: true },
-  { key: 'sim10',           label: '오케스트레이터 (Sim 10)', color: '#ae3ec9', desc: 'Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용' },
-];
+const toSeries = (s: SimRegistryEntry): Series => ({
+  key: s.uiKey,
+  label: s.label,
+  color: chartHex(s),
+  desc: s.shortDesc,
+  paper: isPaper(s) || undefined,
+});
 
-const SERIES_G1 = SERIES.filter(s => ['sim1', 'sim2', 'sim3'].includes(s.key));
-const SERIES_G2 = SERIES.filter(s => ['sim4', 'sim4_daytrading', 'sim5'].includes(s.key));
-const SERIES_G3 = SERIES.filter(s => ['sim6', 'sim7', 'sim8'].includes(s.key));
-const SERIES_G4 = SERIES.filter(s => ['sim9', 'sim9_1', 'sim10'].includes(s.key));
+const SERIES: Series[] = SIM_REGISTRY.map(toSeries);
+
+const SERIES_G1 = simsInChartGroup(1).map(toSeries);
+const SERIES_G2 = simsInChartGroup(2).map(toSeries);
+const SERIES_G3 = simsInChartGroup(3).map(toSeries);
+const SERIES_G4 = simsInChartGroup(4).map(toSeries);
 
 // 나우캐스트 시간축: 장 시간대 고정 슬롯 (sim0_libero의 _hour_label과 동일한 'HH:00' 포맷)
 const HOUR_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'];
 
-// ID → 라벨 (리베로 추천 표시용)
-const ID_LABEL: Record<string, string> = {
-  sim_psych:            '심리 괴리형(S1)',
-  sim_spillover:        '수급 동승형(S2)',
-  sim_risk:             '스마트 리스크형(S3)',
-  sim4_bull:            '상승 모멘텀형(S4)',
-  sim4_bull_daytrading: '상승 단타형(S4-1)',
-  sim5_sideways:        '횡보 스윙형(S5)',
-  sim6_bear:            '하락 줍줍형(S6)',
-};
+// 매니페스트 id → 라벨. 리베로의 recommended_sims가 매니페스트 id로 오는데,
+// 이 표를 손으로 적으면 리베로가 추천 대상을 넓힐 때 날 id가 그대로 화면에 뜬다.
+const ID_LABEL: Record<string, string> = Object.fromEntries(
+  SIM_REGISTRY.map((s) => [s.id, s.label]),
+);
 
 const REGIME_STYLE: Record<string, { color: string; label: string }> = {
   BULL:     { color: '#2f9e44', label: '상승장 (BULL)' },

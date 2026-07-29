@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRealTradeHistory } from '@/lib/kis-api';
+import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
 
 /**
  * [V50.2] Trading History API (Refactored)
@@ -78,20 +79,11 @@ async function fetchSimHistory(fileInfo: { type: string, name: string }) {
 
 export async function GET(req: NextRequest) {
     try {
-        const simFiles = [
-            { type: 'sim_psych',        name: 'trade_history_sim_psych.csv' },
-            { type: 'sim_spillover',    name: 'trade_history_sim_spillover.csv' },
-            { type: 'sim_risk',         name: 'trade_history_sim_risk.csv' },
-            { type: 'sim_bull',             name: 'trade_history_sim_bull.csv' },
-            { type: 'sim4_bull_daytrading', name: 'trade_history_sim_bulldaytrade.csv' },
-            { type: 'sim_sideways',         name: 'trade_history_sim_sideways.csv' },
-            { type: 'sim_bear',             name: 'trade_history_sim_bear.csv' },
-            { type: 'sim7_report_follower', name: 'trade_history_sim_reportfollower.csv' },
-            { type: 'sim10_orchestrator',   name: 'trade_history_sim_orchestrator.csv' },
-            { type: 'sim_original',         name: 'trade_history_sim_original.csv' },
-            { type: 'sim_conservative', name: 'trade_history_sim_conservative.csv' },
-            { type: 'sim_aggressive',   name: 'trade_history_sim_aggressive.csv' }
-        ];
+        // type은 매니페스트 id다 — 대시보드 카드가 이 값으로 자기 기록을 골라낸다.
+        // 손으로 적던 시절 심8·심9·심9-1이 빠져 있어 그 셋의 기록 표가 늘 비어 있었다.
+        // 은퇴한 심(sim_original·conservative·aggressive)도 여기서 함께 사라진다 —
+        // 매니페스트에 없고 화면 어디도 그 type을 참조하지 않는 죽은 fetch였다.
+        const simFiles = SIM_REGISTRY.map((s) => ({ type: s.id, name: s.csvFile }));
 
         // 병렬 요청 수행
         const [realHistory, ...simHistories] = await Promise.all([

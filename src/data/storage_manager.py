@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Optional
 
 from src.data.schemas import StockData, SyncState, ReportEntry
+from src.strategy.regime_state import read_regime_state
 
 
 class StorageManager:
@@ -144,22 +145,19 @@ class StorageManager:
 
     def _load_market_regime(self) -> tuple:
         """Sim0 리베로 state에서 시장 국면, bull_score, 상세 메트릭스를 읽는다."""
-        path = os.path.join(self.DATA_DIR, "sim_libero_state.json")
-        try:
-            with open(path, "r", encoding="utf-8-sig") as f:
-                d = json.load(f)
-            metrics = d.get("metrics", {})
-            return (
-                d.get("current_regime", "-"),
-                d.get("bull_score"),
-                d.get("regime_confidence"),
-                metrics.get("breadth_score"),
-                metrics.get("momentum_score"),
-                metrics.get("trend_strength"),
-                metrics.get("volatility_score"),
-            )
-        except Exception:
+        d = read_regime_state(self.DATA_DIR)
+        if d is None:
             return "-", None, None, None, None, None, None
+        metrics = d.get("metrics", {})
+        return (
+            d.get("current_regime", "-"),
+            d.get("bull_score"),
+            d.get("regime_confidence"),
+            metrics.get("breadth_score"),
+            metrics.get("momentum_score"),
+            metrics.get("trend_strength"),
+            metrics.get("volatility_score"),
+        )
 
     def update_monthly_excel(self, picks: list, now_kst: datetime) -> Optional[str]:
         """

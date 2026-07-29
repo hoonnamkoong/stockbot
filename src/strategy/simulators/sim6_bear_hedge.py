@@ -1,5 +1,4 @@
-import os
-
+from ..regime_state import read_regime
 from .base_simulator import BaseSimulator
 
 # base 순수 헬퍼 재사용
@@ -116,13 +115,7 @@ class BearHedgeSimulator(BaseSimulator):
         뭉개면 '국면이 아니다'와 구분이 안 되고, 비 BEAR 경로는 곧 청산이라
         일시적 파일 오류가 실제 시장가 매도가 된다.
         """
-        import json
-        try:
-            with open(os.path.join(self.data_dir, "sim_libero_state.json"), "r", encoding="utf-8-sig") as f:
-                regime = json.load(f).get("current_regime")
-            return regime if regime in ("BULL", "SIDEWAYS", "BEAR") else None
-        except Exception:
-            return None
+        return read_regime(self.data_dir)[0]
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}

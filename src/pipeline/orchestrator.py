@@ -6,9 +6,7 @@
 Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 """
 
-import json
-import os
-
+from src.strategy.regime_state import read_regime
 from src.pipeline.context import PipelineContext
 from src.data.storage_manager import StorageManager
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
@@ -135,12 +133,8 @@ def run_pipeline(ctx: PipelineContext) -> None:
             p for p in final_picks
             if '강력 매수' in (p.get('rank_and_recommendation') or '')
         ]
-        bull_score = 50.0
-        try:
-            with open(os.path.join('data', 'sim_libero_state.json'), 'r', encoding='utf-8') as _f:
-                bull_score = float(json.load(_f).get('bull_score', 50.0))
-        except Exception:
-            pass
+        _, _bs = read_regime('data')
+        bull_score = 50.0 if _bs is None else _bs
 
         if strong_picks and bull_score >= 45.0:
             from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator

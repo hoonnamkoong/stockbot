@@ -1,6 +1,4 @@
-import json
-import os
-
+from ..regime_state import read_regime
 from .base_simulator import BaseSimulator, get_kst_now
 from .sim4_bull_daytrading import decide_bull_daytrade
 from .sim5_sideways_swing import decide_sideways
@@ -24,16 +22,14 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         국면으로 눌림목 전략이 실제로 돌아 신규 진입까지 나가고, 그 값이
         state["active_regime"]에 박혀 실거래 턴의 손익 귀속 태그까지 오염된다
         (program_trader._resolve_active_tag가 이 값을 읽는다).
+
+        국면을 알면 bull_score만 빠진 경우는 50.0으로 채운다 — 하위 전략 선택은
+        국면이 하고, 여기서 bull_score는 기록용(regime_log)이라 매매를 바꾸지 않는다.
         """
-        try:
-            with open(os.path.join(self.data_dir, "sim_libero_state.json"), "r", encoding="utf-8-sig") as f:
-                d = json.load(f)
-            regime = d.get("current_regime")
-            if regime not in ("BULL", "SIDEWAYS", "BEAR"):
-                return None, None
-            return regime, float(d.get("bull_score", 50.0))
-        except Exception:
+        regime, bull_score = read_regime(self.data_dir)
+        if regime is None:
             return None, None
+        return regime, 50.0 if bull_score is None else bull_score
 
     def get_universe(self):
         """국면 연동 유니버스. BULL=KIS 등락률 상위 30, BEAR=인버스 ETF 고정, SIDEWAYS=공통 버즈."""

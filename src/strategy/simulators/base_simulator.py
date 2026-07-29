@@ -10,6 +10,29 @@ def get_kst_now():
     return datetime.datetime.now(timezone(timedelta(hours=9)))
 
 
+def initial_state(cash):
+    """리셋 직후의 상태 shape. **이 함수가 정본이다.**
+
+    대시보드의 리셋 버튼(TS)도 같은 shape로 파일을 써야 한다. 손으로 두 벌 적던
+    시절에는 한쪽에 키가 늘어도 아무도 몰랐고, 대시보드로 리셋한 심만 다른 상태로
+    시작했다. 지금은 scripts/gen_sim_registry.py가 이 함수를 호출해 TS의
+    buildResetState를 생성한다 — 여기 키를 고치고 생성기를 안 돌리면
+    tests/test_sim_registry_consistency.py가 실패한다.
+    """
+    return {
+        "initial_cash": cash,
+        "cash": cash,
+        "invested": 0,
+        "portfolio": {},
+        "peak_nav": cash,
+        "total_fees": 0,
+        "history": [cash],
+        "daily_trades": [],
+        "market_index_healthy": True,  # [V2] 시장 지수 상태
+        "cooldown_codes": {},
+    }
+
+
 class TradeLog:
     """
     [V8.5.0] 단일 매매 기록 데이터 구조
@@ -93,18 +116,7 @@ class BaseSimulator:
     def reset_state(self):
         """[V8.6.2 Hotfix] 5,000,000원 클린 시작"""
         print(f"[Sim] {self.name} 상태를 {self.initial_cash:,}원으로 초기화합니다.")
-        self.state = {
-            "initial_cash": self.initial_cash,
-            "cash": self.initial_cash,
-            "invested": 0,
-            "portfolio": {},
-            "peak_nav": self.initial_cash,
-            "total_fees": 0, 
-            "history": [self.initial_cash],
-            "daily_trades": [],
-            "market_index_healthy": True, # [V2] 시장 지수 상태
-            "cooldown_codes": {}
-        }
+        self.state = initial_state(self.initial_cash)
         
         # [Fix] 상태 초기화 시 기존 로그 및 CSV 파일도 함께 삭제하여 히스토리 불일치 해결
         if os.path.exists(self.log_file):

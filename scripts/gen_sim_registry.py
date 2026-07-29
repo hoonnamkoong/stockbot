@@ -1,4 +1,4 @@
-"""매니페스트 → 대시보드가 읽는 TS 상수를 생성한다.
+"""매니페스트·리셋 상태 shape → 대시보드가 읽는 TS 상수를 생성한다.
 
 심 목록이 파이썬과 TS 양쪽에 복제돼 있으면 어긋난다 — 2026-07-29에 심8·심9·심9-1이
 리셋·브리프에서, 심8·심9·심9-1의 매매 기록이 히스토리 API에서 각각 누락됐다.
@@ -8,14 +8,20 @@
 그래서 빌드 타임에 옮긴다. 생성 결과는 커밋한다(런타임 의존 0). 매니페스트를
 고치고 이 스크립트를 안 돌리면 tests/test_sim_registry_consistency.py가 잡는다.
 
+리셋 상태 shape도 같은 이유로 여기서 나온다 — 대시보드의 리셋 버튼이 파이썬과
+같은 10키 JSON을 써야 하는데, 손으로 두 벌 적으면 한쪽에 키가 늘어도 아무도 모른다.
+정본은 base_simulator.initial_state()다.
+
     python scripts/gen_sim_registry.py
 """
+import json
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.strategy.registry import get_sim_registry  # noqa: E402
+from src.strategy.simulators.base_simulator import initial_state  # noqa: E402
 
 OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'lib', 'sim-registry.generated.ts')
 
@@ -91,6 +97,39 @@ export function chartHex(s: SimRegistryEntry): string {
 """
 
 
+class _Cash:
+    """예수금 자리표시자. 직렬화될 때 TS 식별자 `cash`로 바뀐다."""
+
+
+_CASH_MARKER = '@@CASH@@'
+
+
+def _reset_state_ts() -> str:
+    """base_simulator.initial_state()의 dict를 TS 함수 본문으로 옮긴다.
+
+    예수금에서 파생되는 값(initial_cash·cash·peak_nav·history[0])이 무엇인지
+    여기에 다시 적지 않는다 — 자리표시자를 넣고 부르면 파이썬이 그것을 어디에
+    놓든 그 자리에 `cash`가 찍힌다. 파이썬이 예수금 파생 필드를 하나 더 늘려도
+    이 생성기는 고칠 것이 없다.
+    """
+    dumped = json.dumps(initial_state(_Cash()), indent=2, ensure_ascii=False,
+                        default=lambda o: _CASH_MARKER)
+    body = '\n'.join('  ' + line for line in dumped.split('\n')).strip()
+    body = body.replace(f'"{_CASH_MARKER}"', 'cash')
+    return (
+        '/**\n'
+        ' * 리셋 직후의 상태. 파이썬 base_simulator.initial_state()에서 생성됐다.\n'
+        ' *\n'
+        ' * 대시보드 리셋과 파이프라인 리셋이 같은 shape를 써야 한다 — 예전에는 양쪽이\n'
+        ' * 손으로 같은 10키를 적고 있어서, 한쪽에 키가 늘면 대시보드로 리셋한 심만\n'
+        ' * 다른 상태로 시작하고 아무도 몰랐다.\n'
+        ' */\n'
+        'export function buildResetState(cash: number): Record<string, unknown> {\n'
+        f'  return {body};\n'
+        '}'
+    )
+
+
 def _ts(value) -> str:
     if isinstance(value, bool):
         return 'true' if value else 'false'
@@ -120,6 +159,9 @@ def build() -> str:
     for s in analyzers:
         lines.append(f"  {{ id: {_ts(s['id'])}, stateFile: {_ts(s['state_file'])} }},")
     lines.append('];')
+
+    lines.append('')
+    lines.append(_reset_state_ts())
 
     lines.append(FOOTER)
     return '\n'.join(lines)

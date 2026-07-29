@@ -41,6 +41,30 @@ export const ANALYZERS: { id: string; stateFile: string }[] = [
   { id: 'sim0_libero', stateFile: 'sim_libero_state.json' },
 ];
 
+/**
+ * 리셋 직후의 상태. 파이썬 base_simulator.initial_state()에서 생성됐다.
+ *
+ * 대시보드 리셋과 파이프라인 리셋이 같은 shape를 써야 한다 — 예전에는 양쪽이
+ * 손으로 같은 10키를 적고 있어서, 한쪽에 키가 늘면 대시보드로 리셋한 심만
+ * 다른 상태로 시작하고 아무도 몰랐다.
+ */
+export function buildResetState(cash: number): Record<string, unknown> {
+  return {
+    "initial_cash": cash,
+    "cash": cash,
+    "invested": 0,
+    "portfolio": {},
+    "peak_nav": cash,
+    "total_fees": 0,
+    "history": [
+      cash
+    ],
+    "daily_trades": [],
+    "market_index_healthy": true,
+    "cooldown_codes": {}
+  };
+}
+
 /** 관찰 단계(tradeable: false) — 순위표에서 실전 심과 구분해 표시한다. */
 export function isPaper(s: SimRegistryEntry): boolean {
   return !s.tradeable;

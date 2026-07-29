@@ -131,3 +131,85 @@ def test_diag_columns_unchanged():
     from src.data import sim_diag
     assert sim_diag.COLUMNS[-1] == 'ignition4'
     assert len(sim_diag.COLUMNS) == 33
+
+
+# ── Task 3: 승계 + 파리티 ───────────────────────────────────
+def _view(prev_day=None, last_run=None, nav=3_000_000):
+    return {'portfolio': {}, 'cash': nav, 'initial_cash': 3_000_000, 'nav': nav,
+            'cooldown_codes': {}, 'market_index_healthy': True,
+            'psych_prev_day': prev_day, 'psych_last_run': last_run}
+
+
+PARITY_KEYS = ('decision', 'reason', 'd_sov', 'd_hype', 'accel', 'accel_d1',
+               'hist_missing', 'hist_days_ago', 'ignition', 'ignition4')
+
+
+def test_carry_returns_consumed_pair():
+    from src.pipeline.workers.program_trader import _psych_carry
+    prev = _snap('20260728')
+    last = _snap('20260729', z_sov=0.5)
+    carry = _psych_carry({'psych_prev_day': prev, 'psych_last_run': last,
+                          'psych_snapshot': _snap('20260729', z_sov=9.9)})
+    assert carry == {'psych_prev_day': prev, 'psych_snapshot': last}
+
+
+def test_carry_is_empty_when_state_absent():
+    """페이퍼 state가 없거나 dict가 아니면 현행대로 동작한다(예외 없음)."""
+    from src.pipeline.workers.program_trader import _psych_carry
+    assert _psych_carry(None) == {}
+    assert _psych_carry('nope') == {}
+    assert _psych_carry({'cash': 100}) == {}
+
+
+def test_program_path_reproduces_paper_history_terms():
+    """파리티의 실제 증명 — 같은 후보·같은 시각에 두 경로의 진단값이 전부 같다."""
+    from src.pipeline.workers.program_trader import _psych_carry
+
+    today = '20260729'
+    prev_day = _snap('20260728', z_sov=0.2, z_posters=0.3, z_hype=0.1)
+    prev_run = _snap(today, z_sov=0.9, z_posters=1.1, z_hype=0.4)
+    cands = [_cand('005930', '삼성전자')] + _filler()
+    prices = {'005930': 1000}
+
+    # (1) 페이퍼 run()이 하는 일
+    p_prev, p_last = resolve_history(prev_day, prev_run, today)
+    o1, d1, new_snap = decide_psych(_view(p_prev, p_last), cands, prices,
+                                    today=today, hhmm='1030', ts='t')
+    # 페이퍼가 state에 써놓는 것 (Task 1 이후)
+    paper_state = {'psych_prev_day': p_prev, 'psych_last_run': p_last,
+                   'psych_snapshot': new_snap}
+
+    # (2) 프로그램: 승계 → 다시 resolve_history 통과 → 같은 입력
+    carry = _psych_carry(paper_state)
+    g_prev, g_last = resolve_history(carry['psych_prev_day'], carry['psych_snapshot'], today)
+    o2, d2, _ = decide_psych(_view(g_prev, g_last), cands, prices,
+                             today=today, hhmm='1030', ts='t')
+
+    assert (g_prev, g_last) == (p_prev, p_last)   # 재승격이 없다
+    assert o1 == o2
+    for k in PARITY_KEYS:
+        assert [x[k] for x in d1] == [x[k] for x in d2], k
+
+
+def test_carrying_psych_snapshot_would_collapse_accel():
+    """기각한 대안 B를 코드로 못 박는다.
+
+    페이퍼가 방금 덮어쓴 psych_snapshot을 승계하면 accel이 전 종목 0이 된다.
+    Phase 2에서 accel>0 게이트가 들어가면 프로그램은 영구 무매매가 된다.
+    """
+    today = '20260729'
+    prev_day = _snap('20260728', z_sov=0.2, z_posters=0.3)
+    prev_run = _snap(today, z_sov=0.9, z_posters=1.1)
+    cands = [_cand('005930', '삼성전자')] + _filler()
+    prices = {'005930': 1000}
+
+    p_prev, p_last = resolve_history(prev_day, prev_run, today)
+    _, d_paper, new_snap = decide_psych(_view(p_prev, p_last), cands, prices,
+                                        today=today, hhmm='1030', ts='t')
+    # 잘못된 승계: last_run 대신 방금 쓴 snapshot
+    b_prev, b_last = resolve_history(p_prev, new_snap, today)
+    _, d_bad, _ = decide_psych(_view(b_prev, b_last), cands, prices,
+                               today=today, hhmm='1030', ts='t')
+
+    assert all(float(x['accel']) == 0 for x in d_bad)
+    assert any(float(x['accel']) != 0 for x in d_paper)

@@ -173,6 +173,28 @@ def _recently_ran(ledger: dict, now_kst: datetime) -> bool:
         return False
 
 
+def _psych_carry(paper_state) -> dict:
+    """Sim1 이력 슬롯을 페이퍼 심 state에서 프로그램 스냅샷으로 승계한다.
+
+    페이퍼가 **이번 런에 실제로 소비한** 쌍(psych_prev_day, psych_last_run)을 옮긴다.
+    psych_snapshot을 옮기면 안 된다 — 그 값은 페이퍼가 방금 이번 런의 z로 덮어썼기
+    때문에 프로그램의 accel이 z - 같은 z = 0이 되어 전 종목 0으로 무너진다.
+
+    psych_last_run은 정의상 None이거나 오늘 날짜다(페이퍼의 resolve_history가 승격을
+    이미 끝냈다). 그래서 프로그램 쪽 run()이 다시 resolve_history를 통과해도 재승격이
+    일어나지 않는다 — 이 승계는 멱등이다.
+
+    Sim1 외의 심은 이 슬롯이 없어 빈 dict가 나온다(현행 동작 유지).
+    """
+    if not isinstance(paper_state, dict):
+        return {}
+    prev_day = paper_state.get('psych_prev_day')
+    last_run = paper_state.get('psych_last_run')
+    if prev_day is None and last_run is None:
+        return {}
+    return {'psych_prev_day': prev_day, 'psych_snapshot': last_run}
+
+
 def _make_adapter(sim, snapshot_state: dict, today: str, real_holdings: dict | None = None):
     """심 인스턴스를 실계좌 스냅샷으로 운용하도록 개조하고, 의도 주문을 수집한다.
     - state를 스냅샷으로 교체, save_state/log_trade는 no-op(실제 가상 상태 파일 보호).
@@ -358,9 +380,11 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         return
 
     # market_index_healthy 게이트는 가상 심 상태(리베로가 기록)에서 승계 — 페이퍼와 동일 동작.
+    # 주의: sim.state는 _make_adapter가 스냅샷으로 갈아끼우기 전까지만 페이퍼 상태다.
+    paper_state = getattr(sim, 'state', None)
     market_index_healthy = True
-    if isinstance(getattr(sim, 'state', None), dict):
-        market_index_healthy = bool(sim.state.get('market_index_healthy', True))
+    if isinstance(paper_state, dict):
+        market_index_healthy = bool(paper_state.get('market_index_healthy', True))
 
     # 7. 심 전용 유니버스 적용 (페이퍼 경로 _run_simulators와 동일 의미론)
     sim_candidates = _resolve_candidates(sim, candidates, enrich, log, log_error)
@@ -411,7 +435,10 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         'total_fees': 0, 'history': [effective_budget], 'daily_trades': [], 'peak_nav': effective_budget,
         'market_index_healthy': market_index_healthy,
         'cooldown_codes': dict(ledger.get('cooldown_codes', {})),  # 손절 쿨다운 영속화
+        'exec_path': 'program',  # 심이 진단 로그를 페이퍼와 분리하도록 알린다
     }
+    # 이력 승계(현재 Sim1만 해당). 없으면 아무것도 안 넣는다 = 현행 동작.
+    snapshot.update(_psych_carry(paper_state))
 
     # 9. 어댑터(실잔고 이중 방어 포함) + 실행
     orders = _make_adapter(sim, snapshot, today, real_holdings)

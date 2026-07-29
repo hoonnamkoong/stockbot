@@ -32,6 +32,7 @@ class BaseSimulator:
     SELL_FEE_RATE = 0.00015  # 매도 수수료율
     SELL_TAX_RATE = 0.0018   # 증권거래세율
     IS_ANALYZER = False      # True면 매매하지 않는 분석기(리베로). reset 시 자본 부여 제외
+    IS_EOD = False           # True면 장중 10분 루프에서 제외하고 마감 후 1회만 실행(일봉 전략)
 
     def __init__(self, name, initial_cash=5000000):
         self.name = name

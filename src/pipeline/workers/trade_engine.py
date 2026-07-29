@@ -250,6 +250,10 @@ class TradeEngineWorker(BaseWorker):
 
             for sim in simulators:
                 try:
+                    # 일봉 전략은 장중 10분 루프에서 돌 이유가 없다 —
+                    # scripts/run_eod_sims.py가 마감 후 1회 돌린다.
+                    if getattr(sim, 'IS_EOD', False):
+                        continue
                     is_libero = getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator'
                     if is_libero:
                         # 국면 판단의 breadth/momentum/trend를 top100 라이브 실측으로 교체 (버즈 표본 편향 제거)
@@ -337,6 +341,14 @@ class TradeEngineWorker(BaseWorker):
                         stock['foreign_rate'] = float(
                             data_rows[0][8].get_text().replace('%', '').replace(',', '').strip() or 0
                         )
+                        # [Sim8] foreign_change: info 축 세 항 중 하나. 이게 없으면 횡단면
+                        # z가 퇴화해 info가 전 종목 비고 진입이 원천 차단된다.
+                        # 같은 표의 어제 행이라 추가 콜 0.
+                        prev_rate = float(
+                            data_rows[1][8].get_text().replace('%', '').replace(',', '').strip() or 0
+                        )
+                        stock.setdefault('foreign_change',
+                                         round(stock['foreign_rate'] - prev_rate, 3))
             except Exception:
                 pass
             return stock
@@ -352,8 +364,9 @@ class TradeEngineWorker(BaseWorker):
                 code = stock.get('code', '')
                 if not code:
                     continue
-                # PER/PBR + 등락률
-                if not (stock.get('per') and stock.get('pbr')) or 'change_rate' not in stock:
+                # PER/PBR + 등락률 + 52주 고저
+                if (not (stock.get('per') and stock.get('pbr'))
+                        or 'change_rate' not in stock or 'w52_hgpr' not in stock):
                     try:
                         quote = kis.get_price_quote(code)
                         for k in ('per', 'pbr', 'sector_name'):
@@ -368,6 +381,11 @@ class TradeEngineWorker(BaseWorker):
                         if 'change_rate' not in stock and quote.get('price'):
                             rate = quote.get('change_rate_pct', 0.0)
                             stock['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
+                        # [Sim8] 52주 고저 — 앵커 판정(_nearness)의 재료. 0으로 채우면
+                        # 앵커가 0으로 나뉘므로, 값이 있을 때만 붙인다.
+                        for _f in ('w52_hgpr', 'w52_lwpr'):
+                            if _f not in stock and quote.get(_f):
+                                stock[_f] = quote[_f]
                     except Exception:
                         pass
                 # 수급 — 유니버스 자체에 이미 값이 있으면 덮어쓰지 않음

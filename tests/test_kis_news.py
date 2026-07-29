@@ -61,8 +61,14 @@ def test_get_news_titles_returns_empty_on_failure():
 
 
 def test_get_news_titles_uses_cache():
+    """캐시는 get_news_items가 소유한다 — get_news_titles는 거기서 제목만 뽑는다.
+
+    키가 news_{code}가 아니라 news_items_{code}이고, 담기는 것도 제목 문자열이
+    아니라 {title, url} dict다. URL을 함께 돌려주도록 바뀌면서 옮겨간 것이다.
+    """
     provider = _make_provider()
-    provider._cache = {"news_035720": (time.time(), ["캐시된 뉴스"])}
+    provider._cache = {"news_items_035720": (time.time(),
+                                             [{"title": "캐시된 뉴스", "url": ""}])}
     with patch.object(provider, '_get') as mock_get:
         result = provider.get_news_titles("035720")
         mock_get.assert_not_called()

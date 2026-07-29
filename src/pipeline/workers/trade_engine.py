@@ -250,6 +250,10 @@ class TradeEngineWorker(BaseWorker):
 
             for sim in simulators:
                 try:
+                    # 일봉 전략은 장중 10분 루프에서 돌 이유가 없다 —
+                    # scripts/run_eod_sims.py가 마감 후 1회 돌린다.
+                    if getattr(sim, 'IS_EOD', False):
+                        continue
                     is_libero = getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator'
                     if is_libero:
                         # 국면 판단의 breadth/momentum/trend를 top100 라이브 실측으로 교체 (버즈 표본 편향 제거)

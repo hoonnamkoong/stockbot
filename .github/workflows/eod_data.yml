@@ -54,8 +54,11 @@ jobs:
 
       - name: Install dependencies
         if: steps.gate.outputs.run == 'true'
-        # fetch_kospi_top100.py는 bs4를 함수 안에서 지연 import한다 (dotenv는 가드됨).
-        run: pip install requests beautifulsoup4
+        # fetch_kospi_top100.py만 있을 땐 requests·beautifulsoup4면 충분했다.
+        # 심9-1 EOD 실행이 붙으면서 src.strategy 패키지를 import하는데, 그 __init__이
+        # analyzer·advisor를 즉시 불러 pandas·google-genai까지 끌고 온다. 개별 패키지를
+        # 쫓으면 __init__이 바뀔 때마다 조용히 깨지므로 선언된 requirements를 쓴다.
+        run: pip install -r scripts/requirements-scraper.txt
 
       # 토큰의 유일한 발급자는 token_manager다. 여기서는 비공개 레포의 유효 토큰을
       # data/kis_token_cache.json에 내려놓기만 하고, fetch_kospi_top100.py가 그것을 읽는다.
@@ -73,6 +76,25 @@ jobs:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
         run: PYTHONPATH=. python scratch/fetch_kospi_top100.py
+
+      # 심9-1(돈치안)은 일봉 전략이라 장중 루프에서 빠져 있다(IS_EOD).
+      # 방금 만든 top100 OHLCV로 하루 1회 돌린다 — 백테스트와 같은 유니버스·데이터다.
+      # 상태는 db-data가 원본이므로 실행 전에 내려받고 실행 후 함께 배포한다.
+      # 상태를 못 받아오면 실행하지 않는다: 백지 상태로 돌리면 이미 보유 중인
+      # 포지션을 잊고 중복 진입하거나 청산 판단을 건너뛴다.
+      - name: Run EOD simulators (Sim9-1 Donchian)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          mkdir -p data
+          if git clone --branch db-data --depth 1 \
+              https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git state_repo 2>/dev/null; then
+            cp state_repo/data/sim_donchian_state.json data/ 2>/dev/null \
+              && echo "[EOD] 심9-1 상태 복원" || echo "[EOD] 기존 상태 없음(최초 실행)"
+            rm -rf state_repo
+            PYTHONPATH=. python scripts/run_eod_sims.py || echo "[EOD] 실행 실패 — CSV 배포는 계속한다"
+          else
+            echo "[EOD] db-data clone 실패 — 심 실행 건너뜀(백지 상태 매매 방지)"
+          fi
 
       - name: Deploy CSV to db-data
         if: steps.gate.outputs.run == 'true'
@@ -93,8 +115,13 @@ jobs:
           else
             echo "[OHLCV] 파일 없음 - 종가만 배포한다"
           fi
+          # 심9-1 상태·매매기록. 이걸 안 올리면 매일 백지에서 시작해 보유가 사라진다.
+          for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv; do
+            [ -f "data/$f" ] && cp "data/$f" db_repo/data/
+          done
           cd db_repo
           git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv
+          git add data/sim_donchian_state.json data/sim_donchian_log.json data/trade_history_sim_donchian.csv 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')"
             git push origin db-data

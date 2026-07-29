@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRealTradeHistory } from '@/lib/kis-api';
 import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
+import { createBucketCache, dbDataUrl } from '@/lib/db-data';
 
 /**
  * [V50.2] Trading History API (Refactored)
@@ -9,8 +10,6 @@ import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
  */
 
 export const dynamic = 'force-dynamic';
-
-const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
 
 /**
  * KIS API를 통해 실제 체결 내역을 가져옵니다.
@@ -29,8 +28,7 @@ async function fetchRealHistory() {
  */
 async function fetchSimHistory(fileInfo: { type: string, name: string }) {
     try {
-        const cacheBuster = Date.now();
-        const res = await fetch(`${GITHUB_BASE}/${fileInfo.name}?t=${cacheBuster}`, { cache: 'no-store' });
+        const res = await fetch(dbDataUrl(fileInfo.name), { cache: 'no-store' });
         if (!res.ok) return [];
 
         const content = await res.text();
@@ -77,21 +75,30 @@ async function fetchSimHistory(fileInfo: { type: string, name: string }) {
     }
 }
 
+/**
+ * 심 매매 기록(GitHub CSV 12개)만 신선도 버킷 단위로 재사용한다.
+ *
+ * **실거래(KIS)는 캐시하지 않는다.** 자기 체결이 화면에 늦게 뜨는 것은 다른 종류의
+ * 문제라 30초라도 미룰 이유가 없다. 심 CSV는 10분마다 도는 파이프라인이 쓴다.
+ */
+const loadSimHistories = createBucketCache(async () => {
+    // type은 매니페스트 id다 — 대시보드 카드가 이 값으로 자기 기록을 골라낸다.
+    // 손으로 적던 시절 심8·심9·심9-1이 빠져 있어 그 셋의 기록 표가 늘 비어 있었다.
+    // 은퇴한 심(sim_original·conservative·aggressive)도 여기서 함께 사라진다 —
+    // 매니페스트에 없고 화면 어디도 그 type을 참조하지 않는 죽은 fetch였다.
+    const simFiles = SIM_REGISTRY.map((s) => ({ type: s.id, name: s.csvFile }));
+    const histories = await Promise.all(simFiles.map(file => fetchSimHistory(file)));
+    return histories.flat();
+});
+
 export async function GET(req: NextRequest) {
     try {
-        // type은 매니페스트 id다 — 대시보드 카드가 이 값으로 자기 기록을 골라낸다.
-        // 손으로 적던 시절 심8·심9·심9-1이 빠져 있어 그 셋의 기록 표가 늘 비어 있었다.
-        // 은퇴한 심(sim_original·conservative·aggressive)도 여기서 함께 사라진다 —
-        // 매니페스트에 없고 화면 어디도 그 type을 참조하지 않는 죽은 fetch였다.
-        const simFiles = SIM_REGISTRY.map((s) => ({ type: s.id, name: s.csvFile }));
-
-        // 병렬 요청 수행
-        const [realHistory, ...simHistories] = await Promise.all([
+        const [realHistory, simHistory] = await Promise.all([
             fetchRealHistory(),
-            ...simFiles.map(file => fetchSimHistory(file))
+            loadSimHistories(),
         ]);
 
-        const allHistory = [...realHistory, ...simHistories.flat()];
+        const allHistory = [...realHistory, ...simHistory];
 
         // 시간순 정렬 (최신 → 과거)
         allHistory.sort((a, b) => {

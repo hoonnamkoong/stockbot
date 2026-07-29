@@ -352,13 +352,22 @@ class TradeEngineWorker(BaseWorker):
                 code = stock.get('code', '')
                 if not code:
                     continue
-                # PER/PBR
-                if not (stock.get('per') and stock.get('pbr')):
+                # PER/PBR + 등락률
+                if not (stock.get('per') and stock.get('pbr')) or 'change_rate' not in stock:
                     try:
                         quote = kis.get_price_quote(code)
                         for k in ('per', 'pbr', 'sector_name'):
                             if quote.get(k):
                                 stock[k] = quote[k]
+                        # 고정 유니버스(코드+이름만 든 리터럴)는 등락률이 없어 심의
+                        # '당일 상승' 조건이 영원히 거짓이 된다 — Sim6가 6주간 거래
+                        # 0건이던 원인이다. 네이버 frgn 페이지는 일봉이라 장중에 전일
+                        # 값이 박제될 수 있어, 실시간인 KIS 현재가(prdy_ctrt)를 쓴다.
+                        # 조회 실패(price=0)를 0%로 채우면 '보합'이라는 거짓이 되므로
+                        # 그때는 키를 붙이지 않는다.
+                        if 'change_rate' not in stock and quote.get('price'):
+                            rate = quote.get('change_rate_pct', 0.0)
+                            stock['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
                     except Exception:
                         pass
                 # 수급 — 유니버스 자체에 이미 값이 있으면 덮어쓰지 않음

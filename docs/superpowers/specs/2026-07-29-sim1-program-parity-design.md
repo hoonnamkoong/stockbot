@@ -51,7 +51,7 @@ if snapshot.get('z'):
 ```python
 'psych_prev_day': paper_state.get('psych_prev_day'),
 'psych_snapshot': paper_state.get('psych_last_run'),
-'diag_key': f'{sim_id}_program',
+'exec_path': 'program',
 ```
 
 `psych_last_run`을 `psych_snapshot` 슬롯에 넣는 이유: 프로그램 쪽 `run()`도 다시
@@ -70,13 +70,19 @@ resolve_history(prev_day, snapshot, today):
 ### 3. 진단 키
 
 ```python
-sim_diag.append(self.state.get('diag_key', 'sim1'), diags)
+key = 'sim1_program' if self.state.get('exec_path') == 'program' else 'sim1'
+sim_diag.append(key, diags)
 ```
 
 `sim_diag.month_path(sim)`이 sim 키로 파일명을 만들고 `sim` 컬럼도 그 값으로 채운다.
-페이퍼는 키가 없어 `'sim1'`(현행 그대로), 프로그램은 `'sim1_program'` →
+페이퍼는 플래그가 없어 `'sim1'`(현행 그대로), 프로그램은 `'sim1_program'` →
 `data/sim1_program_diag_YYYY-MM.csv`. **컬럼은 변하지 않으므로 헤더 회전이 없고 07-29
 데이터가 갈라지지 않는다.**
+
+program_trader가 진단 키 문자열이 아니라 **경로 플래그**를 넘기는 이유: Sim1의 매니페스트
+id는 `sim_psych`인데 진단 키는 `sim1`이라 서로 다르다. `f'{sim_id}_program'`으로 만들면
+`sim_psych_program_diag_*.csv`가 되어 페이퍼 파일과 이름이 어긋난다. 진단 키의 이름은
+Sim1이 소유하고, program_trader는 "이건 프로그램 경로다"만 알린다.
 
 ### 경계 조건
 

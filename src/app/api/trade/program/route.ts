@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { fetchTradeableSims } from '@/lib/manifest-sims';
+import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
 import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult } from '@/lib/program-turn';
 
@@ -23,6 +23,15 @@ const CONFIG_PATH = 'program_trading.json';
 const GITHUB_PAT = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
 
 const DEFAULT_CONFIG = { enabled: false, selected_sim: null as string | null, budget: 0 };
+
+/**
+ * 프론트 드롭다운이 기대하는 형태의 매매 가능 심 목록.
+ *
+ * name은 매니페스트 label이다. 예전 manifest-sims.ts는 description을 '-—(' 로 잘라
+ * 이름을 만들어서, 실전 드롭다운에만 "심리 폭발형" 같은 대시보드와 다른 이름이 떴다.
+ */
+const programSimOptions = () =>
+    tradeableSims().map((s) => ({ id: s.id, name: s.label, description: s.shortDesc }));
 
 async function getConfig(): Promise<{ sha: string | null; content: any }> {
     const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${CONFIG_PATH}?ref=${SECRET_BRANCH}`;
@@ -213,7 +222,7 @@ export async function GET(request: Request) {
         if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const { content } = await getConfig();
-        const sims = await fetchTradeableSims();
+        const sims = programSimOptions();
         const validIds = new Set(sims.map((s) => s.id));
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
@@ -311,8 +320,7 @@ export async function POST(request: Request) {
         await clearPinFailures();
 
         // selected_sim 화이트리스트 검증 (임의 id 차단)
-        const sims = await fetchTradeableSims();
-        const validIds = new Set(sims.map((s) => s.id));
+        const validIds = new Set(tradeableSims().map((s) => s.id));
         const sim = selected_sim && validIds.has(selected_sim) ? selected_sim : null;
         const budgetNum = Math.max(0, Math.floor(Number(budget) || 0));
 

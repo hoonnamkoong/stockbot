@@ -49,6 +49,17 @@ export function isPaper(s: SimRegistryEntry): boolean {
   return !s.tradeable;
 }
 
+/**
+ * 프로그램 매매에 노출할 심(active && tradeable). 실전 드롭다운과 화이트리스트 검증의 원천.
+ *
+ * 예전에는 manifest-sims.ts가 GitHub main의 매니페스트를 런타임에 받아 정규식으로 긁었다.
+ * 조회가 실패하면 빈 배열을 돌려줘서, 사용자가 심을 골라 ON을 눌러도 선택이 조용히
+ * 버려졌다. 이제 네트워크가 관여하지 않는다.
+ */
+export function tradeableSims(): SimRegistryEntry[] {
+  return SIM_REGISTRY.filter((s) => s.tradeable);
+}
+
 export function simsInChartGroup(group: number): SimRegistryEntry[] {
   return SIM_REGISTRY.filter((s) => s.chartGroup === group);
 }

@@ -393,6 +393,10 @@ class PsychDivergenceSimulator(BaseSimulator):
             self.state['psych_snapshot'] = snapshot
 
         self._apply(orders, current_prices)
-        sim_diag.append('sim1', diags)
+        # 프로그램 매매 경로는 별도 파일로 간다. 같은 CSV에 섞이면 같은 사이클·
+        # 같은 종목이 2행씩 들어가 분포 분석이 이중계상된다. 진단 키 이름은
+        # Sim1이 소유한다 — 매니페스트 id(sim_psych)와 진단 키(sim1)가 다르다.
+        sim_diag.append('sim1_program' if self.state.get('exec_path') == 'program' else 'sim1',
+                        diags)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

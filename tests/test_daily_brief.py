@@ -87,9 +87,14 @@ import json
 from src.pipeline.daily_brief import collect_sim_brief, SIM_BRIEF_TARGETS
 
 
-def test_targets_cover_nine_sims():
-    assert len(SIM_BRIEF_TARGETS) == 9
+def test_targets_cover_trading_sims():
+    """개수를 박아두지 않는다 — 심을 추가할 때 이 테스트가 오히려 누락을 고정한다.
+
+    매니페스트와의 실제 대조는 tests/test_sim_registry_consistency.py가 한다.
+    여기서는 형식과 분석기 제외만 본다.
+    """
     states = [t[1] for t in SIM_BRIEF_TARGETS]
+    assert len(states) == len(set(states)), '상태 파일 중복'
     assert 'sim_psych_state.json' in states
     assert 'sim_orchestrator_state.json' in states
     assert 'sim_libero_state.json' not in states   # 분석기는 제외
@@ -118,7 +123,7 @@ def test_collect_reads_state_and_counts_distinct_tickers(tmp_path):
 
 def test_collect_missing_files_are_unmeasurable_not_zero(tmp_path):
     rows = collect_sim_brief(str(tmp_path), '2026-07-22')
-    assert len(rows) == 9
+    assert len(rows) == len(SIM_BRIEF_TARGETS)
     assert all(r['profit_rate'] is None for r in rows)   # 상태 없음 = 모름
     assert all(r['ticker_count'] == 0 for r in rows)     # CSV 없음 = 거래 없음
 

@@ -65,8 +65,10 @@ def build_daily_brief(balance: dict, sims: list[dict], now_kst: datetime) -> str
     return '\n'.join(parts)
 
 
-# (표시명, 상태 파일, 거래이력 CSV) — 리셋 대상 9개와 동일. Sim0 리베로는 매매하지 않아 제외.
+# (표시명, 상태 파일, 거래이력 CSV) — 리셋 대상과 동일. Sim0 리베로는 매매하지 않아 제외.
 # 표시명은 대시보드 라벨(TradeClient.tsx)과 일치시킨다.
+# 새 심을 추가하면 여기·sim-reset-targets.ts·stats/route.ts 세 곳에 다 등록해야 한다.
+# 하나라도 빠지면 심이 조용히 사라진다 → tests/test_sim_registry_consistency.py가 막는다.
 SIM_BRIEF_TARGETS = [
     ('심리 괴리형 (Sim 1)',    'sim_psych_state.json',         'trade_history_sim_psych.csv'),
     ('수급 동승형 (Sim 2)',    'sim_spillover_state.json',     'trade_history_sim_spillover.csv'),
@@ -76,6 +78,9 @@ SIM_BRIEF_TARGETS = [
     ('추세 눌림목형 (Sim 5)',  'sim_sideways_state.json',      'trade_history_sim_sideways.csv'),
     ('하락 줍줍형 (Sim 6)',    'sim_bear_state.json',          'trade_history_sim_bear.csv'),
     ('리포트 팔로워 (Sim 7)',  'sim_reportfollower_state.json','trade_history_sim_reportfollower.csv'),
+    ('선행 매집형 (Sim 8)',    'sim_accumulation_state.json',  'trade_history_sim_accumulation.csv'),
+    ('갭소진 반등 (Sim 9)',    'sim_gapfade_state.json',       'trade_history_sim_gapfade.csv'),
+    ('돈치안 돌파 (Sim 9-1)',  'sim_donchian_state.json',      'trade_history_sim_donchian.csv'),
     ('오케스트레이터 (Sim 10)', 'sim_orchestrator_state.json',  'trade_history_sim_orchestrator.csv'),
 ]
 

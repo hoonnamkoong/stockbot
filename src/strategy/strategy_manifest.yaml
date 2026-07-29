@@ -87,14 +87,14 @@ simulators:
   - id: "sim5_sideways"
     module: "src.strategy.simulators.sim5_sideways_swing"
     class: "SidewaysSwingSimulator"
-    description: "추세 눌림목형 - 상승추세 속 MA5 이하 눌림 저가매수 + 빠른 익절 (구 횡보스윙)"
+    description: "레인지 저점형 - 20일 채널 저점 +3% 이내 진입 + 상단 근접 후 트레일링 (고정익절 없음)"
     active: true
     tradeable: true
 
   - id: "sim6_bear"
     module: "src.strategy.simulators.sim6_bear_hedge"
     class: "BearHedgeSimulator"
-    description: "하락장 줍줍형 - 극단적 현금보유 + 데드캣 반등 2.5% 빠른 익절"
+    description: "하락장 인버스형 - KODEX 인버스 추세추종(Sim0 BEAR 게이트) + 트레일링 -10%"
     active: true
     tradeable: true
 

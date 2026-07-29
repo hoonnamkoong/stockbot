@@ -22,6 +22,19 @@ def _status_of(item) -> str:
     return getattr(item, 'status', '활성')
 
 
+SIM7_BULL_SCORE_MIN = 45.0
+
+
+def sim7_should_buy(strong_picks: list, bull_score) -> bool:
+    """Stage 3.6 게이트 — '강력 매수'가 있고 장이 죽지 않았을 때만 산다.
+
+    bull_score가 None이면 사지 않는다. 예전에는 국면 파일 조회에 실패하면
+    50.0으로 폴백했고, 그 지어낸 점수가 45 게이트를 그대로 통과해 실제 매수가
+    나갔다. 모르는 것은 '보통 장'이 아니다.
+    """
+    return bool(strong_picks) and bull_score is not None and bull_score >= SIM7_BULL_SCORE_MIN
+
+
 def active_only(items: list) -> list:
     """추적 종목은 기록(엑셀·대시보드)용이다.
 
@@ -133,15 +146,15 @@ def run_pipeline(ctx: PipelineContext) -> None:
             p for p in final_picks
             if '강력 매수' in (p.get('rank_and_recommendation') or '')
         ]
-        _, _bs = read_regime('data')
-        bull_score = 50.0 if _bs is None else _bs
+        _, bull_score = read_regime('data')
 
-        if strong_picks and bull_score >= 45.0:
+        if sim7_should_buy(strong_picks, bull_score):
             from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator
             ctx.log(f"▶ Stage 3.6: Sim7 강력 매수 처리 ({len(strong_picks)}개 / bull_score={bull_score:.1f})")
             ReportFollowerSimulator().buy_from_report(strong_picks, bull_score=bull_score)
         else:
-            ctx.log(f"▶ Stage 3.6: Sim7 스킵 (강력매수={len(strong_picks)}개 / bull_score={bull_score:.1f})")
+            score_txt = '측정 불가' if bull_score is None else f'{bull_score:.1f}'
+            ctx.log(f"▶ Stage 3.6: Sim7 스킵 (강력매수={len(strong_picks)}개 / bull_score={score_txt})")
     except Exception as _e:
         ctx.log(f"[Warn] Stage 3.6 Sim7 실패: {_e}")
 

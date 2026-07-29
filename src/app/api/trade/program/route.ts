@@ -3,6 +3,8 @@ import { getToken } from 'next-auth/jwt';
 import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
 import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult } from '@/lib/program-turn';
+import { validateArmRequest } from '@/lib/trade-auth';
+import { kstTimestamp } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
 
@@ -282,7 +284,7 @@ export async function POST(request: Request) {
         // enabled:false 요청에 실수로/악의로 실은 오래된 sim/budget 값이 PIN 검증 없이
         // 저장되는 것을 원천 차단(다음 PIN-ON 시 사용자 모르게 다른 값으로 무장되는 것 방지).
         if (!wantEnabled) {
-            const now = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+            const now = kstTimestamp();
             // [턴 동결] OFF를 누른 순간의 턴 손익을 박제한다. OFF 이후의 시세 변동은
             // 어느 턴의 성과도 아니므로 섞이지 않는다.
             // 계산 전체에 하드 데드라인을 건다 — 실패든 hang이든 kill-switch를 지연/차단할 수 없다.
@@ -319,20 +321,19 @@ export async function POST(request: Request) {
         }
         await clearPinFailures();
 
-        // selected_sim 화이트리스트 검증 (임의 id 차단)
-        const validIds = new Set(tradeableSims().map((s) => s.id));
-        const sim = selected_sim && validIds.has(selected_sim) ? selected_sim : null;
-        const budgetNum = Math.max(0, Math.floor(Number(budget) || 0));
-
-        // ON은 유효 sim AND budget>0 일 때만 허용 (fail-closed)
-        if (!sim || budgetNum <= 0) {
-            return NextResponse.json({
-                success: false,
-                error: !sim ? '유효한 매매 심을 선택해야 켤 수 있습니다.' : '프로그램 예산(>0)을 설정해야 켤 수 있습니다.',
-            }, { status: 400 });
+        // selected_sim 화이트리스트 + 예산 검증 (임의 id 차단, fail-closed).
+        // 판정은 src/lib/trade-auth.ts에 있다 — 라우트 안에서는 테스트가 닿지 않는다.
+        const armed = validateArmRequest({
+            selectedSim: selected_sim,
+            budget,
+            tradeableIds: tradeableSims().map((s) => s.id),
+        });
+        if (!armed.ok) {
+            return NextResponse.json({ success: false, error: armed.error }, { status: 400 });
         }
+        const { sim, budget: budgetNum } = armed;
 
-        const now = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+        const now = kstTimestamp();
 
         // [턴 열기] ON 시점의 시세로 물려받은 보유 종목의 기준가를 스냅샷한다(MTM 리셋).
         // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 현재가로 채워진다.

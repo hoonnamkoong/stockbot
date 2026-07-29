@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { placeRealOrder } from '@/lib/kis-api';
+import { authorizeManualOrder } from '@/lib/trade-auth';
+import { kstTimestamp } from '@/lib/kst';
 
 /**
  * [V8.9.9.22] Trade Order API (Remote Sync Version)
@@ -54,32 +56,31 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { code, qty, price, side, isVirtual, pin } = body;
 
-        // 1. 인증: 자동화 엔진(webhook) 경로는 기존대로, 사람 경로는 세션 + PIN 둘 다 요구
+        // 1. 인증: 자동화 엔진(webhook) 경로는 기존대로, 사람 경로는 세션 + PIN 둘 다 요구.
+        //    판정은 lib에 있다(src/lib/trade-auth.ts) — 라우트는 next/server 때문에
+        //    테스트가 import를 못 하는데, 이건 테스트가 있어야 하는 판정이다.
         const authHeader = request.headers.get('Authorization');
         const webhookSecret = process.env.WEBHOOK_SECRET;
         const isAuthorizedByWebhook = webhookSecret && authHeader === `Bearer ${webhookSecret}`;
+        // 세션 조회는 웹훅 경로에서 불필요하다 — 판정 전에 미리 부르지 않는다.
+        const token = isAuthorizedByWebhook
+            ? null
+            : await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
 
-        if (!isAuthorizedByWebhook) {
-            // 1-1. 세션 검증 (PIN 단독 호출 차단 — 로그인된 세션이어야 함)
-            const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
-            if (!token) {
-                console.error('[API-Order] ❌ Unauthorized order attempt (No valid session)');
-                return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 401 });
-            }
-            // 1-2. PIN 검증 (env 필수, 폴백 없음)
-            const tradePin = process.env.TRADE_PIN;
-            if (!tradePin) {
-                console.error('[API-Order] ❌ TRADE_PIN not configured on server');
-                return NextResponse.json({ success: false, error: 'Server auth not configured' }, { status: 500 });
-            }
-            if (pin !== tradePin) {
-                console.error('[API-Order] ❌ Unauthorized order attempt (Invalid PIN)');
-                return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 403 });
-            }
+        const verdict = authorizeManualOrder({
+            authHeader,
+            webhookSecret,
+            hasSession: !!token,
+            pin,
+            tradePin: process.env.TRADE_PIN,
+        });
+        if (!verdict.ok) {
+            console.error(`[API-Order] ❌ Unauthorized order attempt (${verdict.status})`);
+            return NextResponse.json({ success: false, error: verdict.error }, { status: verdict.status });
         }
 
         let result: any;
-        const now = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+        const now = kstTimestamp();
 
         if (isVirtual) {
             // [VIRTUAL] Sync with GitHub (db-data branch)

@@ -31,7 +31,6 @@ def decide_sim6(view, candidates, current_prices):
     orders = []
     portfolio = view['portfolio']
     sold = set()
-    cand_by_code = {s.get('code'): s for s in candidates}
 
     # 1. 청산: 하드손절 / 트레일링(고점 대비 콜백). 고정 익절 없음(추세 라이딩).
     for code in list(portfolio.keys()):
@@ -56,7 +55,7 @@ def decide_sim6(view, candidates, current_prices):
                            'cooldown': REENTRY_COOLDOWN, 'mark_partial': False})
             sold.add(code); continue
 
-    # 2. 진입: 인버스 ETF가 상승 추세(현재가>MA5 + 5일 상승률>=2% + 당일 상승)일 때만.
+    # 2. 진입: 인버스 ETF가 상승 추세(현재가 > 이동평균 + 당일 상승)일 때만.
     held = len(portfolio) - len(sold)
     for stock in candidates:
         if held >= MAX_HOLDINGS:
@@ -91,9 +90,14 @@ class BearHedgeSimulator(BaseSimulator):
        구 '데드캣 반등 롱'은 하락장에 롱으로 반등에 베팅 = 코인플립(2026-06~07 승률 47.6%,
        수수료로 -0.42%/건). 현물 롱 시스템의 하락 수익 정공법 = 인버스 ETF 추세추종으로 전환.
     - 유니버스: KODEX 인버스(114800) 고정 (검증: 유동성·주문 호환 OK, 2X는 감쇠로 제외).
-    - 진입: 인버스가 상승 추세(현재가>MA5 + 5일 상승률>=2% + 당일 상승) → 하락에 순방향 베팅.
-    - 청산: 트레일링(고점 대비 -7%) / 하드손절 -5%. 청산 후 쿨다운 1일(추세 지속 시 재진입).
-    - 국면 판단 없음(순수 알고리즘). Sim10이 BEAR 국면에 이 심을 켠다.
+    - 진입: 현재가 > 이동평균(sparkline 평균) AND 당일 등락률 > 0 → 하락에 순방향 베팅.
+      1종목(MAX_HOLDINGS)만, 가용현금의 90%(ENTRY_RATIO).
+    - 청산: 트레일링(고점 대비 -10%) / 하드손절 -12%. 청산 후 쿨다운 1일(추세 지속 시 재진입).
+      진입 직후엔 트레일링(-10%)이 하드손절(-12%)보다 항상 먼저 걸린다 — 하드손절은
+      두 선을 한 번에 건너뛰는 갭하락 전용 안전판이다(그래서 넓게 잡았다).
+    - 국면 게이팅은 run()에 있다: Sim0(리베로)의 current_regime을 읽어 BEAR일 때만 매매하고,
+      비 BEAR면 보유분을 전량 청산한다. 순수 함수 decide_sim6 자체는 국면을 보지 않으며,
+      Sim10도 BEAR 국면에서 같은 함수를 재사용한다.
     """
     def __init__(self, initial_cash=3000000):
         super().__init__("Bear", initial_cash)
@@ -106,20 +110,29 @@ class BearHedgeSimulator(BaseSimulator):
         """Sim0(리베로)의 현재 국면 판단을 읽는다. 자체 판단이 아니라 Sim0 출력을 소비.
 
         인버스 ETF는 standalone 알파가 없다(국면 전환이 타이밍 신호를 휩쏨). 상승장에서
-        인버스 매수 = 손실이므로, Sim0가 BEAR로 판단할 때만 매매한다. 실패 시 SIDEWAYS(보수).
+        인버스 매수 = 손실이므로, Sim0가 BEAR로 판단할 때만 매매한다.
+
+        판단할 수 없으면 None이다 — 파일 없음·파싱 실패·알 수 없는 값을 SIDEWAYS로
+        뭉개면 '국면이 아니다'와 구분이 안 되고, 비 BEAR 경로는 곧 청산이라
+        일시적 파일 오류가 실제 시장가 매도가 된다.
         """
         import json
         try:
             with open(os.path.join(self.data_dir, "sim_libero_state.json"), "r", encoding="utf-8-sig") as f:
-                regime = json.load(f).get("current_regime", "SIDEWAYS")
-            return regime if regime in ("BULL", "SIDEWAYS", "BEAR") else "SIDEWAYS"
+                regime = json.load(f).get("current_regime")
+            return regime if regime in ("BULL", "SIDEWAYS", "BEAR") else None
         except Exception:
-            return "SIDEWAYS"
+            return None
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        if self._read_regime() == "BEAR":
+        regime = self._read_regime()
+        if regime is None:
+            # 판단 불가 — 매수도 청산도 하지 않고 다음 사이클을 기다린다.
+            self.save_state(current_prices)
+            return self.calculate_stats(current_prices)
+        if regime == "BEAR":
             orders = decide_sim6(self._view(current_prices), candidates, current_prices)
         else:
             # 비(非)하락장: 인버스 매수 금지 + 보유분 전량 청산(국면 이탈)

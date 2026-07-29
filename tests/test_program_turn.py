@@ -190,7 +190,9 @@ def test_sim10_tag_follows_active_regime():
     """Sim10만 하위 전략으로 분해된다. active_regime은 Sim10이 run() 중 스냅샷에 쓴 값."""
     assert _resolve_active_tag("sim10_orchestrator", {"active_regime": "BULL"}) == "sim4_bull_daytrading"
     assert _resolve_active_tag("sim10_orchestrator", {"active_regime": "SIDEWAYS"}) == "sim5_sideways"
-    assert _resolve_active_tag("sim10_orchestrator", {"active_regime": "BEAR"}) == "cash"
+    # BEAR는 2026-07-21 재설계 전까지 '현금 대기'였다. 지금은 Sim6가 인버스 ETF를
+    # 추세추종하는 실제 매매 구간이라 손익이 붙을 태그가 필요하다.
+    assert _resolve_active_tag("sim10_orchestrator", {"active_regime": "BEAR"}) == "sim6"
 
 
 def test_sim10_unknown_regime_falls_back_to_sim_id():

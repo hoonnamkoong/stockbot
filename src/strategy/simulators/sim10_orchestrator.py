@@ -18,13 +18,22 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         super().__init__("orchestrator", initial_cash)
 
     def _read_regime(self):
+        """Sim0(리베로)의 국면과 bull_score를 읽는다.
+
+        판단할 수 없으면 (None, None)이다. 실패를 SIDEWAYS로 뭉개면 근거 없는
+        국면으로 눌림목 전략이 실제로 돌아 신규 진입까지 나가고, 그 값이
+        state["active_regime"]에 박혀 실거래 턴의 손익 귀속 태그까지 오염된다
+        (program_trader._resolve_active_tag가 이 값을 읽는다).
+        """
         try:
             with open(os.path.join(self.data_dir, "sim_libero_state.json"), "r", encoding="utf-8-sig") as f:
                 d = json.load(f)
-            regime = d.get("current_regime", "SIDEWAYS")
-            return regime if regime in ("BULL", "SIDEWAYS", "BEAR") else "SIDEWAYS", float(d.get("bull_score", 50.0))
+            regime = d.get("current_regime")
+            if regime not in ("BULL", "SIDEWAYS", "BEAR"):
+                return None, None
+            return regime, float(d.get("bull_score", 50.0))
         except Exception:
-            return "SIDEWAYS", 50.0
+            return None, None
 
     def get_universe(self):
         """국면 연동 유니버스. BULL=KIS 등락률 상위 30, BEAR=인버스 ETF 고정, SIDEWAYS=공통 버즈."""
@@ -54,6 +63,11 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         current_prices = current_prices or {}
         regime, bull_score = self._read_regime()
         self.update_peak_prices(current_prices)
+        if regime is None:
+            # 판단 불가 — 하위 전략을 돌리지 않고 다음 사이클을 기다린다.
+            # active_regime도 덮어쓰지 않는다: 지어낸 국면에 손익이 귀속된다.
+            self.save_state(current_prices)
+            return self.calculate_stats(current_prices)
         self.state["active_regime"] = regime
         self.state["active_bull_score"] = round(bull_score, 1)
 

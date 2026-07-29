@@ -46,7 +46,11 @@ _SECRET_BRANCH = 'main'
 _CONFIG_PATH = 'program_trading.json'
 _LEDGER_PATH = 'program_positions.json'
 
-_DUP_GUARD_MIN = 15  # 최근 N분 내 재실행 skip (중복 디스패치 방지)
+_DUP_GUARD_MIN = 5   # 최근 N분 내 재실행 skip (중복 디스패치 방지)
+# 파이프라인이 10분 주기라 15분으로 두면 매 사이클이 걸려 실제 실행이 20분마다로
+# 반토막 났다(2026-07-29 Actions 로그 실측: 샘플한 런이 전부 '중복 방지 skip').
+# 막으려는 건 같은 사이클의 중복 디스패치(수초~1~2분)이므로 5분이면 충분하고,
+# Actions 스케줄 지터로 간격이 9분대로 좁아져도 통과한다.
 
 
 def _gh_token() -> str | None:

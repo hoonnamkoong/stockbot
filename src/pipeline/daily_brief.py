@@ -9,6 +9,8 @@ import json
 import os
 from datetime import datetime
 
+from src.strategy.registry import get_sim_registry
+
 _WEEKDAY_KR = '월화수목금토일'
 
 
@@ -65,23 +67,12 @@ def build_daily_brief(balance: dict, sims: list[dict], now_kst: datetime) -> str
     return '\n'.join(parts)
 
 
-# (표시명, 상태 파일, 거래이력 CSV) — 리셋 대상과 동일. Sim0 리베로는 매매하지 않아 제외.
-# 표시명은 대시보드 라벨(TradeClient.tsx)과 일치시킨다.
-# 새 심을 추가하면 여기·sim-reset-targets.ts·stats/route.ts 세 곳에 다 등록해야 한다.
-# 하나라도 빠지면 심이 조용히 사라진다 → tests/test_sim_registry_consistency.py가 막는다.
+# (표시명, 상태 파일, 거래이력 CSV) — 매니페스트에서 파생한다. 자체 목록을 갖지 않는다.
+# 예전에는 여기에 손으로 적어뒀는데 2026-07-28에 추가한 심8·심9·심9-1이 등록되지
+# 않아 브리프에서 조용히 빠져 있었다. 이제 심을 추가하면 매니페스트만 고치면 된다.
 SIM_BRIEF_TARGETS = [
-    ('심리 괴리형 (Sim 1)',    'sim_psych_state.json',         'trade_history_sim_psych.csv'),
-    ('수급 동승형 (Sim 2)',    'sim_spillover_state.json',     'trade_history_sim_spillover.csv'),
-    ('가치 페어형 (Sim 3)',    'sim_risk_state.json',          'trade_history_sim_risk.csv'),
-    ('상승 모멘텀형 (Sim 4)',  'sim_bull_state.json',          'trade_history_sim_bull.csv'),
-    ('상승 단타형 (Sim 4-1)',  'sim_bulldaytrade_state.json',  'trade_history_sim_bulldaytrade.csv'),
-    ('추세 눌림목형 (Sim 5)',  'sim_sideways_state.json',      'trade_history_sim_sideways.csv'),
-    ('하락 줍줍형 (Sim 6)',    'sim_bear_state.json',          'trade_history_sim_bear.csv'),
-    ('리포트 팔로워 (Sim 7)',  'sim_reportfollower_state.json','trade_history_sim_reportfollower.csv'),
-    ('선행 매집형 (Sim 8)',    'sim_accumulation_state.json',  'trade_history_sim_accumulation.csv'),
-    ('갭소진 반등 (Sim 9)',    'sim_gapfade_state.json',       'trade_history_sim_gapfade.csv'),
-    ('돈치안 돌파 (Sim 9-1)',  'sim_donchian_state.json',      'trade_history_sim_donchian.csv'),
-    ('오케스트레이터 (Sim 10)', 'sim_orchestrator_state.json',  'trade_history_sim_orchestrator.csv'),
+    (s['label'], s['state_file'], s['csv_file'])
+    for s in get_sim_registry()  # 리베로(analyzer)는 매매하지 않아 기본 제외
 ]
 
 

@@ -71,10 +71,37 @@ def test_reset_targets_cover_every_trading_sim():
     assert not missing, f'sim-reset-targets.ts에 누락: {sorted(missing)}'
 
 
-def test_daily_brief_covers_every_trading_sim():
-    """빠지면 15:00 브리프에서 그 심의 성과가 보이지 않는다."""
-    missing = set(EXPECTED.values()) - _state_files(_read(BRIEF_PY))
-    assert not missing, f'daily_brief.py에 누락: {sorted(missing)}'
+def test_daily_brief_derives_from_manifest():
+    """브리프는 자체 목록을 갖지 않는다 — 매니페스트에서 파생한다."""
+    from src.pipeline.daily_brief import SIM_BRIEF_TARGETS
+    assert {t[1] for t in SIM_BRIEF_TARGETS} == set(EXPECTED.values())
+    assert 'sim_libero_state.json' not in {t[1] for t in SIM_BRIEF_TARGETS}
+
+
+def test_brief_is_ordered_for_humans_not_execution():
+    """표시 순서는 실행 순서와 분리돼 있다.
+
+    매니페스트 나열 순서는 실행 순서(국면 생산자가 소비자보다 앞)라 사람이
+    읽기엔 뒤죽박죽이다(1,2,3,4,5,6,4-1,7,10,8,9,9-1). display_order가 그걸
+    번호순으로 되돌린다.
+    """
+    from src.pipeline.daily_brief import SIM_BRIEF_TARGETS
+    labels = [t[0] for t in SIM_BRIEF_TARGETS]
+    assert labels.index('상승 단타형 (Sim 4-1)') == labels.index('상승 모멘텀형 (Sim 4)') + 1
+    assert labels[-1] == '오케스트레이터 (Sim 10)'
+
+
+def test_manifest_state_file_matches_class_naming_rule():
+    """매니페스트에 적은 state_file이 BaseSimulator가 실제로 쓰는 경로와 같은가.
+
+    손으로 적는 값이라 오타 한 글자로 없는 파일을 읽게 된다 — 그 경우 심의
+    성과가 조용히 '측정 불가'로 나온다.
+    """
+    manifest = yaml.safe_load(_read(MANIFEST))
+    declared = {s['id']: s['state_file'] for s in manifest['simulators']}
+    for sim_id, derived in _active_sims().items():
+        assert declared[sim_id] == derived[0], (
+            f'{sim_id}: 매니페스트 {declared[sim_id]} != 클래스 파생 {derived[0]}')
 
 
 def test_stats_api_covers_every_trading_sim():

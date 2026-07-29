@@ -69,6 +69,37 @@ def test_missing_file_returns_empty(tmp_path):
     assert candidates_from_ohlcv(str(tmp_path / '없음.csv')) == []
 
 
+# ── ETF 배제 ─────────────────────────────────────────────
+def test_etfs_are_excluded(tmp_path):
+    """지수 추종 ETF는 변동성이 낮아 2*ATR 손절선이 진입가에 바짝 붙는다.
+
+    실측(top100 100거래일): 혼합 유니버스에서 산 ETF 12건 중 10건 손실, 그중
+    9건이 ATR손절이고 보유일수는 1~8일이 대부분이었다. 추세를 타면 ETF도 벌지만
+    (TIGER 미국S&P500 +11.81%, 39일) 그 전에 잡음으로 털린다. 6개뿐인 슬롯을
+    낭비하며 개별주를 밀어내므로 뺀다(전체 NAV +2.37% → ETF 제외 +20.46%).
+    """
+    closes = list(range(1000, 1000 + CHANNEL_DAYS + 1))
+    rows = (_series('069500', 'KODEX 200', closes)
+            + _series('102110', 'TIGER 200', closes)
+            + _series('459580', 'KODEX CD금리액티브(합성)', closes)
+            + _series('005930', '삼성전자', closes))
+    assert [c['code'] for c in candidates_from_ohlcv(_csv(tmp_path, rows))] == ['005930']
+
+
+def test_brand_lookalikes_are_not_excluded(tmp_path):
+    """이름에 브랜드 문자열이 들어간 일반 종목까지 걸러내면 안 된다.
+
+    '미래에셋증권'은 증권사지 ETF가 아니고, 'SOLUS첨단소재'는 SOL 브랜드가
+    아니다. 브랜드는 이름 맨 앞에서 공백으로 끊길 때만 ETF로 본다.
+    """
+    closes = list(range(1000, 1000 + CHANNEL_DAYS + 1))
+    rows = (_series('006800', '미래에셋증권', closes)
+            + _series('336370', 'SOLUS첨단소재', closes)
+            + _series('008930', '한미사이언스', closes))
+    got = [c['code'] for c in candidates_from_ohlcv(_csv(tmp_path, rows))]
+    assert got == ['006800', '336370', '008930']
+
+
 # ── 장중 루프에서 제외 ────────────────────────────────────
 def test_donchian_is_marked_eod():
     assert DonchianBreakoutSimulator.IS_EOD is True

@@ -21,6 +21,7 @@
 """
 import csv
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -29,6 +30,24 @@ from src.strategy.simulators.sim9_1_donchian import CHANNEL_DAYS  # noqa: E402
 
 DEFAULT_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
                            'output', 'ohlcv_top100.csv')
+
+# ETF는 유니버스에서 뺀다. ETF라서가 아니라 손절 규격이 안 맞아서다 —
+# 지수 추종 ETF는 변동성이 개별주보다 훨씬 낮아 진입가 - 2*ATR 손절선이
+# 진입가에 바짝 붙고, 정상적인 잡음에도 1~2일 만에 털린다.
+# 실측(top100 100거래일): 혼합 유니버스에서 산 ETF 12건 중 10건이 손실이고
+# 그중 9건이 ATR손절이었다. 추세를 타면 ETF도 번다(TIGER 미국S&P500 +11.81%,
+# 39일). 다만 그 전에 털리면서 6개뿐인 슬롯을 낭비해 개별주를 밀어낸다.
+# NAV: 전체 100종목 +2.37% → ETF 제외 89종목 +20.46%.
+# 손절을 변동성 상대화(ATR%)로 바꾸면 다시 볼 여지가 있다.
+_ETF_BRANDS = ('KODEX', 'TIGER', 'KBSTAR', 'ARIRANG', 'HANARO', 'SOL', 'ACE',
+               'PLUS', 'RISE', 'KIWOOM', 'TIMEFOLIO', 'WOORI', '마이티', '파워')
+# 브랜드가 이름 맨 앞에서 공백으로 끊길 때만 ETF로 본다. 부분 문자열로 보면
+# '미래에셋증권'·'SOLUS첨단소재' 같은 일반 종목까지 걸러낸다.
+_ETF_RE = re.compile(r'^(' + '|'.join(_ETF_BRANDS) + r')(\s|$)')
+
+
+def is_etf(name: str) -> bool:
+    return bool(_ETF_RE.match((name or '').strip()))
 
 
 def candidates_from_ohlcv(path: str) -> list[dict]:
@@ -65,6 +84,8 @@ def candidates_from_ohlcv(path: str) -> list[dict]:
 
     out = []
     for code in order:
+        if is_etf(names[code]):
+            continue
         rows = sorted(bars[code], key=lambda x: x[0])
         if len(rows) < CHANNEL_DAYS + 1:
             continue

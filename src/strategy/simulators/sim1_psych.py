@@ -385,10 +385,18 @@ class PsychDivergenceSimulator(BaseSimulator):
             ts=now.strftime('%Y-%m-%d %H:%M:%S'))
 
         self.state['psych_prev_day'] = prev_day
+        # 이번 런이 실제로 소비한 직전 런. 페이퍼는 안 읽는다 — 프로그램 매매
+        # 경로가 '페이퍼와 같은 입력'을 승계하기 위한 슬롯이다. psych_snapshot은
+        # 바로 아래에서 이번 런 값으로 덮어써지므로 그걸 넘기면 accel이 0이 된다.
+        self.state['psych_last_run'] = last_run
         if snapshot.get('z'):
             self.state['psych_snapshot'] = snapshot
 
         self._apply(orders, current_prices)
-        sim_diag.append('sim1', diags)
+        # 프로그램 매매 경로는 별도 파일로 간다. 같은 CSV에 섞이면 같은 사이클·
+        # 같은 종목이 2행씩 들어가 분포 분석이 이중계상된다. 진단 키 이름은
+        # Sim1이 소유한다 — 매니페스트 id(sim_psych)와 진단 키(sim1)가 다르다.
+        sim_diag.append('sim1_program' if self.state.get('exec_path') == 'program' else 'sim1',
+                        diags)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

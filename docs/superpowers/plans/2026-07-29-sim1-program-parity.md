@@ -546,6 +546,10 @@ EOF
 - [ ] `data/sim1_diag_YYYY-MM.csv`에 프로그램 행이 섞이지 않았는가(같은 ts·code가 2행이 아닌가)
 - [ ] 프로그램 행의 `hist_missing` 비율이 페이퍼 행과 같은가 (다르면 승계가 안 된 것)
 - [ ] 같은 ts의 페이퍼 행과 프로그램 행에서 `d_sov`·`accel`·`ignition4`가 일치하는가
+- [ ] 진단 분리는 forward-only다. Sim1이 과거에 `selected_sim`이었다면 기존
+      `data/sim1_diag_2026-07.csv`에는 이미 페이퍼+프로그램 행이 섞여 있고
+      소급 정리되지 않는다 — 분리 시점 이전 행은 같은 `ts`·`code` 중복으로
+      식별해 분석에서 제외할 것.
 
 ## Self-Review 결과
 

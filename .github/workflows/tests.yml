@@ -1,0 +1,75 @@
+name: Tests
+
+# 테스트를 사람이 기억해서 돌리는 상태를 끝낸다.
+#
+# 2026-07-30까지 이 레포에는 테스트를 도는 워크플로가 없었다. pytest 439개와
+# node 7개가 있었지만 전부 로컬에서 손으로 돌려야 했고, 그래서 심 목록 누락 같은
+# 회귀를 두 번 다 사람의 눈이 먼저 잡았다(07-29 리셋·브리프, 07-30 매매 기록).
+#
+# db-data 브랜치는 제외한다. 대시보드와 파이프라인이 거기에 데이터를 계속 커밋하는데
+# (일부는 PAT라 워크플로를 재발화시킨다) 코드가 없는 브랜치라 돌릴 것이 없다.
+
+on:
+  push:
+    branches-ignore:
+      - db-data
+  pull_request:
+  workflow_dispatch:
+
+# 같은 브랜치에 연속 푸시하면 이전 실행을 취소한다(마지막 것만 의미가 있다).
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: pytest
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'scripts/requirements-scraper.txt'
+
+      # requirements.txt가 아닌 -scraper.txt를 쓴다: 전자는 파일 끝이 UTF-16으로
+      # 깨져 있어 pip가 패키지명을 잘못 읽는다(별건, 여기서 고치지 않는다).
+      #
+      # holidays를 따로 깐다: -scraper.txt에 없고 깨진 requirements.txt에만 있는데,
+      # src/analyzer_5days.py가 모듈 최상단에서 import한다. 없으면 pytest가
+      # test_analyzer_5days_filter.py 수집 단계에서 죽는다(exit 2, 테스트 실패가 아님).
+      # 두 목록이 갈라져 있는 것 자체가 별건의 빚이다 — docs/ARCHITECTURE_DEBT.md 참고.
+      - name: 의존성 설치
+        run: |
+          pip install -r scripts/requirements-scraper.txt
+          pip install holidays==0.86 pytest
+
+      # 테스트는 전부 모킹돼 있어 시크릿도 네트워크도 필요 없다.
+      - name: pytest
+        run: python -m pytest tests/ -q
+
+  node:
+    name: node --test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 24를 쓰는 이유: TS 타입 스트리핑이 23.6부터 기본이라
+          # --experimental-strip-types 플래그 없이 .ts 테스트가 그대로 돈다.
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: node --test
+        run: node --test "src/**/*.test.ts"
+
+      - name: 타입 검사
+        run: npx tsc --noEmit

@@ -423,33 +423,53 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
 }
 
 /**
- * KIS 실거래 주문 집행 (REAL/VIRTUAL)
+ * 주문 파라미터 조립 — 순수 함수. I/O 직전까지의 계산을 전부 여기 모은다.
+ *
+ * 떼어낸 이유: 실제 버그가 이 계산에서 났다(시장가 매도에 단가를 실어 KIS가 거부, 683cc55).
+ * 네트워크에 붙어 있으면 그 회귀를 테스트로 막을 수 없다. src/lib/kis-order.test.ts가 지킨다.
  */
-    /**
-     * [지시사항 6] 실거래와 가상 매매의 엄격한 물리적 분리
-     * 실거래 주문 API 호출은 4월 V2 알고리즘 하에서 절대 금지됩니다.
-     */
+export function buildOrderRequest(
+    code: string,
+    qty: number,
+    side: 'buy' | 'sell',
+    opts: { accountNo: string; isVirtual: boolean },
+): { trId: string; body: Record<string, string> } {
+    // KIS 국내주식 주문 API (TTTC0802U: 매수, TTTC0801U: 매도, V접두사는 모의)
+    const trId = side === 'buy'
+        ? (opts.isVirtual ? 'VTTC0802U' : 'TTTC0802U')
+        : (opts.isVirtual ? 'VTTC0801U' : 'TTTC0801U');
+
+    return {
+        trId,
+        body: {
+            "CANO": opts.accountNo.slice(0, 8),
+            "ACNT_PRDT_CD": opts.accountNo.slice(8, 10) || "01",
+            "PDNO": code,
+            "ORD_DVSN": "01", // 시장가(01) 또는 지정가(00) - 여기서는 시장가 기본
+            "ORD_QTY": qty.toString(),
+            "ORD_UNPR": "0" // 시장가(01) 주문은 매수·매도 모두 단가 0 필수 (KIS 규칙)
+        },
+    };
+}
+
+/**
+ * KIS 실거래 주문 집행 (REAL/VIRTUAL)
+ *
+ * [지시사항 6] 실거래와 가상 매매의 엄격한 물리적 분리
+ * 실거래 주문 API 호출은 4월 V2 알고리즘 하에서 절대 금지됩니다.
+ */
     export async function placeRealOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {
         // [지시사항] 실거래 차단 정책 전면 삭제 및 수동 주문 허용
         console.log(`[KIS-API] 🚀 Executing REAL order: ${side.toUpperCase()} ${code} ${qty} shares at ${price}`);
-        
+
         try {
             const config = getKISConfig();
             const token = await getAccessToken();
-            
-            // KIS 국내주식 주문/매도 API 호출 (TTTC0802U: 매수, TTTC0801U: 매도)
-            const tr_id = side === 'buy' ? 
-                (config.IS_VIRTUAL ? 'VTTC0802U' : 'TTTC0802U') : 
-                (config.IS_VIRTUAL ? 'VTTC0801U' : 'TTTC0801U');
 
-            const body = {
-                "CANO": config.ACCOUNT_NO.slice(0, 8),
-                "ACNT_PRDT_CD": config.ACCOUNT_NO.slice(8, 10) || "01",
-                "PDNO": code,
-                "ORD_DVSN": "01", // 시장가(01) 또는 지정가(00) - 여기서는 시장가 기본
-                "ORD_QTY": qty.toString(),
-                "ORD_UNPR": "0" // 시장가(01) 주문은 매수·매도 모두 단가 0 필수 (KIS 규칙)
-            };
+            const { trId: tr_id, body } = buildOrderRequest(code, qty, side, {
+                accountNo: config.ACCOUNT_NO,
+                isVirtual: config.IS_VIRTUAL,
+            });
 
             const hashKey = await getHashKey(body);
 

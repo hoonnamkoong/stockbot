@@ -14,9 +14,10 @@
 | `fd539d8e` `e41d56b0` | 심 목록 복제 해소 — 매니페스트가 유일한 원천, 생성기가 TS로 옮김 |
 | `a60b26cb` | **CI 도입** + 실거래 TS 첫 테스트 17개 (턴 손익 11, 주문 조립 6) |
 | `5d1495c5` | `manifest-sims.ts` 제거 — 런타임 매니페스트 파싱·fail-open 소멸 |
+| `21b578c5` | 리셋 상태 shape 단일화 — `initial_state()`가 정본, TS는 생성물 |
 
-지금 상태: pytest 441 · node 30 · push마다 CI 자동 실행.
-**아래 3순위(리셋 상태 shape)부터 이어가면 된다.** 4~6순위는 그 뒤.
+지금 상태: pytest 446 · node 30 · push마다 CI 자동 실행.
+**아래 4순위(국면 파일 리터럴)부터 이어가면 된다.** 5~6순위는 그 뒤.
 
 **배포 후 아직 눈으로 확인 못 한 것** — 다음 세션 첫 5분에 볼 것:
 1. 심8·심9·심9-1 카드에 매매 기록이 뜨는가 (`5d1495c5` 이전 커밋에서 고친 실버그).
@@ -59,8 +60,8 @@
 | 중복된 지식 | 파이썬 | TS | 상태 |
 |---|---|---|---|
 | 심 목록·라벨·파일명 | `registry.py` | 6곳 | **해결** (07-30, 생성기) |
-| 매매 가능 심 화이트리스트 | `registry.get_tradeable_simulator_ids()` | `manifest-sims.ts` (자체 YAML 파서) | **미해결** |
-| 리셋 상태 shape (10키) | `base_simulator.reset_state()` | `sim-reset-targets.buildResetState()` | **미해결** |
+| 매매 가능 심 화이트리스트 | `registry.get_tradeable_simulator_ids()` | `manifest-sims.ts` (자체 YAML 파서) | **해결** (07-30) |
+| 리셋 상태 shape (10키) | `base_simulator.initial_state()` | 생성물 (`sim-registry.generated.ts`) | **해결** (07-30, 생성기) |
 | 국면 파일 경로 | 4곳에 리터럴 | 해결됨 | **미해결(py)** |
 | KIS TR·헤더·필드명 | `kis_data_provider.py`, `balance.py` | `kis-api.ts` | 구조적 |
 | 턴 손익 계산 | `program_turn.py` | `program-turn.ts` | 의도된 이중화 |
@@ -112,11 +113,16 @@ CI + 17개를 깔았다. **남은 것:** `order/route.ts`, `program/route.ts`(PI
 라우트를 통째로 테스트하려면 vitest가 필요하다(`next/server`를 node가 못 푼다) —
 4순위의 lib 추출을 먼저 하면 필요 없어질 수도 있다.
 
-### 3순위 — 리셋 상태 shape 단일화 ← **여기서 이어간다**
-파이썬이 정본을 만들고 TS가 그것에서 파생하거나(생성기 재사용), 최소한 두 곳을 묶는 테스트.
-지금은 한쪽에 키가 늘면 대시보드로 리셋한 심만 다른 상태로 시작하고, **아무도 모른다.**
+### ~~3순위 — 리셋 상태 shape 단일화~~ ✅ 완료 (`21b578c5`)
+`base_simulator.initial_state(cash)`가 정본이고, `gen_sim_registry.py`가 그 dict를
+TS `buildResetState`로 옮겨 적는다(`sim-reset-targets.ts`는 재수출만).
+예수금 파생 필드는 자리표시자로 찾아서 **생성기에 필드명이 없다** — 파이썬이
+예수금에서 나오는 키를 하나 더 늘려도 생성기는 고칠 것이 없다.
+가드 다섯(`tests/test_reset_state_shape.py` + 기존 `test_generated_ts_is_up_to_date`):
+파이썬에 키를 늘리고 생성기를 안 돌리면 3개, `reset_state`를 인라인 dict로 되돌리면 2개,
+TS가 shape를 다시 적으면 1개가 실패하는 것을 주입해 확인했다.
 
-### 4순위 — 국면 파일 리터럴 4곳 + `_read_regime` 2벌
+### 4순위 — 국면 파일 리터럴 4곳 + `_read_regime` 2벌 ← **여기서 이어간다**
 심 목록과 같은 병의 잔여. registry가 이미 analyzer의 `state_file`을 안다.
 
 ### 5순위 — 대시보드 로드 비용
@@ -162,7 +168,7 @@ CI를 켜자마자 이것이 드러났다(pytest exit 2, 수집 단계 사망). 
 
 **검증 명령 (전부 로컬에서 돌아간다):**
 ```
-python -m pytest tests/ -q          # 441 passed, 4 skipped
+python -m pytest tests/ -q          # 446 passed, 4 skipped
 node --test "src/**/*.test.ts"      # 30 passed
 npx tsc --noEmit
 npm run build

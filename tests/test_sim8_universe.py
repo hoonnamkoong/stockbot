@@ -86,7 +86,7 @@ def test_foreign_change_missing_kills_info_axis():
     cands = [{'code': f'{i:06d}', 'price': 1000, 'amount': 5e9,
               'frgn_fake_ntby_qty': 100 * i, 'orgn_fake_ntby_qty': 50 * i,
               'unique_posters': i, 'foreign_change': 0} for i in range(1, 16)]
-    info, _, _ = _features(cands)
+    info, _ = _features(cands)
     assert info == {}
 
 
@@ -94,7 +94,7 @@ def test_info_axis_lives_when_foreign_change_varies():
     cands = [{'code': f'{i:06d}', 'price': 1000, 'amount': 5e9,
               'frgn_fake_ntby_qty': 100 * i, 'orgn_fake_ntby_qty': 50 * i,
               'unique_posters': i, 'foreign_change': i * 0.1} for i in range(1, 16)]
-    info, _, _ = _features(cands)
+    info, _ = _features(cands)
     assert len(info) == 15
 
 

@@ -1,3 +1,5 @@
+import os
+
 from .base_simulator import BaseSimulator
 
 _cooldown_active = BaseSimulator.cooldown_active
@@ -38,10 +40,14 @@ def _zmap(pairs):
 
 
 def _features(candidates):
-    """후보 횡단면 → (info, crowd, zamt).
+    """후보 횡단면 → (info, zamt).
 
     순매수를 거래대금으로 정규화하는 것이 핵심이다. 절대 수량으로 z를 내면
     대형주가 항상 이긴다(Sim1의 buzz>=500이 대형주 상수가 된 것과 같은 함정).
+
+    군중축은 여기서 만들지 않는다. 유니버스가 외인·기관 순매수 상위로 바뀌면
+    후보에 unique_posters가 아예 없어 횡단면 z가 퇴화한다(전부 0 → 표준편차 0
+    → 빈 dict). 관심의 기준선은 버즈 유니버스에서 따로 가져온다 → crowd_reference.
     """
     rows = []
     for s in candidates:
@@ -56,25 +62,86 @@ def _features(candidates):
             float(s.get('frgn_fake_ntby_qty', 0) or 0) * price / denom,
             float(s.get('orgn_fake_ntby_qty', 0) or 0) * price / denom,
             float(s.get('foreign_change', 0) or 0),
-            float(s.get('unique_posters', 0) or 0),
             amount,
         ))
 
     zf = _zmap([(r[0], r[1]) for r in rows])
     zo = _zmap([(r[0], r[2]) for r in rows])
     zc = _zmap([(r[0], r[3]) for r in rows])
-    crowd = _zmap([(r[0], r[4]) for r in rows])
-    zamt = _zmap([(r[0], r[5]) for r in rows])
+    zamt = _zmap([(r[0], r[4]) for r in rows])
 
     info = {}
-    for code, frgn_r, orgn_r, _, _, _ in rows:
+    for code, frgn_r, orgn_r, _, _ in rows:
         if code not in zf or code not in zo or code not in zc:
             continue
         v = zf[code] + zo[code] + zc[code]
         if frgn_r > 0 and orgn_r > 0:
             v *= CONSENSUS_BOOST
         info[code] = v
-    return info, crowd, zamt
+    return info, zamt
+
+
+def _median(values):
+    srt = sorted(values)
+    return srt[len(srt) // 2] if srt else None
+
+
+def _crowd_baseline(candidates, view):
+    """관심 기준선 → ({code: 관심}, 중앙값). 중앙값이 None이면 판정 불가다.
+
+    후보 자체가 unique_posters를 들고 있으면(버즈 유니버스) 그 분포를 쓴다 —
+    외부 파일에 기대지 않는 편이 정확하고, 같은 런의 같은 횡단면이다.
+    안 들고 있으면(외인·기관 순매수 상위 유니버스) run()이 뷰에 넣어준
+    버즈 기준선을 쓴다.
+    """
+    vals = {}
+    for s in candidates:
+        code = s.get('code')
+        try:
+            v = float(s.get('unique_posters') or 0)
+        except (TypeError, ValueError):
+            continue
+        if code and v > 0:
+            vals[code] = v
+    if vals:
+        return vals, _median(vals.values())
+    return view.get('buzz_attention') or {}, view.get('buzz_median')
+
+
+def crowd_reference(data_dir):
+    """버즈 유니버스의 관심 분포에서 기준선을 뽑는다 → ({code: 관심}, 중앙값).
+
+    latest_stocks.json은 파이프라인 2단계(llm_analyzer)가 매 런 덮어쓰므로 심이
+    도는 3단계 시점에는 당일 최신본이다.
+
+    순위 유니버스 종목이 이 목록에 없다는 것은 지어낸 값이 아니라 측정이다 —
+    그 종목에는 사람들이 글을 안 쓰고 있다. 그래서 '없음'을 관심 0으로 읽는다.
+
+    읽지 못하면 (빈 dict, None)이다. 중앙값이 None이면 '군중 미도달'을 판정할
+    수 없다는 뜻이고, 호출부는 매집을 하지 않는다(없는 근거로 사지 않는다).
+    """
+    import json
+    try:
+        with open(os.path.join(data_dir, 'latest_stocks.json'), encoding='utf-8-sig') as f:
+            rows = json.load(f)
+    except Exception:
+        return {}, None
+    if not isinstance(rows, list):
+        return {}, None
+    attention = {}
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        code = r.get('code')
+        try:
+            v = float(r.get('unique_posters') or 0)
+        except (TypeError, ValueError):
+            continue
+        if code and v > 0:
+            attention[code] = v
+    if not attention:
+        return {}, None
+    return attention, _median(attention.values())
 
 
 def _nearness(stock):
@@ -93,7 +160,8 @@ def decide_accumulation(view, candidates, current_prices):
     portfolio = view['portfolio']
     sold = set()
     cand_by_code = {s.get('code'): s for s in candidates if s.get('code')}
-    info, crowd, zamt = _features(candidates)
+    info, zamt = _features(candidates)
+    attention, crowd_median = _crowd_baseline(candidates, view)
 
     # 1. 청산 — 정보축이 꺼지면 나온다. 이 전략의 근거는 정보거래자의 존재 자체다.
     for code in list(portfolio.keys()):
@@ -152,10 +220,12 @@ def decide_accumulation(view, candidates, current_prices):
         if near < NEAR_FLOOR:
             continue
 
-        cv = crowd.get(code)
+        # 군중 미도달 = 버즈 관심이 유니버스 중앙값 미만(목록에 없으면 0).
+        # 기준선을 못 구했으면 판정 불가라 매집을 하지 않는다.
+        crowd_absent = crowd_median is not None and attention.get(code, 0) < crowd_median
         av = zamt.get(code)
         is_accum = (NEAR_FLOOR <= near < NEAR_ACCUM_MAX and iv > INFO_ACCUM_MIN
-                    and cv is not None and cv < 0)
+                    and crowd_absent)
         is_break = (near >= NEAR_BREAK and iv > 0 and av is not None and av > 0)
         if not (is_accum or is_break):
             continue
@@ -222,7 +292,11 @@ class AccumulationSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_accumulation(self._view(current_prices), candidates, current_prices)
+        view = self._view(current_prices)
+        # 군중축의 기준선은 후보 안에 없다 — 유니버스가 외인·기관 순매수 상위라
+        # unique_posters가 애초에 붙지 않는다. 버즈 유니버스에서 따로 읽어 온다.
+        view['buzz_attention'], view['buzz_median'] = crowd_reference(self.data_dir)
+        orders = decide_accumulation(view, candidates, current_prices)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

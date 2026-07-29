@@ -365,8 +365,11 @@ class KISDataProvider:
     # ──────────────────────────────────────────────────
     def get_price_quote(self, code: str) -> dict:
         """
-        KIS inquire-price(FHKST01010100)로 현재가, PER, PBR, sector_name 반환.
-        반환 키: price, change_rate_pct, per, pbr, sector_name
+        KIS inquire-price(FHKST01010100)로 현재가, PER, PBR, sector_name, 52주 고저 반환.
+        반환 키: price, change_rate_pct, per, pbr, sector_name, w52_hgpr, w52_lwpr
+
+        52주 고저는 같은 응답에 이미 들어 있는데 버리고 있었다 — Sim8의 앵커 판정
+        재료라 추가 콜 없이 함께 돌려준다.
         """
         key = f"price_quote_{code}"
         cached = self._get_cached(key, self.TTL_REALTIME)
@@ -380,7 +383,8 @@ class KISDataProvider:
         )
         out = body.get("output", {})
         if not out:
-            result = {"price": 0, "change_rate_pct": 0.0, "per": 0.0, "pbr": 0.0, "sector_name": ""}
+            result = {"price": 0, "change_rate_pct": 0.0, "per": 0.0, "pbr": 0.0,
+                      "sector_name": "", "w52_hgpr": 0, "w52_lwpr": 0}
             self._set_cache(key, result)
             return result
 
@@ -390,6 +394,8 @@ class KISDataProvider:
             "per": self._to_float(out.get("per", 0)),
             "pbr": self._to_float(out.get("pbr", 0)),
             "sector_name": out.get("bstp_kor_isnm", "").strip(),
+            "w52_hgpr": self._to_int(out.get("w52_hgpr", 0)),
+            "w52_lwpr": self._to_int(out.get("w52_lwpr", 0)),
         }
         self._set_cache(key, result)
         return result

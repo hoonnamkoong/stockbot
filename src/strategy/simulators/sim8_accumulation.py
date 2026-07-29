@@ -203,6 +203,22 @@ class AccumulationSimulator(BaseSimulator):
     def __init__(self, initial_cash=3000000):
         super().__init__("Accumulation", initial_cash)
 
+    def get_universe(self):
+        """외인·기관 순매수 상위 30 (FHPTJ04400000).
+
+        버즈 유니버스로는 앵커 종목이 안 나온다 — 2026-07-29 실측 28종목 중
+        52주 고점 85% 이상이 0개(최고 0.714)였다. 심8의 가설이 '정보거래자가
+        먼저 산다'이므로 그 집단을 직접 본다. 순매수 상위 응답이 이미
+        frgn/orgn_fake_ntby_qty·price·amount를 담고 있어 info 축 재료가 그대로
+        따라오고, w52·foreign_change는 _enrich_universe가 채운다.
+        """
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_foreign_institution_rank(
+                market='0001', etc_cls='0', limit=30)
+        except Exception:
+            return None
+
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)

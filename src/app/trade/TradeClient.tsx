@@ -18,6 +18,7 @@ import {
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
 import { computeTurnPnl, type ProgramTurn, type LastTurnResult } from '@/lib/program-turn';
+import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
 // [V8.9.9.22] 차트 라이브러리 SSR 충돌 방지를 위한 동적 임포트 적용
 const StrategyRadarChart = dynamic(() => import('../components/StrategyRadarChart'), { 
     ssr: false,
@@ -789,21 +790,11 @@ function TradeContent() {
 
     function renderSimulationTripod() {
         if (!geminiBalance) return null;
-        const simConfigs = [
-            { id: 'sim1',              key: 'sim1',              label: '심리 괴리형 (Sim 1)',      color: 'blue',   type: 'sim_psych' },
-            { id: 'sim2',              key: 'sim2',              label: '수급 동승형 (Sim 2)',      color: 'violet', type: 'sim_spillover' },
-            { id: 'sim3',              key: 'sim3',              label: '가치 페어형 (Sim 3)',      color: 'red',    type: 'sim_risk' },
-            { id: 'sim4',              key: 'sim4',              label: '상승 모멘텀형 (Sim 4)',    color: 'green',  type: 'sim_bull' },
-            { id: 'sim4_daytrading',   key: 'sim4_daytrading',   label: '상승 단타형 (Sim 4-1)',   color: 'teal',   type: 'sim4_bull_daytrading' },
-            { id: 'sim5',              key: 'sim5',              label: '추세 눌림목형 (Sim 5)',    color: 'orange', type: 'sim_sideways' },
-            { id: 'sim6',              key: 'sim6',              label: '하락 줍줍형 (Sim 6)',      color: 'cyan',   type: 'sim_bear' },
-            { id: 'sim7',              key: 'sim7',              label: '리포트 팔로워 (Sim 7)',    color: 'pink',   type: 'sim7_report_follower' },
-            // 페이퍼 관찰 단계(tradeable: false) — 실전 승격 전
-            { id: 'sim8',              key: 'sim8',              label: '선행 매집형 (Sim 8)',      color: 'indigo', type: 'sim8_accumulation' },
-            { id: 'sim9',              key: 'sim9',              label: '갭소진 반등 (Sim 9)',      color: 'orange', type: 'sim9_gap_fade' },
-            { id: 'sim9_1',            key: 'sim9_1',            label: '돈치안 돌파 (Sim 9-1)',    color: 'teal',   type: 'sim9_1_donchian' },
-            { id: 'sim10',             key: 'sim10',             label: '오케스트레이터 (Sim 10)',   color: 'violet', type: 'sim10_orchestrator' },
-        ];
+        // 매니페스트에서 파생한다. type은 매니페스트 id이고 매매 기록 API가 각 행에
+        // 붙이는 값과 같아야 한다 — 어긋나면 이 카드의 기록 표가 조용히 빈다.
+        const simConfigs = SIM_REGISTRY.map((s) => ({
+            id: s.uiKey, key: s.uiKey, label: s.label, color: s.color, type: s.id,
+        }));
         return (
             <Stack gap="xl">
                 <Group justify="space-between">

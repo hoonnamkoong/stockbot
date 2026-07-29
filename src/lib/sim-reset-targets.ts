@@ -1,21 +1,17 @@
+// 확장자를 붙인다: 이 모듈은 node --experimental-strip-types --test 로도 로드되는데
+// (sim-reset-targets.test.ts) node의 ESM 해석기는 확장자 없는 상대경로를 못 찾는다.
+import { SIM_REGISTRY } from './sim-registry.generated.ts';
+
 export interface ResetTarget { id: string; stateFile: string; csvFile: string; }
 
-export const RESET_TARGETS: ResetTarget[] = [
-  { id: 'sim1', stateFile: 'sim_psych_state.json', csvFile: 'trade_history_sim_psych.csv' },
-  { id: 'sim2', stateFile: 'sim_spillover_state.json', csvFile: 'trade_history_sim_spillover.csv' },
-  { id: 'sim3', stateFile: 'sim_risk_state.json', csvFile: 'trade_history_sim_risk.csv' },
-  { id: 'sim4', stateFile: 'sim_bull_state.json', csvFile: 'trade_history_sim_bull.csv' },
-  { id: 'sim4_daytrading', stateFile: 'sim_bulldaytrade_state.json', csvFile: 'trade_history_sim_bulldaytrade.csv' },
-  { id: 'sim5', stateFile: 'sim_sideways_state.json', csvFile: 'trade_history_sim_sideways.csv' },
-  { id: 'sim6', stateFile: 'sim_bear_state.json', csvFile: 'trade_history_sim_bear.csv' },
-  { id: 'sim7', stateFile: 'sim_reportfollower_state.json', csvFile: 'trade_history_sim_reportfollower.csv' },
-  // 페이퍼 관찰 단계(tradeable: false)지만 상태는 쌓인다 — 리셋 대상이다.
-  // 2026-07-28 추가 시 여기 등록이 누락돼 초기화가 이 셋을 건너뛰고 있었다.
-  { id: 'sim8', stateFile: 'sim_accumulation_state.json', csvFile: 'trade_history_sim_accumulation.csv' },
-  { id: 'sim9', stateFile: 'sim_gapfade_state.json', csvFile: 'trade_history_sim_gapfade.csv' },
-  { id: 'sim9_1', stateFile: 'sim_donchian_state.json', csvFile: 'trade_history_sim_donchian.csv' },
-  { id: 'sim10', stateFile: 'sim_orchestrator_state.json', csvFile: 'trade_history_sim_orchestrator.csv' },
-];
+// 매매하는 활성 심 전부가 리셋 대상이다 — 페이퍼 관찰 단계(tradeable: false)도
+// 상태는 쌓이므로 포함된다. 목록을 여기 손으로 적던 시절 2026-07-28에 추가한
+// 심8·심9·심9-1이 누락돼 초기화가 셋을 건너뛰고 있었다.
+export const RESET_TARGETS: ResetTarget[] = SIM_REGISTRY.map((s) => ({
+  id: s.uiKey,
+  stateFile: s.stateFile,
+  csvFile: s.csvFile,
+}));
 
 export const RESET_CSV_HEADER = '﻿timestamp,symbol,action,price,quantity,total_amount,reason\n';
 

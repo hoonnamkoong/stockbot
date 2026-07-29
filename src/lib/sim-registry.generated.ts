@@ -1,0 +1,76 @@
+// 이 파일은 생성됩니다. 직접 고치지 마세요.
+// 원천: src/strategy/strategy_manifest.yaml
+// 생성: python scripts/gen_sim_registry.py
+//
+// 심을 추가·삭제·변경하려면 매니페스트를 고치고 위 명령을 다시 돌리세요.
+// 안 돌리면 tests/test_sim_registry_consistency.py가 실패합니다.
+
+export interface SimRegistryEntry {
+  /** 매니페스트 id. 매매 기록 API가 각 행에 붙이는 type 값이다. */
+  id: string;
+  /** 통계 API 응답의 키. 대시보드가 성과를 찾는 이름. */
+  uiKey: string;
+  label: string;
+  shortDesc: string;
+  /** Mantine 팔레트 이름. 카드는 그대로 쓰고, 차트는 SIM_CHART_HEX로 hex를 얻는다. */
+  color: string;
+  chartGroup: number;
+  stateFile: string;
+  csvFile: string;
+  /** 프로그램 매매 노출 여부. false면 페이퍼 관찰 단계다. */
+  tradeable: boolean;
+}
+
+export const SIM_REGISTRY: SimRegistryEntry[] = [
+  { id: 'sim_psych', uiKey: 'sim1', label: '심리 괴리형 (Sim 1)', shortDesc: 'Buzz 급증·가격 정체 종목 매집', color: 'blue', chartGroup: 1, stateFile: 'sim_psych_state.json', csvFile: 'trade_history_sim_psych.csv', tradeable: true },
+  { id: 'sim_spillover', uiKey: 'sim2', label: '수급 동승형 (Sim 2)', shortDesc: '외인 수급 + 감정 발산 스코어', color: 'violet', chartGroup: 1, stateFile: 'sim_spillover_state.json', csvFile: 'trade_history_sim_spillover.csv', tradeable: true },
+  { id: 'sim_risk', uiKey: 'sim3', label: '가치 페어형 (Sim 3)', shortDesc: '추세 돌파 / 횡보 반등 + 트레일링', color: 'red', chartGroup: 1, stateFile: 'sim_risk_state.json', csvFile: 'trade_history_sim_risk.csv', tradeable: true },
+  { id: 'sim4_bull', uiKey: 'sim4', label: '상승 모멘텀형 (Sim 4)', shortDesc: '주도주 탑승·불타기, 고정익절 없이 라이딩', color: 'green', chartGroup: 2, stateFile: 'sim_bull_state.json', csvFile: 'trade_history_sim_bull.csv', tradeable: true },
+  { id: 'sim4_bull_daytrading', uiKey: 'sim4_daytrading', label: '상승 단타형 (Sim 4-1)', shortDesc: 'Sim4 기반 당일 데이트레이딩 — 분할 익절 + 강제청산', color: 'teal', chartGroup: 2, stateFile: 'sim_bulldaytrade_state.json', csvFile: 'trade_history_sim_bulldaytrade.csv', tradeable: true },
+  { id: 'sim5_sideways', uiKey: 'sim5', label: '추세 눌림목형 (Sim 5)', shortDesc: '20일 채널 저점 +3% 이내 진입 · 상단 근접 후 트레일링', color: 'yellow', chartGroup: 2, stateFile: 'sim_sideways_state.json', csvFile: 'trade_history_sim_sideways.csv', tradeable: true },
+  { id: 'sim6_bear', uiKey: 'sim6', label: '하락 줍줍형 (Sim 6)', shortDesc: 'KODEX 인버스 추세추종 (Sim0 BEAR 게이트) · 트레일링 -10%', color: 'cyan', chartGroup: 3, stateFile: 'sim_bear_state.json', csvFile: 'trade_history_sim_bear.csv', tradeable: true },
+  { id: 'sim7_report_follower', uiKey: 'sim7', label: '리포트 팔로워 (Sim 7)', shortDesc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩', color: 'pink', chartGroup: 3, stateFile: 'sim_reportfollower_state.json', csvFile: 'trade_history_sim_reportfollower.csv', tradeable: true },
+  { id: 'sim8_accumulation', uiKey: 'sim8', label: '선행 매집형 (Sim 8)', shortDesc: '52주 앵커 구간 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩', color: 'indigo', chartGroup: 3, stateFile: 'sim_accumulation_state.json', csvFile: 'trade_history_sim_accumulation.csv', tradeable: false },
+  { id: 'sim9_gap_fade', uiKey: 'sim9', label: '갭소진 반등 (Sim 9)', shortDesc: '갭 +3% 후 장중 -3% 급락을 14:30 이후 매수 · 익일 청산', color: 'orange', chartGroup: 4, stateFile: 'sim_gapfade_state.json', csvFile: 'trade_history_sim_gapfade.csv', tradeable: false },
+  { id: 'sim9_1_donchian', uiKey: 'sim9_1', label: '돈치안 돌파 (Sim 9-1)', shortDesc: '20일 채널 상단 돌파 추종 · 10일 채널 이탈 / 2ATR 청산', color: 'lime', chartGroup: 4, stateFile: 'sim_donchian_state.json', csvFile: 'trade_history_sim_donchian.csv', tradeable: false },
+  { id: 'sim10_orchestrator', uiKey: 'sim10', label: '오케스트레이터 (Sim 10)', shortDesc: 'Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용', color: 'grape', chartGroup: 4, stateFile: 'sim_orchestrator_state.json', csvFile: 'trade_history_sim_orchestrator.csv', tradeable: true },
+];
+
+/** 국면 분석기(매매 없음). 성과 목록에 오르지 않고 국면 표시로만 쓰인다. */
+export const ANALYZERS: { id: string; stateFile: string }[] = [
+  { id: 'sim0_libero', stateFile: 'sim_libero_state.json' },
+];
+
+/** 관찰 단계(tradeable: false) — 순위표에서 실전 심과 구분해 표시한다. */
+export function isPaper(s: SimRegistryEntry): boolean {
+  return !s.tradeable;
+}
+
+export function simsInChartGroup(group: number): SimRegistryEntry[] {
+  return SIM_REGISTRY.filter((s) => s.chartGroup === group);
+}
+
+/**
+ * Mantine 팔레트 이름 → hex. recharts는 CSS 변수를 못 받아 hex가 필요하다.
+ *
+ * shade 7을 쓴다: 카드 테두리(--mantine-color-{name}-filled = shade 6)보다 한 단계
+ * 진해 흰 배경의 얇은 선에서도 읽힌다. 같은 색상 계열이라 카드와 차트가 붙는다.
+ */
+export const SIM_CHART_HEX: Record<string, string> = {
+  blue: '#1c7ed6',
+  violet: '#7048e8',
+  red: '#f03e3e',
+  green: '#37b24d',
+  teal: '#0ca678',
+  yellow: '#f59f00',
+  cyan: '#1098ad',
+  pink: '#d6336c',
+  indigo: '#4263eb',
+  orange: '#f76707',
+  lime: '#74b816',
+  grape: '#ae3ec9',
+};
+
+export function chartHex(s: SimRegistryEntry): string {
+  return SIM_CHART_HEX[s.color] ?? '#868e96';
+}

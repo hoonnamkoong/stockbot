@@ -106,7 +106,8 @@ def get_active_simulators() -> list:
 def get_sim_registry(include_analyzers: bool = False) -> list[dict]:
     """활성 심의 '신원' 목록. 매니페스트가 유일한 원천이다.
 
-    항목 키: id, label, state_file, csv_file, tradeable, analyzer
+    항목 키: id, label, state_file, csv_file, tradeable, analyzer, display_order
+             + 매매심만: ui_key, short_desc, chart_group, color
 
     순서는 display_order다 — 매니페스트의 나열 순서가 아니다. 매니페스트 순서는
     실행 순서(국면 생산자를 소비자보다 먼저)라 사람이 읽는 순서와 다르다.
@@ -114,10 +115,12 @@ def get_sim_registry(include_analyzers: bool = False) -> list[dict]:
 
     심 목록이 대시보드·리셋·브리프에 각각 복제돼 있다가 2026-07-29에 실제로
     어긋났다(심8·심9·심9-1이 리셋·브리프에서 누락). 소비자는 자기 목록을
-    갖지 말고 이 함수를 쓸 것.
+    갖지 말고 이 함수를 쓸 것. 대시보드(TS)는 이 함수의 산출을 그대로 옮긴
+    src/lib/sim-registry.generated.ts를 읽는다 — scripts/gen_sim_registry.py가 만든다.
 
     include_analyzers=False면 매매하지 않는 심(리베로)을 뺀다 — 리셋·브리프처럼
-    '매매 성과'를 다루는 소비자의 기본값이다.
+    '매매 성과'를 다루는 소비자의 기본값이다. 분석기는 UI 필드를 요구하지 않는다
+    (성과 카드·순위표에 오르지 않고 국면 표시로만 쓰인다).
     """
     out = []
     for s in _load_manifest().get('simulators', []):
@@ -126,10 +129,13 @@ def get_sim_registry(include_analyzers: bool = False) -> list[dict]:
         is_analyzer = bool(s.get('analyzer', False))
         if is_analyzer and not include_analyzers:
             continue
-        missing = [k for k in ('state_file', 'csv_file', 'label') if not s.get(k)]
+        required = ['state_file', 'csv_file', 'label']
+        if not is_analyzer:
+            required += ['ui_key', 'short_desc', 'chart_group', 'color']
+        missing = [k for k in required if not s.get(k)]
         if missing:
             raise ValueError(f"[Registry] {s['id']}: 매니페스트에 {missing} 누락")
-        out.append({
+        entry = {
             'id': s['id'],
             'label': s['label'],
             'state_file': s['state_file'],
@@ -137,7 +143,15 @@ def get_sim_registry(include_analyzers: bool = False) -> list[dict]:
             'tradeable': bool(s.get('tradeable', False)),
             'analyzer': is_analyzer,
             'display_order': s.get('display_order', 9999),
-        })
+        }
+        if not is_analyzer:
+            entry.update({
+                'ui_key': s['ui_key'],
+                'short_desc': s['short_desc'],
+                'chart_group': s['chart_group'],
+                'color': s['color'],
+            })
+        out.append(entry)
     return sorted(out, key=lambda x: x['display_order'])
 
 

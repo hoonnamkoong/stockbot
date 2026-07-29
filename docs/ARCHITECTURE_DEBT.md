@@ -17,9 +17,10 @@
 | `21b578c5` | 리셋 상태 shape 단일화 — `initial_state()`가 정본, TS는 생성물 |
 | `a1a22f0a` `f85323ba` | 국면 파일 창구 단일화(`regime_state.py`) + Sim7 폴백 제거 |
 | `f23ab4be` | 대시보드 로드 비용 — 신선도 버킷으로 CDN을 되살림(`db-data.ts`) |
+| `a41120d9` | 실거래 판정(PIN·화이트리스트·ROI 조인)에 테스트 28개 |
 
-지금 상태: pytest 463 · node 37 · push마다 CI 자동 실행.
-**아래 6순위(TradeClient 분해)가 마지막이다.** 그 전제인 2순위 잔여(라우트 테스트)부터 볼 것.
+지금 상태: pytest 463 · node 65 · push마다 CI 자동 실행.
+**남은 것은 6순위(TradeClient 분해) 하나다.** 전제였던 라우트 테스트는 깔렸다.
 
 **배포 후 아직 눈으로 확인 못 한 것** — 다음 세션 첫 5분에 볼 것:
 1. 심8·심9·심9-1 카드에 매매 기록이 뜨는가 (`5d1495c5` 이전 커밋에서 고친 실버그).
@@ -89,7 +90,7 @@ GitHub raw가 한 번 실패하면 [program/route.ts:316](../src/app/api/trade/p
 | | 테스트 | 대상 |
 |---|---|---|
 | 파이썬 | 51파일 · 439케이스 | 심 전략, 파이프라인, 국면, 파리티 |
-| TS | 4파일 · 37케이스 | 리셋 타깃 형식, GitHub 커밋, 턴 손익·주문 조립, 신선도 버킷 |
+| TS | 6파일 · 65케이스 | 위 + 주문 인증(PIN·웹훅), ON 화이트리스트, 실현 ROI 조인 |
 
 **실거래를 다루는 TS 약 1,400줄(`kis-api.ts` 706 + `program/route.ts` 367 + `order/route.ts` 161 +
 `reservation` 165)에 테스트가 0이다.**
@@ -109,11 +110,14 @@ fail-open 소멸, 이름 통일, 정규식 YAML 파서 43줄 삭제. id 집합�
 가드 둘을 걸었다 — TS가 매니페스트를 직접 읽지 않는가, 드롭다운 tradeable 집합이
 파이썬 화이트리스트와 같은가.
 
-### ~~2순위 — 실거래 TS에 테스트 깔기~~ ◐ 착수 (`a60b26cb`)
-CI + 17개를 깔았다. **남은 것:** `order/route.ts`, `program/route.ts`(PIN 잠금·
-화이트리스트), `kis-api.ts`의 토큰 캐시·잔고 파싱·`matchRealizedRoi`.
-라우트를 통째로 테스트하려면 vitest가 필요하다(`next/server`를 node가 못 푼다) —
-4순위의 lib 추출을 먼저 하면 필요 없어질 수도 있다.
+### ~~2순위 — 실거래 TS에 테스트 깔기~~ ✅ 사실상 완료 (`a60b26cb` `a41120d9`)
+CI + 45개. **vitest는 결국 필요 없었다** — 라우트를 통째로 부르는 대신 순수 판정만
+`lib`으로 내리면 node가 그대로 읽는다. `db-data.ts`·`trade-auth.ts`가 그 방식이다.
+
+지금 덮인 것: 턴 손익, 주문 조립, 주문 인증(웹훅/세션+PIN), ON 화이트리스트·예산,
+실현 ROI 조인, 신선도 버킷. **남은 것:** `kis-api.ts`의 토큰 캐시·잔고 파싱(둘 다
+네트워크·파일과 얽혀 있어 순수부 분리가 먼저다), 가상 포트폴리오 평단 계산.
+PIN 레이트리밋(파일 카운터)도 아직 네트워크에 묶여 있다.
 
 ### ~~3순위 — 리셋 상태 shape 단일화~~ ✅ 완료 (`21b578c5`)
 `base_simulator.initial_state(cash)`가 정본이고, `gen_sim_registry.py`가 그 dict를
@@ -183,7 +187,7 @@ CI를 켜자마자 이것이 드러났다(pytest exit 2, 수집 단계 사망). 
 **검증 명령 (전부 로컬에서 돌아간다):**
 ```
 python -m pytest tests/ -q          # 463 passed, 4 skipped
-node --test "src/**/*.test.ts"      # 37 passed
+node --test "src/**/*.test.ts"      # 65 passed
 npx tsc --noEmit
 npm run build
 python scripts/gen_sim_registry.py  # 매니페스트 고쳤으면 반드시
@@ -196,9 +200,10 @@ python scripts/gen_sim_registry.py  # 매니페스트 고쳤으면 반드시
   단 `@/` 별칭 import는 node가 모르므로, 테스트가 닿아야 하는 모듈은 상대경로로 쓴다.
 - **라우트 핸들러(`app/api/**/route.ts`)는 import 자체가 안 된다** — `next/server` 미해결.
 
-**테스트를 쓸 때:** 통과하는 것만으로는 부족하다. 이번 세션에서 새로 건 불변식은 전부
+**테스트를 쓸 때:** 통과하는 것만으로는 부족하다. 지금까지 건 불변식은 전부
 **소스를 일부러 망가뜨려 실제로 잡히는지 확인**했다(기준가 `||`→`??`, `by_tag` 복사 제거,
-매니페스트 재fetch, tradeable 불일치). 같은 방식을 계속 쓸 것.
+매니페스트 재fetch, tradeable 불일치, PIN 폴백 부활, 화이트리스트 제거, KST 오프셋 0).
+같은 방식을 계속 쓸 것.
 
 **함정:**
 - `git checkout --`·`git restore`를 정리 명령에 끼워 넣지 말 것. 미커밋 편집을 날린다

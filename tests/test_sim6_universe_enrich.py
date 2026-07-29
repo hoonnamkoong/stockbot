@@ -97,6 +97,14 @@ def test_enriched_universe_feeds_sim6_end_to_end():
     assert [(o['action'], o['code']) for o in orders] == [('BUY', '114800')]
 
 
+def test_sim10_bear_universe_gets_change_rate_too():
+    """Sim10도 BEAR 국면에 같은 리터럴 유니버스로 decide_sim6을 재사용한다 —
+    같은 결함을 공유하고 있었으므로 두 번째 소비자도 고정한다."""
+    from src.strategy.simulators.sim10_orchestrator import INVERSE_UNIVERSE
+    out = _enrich([dict(e) for e in INVERSE_UNIVERSE], _GOOD_QUOTE)
+    assert all('change_rate' in s for s in out)
+
+
 # ── 중복 가드가 10분 주기를 삼키지 않는다 ──────────────────────
 def _ran_ago(minutes):
     from src.pipeline.workers.program_trader import _recently_ran

@@ -56,7 +56,7 @@ def decide_sim6(view, candidates, current_prices):
                            'cooldown': REENTRY_COOLDOWN, 'mark_partial': False})
             sold.add(code); continue
 
-    # 2. 진입: 인버스 ETF가 상승 추세(현재가>MA5 + 5일 상승률>=2% + 당일 상승)일 때만.
+    # 2. 진입: 인버스 ETF가 상승 추세(현재가 > 이동평균 + 당일 상승)일 때만.
     held = len(portfolio) - len(sold)
     for stock in candidates:
         if held >= MAX_HOLDINGS:
@@ -91,9 +91,14 @@ class BearHedgeSimulator(BaseSimulator):
        구 '데드캣 반등 롱'은 하락장에 롱으로 반등에 베팅 = 코인플립(2026-06~07 승률 47.6%,
        수수료로 -0.42%/건). 현물 롱 시스템의 하락 수익 정공법 = 인버스 ETF 추세추종으로 전환.
     - 유니버스: KODEX 인버스(114800) 고정 (검증: 유동성·주문 호환 OK, 2X는 감쇠로 제외).
-    - 진입: 인버스가 상승 추세(현재가>MA5 + 5일 상승률>=2% + 당일 상승) → 하락에 순방향 베팅.
-    - 청산: 트레일링(고점 대비 -7%) / 하드손절 -5%. 청산 후 쿨다운 1일(추세 지속 시 재진입).
-    - 국면 판단 없음(순수 알고리즘). Sim10이 BEAR 국면에 이 심을 켠다.
+    - 진입: 현재가 > 이동평균(sparkline 평균) AND 당일 등락률 > 0 → 하락에 순방향 베팅.
+      1종목(MAX_HOLDINGS)만, 가용현금의 90%(ENTRY_RATIO).
+    - 청산: 트레일링(고점 대비 -10%) / 하드손절 -12%. 청산 후 쿨다운 1일(추세 지속 시 재진입).
+      진입 직후엔 트레일링(-10%)이 하드손절(-12%)보다 항상 먼저 걸린다 — 하드손절은
+      두 선을 한 번에 건너뛰는 갭하락 전용 안전판이다(그래서 넓게 잡았다).
+    - 국면 게이팅은 run()에 있다: Sim0(리베로)의 current_regime을 읽어 BEAR일 때만 매매하고,
+      비 BEAR면 보유분을 전량 청산한다. 순수 함수 decide_sim6 자체는 국면을 보지 않으며,
+      Sim10도 BEAR 국면에서 같은 함수를 재사용한다.
     """
     def __init__(self, initial_cash=3000000):
         super().__init__("Bear", initial_cash)

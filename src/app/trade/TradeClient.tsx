@@ -6,8 +6,8 @@ import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack, SimpleGrid,
-    Table, Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Checkbox, Affix, Transition, ScrollArea, Box, Divider
+    Badge, Button, Tabs, TextInput, NumberInput,
+    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider
 } from '@mantine/core';
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
@@ -19,6 +19,8 @@ import axios from 'axios';
 import { signOut } from 'next-auth/react';
 import { computeTurnPnl, type ProgramTurn, type LastTurnResult } from '@/lib/program-turn';
 import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
+import PortfolioTable from './PortfolioTable';
+import TradeHistoryTable from './TradeHistoryTable';
 // [V8.9.9.22] 차트 라이브러리 SSR 충돌 방지를 위한 동적 임포트 적용
 const StrategyRadarChart = dynamic(() => import('../components/StrategyRadarChart'), { 
     ssr: false,
@@ -392,178 +394,18 @@ function TradeContent() {
 
     // --- Helper UI Renderers ---
 
-    function renderPortfolioTable(holdings: any[], isReal: boolean = false, tableH: string | number = 560) {
-        if (!holdings || holdings.length === 0) {
-            return (
-                <Box style={{ height: 120, textAlign: 'center', border: '1px dashed #ced4da', borderRadius: '8px', width: '100%', minWidth: isReal ? 650 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text c="dimmed">보유 종목이 없습니다.</Text>
-                </Box>
-            );
-        }
-        return (
-            <ScrollArea.Autosize mah={tableH} offsetScrollbars>
-                <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: isReal ? 650 : 600 }}>
-                    <Table.Thead>
-                        <Table.Tr>
-                            {isReal && <Table.Th style={{ width: 40, position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2 }}></Table.Th>}
-                            <Table.Th style={{ width: 120, position: 'sticky', left: isReal ? 40 : 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>종목명</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>수량</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>평단가</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>현재가</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>체결금액</Table.Th>
-                            <Table.Th style={{ textAlign: 'center' }}>수익률(%)</Table.Th>
-                            <Table.Th style={{ textAlign: 'right' }}>손익(원)</Table.Th>
-                        </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {holdings.map((h) => {
-                            const avgPrice = h.avg_price || h.price || 0;
-                            const currentPrice = h.current_price || h.price || 0; 
-                            const plRate = h.pl_rate ?? 0;
-                            const amount = (h.qty || h.quantity || 0) * avgPrice;
-                            const plAmount = h.pl_amount ?? Math.round((currentPrice - avgPrice) * (h.qty || h.quantity || 0));
-                            const isSelected = selectedCodes.includes(h.code);
-
-                            return (
-                                <Table.Tr key={h.code} style={{ cursor: isReal ? 'pointer' : 'default' }}>
-                                    {isReal && (
-                                        <Table.Td onClick={(e) => e.stopPropagation()} style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2 }}>
-                                            <Checkbox 
-                                                checked={isSelected} 
-                                                onChange={(event) => {
-                                                    const checked = event.currentTarget.checked;
-                                                    setSelectedCodes(prev => 
-                                                        checked ? [...prev, h.code] : prev.filter(c => c !== h.code)
-                                                    );
-                                                }}
-                                            />
-                                        </Table.Td>
-                                    )}
-                                    <Table.Td 
-                                        onClick={() => {
-                                            setCode(h.code);
-                                            showNotify('Info', `${h.name} 종목이 선택되었습니다.`, 'blue');
-                                        }}
-                                        style={{ cursor: 'pointer', position: 'sticky', left: isReal ? 40 : 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}
-                                    >
-                                        <Text size="sm" fw={700} truncate maw={100} c="blue" style={{ textDecoration: 'underline', textUnderlineOffset: '2px' }}>{h.name}</Text>
-                                        <Text size="xs" c="dimmed">{h.code}</Text>
-                                    </Table.Td>
-                                    <Table.Td style={{ textAlign: 'right' }}>
-                                        <Text size="sm">{(h.qty || h.quantity || 0).toLocaleString()}주</Text>
-                                    </Table.Td>
-                                    <Table.Td style={{ textAlign: 'right' }}>
-                                        <Text size="sm">{Math.round(avgPrice).toLocaleString()}원</Text>
-                                    </Table.Td>
-                                    <Table.Td style={{ textAlign: 'right' }}>
-                                        <Text size="sm" fw={500} c="teal">{Math.round(currentPrice).toLocaleString()}원</Text>
-                                    </Table.Td>
-                                    <Table.Td style={{ textAlign: 'right' }}>
-                                        <Text size="sm" fw={700}>{Math.round(amount).toLocaleString()}원</Text>
-                                    </Table.Td>
-                                    <Table.Td style={{ textAlign: 'center' }}>
-                                        <Badge color={plRate >= 0 ? 'red' : 'blue'} variant="filled" size="sm" style={{ width: 65 }}>
-                                            {plRate >= 0 ? '+' : ''}{plRate.toFixed(2)}%
-                                        </Badge>
-                                    </Table.Td>
-                                    <Table.Td style={{ textAlign: 'right' }}>
-                                        <Text size="sm" fw={700} c={plAmount >= 0 ? 'red' : 'blue'}>
-                                            {plAmount >= 0 ? '+' : ''}{Math.round(plAmount).toLocaleString()}
-                                        </Text>
-                                    </Table.Td>
-                                </Table.Tr>
-                            );
-                        })}
-                    </Table.Tbody>
-                </Table>
-            </ScrollArea.Autosize>
-        );
-    }
-
-    function renderHistoryTable(targetType: string, histH: string | number = 'calc(100vh - 320px)') {
-        const filtered = history.filter(h => h.type === targetType).slice(0, 100);
-        if (filtered.length === 0) {
-            return (
-                <Box style={{ height: 120, textAlign: 'center', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text size="xs" c="dimmed">최근 거래 내역이 없습니다.</Text>
-                </Box>
-            );
-        }
-        return (
-            <ScrollArea.Autosize mah={histH} offsetScrollbars>
-                <Table striped highlightOnHover stickyHeader verticalSpacing="xs" style={{ minWidth: 500 }}>
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th style={{ fontSize: '11px' }}>일시</Table.Th>
-                            <Table.Th style={{ fontSize: '11px', position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>종목</Table.Th>
-                            <Table.Th style={{ fontSize: '11px' }}>구분</Table.Th>
-                            <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>체결가</Table.Th>
-                            <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>수량</Table.Th>
-                            {targetType === 'real' && <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>ROI(%)</Table.Th>}
-                            {targetType === 'real' && <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>ROI(금액)</Table.Th>}
-                            {targetType !== 'real' && <Table.Th style={{ fontSize: '11px' }}>판단 사유</Table.Th>}
-                        </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {filtered.map((h, i) => (
-                            <Table.Tr key={i}>
-                                <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                                    <Text size="xs" c="dimmed" style={{ fontSize: '10px' }}>{h.time.split(' ')[0].slice(5)}</Text>
-                                    <Text size="xs" fw={500} style={{ fontSize: '10px' }}>{h.time.split(' ')[1]}</Text>
-                                </Table.Td>
-                                <Table.Td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}>
-                                    <Text size="xs" fw={700}>{h.symbol.split('(')[0]}</Text>
-                                </Table.Td>
-                                <Table.Td>
-                                    <Badge color={h.action === 'BUY' ? 'red' : 'blue'} variant="light" size="xs">
-                                        {h.action === 'BUY' ? '매수' : '매도'}
-                                    </Badge>
-                                </Table.Td>
-                                <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.price}</Text></Table.Td>
-                                <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.qty}</Text></Table.Td>
-                                {targetType === 'real' && (() => {
-                                    const isSell = h.action === 'SELL';
-                                    const hasRoi = h.roi !== undefined && h.roi !== null && h.roi !== '-';
-                                    const roiColor = h.roi?.startsWith('+') ? 'red' : h.roi?.startsWith('-') ? 'blue' : 'gray';
-                                    const amtColor = (h.roiAmount ?? 0) > 0 ? 'red' : (h.roiAmount ?? 0) < 0 ? 'blue' : 'gray';
-                                    return (
-                                        <>
-                                            <Table.Td style={{ textAlign: 'center' }}>
-                                                {hasRoi ? (
-                                                    <Badge color={roiColor} variant="light" size="xs">{h.roi}%</Badge>
-                                                ) : (
-                                                    <Text size="xs" c="dimmed">{isSell ? '측정 불가' : '-'}</Text>
-                                                )}
-                                            </Table.Td>
-                                            <Table.Td style={{ textAlign: 'right' }}>
-                                                {hasRoi && h.roiAmount !== undefined ? (
-                                                    <Text size="xs" c={amtColor} fw={600}>
-                                                        {(h.roiAmount > 0 ? '+' : '') + h.roiAmount.toLocaleString()}원
-                                                    </Text>
-                                                ) : (
-                                                    <Text size="xs" c="dimmed">{isSell ? '측정 불가' : '-'}</Text>
-                                                )}
-                                            </Table.Td>
-                                        </>
-                                    );
-                                })()}
-                                {targetType !== 'real' && (
-                                    <Table.Td>
-                                        <Button variant="subtle" size="compact-xs" onClick={() => {
-                                            setSelectedReason({ title: `${h.symbol} 판단 근거`, content: h.reason });
-                                            setReasonModalOpen(true);
-                                        }}>
-                                            <Text size="xs" truncate maw={80}>{h.reason || '사유 없음'}</Text>
-                                        </Button>
-                                    </Table.Td>
-                                )}
-                            </Table.Tr>
-                        ))}
-                    </Table.Tbody>
-                </Table>
-            </ScrollArea.Autosize>
-        );
-    }
+    // 표에서 올라오는 조작 셋. 표 컴포넌트는 상태를 모르고 이 셋만 부른다.
+    const toggleSelectedCode = (code: string, checked: boolean) => {
+        setSelectedCodes(prev => checked ? [...prev, code] : prev.filter(c => c !== code));
+    };
+    const pickCode = (code: string, name: string) => {
+        setCode(code);
+        showNotify('Info', `${name} 종목이 선택되었습니다.`, 'blue');
+    };
+    const showReason = (title: string, content: string) => {
+        setSelectedReason({ title, content });
+        setReasonModalOpen(true);
+    };
 
     function renderRealPortfolioSection() {
         const deposit = balance?.deposit ?? 0;
@@ -768,7 +610,14 @@ function TradeContent() {
                         </Stack>
                     )}
                     <Divider mb="xs" label="보유 포트폴리오 (일괄 매도 가능)" labelPosition="center" />
-                    {renderPortfolioTable(holdings, true, 'calc(100vh - 320px)')}
+                    <PortfolioTable
+                        holdings={holdings}
+                        isReal
+                        maxHeight="calc(100vh - 320px)"
+                        selectedCodes={selectedCodes}
+                        onToggleCode={toggleSelectedCode}
+                        onPickCode={pickCode}
+                    />
                     {selectedCodes.length > 0 && (
                         <Group mt="md" grow>
                             <Button color="red" leftSection={<IconTrash size={16}/>} onClick={() => handleBulkOrder(false)}>
@@ -782,7 +631,7 @@ function TradeContent() {
                 </Paper>
                 <Paper p="md" withBorder radius="md">
                     <Title order={5} mb="sm"><IconHistory size={18} style={{ marginBottom: -4, marginRight: 8 }}/>실거래 매매 히스토리</Title>
-                    {renderHistoryTable('real', 400)}
+                    <TradeHistoryTable history={history} targetType="real" maxHeight={400} onShowReason={showReason} />
                 </Paper>
             </Stack>
         );
@@ -883,12 +732,12 @@ function TradeContent() {
                                     </SimpleGrid>
                                     <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
                                     {/* 5행(행 ~61px + 헤더)까지 표시 후 스크롤 */}
-                                    {renderPortfolioTable(holdings, false, 360)}
+                                    <PortfolioTable holdings={holdings} maxHeight={360} onPickCode={pickCode} />
                                 </Paper>
                                 <Paper p="md" withBorder radius="md" bg="gray.0">
                                     <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{sim.label} 기록</Text>
                                     {/* 5행(행 ~52px + 헤더)까지 표시 후 스크롤 */}
-                                    {renderHistoryTable(sim.type, 305)}
+                                    <TradeHistoryTable history={history} targetType={sim.type} maxHeight={305} onShowReason={showReason} />
                                 </Paper>
                             </Stack>
                         );

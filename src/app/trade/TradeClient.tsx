@@ -17,12 +17,12 @@ import {
 } from '@tabler/icons-react';
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
-import { type ProgramTurn, type LastTurnResult } from '@/lib/program-turn';
 import { buildPriceMap, summarizeAccount, summarizeProgram, summarizeTurn } from '@/lib/real-account-summary';
 import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
 import PortfolioTable from './PortfolioTable';
 import TradeHistoryTable from './TradeHistoryTable';
 import SimCard from './SimCard';
+import { useProgramTrading } from './useProgramTrading';
 // [V8.9.9.22] 차트 라이브러리 SSR 충돌 방지를 위한 동적 임포트 적용
 const StrategyRadarChart = dynamic(() => import('../components/StrategyRadarChart'), { 
     ssr: false,
@@ -88,22 +88,6 @@ function TradeContent() {
     const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
     const [bulkActionType, setBulkActionType] = useState<{ type: 'immediate' | 'reservation' } | null>(null);
 
-    // Program trading (실전 계좌 자동 심 운용)
-    const [programEnabled, setProgramEnabled] = useState(false);
-    const [programSim, setProgramSim] = useState<string | null>(null);
-    const [programBudget, setProgramBudget] = useState<number | ''>('');
-    const [programConfirmedBudget, setProgramConfirmedBudget] = useState(0);
-    const [programSims, setProgramSims] = useState<{ id: string; name: string; description: string }[]>([]);
-    const [programValid, setProgramValid] = useState(true);
-    const [programBusy, setProgramBusy] = useState(false);
-    const [programPinOpen, setProgramPinOpen] = useState(false);
-    const [programPin, setProgramPin] = useState('');
-    const [programPositions, setProgramPositions] = useState<Record<string, { name: string; quantity: number; avg_price: number; tag?: string }>>({});
-    const [programRealizedPnl, setProgramRealizedPnl] = useState(0);
-    const [programLedgerOk, setProgramLedgerOk] = useState(true);
-    const [programTurn, setProgramTurn] = useState<ProgramTurn | null>(null);
-    const [programLastTurn, setProgramLastTurn] = useState<LastTurnResult | null>(null);
-
     // 시뮬레이터 리셋
     const [resetCash, setResetCash] = useState<number | ''>(3000000);
     const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -116,6 +100,17 @@ function TradeContent() {
         setNotification({ title, msg, color });
         setTimeout(() => setNotification(null), 5000);
     }, []);
+
+    // 프로그램 매매(실거래 문)는 상태 14개를 훅이 들고 있다. 이름은 그대로라 JSX는 모른다.
+    const {
+        programEnabled, programSim, setProgramSim,
+        programBudget, setProgramBudget, programConfirmedBudget,
+        programSims, programValid, programBusy,
+        programPinOpen, setProgramPinOpen, programPin, setProgramPin,
+        programPositions, programRealizedPnl, programLedgerOk,
+        programTurn, programLastTurn,
+        submitProgram, onToggleProgram,
+    } = useProgramTrading(showNotify);
 
     const fetchBalance = useCallback(async (retryCount = 0, silent = false) => {
         if (typeof window === 'undefined') return;
@@ -215,64 +210,6 @@ function TradeContent() {
         balancePoller.start();
         return () => balancePoller.stop();
     }, [balancePoller]);
-
-    // ── 프로그램 매매 ──────────────────────────────────────────
-    const fetchProgram = useCallback(async () => {
-        try {
-            const res = await axios.get('/api/trade/program');
-            const d = res.data || {};
-            setProgramEnabled(!!d.enabled);
-            setProgramSim(d.selected_sim ?? null);
-            setProgramBudget(d.budget ? Number(d.budget) : '');
-            setProgramConfirmedBudget(Number(d.budget) || 0);
-            setProgramSims(Array.isArray(d.sims) ? d.sims : []);
-            setProgramValid(d.selected_valid !== false);
-            setProgramPositions(d.positions && typeof d.positions === 'object' ? d.positions : {});
-            setProgramRealizedPnl(Number(d.realized_pnl) || 0);
-            setProgramLedgerOk(d.ledger_ok !== false);
-            setProgramTurn(d.turn && d.turn.id ? d.turn : null);
-            setProgramLastTurn(d.last_turn_result ?? null);
-        } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
-    }, []);
-
-    useEffect(() => { fetchProgram(); }, [fetchProgram]);
-
-    const submitProgram = async (enable: boolean, pinVal?: string) => {
-        setProgramBusy(true);
-        try {
-            const res = await axios.post('/api/trade/program', {
-                enabled: enable,
-                selected_sim: programSim,
-                budget: Number(programBudget) || 0,
-                pin: pinVal,
-            });
-            if (res.data?.success) {
-                setProgramEnabled(!!res.data.enabled);
-                showNotify('프로그램 매매', res.data.enabled ? `ON — ${programSim} 자동 운용` : 'OFF (수동 매매만)', res.data.enabled ? 'red' : 'gray');
-                fetchProgram();
-            } else {
-                showNotify('프로그램 매매 실패', res.data?.error || '변경 실패', 'red');
-            }
-        } catch (e: any) {
-            showNotify('프로그램 매매 실패', e.response?.data?.error || e.message, 'red');
-        } finally {
-            setProgramBusy(false);
-            setProgramPinOpen(false);
-            setProgramPin('');
-        }
-    };
-
-    const onToggleProgram = (checked: boolean) => {
-        if (checked) {
-            // arm: 로컬 유효성 확인 후 PIN
-            if (!programSim) { showNotify('프로그램 매매', '먼저 매매 심을 선택하세요.', 'yellow'); return; }
-            if (!(Number(programBudget) > 0)) { showNotify('프로그램 매매', '프로그램 예산(>0)을 입력하세요.', 'yellow'); return; }
-            setProgramPin('');
-            setProgramPinOpen(true);
-        } else {
-            submitProgram(false); // kill-switch: PIN 없이 즉시 OFF
-        }
-    };
 
     const handleOrder = async (isReservation: boolean) => {
         if (!code || !qty) {

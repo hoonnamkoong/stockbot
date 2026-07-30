@@ -174,7 +174,7 @@ simulators:
     label: "상승 단타형 (Sim 4-1)"
     display_order: 45
     ui_key: "sim4_daytrading"
-    short_desc: "Sim4 기반 당일 데이트레이딩 — 분할 익절 + 강제청산"
+    short_desc: "상승률 상위 단기 회전 — 분할 익절(+5%/+10%) · 2일/5일 강제청산"
     chart_group: 2
     color: "teal"
     active: true

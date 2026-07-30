@@ -14,6 +14,12 @@ export const SIM_INITIAL_CASH = 3_000_000;
 export type SimHolding = {
   code: string; name: string; qty: number;
   avg_price: number; current_price: number; pl_rate: number;
+  /**
+   * 현재가가 실제 시세인가. false면 `current_price`는 평단을 대신 넣은 것이고
+   * 등락률·손익은 **모르는 값**이다 — 화면이 +0.00%로 그리면 '안 움직였다'는
+   * 거짓이 된다.
+   */
+  price_known: boolean;
 };
 
 /**
@@ -31,7 +37,9 @@ export function deriveSimHoldings(
   return Object.keys(portfolio).map((code) => {
     const p = portfolio[code];
     const avg = p.avg_price || p.price || 0;
-    const cur = currentPrices?.[code] ?? avg;
+    const live = currentPrices?.[code];
+    const known = typeof live === 'number' && live > 0;
+    const cur = known ? live : avg;
     return {
       code,
       name: p.name,
@@ -39,6 +47,7 @@ export function deriveSimHoldings(
       avg_price: avg,
       current_price: cur,
       pl_rate: avg > 0 ? ((cur - avg) / avg) * 100 : 0,
+      price_known: known,
     };
   });
 }

@@ -33,6 +33,42 @@ def initial_state(cash):
     }
 
 
+# 매매 기록 CSV의 열. roi 두 개가 **맨 뒤**인 것이 의도다 — 아래 ensure_csv_header 참고.
+CSV_HEADER = ["timestamp", "symbol", "action", "price", "quantity",
+              "total_amount", "reason", "roi", "roi_amount"]
+
+
+def ensure_csv_header(path):
+    """기록 파일의 헤더를 최신 열 목록으로 맞춘다.
+
+    파일이 없으면 헤더만 쓴다. 이미 있고 헤더가 구 포맷(roi 없음)이면 **첫 줄만**
+    바꿔 쓴다 — 데이터 행은 건드리지 않는다. roi 열이 맨 뒤라서 기존 7개 값의
+    위치가 그대로 유지되고, 없는 두 값은 '모른다'로 읽힌다.
+
+    데이터 행을 csv로 다시 인코딩하지 않는 이유: 사유의 따옴표 처리를 다시
+    거치면서 원본이 미묘하게 달라질 수 있다. 텍스트 그대로 옮긴다.
+    임시 파일 후 os.replace — 중간에 죽어도 원장이 반토막 나지 않는다.
+    """
+    header_line = ','.join(CSV_HEADER)
+    if not os.path.exists(path):
+        with open(path, 'w', encoding='utf-8-sig', newline='') as f:
+            csv.writer(f).writerow(CSV_HEADER)
+        return
+
+    with open(path, 'r', encoding='utf-8-sig', newline='') as f:
+        lines = f.read().split('\n')
+    if not lines or not lines[0].strip():
+        return
+    if [c.strip() for c in lines[0].strip().split(',')] == CSV_HEADER:
+        return
+
+    lines[0] = header_line
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8-sig', newline='') as f:
+        f.write('\n'.join(lines))
+    os.replace(tmp, path)
+
+
 class TradeLog:
     """
     [V8.5.0] 단일 매매 기록 데이터 구조
@@ -167,17 +203,26 @@ class BaseSimulator:
         except Exception as e:
             print(f"[Sim Critical] {self.name} 파일 쓰기 실패: {e}")
 
-    def log_trade(self, action, code, name, quantity, price, reason):
-        """매매 이력 기록 (CSV append only — JSON 이중 기록 제거로 I/O 최적화)"""
+    def log_trade(self, action, code, name, quantity, price, reason, roi_pct=None, roi_amount=None):
+        """매매 이력 기록 (CSV append only — JSON 이중 기록 제거로 I/O 최적화)
+
+        roi 두 열은 **사유 뒤**에 있다. 앞에 끼우면 기존 파일의 7번째 값(사유)이
+        roi로 읽혀 기록이 통째로 어긋난다. 뒤에 두면 구 포맷 행은 그 두 값이
+        비어 있는 것으로 읽히고(=모른다), 헤더 한 줄만 승급하면 된다.
+
+        대시보드가 이 열 이름으로 값을 찾는다(src/lib/trade-history-csv.ts).
+        한쪽만 바꾸면 조용히 어긋나는 경계다.
+        """
         timestamp = get_kst_now().strftime('%Y-%m-%d %H:%M:%S')
-        file_exists = os.path.exists(self.csv_file)
+        ensure_csv_header(self.csv_file)
         with open(self.csv_file, 'a', encoding='utf-8-sig', newline='') as f:
             writer = csv.writer(f)
-            if not file_exists:
-                writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "reason"])
             writer.writerow([
                 timestamp, f"{name}({code})", action,
-                int(price), quantity, int(quantity * price), reason
+                int(price), quantity, int(quantity * price), reason,
+                # 모르는 값은 빈 칸이다. 0을 쓰면 '실현손익 0원'과 구분이 사라진다.
+                '' if roi_pct is None else f"{roi_pct:+.2f}",
+                '' if roi_amount is None else int(round(roi_amount)),
             ])
 
     def buy(self, code, name, price, quantity, reason=""):
@@ -239,7 +284,14 @@ class BaseSimulator:
         else:
             self.state['portfolio'][code]['quantity'] -= q_to_sell
             self.state['portfolio'][code]['is_scaled_out'] = True # 일부 매도 발생 시 플래그 설정
-        self.log_trade("SELL", code, p_item['name'], q_to_sell, price, reason)
+        # 실현 ROI: 원가 대비 실수령. 원가를 모르면(평단 0) 만들지 않는다 — 측정 불가다.
+        # 매도측 비용(수수료·세금)은 반영되고 매수 수수료는 안 들어간다:
+        # buy()가 평단을 체결가로만 만들기 때문이다(매수 수수료는 현금에서만 빠진다).
+        cost_basis = q_to_sell * avg_price
+        roi_amount = (net - cost_basis) if cost_basis > 0 else None
+        roi_pct = (roi_amount / cost_basis * 100) if roi_amount is not None else None
+        self.log_trade("SELL", code, p_item['name'], q_to_sell, price, reason,
+                       roi_pct=roi_pct, roi_amount=roi_amount)
         self.save_state()
         return True
 

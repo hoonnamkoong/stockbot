@@ -45,7 +45,7 @@ export default function PortfolioTable({
                 </Table.Thead>
                 <Table.Tbody>
                     {holdings.map((h) => {
-                        const { qty, avgPrice, currentPrice, amount, plRate, plAmount } = derivePosition(h);
+                        const { qty, avgPrice, currentPrice, amount, plRate, plAmount, priceKnown } = derivePosition(h);
                         const isSelected = selectedCodes.includes(h.code);
 
                         return (
@@ -72,20 +72,27 @@ export default function PortfolioTable({
                                     <Text size="sm">{Math.round(avgPrice).toLocaleString()}원</Text>
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
-                                    <Text size="sm" fw={500} c="teal">{Math.round(currentPrice).toLocaleString()}원</Text>
+                                    {priceKnown
+                                        ? <Text size="sm" fw={500} c="teal">{Math.round(currentPrice).toLocaleString()}원</Text>
+                                        : <Text size="sm" c="dimmed">시세 미확인</Text>}
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
                                     <Text size="sm" fw={700}>{Math.round(amount).toLocaleString()}원</Text>
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'center' }}>
-                                    <Badge color={pnlColor(plRate)} variant="filled" size="sm" style={{ width: 65 }}>
-                                        {plRate >= 0 ? '+' : ''}{plRate.toFixed(2)}%
-                                    </Badge>
+                                    {/* 시세를 모르면 등락률도 모른다. 0%로 그리면 '안 움직였다'는 거짓이 된다. */}
+                                    {priceKnown ? (
+                                        <Badge color={pnlColor(plRate)} variant="filled" size="sm" style={{ width: 65 }}>
+                                            {plRate >= 0 ? '+' : ''}{plRate.toFixed(2)}%
+                                        </Badge>
+                                    ) : (
+                                        <Text size="xs" c="dimmed">측정 불가</Text>
+                                    )}
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
-                                    <Text size="sm" fw={700} c={pnlColor(plAmount)}>
-                                        {signed(plAmount)}
-                                    </Text>
+                                    {priceKnown
+                                        ? <Text size="sm" fw={700} c={pnlColor(plAmount)}>{signed(plAmount)}</Text>
+                                        : <Text size="xs" c="dimmed">측정 불가</Text>}
                                 </Table.Td>
                             </Table.Tr>
                         );

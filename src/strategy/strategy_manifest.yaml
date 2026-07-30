@@ -228,13 +228,13 @@ simulators:
   - id: "sim9_gap_fade"
     module: "src.strategy.simulators.sim9_gap_fade"
     class: "GapFadeSimulator"
-    description: "Sim9 갭소진 반등 — 갭>=+3% & 장중<=-3%를 14:30 이후 매수 + 익일 청산(타임스탑 1일)"
+    description: "Sim9 갭소진 반등 — 갭>=+7% & 장중<=-6% & 일중위치<=0.20을 14:30~15:20 매수 + 익일 청산(타임스탑 1일)"
     state_file: "sim_gapfade_state.json"
     csv_file: "trade_history_sim_gapfade.csv"
     label: "갭소진 반등 (Sim 9)"
     display_order: 90
     ui_key: "sim9"
-    short_desc: "갭 +3% 후 장중 -3% 급락을 14:30 이후 매수 · 익일 청산"
+    short_desc: "갭 +7% 후 장중 -6% 저가권 마감을 14:30~15:20 매수 · 익일 청산"
     chart_group: 4
     color: "orange"
     active: true

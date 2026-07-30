@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRealTradeHistory } from '@/lib/kis-api';
 import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
 import { createBucketCache, dbDataUrl } from '@/lib/db-data';
+import { parseSimHistoryCsv } from '@/lib/trade-history-csv';
 
 /**
  * [V50.2] Trading History API (Refactored)
@@ -31,44 +32,9 @@ async function fetchSimHistory(fileInfo: { type: string, name: string }) {
         const res = await fetch(dbDataUrl(fileInfo.name), { cache: 'no-store' });
         if (!res.ok) return [];
 
-        const content = await res.text();
-        const lines = content.split('\n').filter(line => line.trim().length > 0);
-        if (lines.length <= 1) return [];
-
-        const parseCSVLine = (text: string) =>
-            text.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-
-        const headers = parseCSVLine(lines[0]);
-        const entries: any[] = [];
-        
-        for (let i = 1; i < lines.length; i++) {
-            const values = parseCSVLine(lines[i]);
-            if (values.length < 2) continue;
-
-            const entry: any = { type: fileInfo.type };
-            headers.forEach((h, idx) => {
-                const v = values[idx] || '';
-                if (h === 'timestamp') entry.time = v;
-                else if (h === 'symbol') entry.symbol = v;
-                else if (h === 'action') entry.action = v.toUpperCase();
-                else if (h === 'price') entry.price = v;
-                else if (h === 'quantity') entry.qty = v;
-                else if (h === 'total_amount') entry.amount = v;
-                else if (h === 'roi') entry.roi = v;
-                else if (h === 'reason') entry.reason = v;
-            });
-            
-            // 금액 보정 (필요시)
-            if (!entry.amount && entry.price && entry.qty) {
-                const p = parseInt((entry.price || '').replace(/,/g, ''));
-                const q = parseInt(entry.qty);
-                if (!isNaN(p) && !isNaN(q)) {
-                    entry.amount = (p * q).toLocaleString();
-                }
-            }
-            entries.push(entry);
-        }
-        return entries;
+        // 파싱은 lib이 한다(테스트 있음). 여기 있던 split(',') 파서는 따옴표 안의
+        // 콤마를 구분자로 봐서 판단 사유를 첫 콤마에서 잘랐다.
+        return parseSimHistoryCsv(await res.text(), fileInfo.type);
     } catch (err) {
         console.error(`[HistoryAPI] Error fetching ${fileInfo.name}:`, err);
         return [];

@@ -9,10 +9,16 @@
  * '측정 불가'다 — [[no-fabricated-financial-values]].
  */
 
-/** 보유 종목 한 줄의 표시값. 잔고 API와 심 상태가 필드명이 달라 양쪽을 받아준다. */
+/**
+ * 보유 종목 한 줄의 표시값. 잔고 API와 심 상태가 필드명이 달라 양쪽을 받아준다.
+ *
+ * `priceKnown`이 false면 현재가·등락률·손익을 그리지 말아야 한다. 심 쪽은
+ * 시세를 못 붙였을 때 평단을 대신 넣어 오고(`price_known: false`), 그 값으로
+ * 계산한 0%는 '안 움직였다'가 아니라 '모른다'다.
+ */
 export function derivePosition(h: any): {
   qty: number; avgPrice: number; currentPrice: number; amount: number;
-  plRate: number; plAmount: number;
+  plRate: number; plAmount: number; priceKnown: boolean;
 } {
   const qty = h.qty || h.quantity || 0;
   const avgPrice = h.avg_price || h.price || 0;
@@ -21,7 +27,8 @@ export function derivePosition(h: any): {
   // 체결금액은 평단 기준이다(투입 원금). 현재가로 곱하면 평가금액이 되어 다른 뜻이 된다.
   const amount = qty * avgPrice;
   const plAmount = h.pl_amount ?? Math.round((currentPrice - avgPrice) * qty);
-  return { qty, avgPrice, currentPrice, amount, plAmount, plRate };
+  const priceKnown = h.price_known !== false && currentPrice > 0;
+  return { qty, avgPrice, currentPrice, amount, plAmount, plRate, priceKnown };
 }
 
 /** 국내 관례: 이익은 빨강, 손실은 파랑. */
@@ -38,14 +45,20 @@ export type RoiCell = { kind: 'value'; text: string; color: 'red' | 'blue' | 'gr
                     | { kind: 'none' };
 
 /**
- * 실거래 기록의 ROI 두 칸(%, 금액).
+ * 매매 기록의 ROI 두 칸(%, 금액).
  *
  * 값이 없을 때 매도는 '측정 불가', 매수는 '-'다. 매도에 값이 없다는 것은 원가를
  * 확보하지 못했다는 뜻이지 손익이 0이라는 뜻이 아니다(kis-api.matchRealizedRoi).
+ *
+ * `roiTracked: false`는 다르다 — 그 기록 파일에 ROI 열이 아예 없다는 뜻이고
+ * (심 CSV의 구 포맷), 무언가 실패한 것이 아니다. 실패가 아닌 것을 '측정 불가'로
+ * 그리면 매일 보는 화면이 경고로 도배된다.
  */
-export function roiCells(h: { action?: string; roi?: string | null; roiAmount?: number | null }): {
-  pct: RoiCell; amount: RoiCell;
-} {
+export function roiCells(h: {
+  action?: string; roi?: string | null; roiAmount?: number | null; roiTracked?: boolean;
+}): { pct: RoiCell; amount: RoiCell } {
+  if (h.roiTracked === false) return { pct: { kind: 'none' }, amount: { kind: 'none' } };
+
   const isSell = h.action === 'SELL';
   const missing: RoiCell = isSell ? { kind: 'unmeasurable' } : { kind: 'none' };
   const hasRoi = h.roi !== undefined && h.roi !== null && h.roi !== '-';

@@ -13,11 +13,10 @@ export const RESET_TARGETS: ResetTarget[] = SIM_REGISTRY.map((s) => ({
   csvFile: s.csvFile,
 }));
 
-export const RESET_CSV_HEADER = '﻿timestamp,symbol,action,price,quantity,total_amount,reason\n';
-
-// 리셋 상태 shape는 여기서 만들지 않는다 — 파이썬 base_simulator.initial_state()가
+// 리셋 상태 shape도 CSV 헤더도 여기서 만들지 않는다 — 파이썬(base_simulator)이
 // 정본이고 생성기가 옮겨 적는다. 손으로 두 벌 적으면 한쪽에 키가 늘어도 아무도 모른다.
-export { buildResetState } from './sim-registry.generated.ts';
+// 실제로 그랬다: 파이썬이 roi 열을 늘렸는데 여기 헤더는 구 포맷으로 남아 있었다.
+export { buildResetState, TRADE_CSV_HEADER as RESET_CSV_HEADER } from './sim-registry.generated.ts';
 
 export function validateCash(cash: unknown): { ok: true; value: number } | { ok: false; error: string } {
   if (typeof cash !== 'number' || !Number.isInteger(cash)) {

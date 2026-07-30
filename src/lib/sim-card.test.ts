@@ -13,7 +13,7 @@ test('portfolio 딕셔너리가 표 줄들이 된다', () => {
   );
   assert.deepEqual(rows, [{
     code: '005930', name: '삼성전자', qty: 10,
-    avg_price: 70000, current_price: 77000, pl_rate: 10,
+    avg_price: 70000, current_price: 77000, pl_rate: 10, price_known: true,
   }]);
 });
 
@@ -21,6 +21,21 @@ test('시세를 못 붙였으면 평단을 쓴다 — 0원으로 그리면 평�
   const [row] = deriveSimHoldings({ A: { name: 'A', quantity: 1, avg_price: 5000 } }, null);
   assert.equal(row.current_price, 5000);
   assert.equal(row.pl_rate, 0);
+  assert.equal(row.price_known, false, '평단으로 때운 것을 표시해야 화면이 0%를 안 그린다');
+});
+
+test('시세가 0이나 음수로 와도 미확인이다 — 그 값으로 계산하면 전액 손실로 보인다', () => {
+  for (const prices of [{ A: 0 }, { A: -1 }, {}]) {
+    const [row] = deriveSimHoldings({ A: { name: 'A', quantity: 1, avg_price: 5000 } }, prices);
+    assert.equal(row.price_known, false, JSON.stringify(prices));
+    assert.equal(row.current_price, 5000);
+  }
+});
+
+test('실제 시세가 있으면 price_known이 참이다', () => {
+  const [row] = deriveSimHoldings({ A: { name: 'A', quantity: 1, avg_price: 5000 } }, { A: 5500 });
+  assert.equal(row.price_known, true);
+  assert.equal(row.pl_rate, 10);
 });
 
 test('avg_price가 없으면 price로 떨어진다 — 심마다 필드명이 다르다', () => {

@@ -130,12 +130,23 @@ def test_롤링은_거래일_단위다():
 
 
 def test_append가_거래일_상한을_지킨다(tmp_path):
+    # 상한(60)을 실제로 넘겨야 의미가 있다 — 월 경계를 넘어 65개 날짜를 만든다.
     p = str(tmp_path / 'obs.csv')
-    for d in range(1, MAX_DISTINCT_DATES + 5):
-        append_observation(p, f'2026-07-{d:02d} 09:10'.replace('-0', '-0'), 50.0, 0.0, None, 100, 's') \
-            if d <= 31 else None
+    made = []
+    for month, last in ((6, 30), (7, 31), (8, 31)):
+        for d in range(1, last + 1):
+            if len(made) >= MAX_DISTINCT_DATES + 5:
+                break
+            made.append(f'2026-{month:02d}-{d:02d} 09:10')
+    assert len(made) == MAX_DISTINCT_DATES + 5, '상한을 넘기지 못하면 이 테스트는 아무것도 검증하지 않는다'
+    for ts in made:
+        append_observation(p, ts, 50.0, 0.0, None, 100, 's')
+
     rows = parse_observations(_read(p))
-    assert len({r['ts'][:10] for r in rows}) <= MAX_DISTINCT_DATES
+    dates = sorted({r['ts'][:10] for r in rows})
+    assert len(dates) == MAX_DISTINCT_DATES, '오래된 5일이 잘려나간다'
+    assert dates[-1] == made[-1][:10], '최신 날짜가 남는다'
+    assert made[0][:10] not in dates, '가장 오래된 날짜는 사라진다'
 
 
 def test_깨진_행은_건너뛰고_나머지를_읽는다():
@@ -584,13 +595,19 @@ def daily_observations(rows, min_sample=50):
 Run: `python -m pytest tests/test_regime_daily.py -q`
 Expected: PASS (5 passed)
 
-- [ ] **Step 5: 실제 데이터로 스모크 확인**
+- [ ] **Step 5: 실제 데이터로 스모크 확인 (pytest 아님 — 로컬 전용)**
+
+`output/ohlcv_top100.csv`는 git 미추적이라 로컬에만 있다. 없으면 이 스텝을 건너뛴다.
 
 Run:
 ```bash
 PYTHONPATH=. python -c "
+import os
 from src.strategy.regime_daily import load_ohlcv, daily_observations
-obs = daily_observations(load_ohlcv('output/ohlcv_top100.csv'))
+p = 'output/ohlcv_top100.csv'
+if not os.path.exists(p):
+    print('로컬에 없음 — 스킵'); raise SystemExit
+obs = daily_observations(load_ohlcv(p))
 print(len(obs), obs[0]['ts'], obs[-1]['ts'])
 print('breadth 범위', min(o['breadth'] for o in obs), max(o['breadth'] for o in obs))
 "
@@ -842,14 +859,21 @@ def transitions(labels):
 Run: `python -m pytest tests/test_regime_label.py -q`
 Expected: PASS (11 passed)
 
-- [ ] **Step 5: 실제 99일에 붙여보고 창을 훑는다**
+- [ ] **Step 5: 실제 99일에 붙여보고 창을 훑는다 (pytest 아님 — 로컬 전용)**
+
+`output/ohlcv_top100.csv`가 없으면 `tests/fixtures/ohlcv_top100_sample.csv`로 대체해 돌린다
+(전환 건수는 표본이 작아 더 적게 나온다 — 단조성만 확인한다).
 
 Run:
 ```bash
 PYTHONPATH=. python -c "
+import os
 from src.strategy.regime_daily import load_ohlcv, daily_observations
 from src.strategy.regime_label import label_regimes, transitions
-obs = daily_observations(load_ohlcv('output/ohlcv_top100.csv'))
+p = 'output/ohlcv_top100.csv'
+if not os.path.exists(p): p = 'tests/fixtures/ohlcv_top100_sample.csv'
+print('데이터:', p)
+obs = daily_observations(load_ohlcv(p))
 for w in (1, 3, 5, 7, 9):
     L = label_regimes(obs, window=w)
     t = transitions(L)
@@ -1839,11 +1863,15 @@ def test_표에_비용과_구성요소가_들어간다():
     assert 'false' in table.lower()
 
 
-def test_실제_일봉으로_데이터셋이_만들어진다():
-    obs, labels = build_daily_dataset('output/ohlcv_top100.csv', {'window': 5})
-    assert len(obs) > 50, '99거래일이 있어야 한다'
+def test_커밋된_픽스처로_데이터셋이_만들어진다():
+    # output/ohlcv_top100.csv는 git 미추적이고 형제 CSV는 .gitignore에 있다
+    # (런 시점에 db-data에서 복원되는 파일들이다). CI에서 도는 테스트는 커밋된
+    # 픽스처만 쓴다 — 99일 전체 실행은 Step 6의 수동 스모크가 담당한다.
+    obs, labels = build_daily_dataset('tests/fixtures/ohlcv_top100_sample.csv', {'window': 5})
+    assert len(obs) == 59, '60거래일 픽스처에서 첫날은 전일종가가 없어 빠진다'
     assert len(obs) == len(labels)
     assert {l['regime'] for l in labels} <= {'BULL', 'SIDEWAYS', 'BEAR'}
+    assert all(o['sample'] == 12 for o in obs), '픽스처는 12종목 전 기간 존재'
 ```
 
 - [ ] **Step 2: 실패를 확인한다**
@@ -1941,8 +1969,24 @@ def format_table(results):
     return '\n'.join(lines)
 
 
+DATA_CANDIDATES = ('output/ohlcv_top100.csv', 'tests/fixtures/ohlcv_top100_sample.csv')
+
+
+def _pick_data(argv):
+    """인자 > 실측 99일 > 커밋된 픽스처. 어느 데이터로 돌렸는지 항상 출력한다 —
+    표본을 모르고 비교표를 읽으면 결론을 과신한다."""
+    if len(argv) > 1:
+        return argv[1]
+    for p in DATA_CANDIDATES:
+        if os.path.exists(p):
+            return p
+    raise SystemExit(f'데이터가 없다: {DATA_CANDIDATES}')
+
+
 def main():
-    obs, labels = build_daily_dataset('output/ohlcv_top100.csv', {'window': 5})
+    path = _pick_data(sys.argv)
+    print(f'데이터: {path}')
+    obs, labels = build_daily_dataset(path, {'window': 5})
     n_trans = sum(1 for i in range(1, len(labels))
                   if labels[i]['regime'] != labels[i - 1]['regime'])
     print(f'표본 {len(obs)}거래일 · 라벨 전환 {n_trans}건')

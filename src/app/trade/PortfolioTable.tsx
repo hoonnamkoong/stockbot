@@ -11,13 +11,14 @@ import { derivePosition, pnlColor, signed } from '@/lib/trade-display';
  * 이 표가 무엇에 의존하는지가 시그니처에 다 적혀 있다.
  */
 export default function PortfolioTable({
-    holdings, isReal = false, maxHeight = 560, selectedCodes, onToggleCode, onPickCode,
+    holdings, isReal = false, maxHeight = 560, selectedCodes = [], onToggleCode, onPickCode,
 }: {
     holdings: any[];
     isReal?: boolean;
     maxHeight?: string | number;
-    selectedCodes: string[];
-    onToggleCode: (code: string, checked: boolean) => void;
+    /** 일괄매도 선택 상태. isReal일 때만 쓰인다 — 심 카드는 넘기지 않는다. */
+    selectedCodes?: string[];
+    onToggleCode?: (code: string, checked: boolean) => void;
     onPickCode: (code: string, name: string) => void;
 }) {
     if (!holdings || holdings.length === 0) {
@@ -53,7 +54,7 @@ export default function PortfolioTable({
                                     <Table.Td onClick={(e) => e.stopPropagation()} style={{ position: 'sticky', left: 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 2 }}>
                                         <Checkbox
                                             checked={isSelected}
-                                            onChange={(event) => onToggleCode(h.code, event.currentTarget.checked)}
+                                            onChange={(event) => onToggleCode?.(h.code, event.currentTarget.checked)}
                                         />
                                     </Table.Td>
                                 )}

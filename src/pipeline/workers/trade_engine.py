@@ -293,6 +293,21 @@ class TradeEngineWorker(BaseWorker):
                             sim.update_nowcast(
                                 live_breadth[0], now_kst=now_kst,
                                 backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
+                            # 관측 이력: 10분 해상도로 쌓는다(나우캐스트의 1시간 격자와 별개).
+                            # 라벨러·하네스·판정기가 학습·검증에 쓰는 유일한 원천이다 —
+                            # 나우캐스트는 시간당 1건만 남기므로 여기를 대신할 수 없다.
+                            try:
+                                from src.strategy.regime_observations import (
+                                    OBS_PATH_REL, append_observation)
+                                append_observation(
+                                    OBS_PATH_REL,
+                                    now_kst.strftime('%Y-%m-%d %H:%M'),
+                                    live_breadth[0], live_breadth[1],
+                                    self._top100_trend_from_csv(),
+                                    live_breadth[2], 'top100_live')
+                            except Exception as e:
+                                # 이력 축적 실패가 매매를 막지 않는다. 조용히 넘기지도 않는다.
+                                self.log_error(f"국면 관측 이력 기록 실패: {e}")
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
 

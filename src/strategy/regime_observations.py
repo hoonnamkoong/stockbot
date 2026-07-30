@@ -25,6 +25,11 @@ OBS_HEADER = ['ts_kst', 'breadth', 'momentum', 'trend', 'sample', 'source']
 # 이유: 런이 지연되거나 건너뛴 날이 있어도 보관 기간의 뜻이 변하지 않는다.
 MAX_DISTINCT_DATES = 60
 
+# 파이프라인이 쓰는 상대 경로. `data/` 아래 `.csv`라는 것이 계약이다 —
+# scraper.yml이 런 시작에 db-data에서 data/를 복원하고 끝에 data/*.csv를 배포한다.
+# 이 두 조건 중 하나만 어긋나도 이력이 런 사이에 이어지지 않는다.
+OBS_PATH_REL = 'data/regime_observations.csv'
+
 
 def _round_str(value, ndigits):
     """반올림 결과를 문자열로. 0.5 지점은 항상 위(절대값 큰 쪽)로 — 파이썬 기본

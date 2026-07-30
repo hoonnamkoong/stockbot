@@ -1,6 +1,6 @@
 from datetime import date
 
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_date, get_kst_now
 
 
 class ReportFollowerSimulator(BaseSimulator):
@@ -25,7 +25,7 @@ class ReportFollowerSimulator(BaseSimulator):
     def _days_held(self, pos: dict) -> int:
         try:
             entry = date.fromisoformat(pos.get('entry_date', '2000-01-01'))
-            return (date.today() - entry).days
+            return (get_kst_date() - entry).days
         except Exception:
             return 0
 

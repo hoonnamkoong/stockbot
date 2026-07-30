@@ -10,6 +10,16 @@ def get_kst_now():
     return datetime.datetime.now(timezone(timedelta(hours=9)))
 
 
+def get_kst_date():
+    """KST 달력 날짜. 보유일수·쿨다운 만료 판정은 전부 이걸 쓴다.
+
+    `date.today()`는 시스템 로컬 날짜라 러너가 UTC면 KST 자정~09시 구간에서 하루
+    뒤처진다. 그 창에 심이 돌면(밤 수동 dispatch, cron 대지연) 보유일수가 1일
+    어긋나 강제청산·타임스탑이 밀리거나 당겨진다.
+    """
+    return get_kst_now().date()
+
+
 def initial_state(cash):
     """리셋 직후의 상태 shape. **이 함수가 정본이다.**
 
@@ -351,16 +361,14 @@ class BaseSimulator:
 
     def add_cooldown(self, code: str, days: int):
         """손절 후 재진입 금지 기간 등록. expire 당일은 아직 쿨다운 해제 안 됨."""
-        from datetime import date, timedelta
-        expire = (date.today() + timedelta(days=days)).isoformat()
+        expire = (get_kst_date() + timedelta(days=days)).isoformat()
         self.state.setdefault('cooldown_codes', {})[code] = expire
         self.save_state()
 
     @staticmethod
     def cooldown_active(cooldown_codes, code):
-        from datetime import date
         exp = cooldown_codes.get(code)
-        return bool(exp) and date.today().isoformat() < exp
+        return bool(exp) and get_kst_date().isoformat() < exp
 
     def is_in_cooldown(self, code: str) -> bool:
         """쿨다운 기간 중이면 True (expire date 당일부터 재진입 허용)."""
@@ -574,7 +582,6 @@ class BaseSimulator:
 
     def _apply(self, orders, current_prices=None):
         """decide가 반환한 Order 리스트를 실제 매매로 실행."""
-        from datetime import date
         for o in orders:
             if o['action'] == 'BUY':
                 self.buy(o['code'], o['name'], o['price'], o['quantity'], reason=o.get('reason', ''))
@@ -582,6 +589,6 @@ class BaseSimulator:
                 self.sell(o['code'], o['price'], quantity=o.get('quantity'), reason=o.get('reason', ''))
                 if o.get('mark_partial') and o['code'] in self.state['portfolio']:
                     self.state['portfolio'][o['code']]['partial_sold'] = True
-                    self.state['portfolio'][o['code']]['partial_sold_date'] = date.today().isoformat()
+                    self.state['portfolio'][o['code']]['partial_sold_date'] = get_kst_date().isoformat()
             if o.get('cooldown'):
                 self.add_cooldown(o['code'], o['cooldown'])

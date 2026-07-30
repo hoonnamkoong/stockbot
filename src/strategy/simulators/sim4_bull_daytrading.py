@@ -1,5 +1,5 @@
-from .base_simulator import BaseSimulator
-from datetime import date, datetime
+from .base_simulator import BaseSimulator, get_kst_date
+from datetime import datetime
 
 # base의 순수 헬퍼(Task 3에서 @staticmethod로 전환됨)를 재사용 — 중복 정의 없음.
 # decide 본문은 이 로컬 이름들을 그대로 쓴다.
@@ -34,7 +34,7 @@ def decide_bull_daytrade(view, candidates, current_prices):
     """[Sim4-1] 단타 결정. 순수 함수 — 매매·상태 없음. Order 리스트 반환."""
     orders = []
     portfolio = view['portfolio']
-    today = date.today()
+    today = get_kst_date()
     # 1. 청산
     sold = set()
     for code in list(portfolio.keys()):

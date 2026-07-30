@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, get_kst_now
 from datetime import datetime
 
 class SectorSpilloverSimulator(BaseSimulator):
@@ -27,7 +27,7 @@ class SectorSpilloverSimulator(BaseSimulator):
         # 고점 갱신
         self.update_peak_prices(current_prices)
         
-        now = datetime.now()
+        now = get_kst_now()   # 5월 말 캘린더 청산이 날짜에 걸려 있다 — 로컬 시간대면 경계가 하루 밀린다
         current_month = now.month
         current_day = now.day
 

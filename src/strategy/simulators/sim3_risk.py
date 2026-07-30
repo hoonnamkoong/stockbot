@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, get_kst_date
 
 
 class SmartRiskSimulator(BaseSimulator):
@@ -55,14 +55,13 @@ class SmartRiskSimulator(BaseSimulator):
                 continue
 
             # 타임스탑: 7일 (≈5 영업일)
-            from datetime import date
             entry_date_str = p_item.get('entry_date', '')
             if entry_date_str:
                 try:
                     entry_date = date.fromisoformat(entry_date_str)
-                    if (date.today() - entry_date).days >= 7:
+                    if (get_kst_date() - entry_date).days >= 7:
                         self.sell(code, current_price,
-                                  reason=f"[가치페어] 타임스탑 ({(date.today() - entry_date).days}일 보유)")
+                                  reason=f"[가치페어] 타임스탑 ({(get_kst_date() - entry_date).days}일 보유)")
                         self.add_cooldown(code, 1)
                         sold_today.add(code)
                         continue

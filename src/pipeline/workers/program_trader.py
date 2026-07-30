@@ -34,9 +34,20 @@ import base64
 import requests
 from datetime import datetime, timedelta
 
+from src.pipeline.context import MARKET_CLOSE_HHMM
 from src.pipeline.workers.program_turn import (
     REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
 )
+
+
+def _buy_allowed(now_kst) -> bool:
+    """신규 매수 허용 시각인가. 정규장 종료(15:30)부터 막는다.
+
+    차단선을 `MARKET_CLOSE_HHMM` 하나에서 가져온다 — 심의 `allow_buy`
+    (`ctx.is_buy_window()`)와 다른 시각을 쓰면 페이퍼 기록과 실전 동작이 갈린다.
+    이유는 `PipelineContext.is_buy_window()` 주석에 있다.
+    """
+    return (now_kst.hour, now_kst.minute) < MARKET_CLOSE_HHMM
 
 # config·원장 모두 비공개 레포에 있다. config는 프론트가 유일 writer(파이프라인은 읽기만),
 # 원장은 이 모듈이 유일 writer.
@@ -492,6 +503,11 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         # 매도는 프로그램 원장 종목만(이중 방어)
         if side == 'sell' and code not in positions:
             log(f'[Program] SKIP sell {code} — 프로그램 미소유')
+            continue
+        # 정규장이 닫힌 뒤에는 신규 매수를 내지 않는다. 매도는 그대로 둔다.
+        if side == 'buy' and not _buy_allowed(now_kst):
+            log(f'[Program] SKIP buy {code} — 정규장 종료({MARKET_CLOSE_HHMM[0]}:'
+                f'{MARKET_CLOSE_HHMM[1]:02d}) 이후 신규 매수 금지')
             continue
         try:
             res = place_order_via_vercel(side, code, qty, price)

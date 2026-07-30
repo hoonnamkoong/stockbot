@@ -149,6 +149,26 @@ class PipelineContext:
             not (self.now_kst.hour == 15 and self.now_kst.minute >= 50)
         )
 
+    def is_buy_window(self) -> bool:
+        """신규 매수가 허용되는 시간대(09:00~15:29)인지.
+
+        `is_market_hours()`와 다르다. 그쪽 상한은 15:50이고 매도·기타 판단까지
+        포괄하는데, **신규 매수는 정규장이 닫히는 15:30에 멈춰야 한다.**
+        15:30 이후에 낸 지정가는 정규장에서 체결될 수 없고, 브로커가 익일로
+        이월하면 신호를 다시 확인하지 않은 채 익일 시가에 사게 된다 —
+        전략이 결정하지 않은 포지션이다. 태스커의 마지막 신호가 정확히 15:30이라
+        실제로 그 창에 런이 하나 떨어진다.
+
+        매도는 좁히지 않는다: 리스크를 줄이는 행동이고, 안 채워지면 아무 일도 없다.
+
+        거래일 판정 불가(None)면 닫는다.
+        """
+        return bool(
+            self.is_trading_day() is True and
+            self.now_kst.hour >= 9 and
+            (self.now_kst.hour, self.now_kst.minute) < MARKET_CLOSE_HHMM
+        )
+
     def is_after_market_close(self) -> bool:
         """거래일의 장 마감(15:30) 이후인지 확인합니다.
 

@@ -102,7 +102,10 @@ class TradeEngineWorker(BaseWorker):
         try:
             from src.strategy.engine import StrategyEngine
             engine = StrategyEngine()
-            allow_buy = self.ctx.is_market_hours()
+            # 신규 매수는 정규장 종료(15:30)에 멈춘다. is_market_hours()의 상한은
+            # 15:50이라 그걸 쓰면 체결 불가(또는 익일 이월) 매수가 나간다.
+            # 프로그램 매매도 같은 차단선을 쓴다 — 갈리면 페이퍼와 실전이 어긋난다.
+            allow_buy = self.ctx.is_buy_window()
             simulation_results = engine.execute_simulation(candidates, allow_buy=allow_buy)
             self.log(f"전략 판단 완료: {len(simulation_results)}개 / allow_buy={allow_buy}")
         except Exception as e:

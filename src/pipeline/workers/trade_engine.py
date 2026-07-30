@@ -288,26 +288,17 @@ class TradeEngineWorker(BaseWorker):
                             # 마감 후 라이브 등락률 = 확정 종가 기준. 실패 시 당일 갱신 CSV 폴백.
                             actual_eod = live_breadth[0] if live_breadth else self._get_actual_breadth_from_csv()
                             sim.finalize_eod(actual_eod, now_kst=now_kst)
+                            # 종가 관측도 이력에 남긴다. 태스커의 마지막 신호(15:30)는
+                            # after_close가 먼저 참이라 nowcast로 오지 않는다 — 여기서
+                            # 안 쌓으면 하루의 종착점이 관측 시계열에서 통째로 빠지고,
+                            # 나중에 메울 수 없다(KIS 백필은 당일분봉뿐이다).
+                            self._append_regime_observation(now_kst, live_breadth)
                         elif action == 'nowcast' and live_breadth:
                             codes = live_breadth[3]
                             sim.update_nowcast(
                                 live_breadth[0], now_kst=now_kst,
                                 backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
-                            # 관측 이력: 10분 해상도로 쌓는다(나우캐스트의 1시간 격자와 별개).
-                            # 라벨러·하네스·판정기가 학습·검증에 쓰는 유일한 원천이다 —
-                            # 나우캐스트는 시간당 1건만 남기므로 여기를 대신할 수 없다.
-                            try:
-                                from src.strategy.regime_observations import (
-                                    OBS_PATH_REL, append_observation)
-                                append_observation(
-                                    OBS_PATH_REL,
-                                    now_kst.strftime('%Y-%m-%d %H:%M'),
-                                    live_breadth[0], live_breadth[1],
-                                    self._top100_trend_from_csv(),
-                                    live_breadth[2], 'top100_live')
-                            except Exception as e:
-                                # 이력 축적 실패가 매매를 막지 않는다. 조용히 넘기지도 않는다.
-                                self.log_error(f"국면 관측 이력 기록 실패: {e}")
+                            self._append_regime_observation(now_kst, live_breadth)
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
 
@@ -497,6 +488,28 @@ class TradeEngineWorker(BaseWorker):
             return None
         breadth, momentum = self._breadth_momentum(rates)
         return breadth, momentum, len(codes), codes
+
+    def _append_regime_observation(self, now_kst, live_breadth) -> None:
+        """국면 관측 이력에 한 건 남긴다 — 10분 해상도, 분 단위 시각.
+
+        라벨러·하네스·판정기가 학습·검증에 쓰는 유일한 원천이다. 나우캐스트의
+        `measurements`는 시간당 1건만 남기므로(`_hour_label`) 여기를 대신할 수 없다.
+
+        `live_breadth`가 없으면(수집 실패) 아무것도 쓰지 않는다 — 없는 관측을
+        지어내면 이력이 오염된다. 기록 실패가 매매를 막지도 않되 조용히 넘기지도 않는다.
+        """
+        if not live_breadth:
+            return
+        try:
+            from src.strategy.regime_observations import OBS_PATH_REL, append_observation
+            append_observation(
+                OBS_PATH_REL,
+                now_kst.strftime('%Y-%m-%d %H:%M'),
+                live_breadth[0], live_breadth[1],
+                self._top100_trend_from_csv(),
+                live_breadth[2], 'top100_live')
+        except Exception as e:
+            self.log_error(f"국면 관측 이력 기록 실패: {e}")
 
     def _backfill_breadth_kis(self, hhmm: str, codes: list) -> float | None:
         """KIS 당일분봉으로 특정 시각(HH:MM)의 top100 breadth 복원 — 런 결측 백필 전용.

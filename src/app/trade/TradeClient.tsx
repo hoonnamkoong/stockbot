@@ -17,7 +17,8 @@ import {
 } from '@tabler/icons-react';
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
-import { computeTurnPnl, type ProgramTurn, type LastTurnResult } from '@/lib/program-turn';
+import { type ProgramTurn, type LastTurnResult } from '@/lib/program-turn';
+import { buildPriceMap, summarizeAccount, summarizeProgram, summarizeTurn } from '@/lib/real-account-summary';
 import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
 import PortfolioTable from './PortfolioTable';
 import TradeHistoryTable from './TradeHistoryTable';
@@ -409,52 +410,26 @@ function TradeContent() {
     };
 
     function renderRealPortfolioSection() {
-        const deposit = balance?.deposit ?? 0;
-        // [V8.9.9 Hotfix] 매도 완료되어 잔고가 0주인 종목은 포트폴리오(UI)에서 제외 필터링
-        const holdings = (balance?.holdings || []).filter((h: any) => Number(h.qty || h.quantity || 0) > 0);
-        const totalEval = holdings.reduce((sum: any, h: any) => sum + ((h.price || 0) * (h.qty || 0)), 0);
-        const totalPL = holdings.reduce((sum: any, h: any) => sum + (h.pl_amount || 0), 0);
-
-        // 프로그램 매매 수익률/평가손익: 자체 원장(avg_price) 기준 + 실시간 시세 매칭
-        // (브로커 계좌 전체 손익과 섞이지 않도록 program_positions.json의 avg_price를 그대로 씀)
-        const allHoldings = balance?.holdings || [];
-        const programUnrealizedPnl = Object.entries(programPositions).reduce((sum, [code, pos]) => {
-            const live = allHoldings.find((h: any) => h.code === code);
-            const currentPrice = live?.price ?? pos.avg_price; // 시세 매칭 실패 시 기여분 0
-            return sum + (currentPrice - pos.avg_price) * pos.quantity;
-        }, 0);
-        const programTotalPnl = programRealizedPnl + programUnrealizedPnl;
-        const programBudgetNum = programConfirmedBudget;
-        const programTotalPnlRate = programBudgetNum > 0 ? (programTotalPnl / programBudgetNum) * 100 : 0;
-        const programHasData = programBudgetNum > 0 || Object.keys(programPositions).length > 0 || programRealizedPnl !== 0;
-
-        // 프로그램 보유 종목 총액 (원장 포지션 × 실시간 시세)
-        const priceMap: Record<string, number> = {};
-        for (const h of allHoldings) if (h?.code) priceMap[h.code] = Number(h.price) || 0;
-        const programHoldingsValue = Object.entries(programPositions).reduce(
-            (sum, [code, pos]) => sum + (priceMap[code] || pos.avg_price) * pos.quantity, 0);
-
-        // 턴 손익: ON이면 원장 turn으로 실시간(항상 측정 가능), OFF면 동결된 직전 턴.
-        // 직전 턴은 pnl === null이면 OFF 시점 조회 실패로 '측정 불가' — 0으로 그리지 않는다.
-        const liveTurn = programTurn ? computeTurnPnl(programTurn, programPositions, priceMap) : null;
-        const turnIsLive = programEnabled && !!programTurn;
-        const hasTurn = !!programTurn || !!programLastTurn;
-        const turnCapital = programTurn?.capital ?? programLastTurn?.capital ?? 0;
-        // 원금(분모)이 없으면 수익률을 만들 수 없다 — 0%가 아니라 측정 불가다.
-        const turnMeasurable = (turnIsLive || programLastTurn?.pnl != null) && turnCapital > 0;
-        // 파이썬이 아직 이 턴을 한 번도 안 돌았다(원장에 저장된 턴은 항상 active_tag가 있다).
-        // 손익은 config의 기준가로 계산되지만, 어느 전략의 몫인지는 아직 확정되지 않았다.
-        const turnPendingFirstRun = turnIsLive && programTurn?.active_tag == null;
-        const turnPnl = liveTurn ? liveTurn.pnl : (programLastTurn?.pnl ?? 0);
-        const turnByTag = liveTurn ? liveTurn.byTag : (programLastTurn?.by_tag ?? {});
-        const turnRate = turnCapital > 0 ? (turnPnl / turnCapital) * 100 : 0;
+        // 숫자는 전부 lib이 만든다(테스트 있음). 여기는 배치만 한다.
+        const { deposit, holdings, totalEval, totalPL, roiPct } = summarizeAccount(balance);
+        const priceMap = buildPriceMap(balance?.holdings);
+        const program = summarizeProgram({
+            positions: programPositions,
+            prices: priceMap,
+            realizedPnl: programRealizedPnl,
+            budget: programConfirmedBudget,
+        });
+        const turn = summarizeTurn({
+            turn: programTurn,
+            lastTurn: programLastTurn,
+            positions: programPositions,
+            prices: priceMap,
+            programEnabled,
+        });
 
         // 태그 → 표시명. 하위 전략도 매매 가능 심이라 programSims에 이름이 들어있다.
         const tagLabel = (tag: string) =>
             tag === 'cash' ? '현금(하락장)' : (programSims.find(s => s.id === tag)?.name ?? tag);
-        const turnTagRows = Object.entries(turnByTag)
-            .filter(([, pnl]) => pnl !== 0)
-            .sort((a, b) => b[1] - a[1]);
 
         return (
             <Stack gap="md">
@@ -517,9 +492,13 @@ function TradeContent() {
                         </Stack>
                         <Stack gap={2}>
                             <Text size="xs" c="dimmed">총 자산수익률</Text>
-                            <Text fw={800} size="lg" c={totalPL >= 0 ? 'red' : 'blue'}>
-                                {totalPL >= 0 ? '+' : ''}{(totalEval > 0 ? (totalPL / (totalEval - totalPL)) * 100 : 0).toFixed(2)}%
-                            </Text>
+                            {roiPct === null ? (
+                                <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
+                            ) : (
+                                <Text fw={800} size="lg" c={totalPL >= 0 ? 'red' : 'blue'}>
+                                    {totalPL >= 0 ? '+' : ''}{roiPct.toFixed(2)}%
+                                </Text>
+                            )}
                         </Stack>
                         <Stack gap={2}>
                             <Text size="xs" c="dimmed">총 평가손익</Text>
@@ -532,15 +511,15 @@ function TradeContent() {
                             <Text fw={700} size="lg">{Math.round(totalEval).toLocaleString()} 원</Text>
                         </Stack>
                     </SimpleGrid>
-                    {programHasData && (
+                    {program.hasData && (
                         <>
                             <Divider mb="sm" label="프로그램 매매" labelPosition="left" />
                             <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md" mb="md">
                                 <Stack gap={2}>
                                     <Text size="xs" c="dimmed">수익률 (누적)</Text>
-                                    {programLedgerOk ? (
-                                        <Text fw={800} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
-                                            {programTotalPnl >= 0 ? '+' : ''}{programTotalPnlRate.toFixed(2)}%
+                                    {programLedgerOk && program.ratePct !== null ? (
+                                        <Text fw={800} size="lg" c={program.totalPnl >= 0 ? 'red' : 'blue'}>
+                                            {program.totalPnl >= 0 ? '+' : ''}{program.ratePct.toFixed(2)}%
                                         </Text>
                                     ) : (
                                         <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
@@ -549,8 +528,8 @@ function TradeContent() {
                                 <Stack gap={2}>
                                     <Text size="xs" c="dimmed">평가손익 (누적)</Text>
                                     {programLedgerOk ? (
-                                        <Text fw={700} size="lg" c={programTotalPnl >= 0 ? 'red' : 'blue'}>
-                                            {programTotalPnl >= 0 ? '+' : ''}{Math.round(programTotalPnl).toLocaleString()} 원
+                                        <Text fw={700} size="lg" c={program.totalPnl >= 0 ? 'red' : 'blue'}>
+                                            {program.totalPnl >= 0 ? '+' : ''}{Math.round(program.totalPnl).toLocaleString()} 원
                                         </Text>
                                     ) : (
                                         <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
@@ -559,26 +538,26 @@ function TradeContent() {
                                 <Stack gap={2}>
                                     <Text size="xs" c="dimmed">보유 종목 총액</Text>
                                     {programLedgerOk ? (
-                                        <Text fw={700} size="lg">{Math.round(programHoldingsValue).toLocaleString()} 원</Text>
+                                        <Text fw={700} size="lg">{Math.round(program.holdingsValue).toLocaleString()} 원</Text>
                                     ) : (
                                         <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
                                     )}
                                 </Stack>
                                 <Stack gap={2}>
                                     <Text size="xs" c="dimmed">
-                                        턴당 수익률{hasTurn && !turnIsLive ? ' (직전 턴)' : ''}
+                                        턴당 수익률{turn.has && !turn.isLive ? ' (직전 턴)' : ''}
                                     </Text>
-                                    {!hasTurn ? (
+                                    {!turn.has ? (
                                         <Text size="sm" c="dimmed" mt={4}>턴 없음 — 껐다 켜면 시작</Text>
-                                    ) : !turnMeasurable ? (
+                                    ) : !turn.measurable ? (
                                         <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
                                     ) : (
                                         <>
-                                            <Text fw={800} size="lg" c={turnPnl >= 0 ? 'red' : 'blue'}>
-                                                {turnPnl >= 0 ? '+' : ''}{turnRate.toFixed(2)}%
+                                            <Text fw={800} size="lg" c={turn.pnl >= 0 ? 'red' : 'blue'}>
+                                                {turn.pnl >= 0 ? '+' : ''}{turn.ratePct.toFixed(2)}%
                                             </Text>
                                             <Text size="xs" c="dimmed">
-                                                {turnPnl >= 0 ? '+' : ''}{Math.round(turnPnl).toLocaleString()} 원 / 원금 {Math.round(turnCapital).toLocaleString()} 원
+                                                {turn.pnl >= 0 ? '+' : ''}{Math.round(turn.pnl).toLocaleString()} 원 / 원금 {Math.round(turn.capital).toLocaleString()} 원
                                             </Text>
                                         </>
                                     )}
@@ -586,23 +565,23 @@ function TradeContent() {
                             </SimpleGrid>
                         </>
                     )}
-                    {hasTurn && (
+                    {turn.has && (
                         <Stack gap={6} mb="md">
                             <Text size="xs" c="dimmed">턴당 SIM별 수익률 (기여도 — 합계 = 턴 수익률)</Text>
-                            {turnPendingFirstRun ? (
+                            {turn.pendingFirstRun ? (
                                 <Text size="sm" c="dimmed">전략별 집계 대기 — 다음 파이프라인 런부터</Text>
-                            ) : !turnMeasurable ? (
+                            ) : !turn.measurable ? (
                                 <Text size="sm" c="dimmed">측정 불가</Text>
-                            ) : turnTagRows.length === 0 ? (
+                            ) : turn.tagRows.length === 0 ? (
                                 <Text size="sm" c="dimmed">아직 확정된 손익이 없습니다</Text>
                             ) : (
                                 <Group gap="xs" wrap="wrap">
-                                    {turnTagRows.map(([tag, pnl]) => (
+                                    {turn.tagRows.map(([tag, pnl]) => (
                                         <Badge key={tag} size="lg" radius="sm" variant="light"
                                             color={pnl >= 0 ? 'red' : 'blue'}
                                             style={{ textTransform: 'none', fontWeight: 600 }}>
                                             {tagLabel(tag)} {pnl >= 0 ? '+' : ''}
-                                            {(turnCapital > 0 ? (pnl / turnCapital) * 100 : 0).toFixed(2)}%
+                                            {(turn.capital > 0 ? (pnl / turn.capital) * 100 : 0).toFixed(2)}%
                                             {' · '}{pnl >= 0 ? '+' : ''}{Math.round(pnl).toLocaleString()}원
                                         </Badge>
                                     ))}

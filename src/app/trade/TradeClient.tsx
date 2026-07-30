@@ -21,6 +21,7 @@ import { computeTurnPnl, type ProgramTurn, type LastTurnResult } from '@/lib/pro
 import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
 import PortfolioTable from './PortfolioTable';
 import TradeHistoryTable from './TradeHistoryTable';
+import SimCard from './SimCard';
 // [V8.9.9.22] 차트 라이브러리 SSR 충돌 방지를 위한 동적 임포트 적용
 const StrategyRadarChart = dynamic(() => import('../components/StrategyRadarChart'), { 
     ssr: false,
@@ -669,79 +670,20 @@ function TradeContent() {
                     </Group>
                 </Paper>
                 <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                    {simConfigs.map((sim) => {
-                        const stats = geminiBalance[sim.key]?.raw || {};
-                        const portfolio = geminiBalance[sim.key]?.portfolio || {};
-                        const holdings = Object.keys(portfolio).map(code => {
-                            const p = portfolio[code];
-                            const avgVal = p.avg_price || p.price || 0;
-                            const curVal = stats.current_prices?.[code] ?? avgVal;
-                            const pl = avgVal > 0 ? ((curVal - avgVal) / avgVal) * 100 : 0;
-                            return {
-                                code,
-                                name: p.name,
-                                qty: p.quantity,
-                                avg_price: avgVal,
-                                current_price: curVal,
-                                pl_rate: pl
-                            };
-                        });
-                        // 순수 평가손익: NAV - 초기자본 (수수료는 이미 현금에서 차감됨)
-                        const INITIAL_CASH = 3000000;
-                        const netPL = Math.round((stats.total_asset || stats.cash || 0) - INITIAL_CASH);
-                        // 금일 KST 기준 거래 종목수 (BUY+SELL 합산, 종목 중복 제거)
-                        const todayKST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-                        const todayTrades = history.filter(h => h.type === sim.type && h.time?.startsWith(todayKST));
-                        const todayTickerCount = new Set(todayTrades.map(h => h.symbol)).size;
-                        return (
-                            <Stack key={sim.id} gap="sm">
-                                <Paper p="md" withBorder radius="md" style={{ borderTop: `4px solid var(--mantine-color-${sim.color}-filled)` }}>
-                                    <Group justify="space-between" mb="xs">
-                                        <Text fw={800} size="lg" c={sim.color}>{sim.label}</Text>
-                                        <Badge color={sim.color}>{sim.id.toUpperCase()}</Badge>
-                                    </Group>
-                                    <SimpleGrid cols={{ base: 3, sm: 6 }} mb="md">
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">예수금</Text>
-                                            <Text fw={700} size="sm">{(Math.round(stats.cash || 0)).toLocaleString()}원</Text>
-                                        </Stack>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">수익률</Text>
-                                            <Text size="sm" fw={800} c={(stats.profit_rate || 0) >= 0 ? 'red' : 'blue'}>
-                                                {(stats.profit_rate || 0).toFixed(2)}%
-                                            </Text>
-                                        </Stack>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">누적 수익</Text>
-                                            <Text size="sm" fw={800} c={netPL >= 0 ? 'red' : 'blue'}>
-                                                {netPL >= 0 ? '+' : ''}{netPL.toLocaleString()}원
-                                            </Text>
-                                        </Stack>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">누적 수수료</Text>
-                                            <Text size="sm" fw={700} c="gray.6">{(Math.round(stats.total_fees || 0)).toLocaleString()}원</Text>
-                                        </Stack>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">보유 종목</Text>
-                                            <Text size="sm" fw={800} c={sim.color}>{(holdings?.length || 0)}개</Text>
-                                        </Stack>
-                                        <Stack gap={2}>
-                                            <Text size="xs" c="dimmed">금일 거래</Text>
-                                            <Text size="sm" fw={800} c={todayTickerCount > 0 ? 'dark' : 'dimmed'}>{todayTickerCount}종목</Text>
-                                        </Stack>
-                                    </SimpleGrid>
-                                    <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
-                                    {/* 5행(행 ~61px + 헤더)까지 표시 후 스크롤 */}
-                                    <PortfolioTable holdings={holdings} maxHeight={360} onPickCode={pickCode} />
-                                </Paper>
-                                <Paper p="md" withBorder radius="md" bg="gray.0">
-                                    <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{sim.label} 기록</Text>
-                                    {/* 5행(행 ~52px + 헤더)까지 표시 후 스크롤 */}
-                                    <TradeHistoryTable history={history} targetType={sim.type} maxHeight={305} onShowReason={showReason} />
-                                </Paper>
-                            </Stack>
-                        );
-                    })}
+                    {simConfigs.map((sim) => (
+                        <SimCard
+                            key={sim.id}
+                            uiKey={sim.key}
+                            label={sim.label}
+                            color={sim.color}
+                            type={sim.type}
+                            stats={geminiBalance[sim.key]?.raw || {}}
+                            portfolio={geminiBalance[sim.key]?.portfolio || {}}
+                            history={history}
+                            onPickCode={pickCode}
+                            onShowReason={showReason}
+                        />
+                    ))}
                 </SimpleGrid>
             </Stack>
         );

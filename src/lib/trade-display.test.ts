@@ -6,7 +6,7 @@ import { derivePosition, pnlColor, roiCells, signed, splitTimestamp } from './tr
 
 test('잔고 API 필드(qty/avg_price)로 한 줄을 만든다', () => {
   const p = derivePosition({ qty: 10, avg_price: 1000, current_price: 1100, pl_rate: 10, pl_amount: 1000 });
-  assert.deepEqual(p, { qty: 10, avgPrice: 1000, currentPrice: 1100, amount: 10_000, plAmount: 1000, plRate: 10 });
+  assert.deepEqual(p, { qty: 10, avgPrice: 1000, currentPrice: 1100, amount: 10_000, plAmount: 1000, plRate: 10, priceKnown: true });
 });
 
 test('심 상태 필드(quantity/price)도 같은 줄이 된다', () => {
@@ -29,6 +29,19 @@ test('손익이 안 오면 (현재가-평단)×수량으로 만든다', () => {
 test('서버가 준 손익이 있으면 그것을 쓴다 — 0원도 값이다', () => {
   const p = derivePosition({ qty: 10, avg_price: 1000, current_price: 9999, pl_amount: 0 });
   assert.equal(p.plAmount, 0, '?? 대신 ||를 쓰면 0이 사라져 엉뚱한 숫자로 대체된다');
+});
+
+test('심이 평단으로 때운 행은 시세 미확인이다 — 등락률을 그리면 안 된다', () => {
+  const p = derivePosition({ qty: 1, avg_price: 5000, current_price: 5000, price_known: false });
+  assert.equal(p.priceKnown, false);
+});
+
+test('현재가가 0이면 시세 미확인이다', () => {
+  assert.equal(derivePosition({ qty: 1, avg_price: 5000, current_price: 0 }).priceKnown, false);
+});
+
+test('실거래 잔고 행은 플래그가 없어도 시세가 있으면 확인된 것이다', () => {
+  assert.equal(derivePosition({ qty: 10, avg_price: 1000, current_price: 1100 }).priceKnown, true);
 });
 
 test('색은 이익 빨강·손실 파랑, 0은 이익 쪽', () => {
@@ -79,6 +92,18 @@ test('%는 왔는데 금액이 없으면 금액만 측정 불가다', () => {
   const { pct, amount } = roiCells({ action: 'SELL', roi: '+1.0' });
   assert.equal(pct.kind, 'value');
   assert.equal(amount.kind, 'unmeasurable');
+});
+
+test('ROI를 아예 기록하지 않는 파일은 측정 불가가 아니라 빈 칸이다', () => {
+  // 심 CSV의 구 포맷. 실패한 게 아니라 그 열이 생기기 전 기록이다.
+  const { pct, amount } = roiCells({ action: 'SELL', roi: null, roiTracked: false });
+  assert.equal(pct.kind, 'none');
+  assert.equal(amount.kind, 'none');
+});
+
+test('기록하는 파일인데 매도에 값이 없으면 여전히 측정 불가다', () => {
+  const { pct } = roiCells({ action: 'SELL', roi: null, roiTracked: true });
+  assert.equal(pct.kind, 'unmeasurable');
 });
 
 test('실현손익 0원은 값이다 — 측정 불가로 뭉개지 않는다', () => {

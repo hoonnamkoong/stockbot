@@ -10,10 +10,14 @@ function RoiText({ cell }: { cell: RoiCell }) {
 }
 
 /**
- * 매매 기록 표. 실거래(real)에는 ROI 두 칸이, 시뮬에는 판단 사유가 붙는다.
+ * 매매 기록 표. ROI 두 칸은 실거래·시뮬 공통이고, 판단 사유는 시뮬에만 붙는다.
  *
  * TradeClient.tsx의 renderHistoryTable을 옮겼다. 필터링은 여기서 한다 —
  * 호출부가 전체 기록과 보고 싶은 type만 넘긴다.
+ *
+ * ROI 출처가 둘이다: 실거래는 KIS 실현손익(kis-api.matchRealizedRoi), 시뮬은
+ * 심이 매도 시점에 CSV에 쓴 값(base_simulator.sell). 둘 다 없으면 '측정 불가'이고,
+ * 시뮬의 구 기록(roi 열 이전)은 값이 없는 것이 정상이다.
  */
 export default function TradeHistoryTable({
     history, targetType, maxHeight = 'calc(100vh - 320px)', onShowReason,
@@ -43,15 +47,15 @@ export default function TradeHistoryTable({
                         <Table.Th style={{ fontSize: '11px' }}>구분</Table.Th>
                         <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>체결가</Table.Th>
                         <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>수량</Table.Th>
-                        {isReal && <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>ROI(%)</Table.Th>}
-                        {isReal && <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>ROI(금액)</Table.Th>}
+                        <Table.Th style={{ fontSize: '11px', textAlign: 'center' }}>ROI(%)</Table.Th>
+                        <Table.Th style={{ fontSize: '11px', textAlign: 'right' }}>ROI(금액)</Table.Th>
                         {!isReal && <Table.Th style={{ fontSize: '11px' }}>판단 사유</Table.Th>}
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                     {filtered.map((h, i) => {
                         const { date, clock } = splitTimestamp(h.time);
-                        const roi = isReal ? roiCells(h) : null;
+                        const roi = roiCells(h);
                         return (
                             <Table.Tr key={i}>
                                 <Table.Td style={{ whiteSpace: 'nowrap' }}>
@@ -68,16 +72,12 @@ export default function TradeHistoryTable({
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.price}</Text></Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}><Text size="xs">{h.qty}</Text></Table.Td>
-                                {roi && (
-                                    <>
-                                        <Table.Td style={{ textAlign: 'center' }}>
-                                            {roi.pct.kind === 'value'
-                                                ? <Badge color={roi.pct.color} variant="light" size="xs">{roi.pct.text}</Badge>
-                                                : <RoiText cell={roi.pct} />}
-                                        </Table.Td>
-                                        <Table.Td style={{ textAlign: 'right' }}><RoiText cell={roi.amount} /></Table.Td>
-                                    </>
-                                )}
+                                <Table.Td style={{ textAlign: 'center' }}>
+                                    {roi.pct.kind === 'value'
+                                        ? <Badge color={roi.pct.color} variant="light" size="xs">{roi.pct.text}</Badge>
+                                        : <RoiText cell={roi.pct} />}
+                                </Table.Td>
+                                <Table.Td style={{ textAlign: 'right' }}><RoiText cell={roi.amount} /></Table.Td>
                                 {!isReal && (
                                     <Table.Td>
                                         <Button variant="subtle" size="compact-xs" onClick={() => onShowReason(`${h.symbol} 판단 근거`, h.reason)}>

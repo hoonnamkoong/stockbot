@@ -21,7 +21,9 @@ test('심 목록 형식 규칙', () => {
 });
 
 test('CSV 헤더는 BOM + 정확한 컬럼', () => {
-  assert.equal(RESET_CSV_HEADER, '﻿timestamp,symbol,action,price,quantity,total_amount,reason\n');
+  // 파이썬 base_simulator.CSV_HEADER에서 생성된다. 리셋이 만드는 빈 CSV도
+  // ROI 열을 갖고 시작해야 한다 — 아니면 대시보드로 리셋한 심만 ROI를 못 쓴다.
+  assert.equal(RESET_CSV_HEADER, '﻿timestamp,symbol,action,price,quantity,total_amount,reason,roi,roi_amount\n');
 });
 
 test('buildResetState는 reset_state shape', () => {

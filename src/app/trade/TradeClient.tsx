@@ -694,9 +694,14 @@ function TradeContent() {
             <Modal opened={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} title="정말 초기화할까요?" centered zIndex={2000}>
                 <Stack>
                     <Text size="sm">
-                        9개 시뮬레이터(Sim1~7, Sim10)를{' '}
+                        {/* 개수·이름을 손으로 적으면 심이 늘 때마다 거짓말이 된다.
+                            실제로 "9개(Sim1~7, Sim10)"로 남아 12개를 지우고 있었다. */}
+                        <b>{SIM_REGISTRY.length}개</b> 시뮬레이터를{' '}
                         <b>{typeof resetCash === 'number' ? resetCash.toLocaleString() : '-'}원</b>으로 초기화하고
                         모든 거래기록을 삭제합니다. <b style={{ color: '#fa5252' }}>되돌릴 수 없습니다.</b>
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                        {SIM_REGISTRY.map((s) => s.label).join(' · ')}
                     </Text>
                     <Group justify="flex-end">
                         <Button variant="default" onClick={() => setResetConfirmOpen(false)} disabled={resetBusy}>취소</Button>

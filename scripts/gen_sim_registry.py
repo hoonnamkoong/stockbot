@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.strategy.registry import get_sim_registry  # noqa: E402
-from src.strategy.simulators.base_simulator import initial_state  # noqa: E402
+from src.strategy.simulators.base_simulator import CSV_HEADER, initial_state  # noqa: E402
 
 OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'lib', 'sim-registry.generated.ts')
 
@@ -130,6 +130,21 @@ def _reset_state_ts() -> str:
     )
 
 
+def _csv_header_ts() -> str:
+    """base_simulator.CSV_HEADER를 TS 상수로 옮긴다.
+
+    대시보드 리셋이 새로 만드는 빈 CSV의 헤더다. 손으로 적던 시절 파이썬이
+    roi 열을 늘렸을 때 이쪽이 구 헤더로 남아, 대시보드로 리셋한 심만 ROI를
+    기록하지 못하는 상태가 됐다.
+
+    BOM은 파이썬 기록기가 utf-8-sig로 쓰기 때문이다(엑셀 호환).
+    """
+    return (
+        '/** 매매 기록 CSV의 헤더. 파이썬 base_simulator.CSV_HEADER에서 생성됐다. */\n'
+        "export const TRADE_CSV_HEADER = '\\ufeff" + ','.join(CSV_HEADER) + "\\n';"
+    )
+
+
 def _ts(value) -> str:
     if isinstance(value, bool):
         return 'true' if value else 'false'
@@ -159,6 +174,9 @@ def build() -> str:
     for s in analyzers:
         lines.append(f"  {{ id: {_ts(s['id'])}, stateFile: {_ts(s['state_file'])} }},")
     lines.append('];')
+
+    lines.append('')
+    lines.append(_csv_header_ts())
 
     lines.append('')
     lines.append(_reset_state_ts())

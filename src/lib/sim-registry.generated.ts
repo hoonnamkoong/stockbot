@@ -31,7 +31,7 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
   { id: 'sim6_bear', uiKey: 'sim6', label: '하락 줍줍형 (Sim 6)', shortDesc: 'KODEX 인버스 추세추종 (Sim0 BEAR 게이트) · 트레일링 -10%', color: 'cyan', chartGroup: 3, stateFile: 'sim_bear_state.json', csvFile: 'trade_history_sim_bear.csv', tradeable: true },
   { id: 'sim7_report_follower', uiKey: 'sim7', label: '리포트 팔로워 (Sim 7)', shortDesc: '딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩', color: 'pink', chartGroup: 3, stateFile: 'sim_reportfollower_state.json', csvFile: 'trade_history_sim_reportfollower.csv', tradeable: true },
   { id: 'sim8_accumulation', uiKey: 'sim8', label: '선행 매집형 (Sim 8)', shortDesc: '52주 앵커 구간 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩', color: 'indigo', chartGroup: 3, stateFile: 'sim_accumulation_state.json', csvFile: 'trade_history_sim_accumulation.csv', tradeable: false },
-  { id: 'sim9_gap_fade', uiKey: 'sim9', label: '갭소진 반등 (Sim 9)', shortDesc: '갭 +3% 후 장중 -3% 급락을 14:30 이후 매수 · 익일 청산', color: 'orange', chartGroup: 4, stateFile: 'sim_gapfade_state.json', csvFile: 'trade_history_sim_gapfade.csv', tradeable: false },
+  { id: 'sim9_gap_fade', uiKey: 'sim9', label: '갭소진 반등 (Sim 9)', shortDesc: '갭 +7% 후 장중 -6% 저가권 마감을 14:30~15:20 매수 · 익일 청산', color: 'orange', chartGroup: 4, stateFile: 'sim_gapfade_state.json', csvFile: 'trade_history_sim_gapfade.csv', tradeable: false },
   { id: 'sim9_1_donchian', uiKey: 'sim9_1', label: '돈치안 돌파 (Sim 9-1)', shortDesc: '20일 채널 상단 돌파 추종 · 10일 채널 이탈 / 2ATR 청산', color: 'lime', chartGroup: 4, stateFile: 'sim_donchian_state.json', csvFile: 'trade_history_sim_donchian.csv', tradeable: false },
   { id: 'sim10_orchestrator', uiKey: 'sim10', label: '오케스트레이터 (Sim 10)', shortDesc: 'Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용', color: 'grape', chartGroup: 4, stateFile: 'sim_orchestrator_state.json', csvFile: 'trade_history_sim_orchestrator.csv', tradeable: true },
 ];
@@ -40,6 +40,9 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
 export const ANALYZERS: { id: string; stateFile: string }[] = [
   { id: 'sim0_libero', stateFile: 'sim_libero_state.json' },
 ];
+
+/** 매매 기록 CSV의 헤더. 파이썬 base_simulator.CSV_HEADER에서 생성됐다. */
+export const TRADE_CSV_HEADER = '\ufefftimestamp,symbol,action,price,quantity,total_amount,reason,roi,roi_amount\n';
 
 /**
  * 리셋 직후의 상태. 파이썬 base_simulator.initial_state()에서 생성됐다.

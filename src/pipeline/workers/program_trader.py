@@ -386,8 +386,9 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
 
     # 5. 원장 ↔ 실보유 정합: 프로그램 포지션이 실제로 남아있는 것만 유지(수동 매도분 제거).
     #    dict 전체 복사 — 심이 붙인 전략 플래그(partial_sold 등)를 그대로 보존.
+    #    사라진 포지션은 손익을 알 수 없으므로 지어내지 않되 미정산으로 기록한다.
     today = now_kst.strftime('%Y-%m-%d')
-    positions = {c: dict(p) for c, p in ledger.get('positions', {}).items() if c in real_holdings}
+    positions = reconcile_positions(ledger, real_holdings, today, log_error)
 
     # 6. 심 인스턴스화(화이트리스트). 사이징을 effective_budget 기준으로 스케일
     #    → 시뮬(initial_cash/N 사이징)의 비례 축소 복제본으로 동작.
@@ -560,6 +561,37 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     ledger['turn'] = turn
     _write_ledger(ledger, ledger_sha, log)
     log(f'[Program] 완료: {executed}/{len(orders)}건 체결 (sim={sim_id})')
+
+
+def reconcile_positions(ledger: dict, real_holdings: dict, today: str, log_error) -> dict:
+    """원장 ↔ 실보유 정합. 실계좌에 없는 프로그램 포지션은 빼되, 뺐다는 사실을 남긴다.
+
+    조용히 지우면 그 청산 손익이 realized_pnl에서 통째로 빠진다. realized_pnl은
+    프로그램이 낸 매도가 체결될 때만 누적되기 때문이다. 2026-07-08에 진흥기업
+    1,230주(매입원가 1,495,680원)와 비엘팜텍 72주(295,920원)가 그렇게 빠졌고,
+    수동 매도가 대개 손절이라 손실만 빠지고 이익은 남아 수익률이 실제보다
+    좋아 보였다.
+
+    체결가는 우리 기록에 없으므로 손익을 만들어 채우지 않는다. 매입원가만 적고
+    '미정산'으로 남겨 나중에 사람이 정산할 수 있게 한다.
+    """
+    prev = ledger.get('positions', {}) or {}
+    kept = {c: dict(p) for c, p in prev.items() if c in real_holdings}
+
+    for code in prev:
+        if code in kept:
+            continue
+        p = prev[code]
+        qty = p.get('quantity', 0)
+        avg = p.get('avg_price', 0)
+        cost = round(float(avg) * float(qty), 2)
+        ledger.setdefault('unreconciled_exits', []).append({
+            'date': today, 'code': code, 'name': p.get('name', code),
+            'quantity': qty, 'avg_price': avg, 'cost_basis': cost,
+        })
+        log_error(f"[Program] 원장에서 사라진 포지션 {code}({p.get('name', '?')}) "
+                  f"{qty}주 매입원가 {cost:,.0f}원 — 실계좌에 없음. 손익 미계상(수동 매도 추정)")
+    return kept
 
 
 def _apply_order_to_positions(positions: dict, o: dict, today: str) -> None:

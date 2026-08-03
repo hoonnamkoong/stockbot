@@ -510,6 +510,19 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             log(f'[Program] SKIP buy {code} — 정규장 종료({MARKET_CLOSE_HHMM[0]}:'
                 f'{MARKET_CLOSE_HHMM[1]:02d}) 이후 신규 매수 금지')
             continue
+
+        # 판단가와 체결 시점 가격이 벌어졌으면 그 진입은 포기한다(매수 한정).
+        # 후보 가격은 스크래퍼 스냅샷이라 주문 시점엔 10분 이상 묵어 있을 수 있고,
+        # 주문은 시장가라 체결가를 호가에 맡긴다. 둘이 겹치면 심이 보지도 않은
+        # 가격에 사게 된다.
+        if side == 'buy':
+            allowed, live_px, why = check_buy_drift(code, price, _price_quote)
+            if not allowed:
+                log(f'[Program] SKIP buy {code} — {why}')
+                failed_codes.add(code)
+                continue
+            if live_px:
+                price = int(live_px)   # 기록·턴 회계는 더 신선한 값으로
         try:
             res = place_order_via_vercel(side, code, qty, price)
             if res.get('success'):
@@ -561,6 +574,47 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     ledger['turn'] = turn
     _write_ledger(ledger, ledger_sha, log)
     log(f'[Program] 완료: {executed}/{len(orders)}건 체결 (sim={sim_id})')
+
+
+# 매수 판단가 대비 허용 괴리(%). 초과하면 그 진입은 포기한다.
+# 심의 진입 조건(모멘텀·ADX·기간수익률)은 판단 시점 가격으로 계산된 것이라,
+# 그보다 크게 오른 가격에서는 근거가 성립하지 않는다. 2026-07-30 LG생활건강이
+# 263,000 판단 → 303,000 체결(+15.2%)로 이 구멍을 드러냈다.
+BUY_DRIFT_MAX_PCT = 2.0
+
+
+def _price_quote(code: str) -> dict:
+    """주문 직전 현재가 조회. 매번 새 인스턴스를 쓴다 — KISDataProvider의 캐시는
+    인스턴스 단위(TTL 5분)라, 재사용하면 가드가 5분 묵은 값을 볼 수 있다."""
+    from src.trade.kis_data_provider import KISDataProvider
+    return KISDataProvider().get_price_quote(code)
+
+
+def check_buy_drift(code: str, decided_price: float, quote_fn) -> tuple[bool, float | None, str]:
+    """매수 직전 현재가를 재조회해 판단가와의 괴리를 검사한다.
+
+    반환: (주문해도 되는가, 조회된 현재가 또는 None, 차단 사유)
+
+    - 상승 괴리만 막는다. 판단가보다 싸진 것은 불리하지 않다.
+    - 현재가를 못 받으면 막는다(fail-closed). 매수는 건너뛰어도 원금 손실이 없고
+      다음 사이클에 기회가 다시 온다 — 괴리를 모르는 채 시장가로 던지는 쪽이 위험하다.
+    - 매도에는 쓰지 않는다. 청산은 무조건 나가야 한다.
+    """
+    if not decided_price or decided_price <= 0:
+        return True, None, ''          # 비교 기준이 없으면 가드를 걸지 않는다
+    try:
+        quote = quote_fn(code) or {}
+        live = float(quote.get('price') or 0)
+    except Exception as e:
+        return False, None, f'현재가 조회 실패({e})'
+    if live <= 0:
+        return False, None, '현재가 조회 실패(값 없음)'
+
+    drift_pct = (live - decided_price) / decided_price * 100
+    if drift_pct > BUY_DRIFT_MAX_PCT:
+        return False, live, (f'판단가 {decided_price:,.0f} → 현재가 {live:,.0f} '
+                             f'괴리 +{drift_pct:.1f}% (상한 {BUY_DRIFT_MAX_PCT:.0f}%)')
+    return True, live, ''
 
 
 def reconcile_positions(ledger: dict, real_holdings: dict, today: str, log_error) -> dict:

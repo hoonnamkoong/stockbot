@@ -1,6 +1,12 @@
 from .base_simulator import BaseSimulator, get_kst_now
 from datetime import datetime
 
+# 사이징은 전 매매심 공통 규격이다(NAV×15% × 최대 6종목 = 90% 투입).
+# 2026-08-03 이전의 심2는 상한 없이 NAV/10씩 담아 10종목까지 갔고, 현금이 36,234원
+# (NAV의 1.2%)까지 마르자 신호가 와도 매수가 조용히 실패했다.
+MAX_HOLDINGS = 6
+POSITION_WEIGHT = 0.15
+
 class SectorSpilloverSimulator(BaseSimulator):
     """
     [Sim 2] MFHS2 (다중 필터 하이브리드 수급 동승 전략)
@@ -79,12 +85,14 @@ class SectorSpilloverSimulator(BaseSimulator):
         # 2. 진입 로직 (MFHS2 통합 스코어링 기반 진입)
         if not self.state.get('market_index_healthy', True): return self.calculate_stats(current_prices)
         
-        target_amount = self.calc_nav(current_prices) / 10
+        target_amount = self.calc_nav(current_prices) * POSITION_WEIGHT
+        held = len(self.state['portfolio']) - len(sold_today)
 
         for stock in candidates:
+            if held >= MAX_HOLDINGS: break
             code = stock['code']
             if code in self.state['portfolio'] or code in sold_today: continue
-            
+
             if self.is_in_cooldown(code): continue
 
             price = float(stock.get('price', 0))
@@ -97,9 +105,9 @@ class SectorSpilloverSimulator(BaseSimulator):
             # 진입 결정: 60점 이상이면 매수 (이전 40점 → 수급 신호 강도 상향)
             if score >= 60:
                 qty = int(target_amount / price)
-                if qty > 0:
-                    self.buy(code, stock['name'], price, qty, 
-                             reason=f"[MFHS2] 다중 필터 수급 동승 (Score: {score}/100)")
+                if qty > 0 and self.buy(code, stock['name'], price, qty,
+                                        reason=f"[MFHS2] 다중 필터 수급 동승 (Score: {score}/100)"):
+                    held += 1
 
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

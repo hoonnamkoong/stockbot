@@ -104,6 +104,29 @@ def headers(tr_id: str, token: str) -> dict:
 
 
 # ── 3. KOSPI 시가총액 상위 100 ────────────────────────
+def _load_previous_universe() -> list[dict]:
+    """직전 실행이 남긴 종가 CSV 헤더에서 종목 구성을 복원한다.
+
+    헤더는 ['date', '005930_삼성전자', ...] 꼴이다. 네이버가 막혔을 때만 쓰는
+    폴백이며, 여기서 되살리는 것은 종목 코드·이름뿐이다(시세는 KIS로 새로 받는다).
+    """
+    path = Path("output/kospi_top100_close.csv")
+    if not path.exists():
+        return []
+    try:
+        with path.open(encoding="utf-8-sig") as f:
+            header = next(csv.reader(f), [])
+    except OSError:
+        return []
+
+    stocks = []
+    for col in header[1:]:
+        code, _, name = col.partition("_")
+        if code.isdigit() and name:
+            stocks.append({"code": code, "name": name, "price": "0", "trade_amt": "0"})
+    return stocks
+
+
 def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
     """
     네이버 금융 sise_market_sum 페이지에서 KOSPI 시가총액 상위 100 종목.
@@ -120,37 +143,49 @@ def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
     results = []
     seen_codes: set = set()
     print("[STEP 1] KOSPI 시가총액 상위 100 종목 수집 중 (네이버 금융)...")
-    for page in range(1, 5):
-        url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
-        r = _with_retry(requests.get, url, headers=naver_hdrs, timeout=10)
-        soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
-        table = soup.select_one('table.type_2')
-        if not table:
-            break
-        new_in_page = 0
-        for row in table.select('tr'):
-            cols = row.select('td')
-            if len(cols) < 5:
-                continue
-            name_tag = cols[1].select_one('a')
-            if not name_tag:
-                continue
-            name = name_tag.get_text(strip=True)
-            code = name_tag['href'].split('code=')[-1]
-            if not code.isdigit() or code in seen_codes:
-                continue
-            seen_codes.add(code)
-            price_str = cols[2].get_text(strip=True).replace(',', '')
-            price = int(price_str) if price_str.isdigit() else 0
-            results.append({"code": code, "name": name, "price": str(price), "trade_amt": "0"})
-            new_in_page += 1
+    try:
+        for page in range(1, 5):
+            url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
+            r = _with_retry(requests.get, url, headers=naver_hdrs, timeout=10)
+            soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
+            table = soup.select_one('table.type_2')
+            if not table:
+                break
+            new_in_page = 0
+            for row in table.select('tr'):
+                cols = row.select('td')
+                if len(cols) < 5:
+                    continue
+                name_tag = cols[1].select_one('a')
+                if not name_tag:
+                    continue
+                name = name_tag.get_text(strip=True)
+                code = name_tag['href'].split('code=')[-1]
+                if not code.isdigit() or code in seen_codes:
+                    continue
+                seen_codes.add(code)
+                price_str = cols[2].get_text(strip=True).replace(',', '')
+                price = int(price_str) if price_str.isdigit() else 0
+                results.append({"code": code, "name": name, "price": str(price), "trade_amt": "0"})
+                new_in_page += 1
+                if len(results) >= 100:
+                    break
             if len(results) >= 100:
                 break
-        if len(results) >= 100:
-            break
-        if new_in_page == 0:
-            break
-        time.sleep(0.3)
+            if new_in_page == 0:
+                break
+            time.sleep(0.3)
+    except requests.RequestException as e:
+        # 2026-08-03: 러너에서 네이버 커넥트 타임아웃 3연속으로 EOD 런 전체가 죽었고,
+        # 심9-1이 하루 실행되지 않았으며 CSV도 멈췄다. 시총 상위 구성은 하루 사이
+        # 거의 바뀌지 않으므로 직전 실행이 남긴 구성으로 계속한다.
+        # 복원되는 것은 '어떤 종목을 볼지'뿐이고, 시세는 전부 오늘 KIS 실측이다.
+        previous = _load_previous_universe()
+        if not previous:
+            raise
+        print(f"[폴백] 네이버 접속 실패({type(e).__name__}) — 직전 CSV의 {len(previous)}종목으로 진행")
+        print("       종목 구성은 전 거래일 기준, OHLCV는 오늘 KIS 실측이다.")
+        return previous
 
     results = results[:100]
     print(f"  → {len(results)}개 종목 수집 완료")

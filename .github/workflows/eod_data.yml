@@ -70,6 +70,22 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: python scripts/token_manager.py
 
+      # 종목 목록은 네이버 한 곳에서만 나온다. 2026-08-03에 러너에서 네이버가 막히자
+      # EOD 런이 통째로 죽었고 심9-1이 하루 실행되지 않았다. 수집 스크립트는 네이버가
+      # 막히면 직전 CSV의 종목 구성으로 폴백하는데, 그러려면 그 파일이 러너에 있어야 한다.
+      - name: 직전 종가 CSV 확보 (네이버 장애 시 유니버스 폴백용)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          mkdir -p output
+          if git clone --branch db-data --depth 1 \
+              https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git prev_repo 2>/dev/null; then
+            cp prev_repo/data/kospi_top100_close.csv output/ 2>/dev/null \
+              && echo "[폴백준비] 직전 종가 CSV 확보" || echo "[폴백준비] 직전 CSV 없음(최초 실행)"
+            rm -rf prev_repo
+          else
+            echo "[폴백준비] db-data clone 실패 — 폴백 없이 진행한다"
+          fi
+
       - name: Fetch KOSPI top100 close + OHLCV CSV
         if: steps.gate.outputs.run == 'true'
         env:

@@ -261,4 +261,6 @@ def test_post_limit_is_thirty():
     """공감 상위 30 — 30위까지는 공감 0인 글이 없다(2026-07-28 실측)."""
     from src.pipeline.workers import data_fetcher
     assert data_fetcher.POST_LIMIT == 30
-    assert data_fetcher.BODY_FETCH_LIMIT == 5, "본문은 성공률 0%라 상한을 따라 올리지 않는다"
+    # 본문 수집은 폐기됐다(네이버가 iframe+SPA로 옮겨 requests로는 못 읽는다).
+    # 죽은 요청이 다시 살아나지 않도록 못을 박는다.
+    assert not hasattr(data_fetcher, 'BODY_FETCH_LIMIT')

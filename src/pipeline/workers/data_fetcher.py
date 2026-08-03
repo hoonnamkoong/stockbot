@@ -17,7 +17,6 @@ from src.pipeline.context import PipelineContext
 from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
 from src.data.storage_manager import StorageManager
-from src.data import usage_log
 from src.data import post_archive
 from src.strategy import analyzer
 
@@ -28,7 +27,6 @@ PAGE_WORKERS = 8    # 종목당 동시에 긁을 토론방 페이지 수
 PAGE_RETRIES = 3
 PAGE_RETRY_WAIT = 0.5
 POST_LIMIT = 30       # 종목당 LLM에 넘길 게시글 수 (공감 상위). 2026-07-28: 5 → 30
-BODY_FETCH_LIMIT = 5  # 본문 수집 시도 상한. 성공률 0%라 상한을 따라 올리지 않는다
 
 
 def classify(count: int, threshold: int, adopted: set, code: str = '') -> str | None:
@@ -143,12 +141,12 @@ class DataFetcherWorker(BaseWorker):
                     # 상위 5개는 하루 글의 0.3%·공감 총량의 2.0%만 담는다(2026-07-28 실측).
                     # 공감 감쇠가 완만해(1~5위 12.8 → 21~30위 5.4) 5는 근거 없는 컷이었다.
                     # 30으로 올린 근거: 30위까지는 공감 0인 글이 하나도 없다(31위부터 등장).
-                    posts = ranked[:POST_LIMIT]
-                    # 본문은 상위 5개만 시도한다. 수집 성공률이 0%(0/3,165)라
-                    # 상한을 따라 올리면 실패하는 HTTP 요청만 6배가 된다.
-                    for p in posts[:BODY_FETCH_LIMIT]:
-                        p['body'] = self._get_post_body(s['code'], p['nid'])
-                    s['posts'] = posts
+                    # 본문은 수집하지 않는다. 네이버가 게시글 본문을 iframe(m.stock.naver.com)
+                    # 으로 분리했고 그마저 SPA라, requests로는 "로딩중"만 온다. 옛 #body
+                    # 셀렉터는 페이지에 존재하지 않는다 — 계측 결과가 0/3,165(0%)였던 이유다.
+                    # 매 런 55~70건이 전부 실패했고, 남는 건 그 요청에 쓴 시간뿐이었다.
+                    # 소비자(analyzer)는 p.get('body', '')로 읽으므로 키가 없어도 안전하다.
+                    s['posts'] = ranked[:POST_LIMIT]
                 else:
                     s['posts'] = []
                 return s, True, pages
@@ -216,11 +214,7 @@ class DataFetcherWorker(BaseWorker):
         self.log(f"수집 완료: {len(results)}개 종목 통과")
         added = post_archive.append(self._title_rows)
         self.log(f"제목 아카이브: 신규 {added}건 / 수집 {len(self._title_rows)}건")
-        usage_log.append({
-            'event': 'run_summary',
-            'body_ok': self.body_ok,
-            'body_fail': self.body_fail,
-        })
+
         return results
 
     # ── 내부 수집 메서드들 (기존 scraper.py에서 이전) ──────────────
@@ -458,9 +452,7 @@ class DataFetcherWorker(BaseWorker):
     def _reset_body_stats(self) -> None:
         """본문 수집 성공/실패 카운터를 초기화한다. 스레드풀에서 갱신되므로 락을 둔다."""
         import threading
-        self.body_ok = 0
-        self.body_fail = 0
-        self._body_lock = threading.Lock()
+        self._title_lock = threading.Lock()
         self._title_rows = []
 
     def _queue_titles(self, stock: dict, new_posts: list) -> None:
@@ -479,30 +471,6 @@ class DataFetcherWorker(BaseWorker):
         } for p in (new_posts or [])]
         if not rows:
             return
-        with self._body_lock:
+        with self._title_lock:
             self._title_rows.extend(rows)
 
-    def _get_post_body(self, code: str, nid: str) -> str:
-        """게시글 본문을 수집합니다.
-
-        성공/실패를 센다. Gemini 프롬프트에 본문이 실제로 실리는 비율을 모르면
-        '본문을 줄여 표본을 늘릴지'를 판단할 수 없다. 실패해도 ""를 반환하므로
-        호출부에서는 구분이 안 된다.
-        """
-        url = f"https://finance.naver.com/item/board_read.naver?code={code}&nid={nid}"
-        text = ""
-        try:
-            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-            soup = BeautifulSoup(res.content, 'html.parser')
-            body = soup.select_one('#body')
-            if body:
-                text = body.get_text(strip=True)
-        except:
-            pass
-
-        with self._body_lock:
-            if text:
-                self.body_ok += 1
-            else:
-                self.body_fail += 1
-        return text

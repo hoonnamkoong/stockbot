@@ -33,6 +33,9 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
     const [programTurn, setProgramTurn] = useState<ProgramTurn | null>(null);
     const [programLastTurn, setProgramLastTurn] = useState<LastTurnResult | null>(null);
     const [programUnreconciled, setProgramUnreconciled] = useState<UnreconciledExit[]>([]);
+    // KIS 확정 실현손익(계좌 전체). null = 조회 못 함 → 화면은 '측정 불가'
+    const [programKisRealized, setProgramKisRealized] = useState<number | null>(null);
+    const [programPnlSince, setProgramPnlSince] = useState<string | null>(null);
 
     const fetchProgram = useCallback(async () => {
         try {
@@ -50,6 +53,8 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
             setProgramTurn(d.turn && d.turn.id ? d.turn : null);
             setProgramLastTurn(d.last_turn_result ?? null);
             setProgramUnreconciled(Array.isArray(d.unreconciled_exits) ? d.unreconciled_exits : []);
+            setProgramKisRealized(typeof d.kis_realized_pnl === 'number' ? d.kis_realized_pnl : null);
+            setProgramPnlSince(d.pnl_since ?? null);
         } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
     }, []);
 
@@ -99,6 +104,7 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
         programPinOpen, setProgramPinOpen, programPin, setProgramPin,
         programPositions, programRealizedPnl, programLedgerOk,
         programTurn, programLastTurn, programUnreconciled,
+        programKisRealized, programPnlSince,
         submitProgram, onToggleProgram,
     };
 }

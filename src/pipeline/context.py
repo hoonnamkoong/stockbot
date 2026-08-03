@@ -8,6 +8,8 @@
 """
 
 import os
+import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 # 이 비율을 넘는 페이지가 실패하면 그 런의 게시글 수는 실제보다 작다.
@@ -184,5 +186,26 @@ class PipelineContext:
         return self.is_trading_day() is True
 
     def log(self, msg: str) -> None:
-        """타임스탬프가 포함된 로그를 출력합니다."""
-        print(f"[{self.now_kst.strftime('%H:%M:%S')}] {msg}")
+        """타임스탬프가 포함된 로그를 출력합니다.
+
+        now_kst(런 시작 시각으로 고정)가 아니라 실제 시계를 찍는다. 고정 시각을 찍으면
+        한 런의 모든 줄이 같은 시각이 되어, 6~11분 걸리는 런에서 어느 단계가 시간을
+        먹는지 알 수 없다. now_kst 자체는 그대로 둔다 — 날짜·거래일 판정이 한 런
+        안에서 흔들리면 안 된다.
+        """
+        wall = datetime.utcnow() + timedelta(hours=9)
+        print(f"[{wall.strftime('%H:%M:%S')}] {msg}")
+
+    @contextmanager
+    def stage(self, label: str):
+        """단계 시작·종료를 소요와 함께 남긴다.
+
+        예외로 죽어도 종료 줄을 남긴다 — 느려서 터진 것인지 즉시 터진 것인지
+        구분해야 다음에 어디를 볼지 정할 수 있다.
+        """
+        t0 = time.monotonic()
+        self.log(f"▶ {label}")
+        try:
+            yield
+        finally:
+            self.log(f"◀ {label} ({time.monotonic() - t0:.1f}초)")

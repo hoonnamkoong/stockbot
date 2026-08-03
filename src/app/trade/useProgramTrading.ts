@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import type { LastTurnResult, ProgramTurn } from '@/lib/program-turn';
+import type { LastTurnResult, ProgramTurn, UnreconciledExit } from '@/lib/program-turn';
 
 export type ProgramPositions = Record<string, { name: string; quantity: number; avg_price: number; tag?: string }>;
 
@@ -32,6 +32,7 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
     const [programLedgerOk, setProgramLedgerOk] = useState(true);
     const [programTurn, setProgramTurn] = useState<ProgramTurn | null>(null);
     const [programLastTurn, setProgramLastTurn] = useState<LastTurnResult | null>(null);
+    const [programUnreconciled, setProgramUnreconciled] = useState<UnreconciledExit[]>([]);
 
     const fetchProgram = useCallback(async () => {
         try {
@@ -48,6 +49,7 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
             setProgramLedgerOk(d.ledger_ok !== false);
             setProgramTurn(d.turn && d.turn.id ? d.turn : null);
             setProgramLastTurn(d.last_turn_result ?? null);
+            setProgramUnreconciled(Array.isArray(d.unreconciled_exits) ? d.unreconciled_exits : []);
         } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
     }, []);
 
@@ -96,7 +98,7 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
         programSims, programValid, programBusy,
         programPinOpen, setProgramPinOpen, programPin, setProgramPin,
         programPositions, programRealizedPnl, programLedgerOk,
-        programTurn, programLastTurn,
+        programTurn, programLastTurn, programUnreconciled,
         submitProgram, onToggleProgram,
     };
 }

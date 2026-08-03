@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
-import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult } from '@/lib/program-turn';
+import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
 import { validateArmRequest } from '@/lib/trade-auth';
 import { kstTimestamp } from '@/lib/kst';
 
@@ -87,8 +87,9 @@ async function getPositions(): Promise<{
     positions: Record<string, ProgramPosition>;
     realized_pnl: number;
     turn: ProgramTurn | null;
+    unreconciled_exits: UnreconciledExit[];
 }> {
-    const empty = { positions: {}, realized_pnl: 0, turn: null };
+    const empty = { positions: {}, realized_pnl: 0, turn: null, unreconciled_exits: [] };
     try {
         const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${POSITIONS_PATH}?ref=${SECRET_BRANCH}`;
         const res = await fetch(url, {
@@ -105,6 +106,9 @@ async function getPositions(): Promise<{
             positions: content.positions && typeof content.positions === 'object' ? content.positions : {},
             realized_pnl: Number(content.realized_pnl) || 0,
             turn: content.turn && content.turn.id ? content.turn : null,
+            // 실계좌에서 사라져 손익을 계상하지 못한 청산분. 비어 있지 않으면 누적 수익률은
+            // 이 금액만큼 실제와 어긋난다(2026-07-08 진흥기업 등). 화면에서 감추지 않는다.
+            unreconciled_exits: Array.isArray(content.unreconciled_exits) ? content.unreconciled_exits : [],
         };
     } catch {
         return { ok: false, ...empty }; // 네트워크/파싱 실패 — non-blocking이되 '실패'로 신호
@@ -228,7 +232,7 @@ export async function GET(request: Request) {
         const validIds = new Set(sims.map((s) => s.id));
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
-        const { ok: ledgerOk, positions, realized_pnl, turn } = await getPositions();
+        const { ok: ledgerOk, positions, realized_pnl, turn, unreconciled_exits: unreconciledExits } = await getPositions();
         // 진행 중인 턴은 config가 정의한다(ON 시 route가 연다). 원장 turn은 파이썬만 쓰고
         // OFF 시 지워지지 않으므로, id가 config와 같을 때만 채택한다(stale 방지).
         //
@@ -261,6 +265,7 @@ export async function GET(request: Request) {
             realized_pnl, // 프로그램 누적 실현손익(원)
             turn: liveTurn, // 진행 중인 턴(config와 원장이 같은 턴을 가리킬 때만) — 프론트가 실시간 손익 계산
             last_turn_result: content.last_turn_result ?? null, // OFF 시 동결된 직전 턴
+            unreconciled_exits: unreconciledExits, // 손익 미계상 청산분 — 있으면 수익률이 실제와 어긋난다
         });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

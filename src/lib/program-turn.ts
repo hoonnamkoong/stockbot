@@ -22,6 +22,23 @@ export type TurnResult = { pnl: number; byTag: Record<string, number> };
  * pnl === null 이면 '측정 불가'(계산에 필요한 조회가 실패/지연) — 진짜 0원 턴과 반드시 구분해 그린다.
  * degraded가 있으면 by_tag는 비어 있다(부분 합계가 전체인 것처럼 보이지 않게).
  */
+/**
+ * 실계좌에서 사라져 손익을 계상하지 못한 청산분.
+ *
+ * 프로그램이 낸 매도만 realized_pnl에 누적되므로, 수동 청산은 원장에서 포지션만
+ * 빠지고 손익은 어디에도 남지 않는다. 체결가를 우리가 모르기 때문에 pnl 필드가
+ * 없다 — 매입원가(cost_basis)만 적고 '미정산'으로 둔다. 값을 지어내는 대신
+ * 누락 사실을 드러내기 위한 타입이다.
+ */
+export type UnreconciledExit = {
+    date: string;
+    code: string;
+    name: string;
+    quantity: number;
+    avg_price: number;
+    cost_basis: number;
+};
+
 export type LastTurnResult = {
     id: string;
     ended_at: string;

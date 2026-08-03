@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack, SimpleGrid,
     Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider
+    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider, Alert
 } from '@mantine/core';
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
@@ -108,7 +108,7 @@ function TradeContent() {
         programSims, programValid, programBusy,
         programPinOpen, setProgramPinOpen, programPin, setProgramPin,
         programPositions, programRealizedPnl, programLedgerOk,
-        programTurn, programLastTurn,
+        programTurn, programLastTurn, programUnreconciled,
         submitProgram, onToggleProgram,
     } = useProgramTrading(showNotify);
 
@@ -451,6 +451,22 @@ function TradeContent() {
                     {program.hasData && (
                         <>
                             <Divider mb="sm" label="프로그램 매매" labelPosition="left" />
+                            {programUnreconciled.length > 0 && (
+                                <Alert color="orange" variant="light" mb="md" title="누적 수익률이 실제와 어긋납니다">
+                                    <Text size="sm">
+                                        실계좌에서 사라졌지만 손익을 계상하지 못한 청산이 {programUnreconciled.length}건 있습니다.
+                                        체결가가 기록에 없어 손익을 계산할 수 없으므로, 아래 누적 수치에는 이 금액이 빠져 있습니다.
+                                    </Text>
+                                    <Stack gap={2} mt={6}>
+                                        {programUnreconciled.map((u, i) => (
+                                            <Text key={`${u.code}-${u.date}-${i}`} size="xs" c="dimmed">
+                                                {u.date} · {u.name}({u.code}) {u.quantity.toLocaleString()}주 ·
+                                                매입원가 {Math.round(u.cost_basis).toLocaleString()}원 — 손익 미정산
+                                            </Text>
+                                        ))}
+                                    </Stack>
+                                </Alert>
+                            )}
                             <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md" mb="md">
                                 <Stack gap={2}>
                                     <Text size="xs" c="dimmed">수익률 (누적)</Text>

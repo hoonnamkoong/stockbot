@@ -109,6 +109,7 @@ function TradeContent() {
         programPinOpen, setProgramPinOpen, programPin, setProgramPin,
         programPositions, programRealizedPnl, programLedgerOk,
         programTurn, programLastTurn, programUnreconciled,
+        programKisRealized, programPnlSince,
         submitProgram, onToggleProgram,
     } = useProgramTrading(showNotify);
 
@@ -494,6 +495,21 @@ function TradeContent() {
                                         <Text fw={700} size="lg">{Math.round(program.holdingsValue).toLocaleString()} 원</Text>
                                     ) : (
                                         <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
+                                    )}
+                                </Stack>
+                                <Stack gap={2}>
+                                    <Text size="xs" c="dimmed">
+                                        KIS 실측 실현손익{programPnlSince ? ` (${programPnlSince.slice(4, 6)}/${programPnlSince.slice(6, 8)}~)` : ''}
+                                    </Text>
+                                    {programKisRealized == null ? (
+                                        <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
+                                    ) : (
+                                        <>
+                                            <Text fw={700} size="lg" c={programKisRealized >= 0 ? 'red' : 'blue'}>
+                                                {programKisRealized >= 0 ? '+' : ''}{Math.round(programKisRealized).toLocaleString()} 원
+                                            </Text>
+                                            <Text size="xs" c="dimmed">계좌 전체 · 증권사 확정치</Text>
+                                        </>
                                     )}
                                 </Stack>
                                 <Stack gap={2}>

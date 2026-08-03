@@ -199,6 +199,12 @@ class DataFetcherWorker(BaseWorker):
         except Exception as e:
             self.log_error(f"KIS 데이터 보강 실패 (기존 데이터로 계속): {e}")
 
+        # 시가가 비면 심9는 갭을 계산할 수 없어 조용히 0건이 된다(2026-08-03: 18/18 결손).
+        # '신호가 없는 하루'와 '측정하지 못한 하루'는 다르므로 여기서 드러낸다.
+        missing_open = sum(1 for s in results_raw if not s.get('open_price'))
+        if missing_open:
+            self.log_error(f"KIS 시가 결손 {missing_open}/{len(results_raw)}종목 — 심9 갭 판정 불가")
+
         # 7. Pydantic 변환 (타입 안전성 확보)
         results: list[StockData] = []
         for s in results_raw:
@@ -260,78 +266,82 @@ class DataFetcherWorker(BaseWorker):
         except Exception as e:
             print(f"   [DataFetcher] 외인비중 수집 실패 {code}: {e}")
 
-        # [V60.0] 체결강도 및 호가잔량 추출을 위해 메인 페이지 추가 파싱
+        # [V60.0] 1. 체결강도·시세 보강 (KIS API 활용, 네이버 제공 중단에 따른 대응)
+        # 네이버 메인 페이지 파싱과 같은 try에 묶지 않는다: 2026-08-03에 둘이 한 블록이라
+        # 러너에서 main.naver가 타임아웃 나자 KIS 호출이 실행조차 되지 않았고, 시가가 빈
+        # 심9는 하루 종일 진입 후보를 한 건도 만들지 못했다. 두 소스는 독립이어야 한다.
+        details['tick_power'] = 0.0
+        if getattr(self, 'kis_token', None) and getattr(self, 'kis_app_key', None):
+            try:
+                url = f"{self.kis_base_url}/uapi/domestic-stock/v1/quotations/inquire-price"
+                headers = {
+                    "Content-Type": "application/json; charset=utf-8",
+                    "authorization": f"Bearer {self.kis_token}",
+                    "appkey": self.kis_app_key,
+                    "appsecret": self.kis_app_secret,
+                    "tr_id": "FHKST01010100"
+                }
+                params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code}
+                # 잦은 호출 방지를 위해 timeout 짧게 설정
+                r = requests.get(url, headers=headers, params=params, timeout=3)
+                if r.status_code == 200:
+                    out = r.json().get('output', {})
+                    # 체결강도
+                    if out.get('tday_rltv'):
+                        details['tick_power'] = float(out['tday_rltv'])
+                    # 기존 Naver 데이터 KIS로 보강 (더 정확)
+                    if out.get('stck_prpr'):
+                        details['price'] = int(out['stck_prpr'])
+                        details['current_price'] = int(out['stck_prpr'])
+                    if out.get('prdy_ctrt'):
+                        rate = float(out['prdy_ctrt'])
+                        details['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
+                    if out.get('hts_frgn_ehrt'):
+                        details['foreign_rate'] = float(out['hts_frgn_ehrt'])
+                    if out.get('stck_sdpr'):
+                        details['prev_close'] = int(out['stck_sdpr'])
+                    # [Sim9] 시가: 갭(=시가/전일종가) 산출용. 전일종가와 같은 응답 블록이라 추가 콜 0.
+                    if out.get('stck_oprc'):
+                        details['open_price'] = int(out['stck_oprc'])
+                    # [Sim9] 당일 고가/저가: 진입가가 그날 변동폭의 어디인지(일중 위치) 산출용.
+                    # 저가 근처에서 마감한 되밀림만 다음날 되돌아온다(실측).
+                    for _src, _dst in (('stck_hgpr', 'day_high'), ('stck_lwpr', 'day_low')):
+                        if out.get(_src):
+                            try: details[_dst] = int(out[_src])
+                            except (ValueError, TypeError): pass
+                    # 신규 밸류에이션/52주 필드 (추가 API 호출 없이 동일 응답에서 파싱)
+                    for _f in ('per', 'pbr'):
+                        if out.get(_f):
+                            try: details[_f] = float(out[_f])
+                            except (ValueError, TypeError): pass
+                    for _f in ('eps', 'bps', 'w52_hgpr', 'w52_lwpr'):
+                        if out.get(_f):
+                            try: details[_f] = int(float(out[_f]))
+                            except (ValueError, TypeError): pass
+                    if out.get('hts_avls'):
+                        try: details['mkt_cap'] = int(out['hts_avls'])
+                        except (ValueError, TypeError): pass
+                    # 거래대금/거래량: KIS가 네이버보다 정확 (원 단위)
+                    if out.get('acml_tr_pbmn'):
+                        try: details['amount'] = int(out['acml_tr_pbmn'])
+                        except (ValueError, TypeError): pass
+                    if out.get('acml_vol'):
+                        try: details['volume'] = int(out['acml_vol'])
+                        except (ValueError, TypeError): pass
+                    if out.get('bstp_kor_isnm'):
+                        details['sector_name'] = out['bstp_kor_isnm'].strip()
+                else:
+                    print(f"   [DataFetcher] KIS 시세 보강 실패 {code}: HTTP {r.status_code}")
+            except Exception as e:
+                # 조용히 삼키면 시가 없는 하루가 '신호 없는 하루'로 위장된다.
+                print(f"   [DataFetcher] KIS 시세 보강 실패 {code}: {e}")
+
+        # 2. 호가 잔량 추출 (매도잔량 / 매수잔량)
+        # 메인 페이지의 호가 정보 테이블 탐색
         try:
             main_url = f"https://finance.naver.com/item/main.naver?code={code}"
             main_res = requests.get(main_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
             main_soup = BeautifulSoup(main_res.content, 'html.parser')
-            
-            # 1. 체결강도 추출 (KIS API 활용, 네이버 제공 중단에 따른 대응)
-            details['tick_power'] = 0.0
-            if getattr(self, 'kis_token', None) and getattr(self, 'kis_app_key', None):
-                try:
-                    url = f"{self.kis_base_url}/uapi/domestic-stock/v1/quotations/inquire-price"
-                    headers = {
-                        "Content-Type": "application/json; charset=utf-8",
-                        "authorization": f"Bearer {self.kis_token}",
-                        "appkey": self.kis_app_key,
-                        "appsecret": self.kis_app_secret,
-                        "tr_id": "FHKST01010100"
-                    }
-                    params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code}
-                    # 잦은 호출 방지를 위해 timeout 짧게 설정
-                    r = requests.get(url, headers=headers, params=params, timeout=3)
-                    if r.status_code == 200:
-                        out = r.json().get('output', {})
-                        # 체결강도
-                        if out.get('tday_rltv'):
-                            details['tick_power'] = float(out['tday_rltv'])
-                        # 기존 Naver 데이터 KIS로 보강 (더 정확)
-                        if out.get('stck_prpr'):
-                            details['price'] = int(out['stck_prpr'])
-                            details['current_price'] = int(out['stck_prpr'])
-                        if out.get('prdy_ctrt'):
-                            rate = float(out['prdy_ctrt'])
-                            details['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
-                        if out.get('hts_frgn_ehrt'):
-                            details['foreign_rate'] = float(out['hts_frgn_ehrt'])
-                        if out.get('stck_sdpr'):
-                            details['prev_close'] = int(out['stck_sdpr'])
-                        # [Sim9] 시가: 갭(=시가/전일종가) 산출용. 전일종가와 같은 응답 블록이라 추가 콜 0.
-                        if out.get('stck_oprc'):
-                            details['open_price'] = int(out['stck_oprc'])
-                        # [Sim9] 당일 고가/저가: 진입가가 그날 변동폭의 어디인지(일중 위치) 산출용.
-                        # 저가 근처에서 마감한 되밀림만 다음날 되돌아온다(실측).
-                        for _src, _dst in (('stck_hgpr', 'day_high'), ('stck_lwpr', 'day_low')):
-                            if out.get(_src):
-                                try: details[_dst] = int(out[_src])
-                                except (ValueError, TypeError): pass
-                        # 신규 밸류에이션/52주 필드 (추가 API 호출 없이 동일 응답에서 파싱)
-                        for _f in ('per', 'pbr'):
-                            if out.get(_f):
-                                try: details[_f] = float(out[_f])
-                                except (ValueError, TypeError): pass
-                        for _f in ('eps', 'bps', 'w52_hgpr', 'w52_lwpr'):
-                            if out.get(_f):
-                                try: details[_f] = int(float(out[_f]))
-                                except (ValueError, TypeError): pass
-                        if out.get('hts_avls'):
-                            try: details['mkt_cap'] = int(out['hts_avls'])
-                            except (ValueError, TypeError): pass
-                        # 거래대금/거래량: KIS가 네이버보다 정확 (원 단위)
-                        if out.get('acml_tr_pbmn'):
-                            try: details['amount'] = int(out['acml_tr_pbmn'])
-                            except (ValueError, TypeError): pass
-                        if out.get('acml_vol'):
-                            try: details['volume'] = int(out['acml_vol'])
-                            except (ValueError, TypeError): pass
-                        if out.get('bstp_kor_isnm'):
-                            details['sector_name'] = out['bstp_kor_isnm'].strip()
-                except Exception as e:
-                    pass
-            
-            # 2. 호가 잔량 추출 (매도잔량 / 매수잔량)
-            # 메인 페이지의 호가 정보 테이블 탐색
             quote_table = main_soup.select_one("table.type2.type_stock2")
             if quote_table:
                 # 보통 매도잔량은 상단 합계, 매수잔량은 하단 합계에 위치
@@ -342,7 +352,7 @@ class DataFetcherWorker(BaseWorker):
                     bid_v = int(bid_total.get_text().replace(',', '').strip() or 1)
                     details['bid_ask_ratio'] = ask_v / bid_v if bid_v > 0 else 1.0
         except Exception as e:
-            print(f"   [DataFetcher] 미시 데이터(체결/호가) 수집 실패 {code}: {e}")
+            print(f"   [DataFetcher] 미시 데이터(호가) 수집 실패 {code}: {e}")
 
         return details
 

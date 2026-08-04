@@ -6,11 +6,20 @@ KIS API 데이터 공급자 (KISDataProvider)
 - 모든 API 실패 시 빈 dict 반환 → 기존 시뮬레이터 로직 영향 없음
 """
 
+import json
 import os
 import time
 import requests
 from datetime import datetime, timedelta
 from typing import Optional
+
+# 재무비율·투자의견(TTL_FINANCIAL 7일 / TTL_DAILY 1일) 전용 디스크 캐시 경로.
+# 파이프라인 런은 매번 새 프로세스라 인메모리 캐시는 6분짜리 수명으로 끝난다 —
+# 10분 주기로 도는데 7일짜리 캐시가 매번 다시 조회됐다(17종목×3콜×40런/일).
+# data/ 밑에 두면 scraper.yml의 기존 db-data 왕복(Fetch/Deploy)이 그대로 이 파일을
+# 실어 나른다 — 워크플로 변경이 필요 없다(data/*.json을 통째로 커밋·복원한다).
+_DISK_CACHE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'kis_financial_cache.json')
 
 
 class KISDataProvider:
@@ -18,6 +27,24 @@ class KISDataProvider:
     TTL_REALTIME = 300       # 5분 — 투자자 추세, 외인기관 가집계
     TTL_DAILY = 86400        # 1일 — 투자의견, 증권사별 의견
     TTL_FINANCIAL = 604800   # 7일 — 재무비율 (분기 업데이트)
+
+    # 유니버스 순위 API(get_fluctuation_rank 등) 전용 클래스 레벨 캐시.
+    # Sim4·Sim4-1·Sim10(BULL)·프로그램매매가 매 사이클 같은 (market, sort, limit)
+    # 조합을 각자 새 KISDataProvider() 인스턴스로 조회한다 — 인스턴스 캐시(self._cache)는
+    # 매번 리셋돼 같은 요청이 최대 4번 나갔다. 클래스 레벨로 올려 프로세스(=파이프라인
+    # 런) 수명 동안 공유한다.
+    # get_price_quote 등 매매 판단 직전 신선도가 핵심인 호출은 여기 넣지 않는다 —
+    # program_trader._price_quote()가 "새 인스턴스 = 캐시 무시"로 5분 묵은 값을 피하는
+    # 설계에 기대고 있어(주석 참고), 그 경로를 공유 캐시로 옮기면 드리프트 가드가
+    # 오래된 가격을 볼 수 있다.
+    _rank_cache: dict[str, tuple[float, list]] = {}
+
+    # 재무비율·투자의견(TTL_FINANCIAL/TTL_DAILY) 전용 디스크 백업 캐시. 클래스 레벨
+    # 인메모리 사본 + kis_financial_cache.json 파일로 이중 저장한다 — 인메모리는
+    # 같은 프로세스 내 인스턴스 간 공유(_rank_cache와 동일 이유), 파일은 프로세스
+    # (=파이프라인 런)를 넘어선 공유(E7)를 담당한다.
+    _disk_cache: dict[str, tuple[float, object]] = {}
+    _disk_cache_loaded = False
 
     def __init__(self):
         self._cache: dict[str, tuple[float, dict]] = {}  # key → (ts, data)
@@ -55,6 +82,63 @@ class KISDataProvider:
 
     def _set_cache(self, key: str, data: dict):
         self._cache[key] = (time.time(), data)
+
+    def _get_rank_cached(self, key: str, ttl: float) -> Optional[list]:
+        """클래스 레벨 유니버스 순위 캐시 조회. 호출자마다 얕은 복사본을 준다 —
+        서로 다른 심이 같은 리스트를 공유하면 한 심의 enrichment(_enrich_universe)
+        수정이 다른 심에 새어 들어간다."""
+        entry = KISDataProvider._rank_cache.get(key)
+        if entry is None:
+            return None
+        ts, data = entry
+        if time.time() - ts >= ttl:
+            return None
+        return [dict(row) for row in data]
+
+    @classmethod
+    def _ensure_disk_cache_loaded(cls):
+        """프로세스에서 최초 1회만 파일을 읽는다. 실패(파일 없음·손상)는
+        빈 캐시로 취급한다 — 다음 API 조회가 채워 넣으면 그만이다."""
+        if cls._disk_cache_loaded:
+            return
+        cls._disk_cache_loaded = True
+        try:
+            with open(_DISK_CACHE_PATH, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+            cls._disk_cache = {k: (float(v[0]), v[1]) for k, v in raw.items()}
+        except Exception:
+            cls._disk_cache = {}
+
+    def _get_disk_cached(self, key: str, ttl: float):
+        """재무비율·투자의견(TTL_FINANCIAL/TTL_DAILY) 전용 — 프로세스를 넘어
+        디스크에 남는다. 호출자마다 사본을 준다(리스트 값은 _rank_cache와 같은 이유)."""
+        KISDataProvider._ensure_disk_cache_loaded()
+        entry = KISDataProvider._disk_cache.get(key)
+        if entry is None:
+            return None
+        ts, data = entry
+        if time.time() - ts >= ttl:
+            return None
+        return [dict(row) for row in data] if isinstance(data, list) else dict(data)
+
+    def _set_disk_cache(self, key: str, data):
+        KISDataProvider._ensure_disk_cache_loaded()
+        KISDataProvider._disk_cache[key] = (time.time(), data)
+        self._persist_disk_cache()
+
+    def _persist_disk_cache(self):
+        """쓰기 실패는 조용히 넘어간다 — 캐시는 성능 최적화이지 정합성의
+        근거가 아니다. 다음 호출이 API로 재조회하면 그만이다."""
+        try:
+            os.makedirs(os.path.dirname(_DISK_CACHE_PATH), exist_ok=True)
+            serializable = {k: [ts, data] for k, (ts, data) in KISDataProvider._disk_cache.items()}
+            with open(_DISK_CACHE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(serializable, f, ensure_ascii=False)
+        except Exception:
+            pass
+
+    def _set_rank_cache(self, key: str, data: list):
+        KISDataProvider._rank_cache[key] = (time.time(), data)
 
     def _get(self, url: str, tr_id: str, params: dict, timeout: int = 5) -> dict:
         if not self._token or not self._base_url:
@@ -152,7 +236,7 @@ class KISDataProvider:
         반환 키: roe, net_profit_rate
         """
         key = f"profit_ratio_{code}"
-        cached = self._get_cached(key, self.TTL_FINANCIAL)
+        cached = self._get_disk_cached(key, self.TTL_FINANCIAL)
         if cached is not None:
             return cached
 
@@ -164,7 +248,7 @@ class KISDataProvider:
         rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"roe": 0.0, "net_profit_rate": 0.0}
-            self._set_cache(key, result)
+            self._set_disk_cache(key, result)
             return result
 
         row = rows[0] if isinstance(rows, list) else rows
@@ -172,7 +256,7 @@ class KISDataProvider:
             "roe": self._to_float(row.get("self_cptl_ntin_inrt", 0)),   # 자기자본 순이익률 = ROE
             "net_profit_rate": self._to_float(row.get("sale_ntin_rate", 0)),
         }
-        self._set_cache(key, result)
+        self._set_disk_cache(key, result)
         return result
 
     # ──────────────────────────────────────────────────
@@ -184,7 +268,7 @@ class KISDataProvider:
         반환 키: debt_ratio, current_ratio
         """
         key = f"stability_ratio_{code}"
-        cached = self._get_cached(key, self.TTL_FINANCIAL)
+        cached = self._get_disk_cached(key, self.TTL_FINANCIAL)
         if cached is not None:
             return cached
 
@@ -196,7 +280,7 @@ class KISDataProvider:
         rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"debt_ratio": 999.0, "current_ratio": 0.0}
-            self._set_cache(key, result)
+            self._set_disk_cache(key, result)
             return result
 
         row = rows[0] if isinstance(rows, list) else rows
@@ -204,7 +288,7 @@ class KISDataProvider:
             "debt_ratio": self._to_float(row.get("lblt_rate", 999)),
             "current_ratio": self._to_float(row.get("crnt_rate", 0)),
         }
-        self._set_cache(key, result)
+        self._set_disk_cache(key, result)
         return result
 
     # ──────────────────────────────────────────────────
@@ -216,7 +300,7 @@ class KISDataProvider:
         반환 키: invest_opinion, target_price, opinion_divergence
         """
         key = f"invest_opinion_{code}"
-        cached = self._get_cached(key, self.TTL_DAILY)
+        cached = self._get_disk_cached(key, self.TTL_DAILY)
         if cached is not None:
             return cached
 
@@ -232,7 +316,7 @@ class KISDataProvider:
         rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"invest_opinion": "", "target_price": 0, "opinion_divergence": 0.0}
-            self._set_cache(key, result)
+            self._set_disk_cache(key, result)
             return result
 
         row = rows[0] if isinstance(rows, list) else rows
@@ -241,7 +325,7 @@ class KISDataProvider:
             "target_price":   self._to_int(row.get("hts_goal_prc", 0)),
             "opinion_divergence": self._to_float(row.get("dprt", 0)),
         }
-        self._set_cache(key, result)
+        self._set_disk_cache(key, result)
         return result
 
     # ──────────────────────────────────────────────────
@@ -253,7 +337,7 @@ class KISDataProvider:
         반환 키: consensus_buy_count, consensus_avg_target, consensus_summary
         """
         key = f"opbysec_{code}"
-        cached = self._get_cached(key, self.TTL_DAILY)
+        cached = self._get_disk_cached(key, self.TTL_DAILY)
         if cached is not None:
             return cached
 
@@ -269,7 +353,7 @@ class KISDataProvider:
         rows = body.get("output") or body.get("output1") or body.get("output2") or []
         if not rows:
             result = {"consensus_buy_count": 0, "consensus_avg_target": 0, "consensus_summary": ""}
-            self._set_cache(key, result)
+            self._set_disk_cache(key, result)
             return result
 
         if not isinstance(rows, list):
@@ -297,7 +381,7 @@ class KISDataProvider:
             "consensus_avg_target": avg_target,
             "consensus_summary": summary,
         }
-        self._set_cache(key, result)
+        self._set_disk_cache(key, result)
         return result
 
     # ──────────────────────────────────────────────────
@@ -411,7 +495,7 @@ class KISDataProvider:
         반환: [{code, name, price, change_rate, acml_vol, amount}, ...]
         """
         key = f"fluctuation_rank_{market}_{sort}"
-        cached = self._get_cached(key, self.TTL_REALTIME)
+        cached = self._get_rank_cached(key, self.TTL_REALTIME)
         if cached is not None:
             return cached
 
@@ -457,8 +541,10 @@ class KISDataProvider:
                 "amount": price * vol,
             })
 
-        self._set_cache(key, result)
-        return result
+        self._set_rank_cache(key, result)
+        # 방금 만든 result도 캐시가 참조하는 바로 그 리스트다 — 이 호출자에게도
+        # 복사본을 줘야 뒤이어 도는 다른 심의 enrichment가 이 심의 사본을 오염시키지 않는다.
+        return [dict(row) for row in result]
 
     # ──────────────────────────────────────────────────
     # 9. 외국인/기관 순매수 상위 (FHPTJ04400000)
@@ -471,7 +557,7 @@ class KISDataProvider:
         반환: [{code, name, price, frgn_fake_ntby_qty, orgn_fake_ntby_qty, amount}, ...]
         """
         key = f"frgn_inst_rank_{market}_{etc_cls}"
-        cached = self._get_cached(key, self.TTL_REALTIME)
+        cached = self._get_rank_cached(key, self.TTL_REALTIME)
         if cached is not None:
             return cached
 
@@ -513,8 +599,10 @@ class KISDataProvider:
                 "orgn_fake_ntby_qty": orgn,
             })
 
-        self._set_cache(key, result)
-        return result
+        self._set_rank_cache(key, result)
+        # 방금 만든 result도 캐시가 참조하는 바로 그 리스트다 — 이 호출자에게도
+        # 복사본을 줘야 뒤이어 도는 다른 심의 enrichment가 이 심의 사본을 오염시키지 않는다.
+        return [dict(row) for row in result]
 
     # ──────────────────────────────────────────────────
     # 10. 재무비율 수익성 순위 (FHPST01750000)
@@ -525,7 +613,10 @@ class KISDataProvider:
         반환: [{code, name, price, roe, debt_ratio, amount}, ...]
         """
         key = f"finance_ratio_rank_{market}"
-        cached = self._get_cached(key, self.TTL_FINANCIAL)
+        # TTL_FINANCIAL(7일)이라 인메모리(_rank_cache)가 아니라 디스크 캐시를 쓴다(E7) —
+        # 나머지 랭킹(TTL_REALTIME 5분)은 프로세스 수명 안에서만 의미 있지만, 이건
+        # 파이프라인 런(프로세스)을 몇 번이고 넘어 살아야 한다.
+        cached = self._get_disk_cached(key, self.TTL_FINANCIAL)
         if cached is not None:
             return cached
 
@@ -573,8 +664,10 @@ class KISDataProvider:
                 "debt_ratio": self._to_float(r.get("lblt_rate", 999)),
             })
 
-        self._set_cache(key, result)
-        return result
+        self._set_disk_cache(key, result)
+        # 방금 만든 result도 캐시가 참조하는 바로 그 리스트다 — 이 호출자에게도
+        # 복사본을 줘야 뒤이어 도는 다른 심의 enrichment가 이 심의 사본을 오염시키지 않는다.
+        return [dict(row) for row in result]
 
     # ──────────────────────────────────────────────────
     # 배치 enrichment (DataFetcher에서 호출)

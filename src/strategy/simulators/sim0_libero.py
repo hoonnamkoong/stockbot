@@ -307,8 +307,14 @@ class LiberoSimulator(BaseSimulator):
         return top, confidence
 
     def run(self, candidates, current_prices=None):
-        if not candidates:
-            # 분석할 데이터 없음 — 직전 국면 유지, 타임스탬프만 갱신
+        # breadth/momentum/trend는 top100 라이브 실측(live_market_metrics)만으로도
+        # 산출 가능하다 — candidates(버즈 후보)는 foreign·volatility(둘 다 표시 전용,
+        # calc_bull_score 미사용)에만 쓰인다. 그래서 candidates가 비어도 라이브
+        # 실측이 있으면 국면을 판단한다. 스크래핑을 기다리지 않고 매매를 먼저
+        # 내보내는 순서(needs_buzz=false 경로)의 입력이 이 판단이다.
+        # 둘 다 없을 때만 판단 불가 — 직전 국면 유지, 타임스탬프만 갱신.
+        metrics = getattr(self, 'live_market_metrics', None)
+        if not candidates and not metrics:
             self.state['last_run'] = get_kst_now().strftime('%Y-%m-%d %H:%M:%S')
             self.save_state()
             return self.state
@@ -330,7 +336,6 @@ class LiberoSimulator(BaseSimulator):
         # 버즈 후보군(3~30개)은 표본 편향·양자화가 심해 top100 지표의 추정치로 부적합
         # (2026-07-08 갭 분석). trend는 CSV 파싱 실패 시에만 버즈 ADX median으로 개별 폴백하고,
         # breadth/momentum은 라이브 실측 실패(live_market_metrics=None) 시에만 후보 기반으로 폴백.
-        metrics = getattr(self, 'live_market_metrics', None)
         if metrics:
             breadth = round(float(metrics['breadth']), 1)
             momentum = round(float(metrics['momentum']), 2)
@@ -344,8 +349,15 @@ class LiberoSimulator(BaseSimulator):
             trend = round(_median(adxs), 1) if adxs else 0.0
             breadth_sample = total
             breadth_source = 'candidates'
-        foreign = round(_mean(foreigns), 3) if foreigns else 0.0   # metrics 표시 전용(bull_score 미사용)
-        volatility = round(_pstdev(dailies), 2) if len(dailies) > 1 else 0.0
+        if candidates:
+            foreign = round(_mean(foreigns), 3) if foreigns else 0.0   # metrics 표시 전용(bull_score 미사용)
+            volatility = round(_pstdev(dailies), 2) if len(dailies) > 1 else 0.0
+        else:
+            # candidates 없이 top100 실측만으로 판단하는 경로 — foreign·volatility는
+            # 후보 종목에서만 뽑을 수 있어 여기서는 측정 불가. 0.0(중립)으로 지어내지
+            # 않고 None으로 남긴다.
+            foreign = None
+            volatility = None
 
         instant_regime = self.classify_regime(breadth, momentum, trend)
         bull_score = self.calc_bull_score(breadth, momentum, trend)

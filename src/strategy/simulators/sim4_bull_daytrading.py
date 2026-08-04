@@ -74,8 +74,6 @@ def decide_bull_daytrade(view, candidates, current_prices):
                                'reason': f"[단타] 2차 전량 익절 +10% ({pr:.1f}%)", 'cooldown': 2, 'mark_partial': False})
                 sold.add(code); continue
     # 2. 진입
-    if not view['market_index_healthy']:
-        return orders
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len(portfolio) - len(sold)
     for stock in candidates:

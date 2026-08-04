@@ -118,8 +118,12 @@ class DataFetcherWorker(BaseWorker):
 
         def process_one(s: dict) -> tuple:
             try:
-                d = self._get_stock_details(s['code'])
-                s.update(d)
+                # 임계값 판정(게시글 스캔)을 먼저 하고, 통과한 종목만 상세조회(HTTP 3회:
+                # frgn.naver·KIS inquire-price·main.naver 호가)한다. 예전엔 순서가
+                # 반대라 41종목 전부 상세조회한 뒤 24개를 버렸다 — 통과 못 할 종목의
+                # 상세조회는 판정에 쓰이지 않으므로 순수 낭비였다(2026-08-04 실측
+                # 72콜/런). 두 조회는 서로 다른 소스(토론방 vs 시세)라 순서를
+                # 바꿔도 결과가 갈리지 않는다.
                 stats = self._get_discussion_stats(s['code'], today_display)
                 count = stats['recent_posts_count']
                 pages = (stats['total_pages'], stats['failed_pages'])
@@ -127,6 +131,9 @@ class DataFetcherWorker(BaseWorker):
                 status = classify(count, self.ctx.threshold, set(adopted), s['code'])
                 if status is None:
                     return None, False, pages
+
+                d = self._get_stock_details(s['code'])
+                s.update(d)
 
                 s['recent_posts_count'] = count
                 s['unique_posters'] = stats['unique_posters']
@@ -183,9 +190,7 @@ class DataFetcherWorker(BaseWorker):
             elif 'change_rate' not in s:
                 s['change_rate'] = "0.00%"
 
-        # 6. 시장 지수 상태 수집 및 상태 저장 (Consensus 반영)
-        indices = self._get_market_indices()
-        sync_state.market_index_healthy = indices['KOSPI_healthy'] and indices['KOSDAQ_healthy']
+        # 6. 상태 저장
         self.storage.save_sync_state(sync_state)
 
         # 6-1. KIS API 보강 데이터 추가 (외인/기관 추정, 재무비율, 투자의견)
@@ -202,6 +207,18 @@ class DataFetcherWorker(BaseWorker):
         missing_open = sum(1 for s in results_raw if not s.get('open_price'))
         if missing_open:
             self.log_error(f"KIS 시가 결손 {missing_open}/{len(results_raw)}종목 — 심9 갭 판정 불가")
+
+        # [2026-08-04, E9] 상세조회 순서를 임계값 판정 뒤로 옮겼다(위 process_one).
+        # 통과 종목의 상세조회 자체는 안 바뀌었어야 한다 — 결손률이 오르면 순서
+        # 변경이 아니라 다른 문제(토큰 만료·유량제한 등)를 의심할 근거가 된다.
+        for field, note in (
+            ('per', 'Sim3 가치페어 밸류에이션 판정 불가'),
+            ('tick_power', '체결강도 판정 불가'),
+            ('range_history', 'Sim5 채널 산출 불가'),
+        ):
+            missing = sum(1 for s in results_raw if not s.get(field))
+            if missing:
+                self.log_error(f"{field} 결손 {missing}/{len(results_raw)}종목 — {note}")
 
         # 7. Pydantic 변환 (타입 안전성 확보)
         results: list[StockData] = []
@@ -349,22 +366,6 @@ class DataFetcherWorker(BaseWorker):
             print(f"   [DataFetcher] 미시 데이터(호가) 수집 실패 {code}: {e}")
 
         return details
-
-    def _get_market_indices(self) -> dict:
-        """[V60.0] KOSPI, KOSDAQ 지수 상태를 수집합니다."""
-        url = "https://finance.naver.com/sise/sise_index.naver?code=KOSPI"
-        indices = {'KOSPI_healthy': True, 'KOSDAQ_healthy': True}
-        try:
-            # 코스피
-            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-            soup = BeautifulSoup(res.content, 'html.parser')
-            # 지수 등락 확인 (상승/보합이면 healthy로 간주)
-            kospi_change = soup.select_one("#now_value")
-            # (간소화: 전일 대비 하락폭이 2% 이상이면 unhealthy)
-            indices['KOSPI_healthy'] = True # 실시간 로직은 실제 등락률 파싱 필요
-        except:
-            pass
-        return indices
 
     def _get_discussion_stats(self, code: str, today_str: str) -> dict:
         """네이버 토론방에서 오늘 게시글을 전수 스캔합니다."""

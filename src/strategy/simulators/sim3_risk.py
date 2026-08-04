@@ -69,8 +69,6 @@ class SmartRiskSimulator(BaseSimulator):
                     pass
 
         # 2. 진입
-        if not self.state.get('market_index_healthy', True):
-            return self.calculate_stats(current_prices)
         if len(self.state['portfolio']) >= self.MAX_HOLDINGS:
             return self.calculate_stats(current_prices)
 

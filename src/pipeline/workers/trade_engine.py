@@ -85,10 +85,15 @@ class TradeEngineWorker(BaseWorker):
         self,
         stocks: list[StockData],
         sync_state: SyncState,
+        skip_program_trading: bool = False,
     ) -> tuple[list, list, dict]:
         """
         전략 판단과 딥다이브 대상 선정을 수행합니다.
-        
+
+        skip_program_trading: orchestrator가 이미 이번 사이클에 프로그램 매매를
+        Stage 1 이전(순서 가변 분기, E3)에 실행했으면 True — 원장 last_run
+        중복가드가 막아주긴 하지만, 불필요한 GitHub API 왕복을 아예 피한다.
+
         Returns:
             (final_picks, simulation_results, sell_candidate)
         """
@@ -193,24 +198,92 @@ class TradeEngineWorker(BaseWorker):
         elif final_picks or sell_candidate:
             self.log(f"[{session_name} 세션] 정각 아님 - 종목 상태 기록 생략")
 
-        # 6. 시뮬레이터 3종 실행 (Registry에서 자동 로드)
+        # 6. 시뮬레이터 실행 (Registry에서 자동 로드; sim0_libero는 run_regime_stage()가 별도로 돔)
         self._run_simulators(candidates)
 
         # 7. 프로그램 매매(실전 계좌 자동 심 운용) — config ON & 유효 시에만 실주문(내부 fail-closed)
-        try:
-            from src.pipeline.workers.program_trader import run_program_trading
-            run_program_trading(
-                candidates,
-                is_market_hours=self.ctx.is_market_hours(),
-                now_kst=self.ctx.now_kst,
-                log=self.log,
-                log_error=self.log_error,
-                enrich=self._enrich_universe,  # 심 전용 유니버스 보강 — 페이퍼 경로와 동일 적용
-            )
-        except Exception as e:
-            self.log_error(f"프로그램 매매 실행 실패(무시하고 계속): {e}")
+        # 버즈 불필요 심은 orchestrator가 Stage 1 이전에 이미 실행했다(skip_program_trading=True).
+        if not skip_program_trading:
+            try:
+                from src.pipeline.workers.program_trader import run_program_trading
+                run_program_trading(
+                    candidates,
+                    is_market_hours=self.ctx.is_market_hours(),
+                    now_kst=self.ctx.now_kst,
+                    log=self.log,
+                    log_error=self.log_error,
+                    enrich=self._enrich_universe,  # 심 전용 유니버스 보강 — 페이퍼 경로와 동일 적용
+                )
+            except Exception as e:
+                self.log_error(f"프로그램 매매 실행 실패(무시하고 계속): {e}")
 
         return final_picks, simulation_results, sell_candidate
+
+    def run_regime_stage(self) -> str | None:
+        """Sim0(리베로) 국면 갱신 — 스크래핑 전에 사이클당 정확히 한 번 돈다(E3).
+
+        top100 라이브 실측만으로 국면을 계산한다(E2: candidates=[]로 호출해도
+        breadth/momentum/trend는 산출된다). Sim10의 순서 가변 라우팅
+        (needs_buzz=dynamic)이 이 결과를 읽으므로, 스크래핑 전에 매매를
+        내보내려면 스크래핑 전에 국면도 갱신돼 있어야 한다.
+
+        사이클당 한 번만 불러야 한다 — regime_history가 호출마다 누적되므로
+        두 번 부르면 국면 평활(smoothing)이 같은 순간을 두 번 반영해 왜곡된다.
+        _run_simulators()는 그래서 분석기 심(IS_ANALYZER)을 건너뛴다 — 여기가
+        유일한 실행 지점이다.
+
+        반환: 확정 국면(current_regime) 문자열, 또는 판단 불가 시 None.
+        """
+        live_breadth = None  # (breadth%, momentum, 표본수, [codes]) | None
+        try:
+            live_breadth = self._fetch_top100_breadth()
+            if live_breadth:
+                self.log(f"  top100 라이브 breadth: {live_breadth[0]:.1f}% (표본 {live_breadth[2]})")
+        except Exception as e:
+            self.log_error(f"top100 라이브 breadth 수집 실패: {e}")
+
+        from src.strategy.registry import get_analyzer_simulator
+        try:
+            sim = get_analyzer_simulator()
+        except Exception as e:
+            self.log_error(f"분석기 심 로드 실패(국면 판단 스킵): {e}")
+            return None
+
+        sim.live_market_metrics = {
+            'breadth': live_breadth[0], 'momentum': live_breadth[1],
+            'trend': self._top100_trend_from_csv(),  # None이면 Sim0가 버즈 ADX로 폴백(candidates=[]라 0.0)
+            'sample': live_breadth[2],
+        } if live_breadth else None
+
+        try:
+            result = sim.run([], current_prices={})
+        except Exception as e:
+            self.log_error(f"{sim.__class__.__name__} 실행 실패: {e}")
+            return None
+        self.log(f"  {sim.__class__.__name__} 완료 (국면: {result.get('current_regime')})")
+
+        # 리베로 나우캐스트: 장중엔 시간당 실측·예측·채점, 마감 후엔 EOD 확정 채점
+        now_kst = self.ctx.now_kst
+        action = libero_action(
+            after_close=self.ctx.is_after_market_close(),
+            market_hours=self.ctx.is_market_hours(),
+        )
+        try:
+            if action == 'finalize':
+                # 마감 후 라이브 등락률 = 확정 종가 기준. 실패 시 당일 갱신 CSV 폴백.
+                actual_eod = live_breadth[0] if live_breadth else self._get_actual_breadth_from_csv()
+                sim.finalize_eod(actual_eod, now_kst=now_kst)
+                self._append_regime_observation(now_kst, live_breadth)
+            elif action == 'nowcast' and live_breadth:
+                codes = live_breadth[3]
+                sim.update_nowcast(
+                    live_breadth[0], now_kst=now_kst,
+                    backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
+                self._append_regime_observation(now_kst, live_breadth)
+        except Exception as e:
+            self.log_error(f"리베로 나우캐스트 처리 실패(무시): {e}")
+
+        return result.get('current_regime')
 
     def _run_simulators(self, candidates: list[dict]) -> None:
         """
@@ -218,6 +291,9 @@ class TradeEngineWorker(BaseWorker):
         실제 simulator.run(candidates, current_prices=dict) 시그니처 사용.
         [Fix] 포트폴리오 보유 종목 중 오늘 Buzz Filter 이탈 종목의
               현재가를 네이버에서 별도 조회하여 current_prices에 보강합니다.
+
+        분석기 심(sim0_libero)은 여기서 돌지 않는다 — run_regime_stage()가
+        사이클당 한 번 별도로 돈다(E3).
         """
         try:
             # 1. 오늘 candidates 기반으로 현재가 구성
@@ -225,17 +301,8 @@ class TradeEngineWorker(BaseWorker):
                 s['code']: s.get('price', s.get('current_price', 0))
                 for s in candidates if s.get('code')
             }
-            simulators = get_active_simulators()
+            simulators = [s for s in get_active_simulators() if not getattr(s, 'IS_ANALYZER', False)]
             self.log(f"시뮬레이터 동기화 시작 ({len(simulators)}개 활성, {len(current_prices)}개 현재가)")
-
-            # 리베로 나우캐스트용 top100 라이브 실측 (실패해도 파이프라인 계속)
-            live_breadth = None  # (breadth%, momentum, 표본수, [codes]) | None
-            try:
-                live_breadth = self._fetch_top100_breadth()
-                if live_breadth:
-                    self.log(f"  top100 라이브 breadth: {live_breadth[0]:.1f}% (표본 {live_breadth[2]})")
-            except Exception as e:
-                self.log_error(f"top100 라이브 breadth 수집 실패: {e}")
 
             # 2. 포트폴리오 종목 중 현재가 미확보된 코드 수집
             missing_codes = set()
@@ -257,16 +324,6 @@ class TradeEngineWorker(BaseWorker):
                     # scripts/run_eod_sims.py가 마감 후 1회 돌린다.
                     if getattr(sim, 'IS_EOD', False):
                         continue
-                    is_libero = getattr(sim, 'IS_ANALYZER', False) and sim.__class__.__name__ == 'LiberoSimulator'
-                    if is_libero:
-                        # 국면 판단의 breadth/momentum/trend를 top100 라이브 실측으로 교체 (버즈 표본 편향 제거)
-                        if live_breadth:
-                            sim.live_market_metrics = {
-                                'breadth': live_breadth[0], 'momentum': live_breadth[1],
-                                'trend': self._top100_trend_from_csv(),  # None이면 Sim0가 버즈 ADX로 폴백
-                                'sample': live_breadth[2]}
-                        else:
-                            sim.live_market_metrics = None
                     own_universe = sim.get_universe()
                     if own_universe:
                         sim_candidates = self._enrich_universe(own_universe)
@@ -280,28 +337,6 @@ class TradeEngineWorker(BaseWorker):
                         sim_prices = current_prices
                     sim.run(sim_candidates, current_prices=sim_prices)
                     self.log(f"  {sim.__class__.__name__} 완료")
-                    # Libero 나우캐스트: 장중엔 시간당 실측·예측·채점, 마감 후엔 EOD 확정 채점
-                    if is_libero:
-                        now_kst = self.ctx.now_kst
-                        action = libero_action(
-                            after_close=self.ctx.is_after_market_close(),
-                            market_hours=self.ctx.is_market_hours(),
-                        )
-                        if action == 'finalize':
-                            # 마감 후 라이브 등락률 = 확정 종가 기준. 실패 시 당일 갱신 CSV 폴백.
-                            actual_eod = live_breadth[0] if live_breadth else self._get_actual_breadth_from_csv()
-                            sim.finalize_eod(actual_eod, now_kst=now_kst)
-                            # 종가 관측도 이력에 남긴다. 태스커의 마지막 신호(15:30)는
-                            # after_close가 먼저 참이라 nowcast로 오지 않는다 — 여기서
-                            # 안 쌓으면 하루의 종착점이 관측 시계열에서 통째로 빠지고,
-                            # 나중에 메울 수 없다(KIS 백필은 당일분봉뿐이다).
-                            self._append_regime_observation(now_kst, live_breadth)
-                        elif action == 'nowcast' and live_breadth:
-                            codes = live_breadth[3]
-                            sim.update_nowcast(
-                                live_breadth[0], now_kst=now_kst,
-                                backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
-                            self._append_regime_observation(now_kst, live_breadth)
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
 
@@ -334,10 +369,17 @@ class TradeEngineWorker(BaseWorker):
                     and re.match(r'\d{4}', r.select('td')[0].get_text(strip=True))
                 ]
                 if data_rows:
-                    price_text = data_rows[0][1].get_text().replace(',', '').strip()
-                    if price_text.isdigit():
-                        stock['price'] = int(price_text)
-                        stock['current_price'] = stock['price']
+                    # price/current_price는 get_universe()가 이미 KIS 라이브 값으로
+                    # 채워왔다면 덮어쓰지 않는다 — 이 페이지(frgn.naver)는 일봉이라 장중에
+                    # 전일 값에서 멈춰 있을 수 있다(Sim6가 6주간 거래 0건이던 원인과 동일
+                    # 함정). 2026-08-04: 이 덮어쓰기가 Sim4-1의 라이브 판단가를 지워
+                    # 실전 계좌가 하루 종일 매수 0건이었다(check_buy_drift가 계속 차단).
+                    # 유니버스 자체에 price가 없을 때(Sim6 고정 리터럴)만 이 값을 쓴다.
+                    if not stock.get('price'):
+                        price_text = data_rows[0][1].get_text().replace(',', '').strip()
+                        if price_text.isdigit():
+                            stock['price'] = int(price_text)
+                            stock['current_price'] = stock['price']
                     sparkline = []
                     for row in data_rows[:5]:
                         try:
@@ -366,13 +408,18 @@ class TradeEngineWorker(BaseWorker):
             enriched = list(ex.map(fetch_sparkline, stocks))
 
         # per/pbr/sector_name + 수급 보강 (Sim3 가치페어, Sim4/4-1 has_inst 조건용)
+        # 종목당 최대 2콜(get_price_quote + get_investor_trend_estimate)을 순차로
+        # 돌면 30종목에 수십 초가 든다 — sparkline과 같은 방식으로 병렬화한다.
+        # kis 인스턴스를 스레드끼리 공유하는 이유는 스파크라인 단계와 같다: 그래야
+        # get_price_quote의 인스턴스 캐시가(같은 종목이 중복 조회될 때) 의미가 있다.
         try:
             from src.trade.kis_data_provider import KISDataProvider
             kis = KISDataProvider()
-            for stock in enriched:
+
+            def enrich_kis(stock):
                 code = stock.get('code', '')
                 if not code:
-                    continue
+                    return stock
                 # PER/PBR + 등락률 + 52주 고저
                 if (not (stock.get('per') and stock.get('pbr'))
                         or 'change_rate' not in stock or 'w52_hgpr' not in stock):
@@ -405,6 +452,10 @@ class TradeEngineWorker(BaseWorker):
                         stock.setdefault('orgn_fake_ntby_qty', trend.get('orgn_fake_ntby_qty', 0))
                     except Exception:
                         pass
+                return stock
+
+            with ThreadPoolExecutor(max_workers=10) as ex:
+                enriched = list(ex.map(enrich_kis, enriched))
         except Exception:
             pass
 

@@ -7,11 +7,13 @@ Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 """
 
 from src.strategy.regime_state import read_regime
+from src.strategy.registry import needs_buzz as sim_needs_buzz
 from src.pipeline.context import PipelineContext
 from src.data.storage_manager import StorageManager
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
 from src.pipeline.workers.llm_analyzer import LLMAnalyzerWorker
 from src.pipeline.workers.trade_engine import TradeEngineWorker
+from src.pipeline.workers.program_trader import run_program_trading, peek_selected_sim
 from src.pipeline.workers.notifier import NotifierWorker
 
 
@@ -89,6 +91,40 @@ def run_pipeline(ctx: PipelineContext) -> None:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 파이프라인을 종료합니다.")
         return
 
+    # ── Stage 0: 국면 판단 + 순서 가변 분기(E3) ───────────────────
+    # 실전 계좌가 선택한 심이 네이버 게시글(버즈)을 안 쓰면(needs_buzz=False),
+    # 스크래핑(Stage 1)을 기다리지 않고 매매부터 낸다. Sim0(리베로) 국면 갱신은
+    # top100 라이브 실측만으로 가능해졌다(E2) — 이게 이 분기의 유일한 입력이라
+    # 스크래핑보다 먼저 돈다. Sim10처럼 국면에 따라 필요 여부가 바뀌는 심도
+    # registry.needs_buzz()가 국면을 받아 판단한다.
+    trade_worker = TradeEngineWorker(ctx, storage)
+    with ctx.stage("Stage 0: 국면 판단"):
+        regime = trade_worker.run_regime_stage()
+
+    program_traded_early = False
+    with ctx.stage("Stage 0.5: 매매 순서 분기"):
+        selected_sim = None
+        try:
+            selected_sim = peek_selected_sim(log=ctx.log)
+        except Exception as e:
+            ctx.log(f"[경고] 선택 심 조회 실패 — 스크래핑 후 매매(느린 경로)로 진행: {e}")
+
+        if selected_sim and not sim_needs_buzz(selected_sim, regime):
+            ctx.log(f"[Program] '{selected_sim}' 버즈 불필요(국면={regime}) — 스크래핑 전에 매매 실행")
+            try:
+                run_program_trading(
+                    [], is_market_hours=ctx.is_market_hours(), now_kst=ctx.now_kst,
+                    log=trade_worker.log, log_error=trade_worker.log_error,
+                    enrich=trade_worker._enrich_universe,
+                )
+                program_traded_early = True
+            except Exception as e:
+                ctx.log(f"[경고] 조기 프로그램 매매 실패 — Stage 3에서 재시도: {e}")
+        elif selected_sim:
+            ctx.log(f"[Program] '{selected_sim}' 버즈 필요(국면={regime}) — 스크래핑 후 매매")
+        else:
+            ctx.log("[Program] 선택된 심 없음(OFF) — 순서 변경 없음")
+
     # ── Stage 1: 데이터 수집 및 1차 필터링 ───────────────────────
     with ctx.stage("Stage 1: 데이터 수집"):
         stocks = DataFetcherWorker(ctx, storage).run()
@@ -105,10 +141,12 @@ def run_pipeline(ctx: PipelineContext) -> None:
             stocks, candidates = analyzer_worker.run(stocks)
 
     # ── Stage 3: 전략 판단 + 시뮬레이터 동기화 ───────────────────
+    # trade_worker는 Stage 0에서 만든 것을 그대로 쓴다(새로 만들면 _kis_provider
+    # 캐시가 갈리고, sim0_libero를 다시 도는 실수를 하기도 쉽다).
     with ctx.stage("Stage 3: 전략 판단 + 시뮬레이터"):
         sync_state, _ = storage.load_sync_state(ctx.today_str)
-        trade_worker = TradeEngineWorker(ctx, storage)
-        final_picks, simulation_results, sell_candidate = trade_worker.run(active_only(stocks), sync_state)
+        final_picks, simulation_results, sell_candidate = trade_worker.run(
+            active_only(stocks), sync_state, skip_program_trading=program_traded_early)
 
     # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
     deep_dive_report = ""

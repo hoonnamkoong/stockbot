@@ -61,33 +61,29 @@ class BullMomentumSimulator(BaseSimulator):
 
         # 2. 불타기 (Pyramiding) — 보유 종목 +5% & 미증액 시 1회만
         # is_scaled_out(base)는 부분매도 플래그와 충돌하므로 sim4 전용 'pyramided' 플래그 사용
-        if self.state.get('market_index_healthy', True):
-            for code in list(self.state['portfolio'].keys()):
-                if code in sold_today: continue
-                p_item = self.state['portfolio'][code]
-                current_price = current_prices.get(code, 0)
-                if current_price <= 0: continue
-                avg_price = p_item.get('avg_price', 0)
-                if avg_price <= 0: continue
-                profit_rate = (current_price - avg_price) / avg_price * 100
-                # 불타기 추가 조건: 기관 OR 외인 추정 순매수 양수여야 허수 신호 제거
-                _s = candidate_map.get(code, {})
-                orgn_support = _s.get('orgn_fake_ntby_qty', 0)
-                frgn_support = _s.get('frgn_fake_ntby_qty', 0)
-                has_inst_support = (orgn_support > 0 or frgn_support > 0)
-                if profit_rate >= 5.0 and not p_item.get('pyramided', False) and has_inst_support:
-                    add_qty = int(p_item['quantity'] * 0.5)
-                    cost = add_qty * current_price
-                    if add_qty > 0 and cost <= self.state['cash'] * 0.15:
-                        if self.buy(code, p_item['name'], current_price, add_qty,
-                                    reason=f"[상승모멘텀] 불타기 50% (기관{orgn_support:+,}/외인{frgn_support:+,})"):
-                            self.state['portfolio'][code]['pyramided'] = True
-                            self.save_state(current_prices)
+        for code in list(self.state['portfolio'].keys()):
+            if code in sold_today: continue
+            p_item = self.state['portfolio'][code]
+            current_price = current_prices.get(code, 0)
+            if current_price <= 0: continue
+            avg_price = p_item.get('avg_price', 0)
+            if avg_price <= 0: continue
+            profit_rate = (current_price - avg_price) / avg_price * 100
+            # 불타기 추가 조건: 기관 OR 외인 추정 순매수 양수여야 허수 신호 제거
+            _s = candidate_map.get(code, {})
+            orgn_support = _s.get('orgn_fake_ntby_qty', 0)
+            frgn_support = _s.get('frgn_fake_ntby_qty', 0)
+            has_inst_support = (orgn_support > 0 or frgn_support > 0)
+            if profit_rate >= 5.0 and not p_item.get('pyramided', False) and has_inst_support:
+                add_qty = int(p_item['quantity'] * 0.5)
+                cost = add_qty * current_price
+                if add_qty > 0 and cost <= self.state['cash'] * 0.15:
+                    if self.buy(code, p_item['name'], current_price, add_qty,
+                                reason=f"[상승모멘텀] 불타기 50% (기관{orgn_support:+,}/외인{frgn_support:+,})"):
+                        self.state['portfolio'][code]['pyramided'] = True
+                        self.save_state(current_prices)
 
         # 3. 진입 (고유동성 + 강한 기간 모멘텀 + 당일 상승 + ADX + 체결강도)
-        if not self.state.get('market_index_healthy', True):
-            return self.calculate_stats(current_prices)
-
         target_amount = self.calc_nav(current_prices) * self.POSITION_WEIGHT
         for stock in candidates:
             if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break

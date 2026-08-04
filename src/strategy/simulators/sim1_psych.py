@@ -230,9 +230,6 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
     snapshot = build_snapshot(rows, today, ts)
 
     # 2. 진입
-    if not view['market_index_healthy']:
-        return orders, diags, snapshot
-
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len([c for c in portfolio if c not in sold])
     for stock in candidates:

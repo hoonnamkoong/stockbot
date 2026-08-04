@@ -36,13 +36,13 @@ def _sim(tmp_path, cls=SidewaysSwingSimulator, cash=NAV, portfolio=None):
     s.log_file = str(tmp_path / "s.log")
     s.state = {'initial_cash': NAV, 'cash': cash, 'invested': 0, 'portfolio': portfolio or {},
                'peak_nav': NAV, 'total_fees': 0, 'history': [NAV], 'daily_trades': [],
-               'market_index_healthy': True, 'cooldown_codes': {}}
+               'cooldown_codes': {}}
     return s
 
 
-def _view(portfolio=None, cash=NAV, nav=NAV, healthy=True):
+def _view(portfolio=None, cash=NAV, nav=NAV):
     return {'portfolio': portfolio or {}, 'cash': cash, 'initial_cash': NAV, 'nav': nav,
-            'cooldown_codes': {}, 'market_index_healthy': healthy}
+            'cooldown_codes': {}}
 
 
 # ---------------------------------------------------------------- 원인 A: 상한

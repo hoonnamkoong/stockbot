@@ -36,6 +36,17 @@
 #   tradeable: true  → 실전 계좌 '프로그램 선택' 드롭다운에 노출(자동 운용 가능)
 #   tradeable: false → 분석기/미매매 심(예: Libero). 프로그램 선택 불가
 #   → 이 플래그가 프론트·파이프라인 공통 동적 소스. 심 추가/삭제/변경 시 여기만 수정.
+#
+# [스크래핑(네이버 게시글) 필요 여부 — needs_buzz]
+#   true     → 이 심의 진입 신호가 버즈 후보(게시글 스캔 결과)를 직접 쓴다.
+#   false    → get_universe()가 KIS 순위 API로 자체 유니버스를 조회한다. 스크래핑을
+#              기다릴 필요가 없다 — 실전 계좌가 이 심을 선택하면 매매를 먼저 내고
+#              그 다음에 스크래핑·나머지 심을 돈다(orchestrator 순서 분기).
+#   dynamic  → 국면에 따라 필요 여부가 바뀐다(Sim10). 클래스에 반드시
+#              `needs_buzz(regime) -> bool` classmethod가 있어야 한다
+#              (registry.needs_buzz()가 그 값을 dynamic일 때 호출한다).
+#   새 심을 추가하면서 이 필드를 빠뜨리면 registry가 fail-safe로 True(버즈 필요)
+#   취급한다 — 신호에 뭘 쓰는지 모르는 채로 스크래핑을 건너뛰는 사고를 막는다.
 # ================================================================
 
 # 현재 활성 전략 키 (strategies 항목 중 하나와 일치해야 함)
@@ -74,6 +85,7 @@ simulators:
     analyzer: true   # 매매하지 않는다 — 리셋·브리프 대상에서 제외
     active: true
     tradeable: false  # 분석기(IS_ANALYZER) — 매매 없음, 프로그램 선택 불가
+    needs_buzz: false  # top100 라이브 실측만으로 국면 판정 가능 (candidates는 표시 전용 지표만)
 
   - id: "sim_psych"
     module: "src.strategy.simulators.sim1_psych"
@@ -89,6 +101,7 @@ simulators:
     color: "blue"
     active: true
     tradeable: true
+    needs_buzz: true  # 작성자 수·배수가 진입 신호 본체
 
   - id: "sim_spillover"
     module: "src.strategy.simulators.sim2_spillover"
@@ -104,6 +117,7 @@ simulators:
     color: "violet"
     active: true
     tradeable: true
+    needs_buzz: false  # 외인·기관 순매수 상위 30 (KIS 자체 유니버스)
 
   - id: "sim_risk"
     module: "src.strategy.simulators.sim3_risk"
@@ -119,6 +133,7 @@ simulators:
     color: "red"
     active: true
     tradeable: true
+    needs_buzz: false  # 재무수익성 상위 30 (KIS 자체 유니버스)
 
   - id: "sim4_bull"
     module: "src.strategy.simulators.sim4_bull_momentum"
@@ -134,6 +149,7 @@ simulators:
     color: "green"
     active: true
     tradeable: true
+    needs_buzz: false  # 당일 등락률 상위 30 (KIS 자체 유니버스)
 
   - id: "sim5_sideways"
     module: "src.strategy.simulators.sim5_sideways_swing"
@@ -149,6 +165,7 @@ simulators:
     color: "yellow"
     active: true
     tradeable: true
+    needs_buzz: true  # range_history(20일 종가, 채널 산출용)가 버즈 경로에만 채워짐
 
   - id: "sim6_bear"
     module: "src.strategy.simulators.sim6_bear_hedge"
@@ -164,6 +181,7 @@ simulators:
     color: "cyan"
     active: true
     tradeable: true
+    needs_buzz: false  # 인버스 ETF 고정 유니버스 (스크리너 불필요)
 
   - id: "sim4_bull_daytrading"
     module: "src.strategy.simulators.sim4_bull_daytrading"
@@ -179,6 +197,7 @@ simulators:
     color: "teal"
     active: true
     tradeable: true
+    needs_buzz: false  # 당일 등락률 상위 30 (KIS 자체 유니버스) — 실전 계좌 현재 선택 중
 
   - id: "sim7_report_follower"
     module: "src.strategy.simulators.sim7_report_follower"
@@ -194,6 +213,7 @@ simulators:
     color: "pink"
     active: true
     tradeable: true
+    needs_buzz: true  # Stage 3.5 딥다이브 결과를 소비
 
   - id: "sim10_orchestrator"
     module: "src.strategy.simulators.sim10_orchestrator"
@@ -209,6 +229,7 @@ simulators:
     color: "grape"
     active: true
     tradeable: true
+    needs_buzz: dynamic  # BULL/BEAR=자체 유니버스(불필요), SIDEWAYS=공통 버즈 후보(필요)
 
   - id: "sim8_accumulation"
     module: "src.strategy.simulators.sim8_accumulation"
@@ -224,6 +245,7 @@ simulators:
     color: "indigo"
     active: true
     tradeable: false  # 과거 검증 불가(엑셀에 52주·수급추정 컬럼 없음) — 페이퍼 관찰 단계
+    needs_buzz: false  # 외인·기관 순매수 상위 30 (KIS 자체 유니버스)
 
   - id: "sim9_gap_fade"
     module: "src.strategy.simulators.sim9_gap_fade"
@@ -239,6 +261,7 @@ simulators:
     color: "orange"
     active: true
     tradeable: false  # 실측 시가가 09:02 근사였음 — 실제 시가로 재검증 후 승격
+    needs_buzz: true  # candidates의 open_price(시가) 필요
 
   - id: "sim9_1_donchian"
     module: "src.strategy.simulators.sim9_1_donchian"
@@ -254,3 +277,4 @@ simulators:
     color: "lime"
     active: true
     tradeable: false  # 과거 검증 불가(엑셀 유니버스가 동적이라 20일 채널 신호 4건) — 페이퍼 관찰
+    needs_buzz: true  # IS_EOD — 장중 10분 루프 밖(scripts/run_eod_sims.py). 값은 비관여이나 명시

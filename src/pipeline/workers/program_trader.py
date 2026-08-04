@@ -19,8 +19,7 @@ config(비공개 stockbot-secret/program_trading.json)가 ON이고 유효할 때
 - 심 선택 = 해당 심과 동일 동작:
   (1) 심 전용 유니버스(get_universe)를 페이퍼 경로(_run_simulators)와 동일하게 적용,
   (2) 사이징을 effective_budget 기준으로 스케일(비례 축소 복제본),
-  (3) partial_sold 등 전략 플래그·손절 쿨다운을 원장에 영속화,
-  (4) market_index_healthy 게이트를 가상 심 상태에서 승계.
+  (3) partial_sold 등 전략 플래그·손절 쿨다운을 원장에 영속화.
 - 매수는 effective_budget(=budget + 누적실현손익) − 프로그램 기투자액 내(스냅샷 cash로 강제).
   실현손익이 원장에 누적되어 자동 복리 — 수익은 다음 실행부터 굴리고, 손실도 그만큼 반영.
 - 중복 실행 가드(원장 last_run).
@@ -48,6 +47,17 @@ def _buy_allowed(now_kst) -> bool:
     이유는 `PipelineContext.is_buy_window()` 주석에 있다.
     """
     return (now_kst.hour, now_kst.minute) < MARKET_CLOSE_HHMM
+
+
+def _extract_odno(order_res: dict) -> str:
+    """/api/trade/order 응답에서 KIS 주문번호를 꺼낸다(E10).
+
+    'UNKNOWN'은 라우트가 ODNO를 못 받았을 때의 폴백값(order/route.ts) —
+    나중에 TTTC8001R 체결 조회와 매칭하는 데 못 쓰므로 빈 문자열로 취급한다.
+    """
+    odno = ((order_res or {}).get('data') or {}).get('odno') or ''
+    odno = odno.strip()
+    return '' if odno == 'UNKNOWN' else odno
 
 # config·원장 모두 비공개 레포에 있다. config는 프론트가 유일 writer(파이프라인은 읽기만),
 # 원장은 이 모듈이 유일 writer.
@@ -315,6 +325,25 @@ def _merge_strategy_flags(positions: dict, snapshot_portfolio: dict, failed_code
                 p[k] = v
 
 
+def peek_selected_sim(log=print) -> str | None:
+    """프로그램 매매가 켜져 있고 유효하면 선택된 심 id, 아니면 None.
+
+    E3(순서 가변 분기)이 스크래핑 전에 '버즈가 필요한 심을 골랐는가'만 미리
+    알기 위해 쓴다. run_program_trading()의 본 게이트(예산·원장·실계좌 조회 등)를
+    앞질러 판단하지 않는다 — 이 함수가 True를 준 뒤에도 실제 실행 여부는
+    run_program_trading()이 다시 처음부터 fail-closed로 판정한다. 이 함수는
+    그 어떤 안전장치도 대체하지 않는다.
+    """
+    cfg = _read_config_fresh(log)
+    if not cfg or not cfg.get('enabled'):
+        return None
+    sim_id = cfg.get('selected_sim')
+    from src.strategy.registry import get_tradeable_simulator_ids
+    if sim_id not in get_tradeable_simulator_ids():
+        return None
+    return sim_id
+
+
 def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: datetime,
                         log=print, log_error=print, enrich=None) -> None:
     """프로그램 매매 1회 실행. 모든 게이트 통과 시에만 실주문."""
@@ -397,12 +426,8 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         log(f"[Program] 심 인스턴스 생성 실패: {sim_id} — skip")
         return
 
-    # market_index_healthy 게이트는 가상 심 상태(리베로가 기록)에서 승계 — 페이퍼와 동일 동작.
     # 주의: sim.state는 _make_adapter가 스냅샷으로 갈아끼우기 전까지만 페이퍼 상태다.
     paper_state = getattr(sim, 'state', None)
-    market_index_healthy = True
-    if isinstance(paper_state, dict):
-        market_index_healthy = bool(paper_state.get('market_index_healthy', True))
 
     # 7. 심 전용 유니버스 적용 (페이퍼 경로 _run_simulators와 동일 의미론)
     sim_candidates = _resolve_candidates(sim, candidates, enrich, log, log_error)
@@ -451,7 +476,6 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         'invested': invested_cost,
         'portfolio': snapshot_portfolio,
         'total_fees': 0, 'history': [effective_budget], 'daily_trades': [], 'peak_nav': effective_budget,
-        'market_index_healthy': market_index_healthy,
         'cooldown_codes': dict(ledger.get('cooldown_codes', {})),  # 손절 쿨다운 영속화
         'exec_path': 'program',  # 심이 진단 로그를 페이퍼와 분리하도록 알린다
     }
@@ -546,13 +570,21 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 _apply_order_to_positions(positions, o, today)
                 if turn and side == 'buy' and code in positions:
                     positions[code]['tag'] = active_tag
+                # [E10] KIS 주문번호를 기록만 한다 — 아직 원장 값(avg_price 등)을
+                # 이걸로 정정하지는 않는다. 며칠 관찰 후 추정치와 실측의 차이를
+                # 보고 다음 단계에서 자동 대사를 붙인다(설계 문서 Rollback Plan).
+                odno = _extract_odno(res)
+                if odno and code in positions:
+                    positions[code]['last_odno'] = odno
                 append_order_history({
                     'executed_at': now_kst.isoformat(), 'side': side, 'code': code,
                     'name': o.get('name', ''), 'qty': qty, 'price': price,
                     'status': 'executed', 'reason': f"[프로그램:{sim_id}] {o.get('reason', '')}",
+                    'odno': odno,
                 })
                 executed += 1
-                log(f"[Program] 체결: {side.upper()} {code} {qty}주 @ {price}")
+                log(f"[Program] 체결: {side.upper()} {code} {qty}주 @ {price}"
+                    f"{f' (odno={odno})' if odno else ''}")
             else:
                 failed_codes.add(code)
                 log(f"[Program] 주문 거부 {code}: {res.get('error')}")

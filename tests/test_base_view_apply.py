@@ -9,7 +9,7 @@ def _sim(tmp_path):
     s.state_file = str(tmp_path / "s.json"); s.csv_file = str(tmp_path / "s.csv"); s.log_file = str(tmp_path / "s.log")
     s.state = {'initial_cash': 3_000_000, 'cash': 3_000_000, 'invested': 0, 'portfolio': {},
                'peak_nav': 3_000_000, 'total_fees': 0, 'history': [3_000_000], 'daily_trades': [],
-               'market_index_healthy': True, 'cooldown_codes': {}}
+               'cooldown_codes': {}}
     return s
 
 
@@ -17,7 +17,7 @@ def test_view_exposes_readonly_state(tmp_path):
     s = _sim(tmp_path)
     v = s._view()
     assert v['cash'] == 3_000_000 and v['initial_cash'] == 3_000_000
-    assert v['portfolio'] == {} and v['market_index_healthy'] is True
+    assert v['portfolio'] == {}
 
 
 def test_apply_buy_then_sell(tmp_path):

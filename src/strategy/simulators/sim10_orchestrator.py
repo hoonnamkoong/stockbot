@@ -15,6 +15,18 @@ class Sim10OrchestratorSimulator(BaseSimulator):
     def __init__(self, initial_cash=3_000_000):
         super().__init__("orchestrator", initial_cash)
 
+    @classmethod
+    def needs_buzz(cls, regime: str | None) -> bool:
+        """이 심의 버즈(네이버 게시글) 필요 여부는 국면에 따라 바뀐다.
+
+        BULL·BEAR는 get_universe()가 KIS 자체 유니버스를 쓰므로 불필요.
+        SIDEWAYS는 get_universe()가 None을 반환해 공통 버즈 후보로 폴백하므로
+        필요. 국면을 모르면(regime=None) 버즈 필요로 취급한다 — 스크래핑을
+        건너뛰었다가 실제로는 SIDEWAYS라 유니버스가 텅 비는 사고를 막는다.
+        registry.needs_buzz()가 매니페스트의 needs_buzz: dynamic일 때 호출한다.
+        """
+        return regime not in ("BULL", "BEAR")
+
     def _read_regime(self):
         """Sim0(리베로)의 국면과 bull_score를 읽는다.
 

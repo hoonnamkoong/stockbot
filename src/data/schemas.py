@@ -215,7 +215,6 @@ class SyncState(BaseModel):
     sync_state.json의 스키마입니다.
     """
     last_update_date: str = ""        # 상태 파일이 마지막으로 업데이트된 날짜 (YYYY-MM-DD)
-    market_index_healthy: bool = True # [V60.0] 시장 지수 건강 상태
     stocks: dict = {}                 # [Legacy] 종목별 연속일수 등 보관
     reported_codes: list = []         # [Legacy] 전체 기간 중 보고된 적 있는 종목 코드 리스트
     daily_reported_info: list = []    # 당일 텔레그램으로 보고된 전체 종목 리스트 (rank 포함)

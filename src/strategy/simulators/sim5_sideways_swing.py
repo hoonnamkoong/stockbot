@@ -77,8 +77,6 @@ def decide_sideways(view, candidates, current_prices):
                 pass
 
     # 2. 진입: 넓은 채널 + 저점 근접 + 당일 급락 아님
-    if not view['market_index_healthy']:
-        return orders
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len(portfolio) - len(sold)
     for stock in candidates:

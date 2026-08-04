@@ -164,6 +164,51 @@ def get_tradeable_simulator_ids() -> list[str]:
     ]
 
 
+def get_analyzer_simulator():
+    """유일한 분석기 심(현재 Sim0 리베로) 인스턴스.
+
+    tradeable 화이트리스트와 무관하게 로드한다 — 국면 판단을 스크래핑보다
+    먼저 돌리는 Stage 0(trade_engine.run_regime_stage)의 유일한 진입점이다.
+    분석기가 정확히 하나라는 전제는 regime_state.regime_state_filename()과 같다.
+    """
+    manifest = _load_manifest()
+    analyzers = [s for s in manifest.get('simulators', [])
+                 if s.get('active', True) and s.get('analyzer', False)]
+    if len(analyzers) != 1:
+        raise ValueError(
+            f"[Registry] 분석기 심이 {len(analyzers)}개다(1개여야 한다): "
+            f"{[s['id'] for s in analyzers]}")
+    s = analyzers[0]
+    cls = _load_class(s['module'], s['class'])
+    return cls()
+
+
+def needs_buzz(sim_id: str, regime: str | None = None) -> bool:
+    """이 심이 이번 실행에 버즈(네이버 게시글) 후보가 필요한가.
+
+    매니페스트의 needs_buzz 값이 'dynamic'이면 심 클래스의 needs_buzz(regime)
+    classmethod를 호출한다 — Sim10처럼 국면에 따라 필요 여부가 바뀌는 심.
+    정적 값(true/false)이면 그대로 쓴다. 매니페스트에 필드가 없으면 fail-safe로
+    필요(True) 취급한다 — 신호에 뭘 쓰는지 모르는 새 심이 스크래핑을 건너뛰는
+    사고를 막는다.
+    """
+    manifest = _load_manifest()
+    for s in manifest.get('simulators', []):
+        if s['id'] != sim_id:
+            continue
+        v = s.get('needs_buzz', True)
+        if v == 'dynamic':
+            cls = _load_class(s['module'], s['class'])
+            fn = getattr(cls, 'needs_buzz', None)
+            if fn is None:
+                raise ValueError(
+                    f"[Registry] {sim_id}: needs_buzz=dynamic인데 클래스에 "
+                    f"needs_buzz(regime) classmethod가 없다")
+            return bool(fn(regime))
+        return bool(v)
+    raise KeyError(f"[Registry] 심 '{sim_id}'를 매니페스트에서 찾을 수 없습니다.")
+
+
 def get_simulator_by_id(sim_id: str, initial_cash: int | None = None):
     """id로 매매 가능 시뮬레이터 인스턴스를 반환. active && tradeable 이 아니면 None(화이트리스트 강제).
 

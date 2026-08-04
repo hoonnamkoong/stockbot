@@ -11,9 +11,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.strategy.simulators.sim1_psych import decide_psych, MIN_SAMPLE
 
 
-def _view(portfolio=None, nav=3_000_000, healthy=True):
+def _view(portfolio=None, nav=3_000_000):
     return {'portfolio': portfolio or {}, 'cash': nav, 'initial_cash': 3_000_000,
-            'nav': nav, 'cooldown_codes': {}, 'market_index_healthy': healthy}
+            'nav': nav, 'cooldown_codes': {}}
 
 
 def _filler(n=MIN_SAMPLE + 2):
@@ -91,11 +91,6 @@ def test_weak_tick_power_is_rejected():
     orders, diags, _ = decide_psych(_view(), [_target(tick_power=90.0)] + _filler(),
                                  {'T001': 1000})
     assert _buys(orders) == [] and _reason(diags, 'T001') == 'weak_demand'
-
-
-def test_no_entry_when_market_unhealthy():
-    orders, _, _ = decide_psych(_view(healthy=False), [_target()] + _filler(), {'T001': 1000})
-    assert _buys(orders) == []
 
 
 # ── 진단 로그 ────────────────────────────────────────────

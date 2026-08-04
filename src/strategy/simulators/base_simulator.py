@@ -38,7 +38,6 @@ def initial_state(cash):
         "total_fees": 0,
         "history": [cash],
         "daily_trades": [],
-        "market_index_healthy": True,  # [V2] 시장 지수 상태
         "cooldown_codes": {},
     }
 
@@ -131,7 +130,6 @@ class BaseSimulator:
                     self.state = data
                     # 신규 필드 마이그레이션
                     self.state.setdefault('initial_cash', self.initial_cash)
-                    self.state.setdefault('market_index_healthy', True)
                     self.state.setdefault('peak_nav', data.get('cash', self.initial_cash))
                     self.state.setdefault('total_fees', 0)
                     self.state.setdefault('daily_trades', [])
@@ -577,7 +575,6 @@ class BaseSimulator:
             'initial_cash': self.initial_cash,
             'nav': self.calc_nav(current_prices),
             'cooldown_codes': self.state.get('cooldown_codes', {}),
-            'market_index_healthy': self.state.get('market_index_healthy', True),
         }
 
     def _apply(self, orders, current_prices=None):

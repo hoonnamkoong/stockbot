@@ -63,7 +63,6 @@ export function buildResetState(cash: number): Record<string, unknown> {
       cash
     ],
     "daily_trades": [],
-    "market_index_healthy": true,
     "cooldown_codes": {}
   };
 }

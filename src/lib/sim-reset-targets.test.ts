@@ -36,7 +36,6 @@ test('buildResetState는 reset_state shape', () => {
   assert.deepEqual(s.portfolio, {});
   assert.deepEqual(s.history, [3_000_000]);
   assert.deepEqual(s.daily_trades, []);
-  assert.equal(s.market_index_healthy, true);
   assert.deepEqual(s.cooldown_codes, {});
 });
 

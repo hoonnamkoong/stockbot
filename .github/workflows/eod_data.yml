@@ -131,13 +131,17 @@ jobs:
           else
             echo "[OHLCV] 파일 없음 - 종가만 배포한다"
           fi
-          # 심9-1 상태·매매기록. 이걸 안 올리면 매일 백지에서 시작해 보유가 사라진다.
-          for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv; do
-            [ -f "data/$f" ] && cp "data/$f" db_repo/data/
-          done
           cd db_repo
           git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv
-          git add data/sim_donchian_state.json data/sim_donchian_log.json data/trade_history_sim_donchian.csv 2>/dev/null || true
+          # 심9-1 상태·매매기록. 이걸 안 올리면 매일 백지에서 시작해 보유가 사라진다.
+          # git add는 인자로 받은 경로 중 하나라도 없으면 전체를 원자적으로 실패시킨다.
+          # sim_donchian_log.json은 실제로 쓰인 적 없는 파일이라 이 셋을 한 줄로 add하면
+          # 그 하나 때문에 state.json·CSV까지 매번 조용히 add가 안 됐다(2026-08-05 발견,
+          # 심9-1이 매일 실행·매수까지 하고도 db-data에 한 번도 반영되지 못한 원인).
+          # 파일별로 나눠서 서로 실패가 전염되지 않게 한다.
+          for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv; do
+            [ -f "../data/$f" ] && cp "../data/$f" "data/$f" && git add "data/$f"
+          done
           if ! git diff --cached --quiet; then
             git commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')"
             git push origin db-data

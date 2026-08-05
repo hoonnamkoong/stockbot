@@ -442,6 +442,11 @@ class TradeEngineWorker(BaseWorker):
                         for _f in ('w52_hgpr', 'w52_lwpr'):
                             if _f not in stock and quote.get(_f):
                                 stock[_f] = quote[_f]
+                        # [Sim9] 갭소진 판정 재료. 자체 유니버스(등락률 상위)로 들어온
+                        # 종목엔 이 필드들이 없어 갭 계산 전에 전량 continue됐다.
+                        for _f in ('open_price', 'day_high', 'day_low', 'prev_close'):
+                            if _f not in stock and quote.get(_f):
+                                stock[_f] = quote[_f]
                     except Exception:
                         pass
                 # 수급 — 유니버스 자체에 이미 값이 있으면 덮어쓰지 않음

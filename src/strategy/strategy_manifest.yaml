@@ -261,7 +261,9 @@ simulators:
     color: "orange"
     active: true
     tradeable: false  # 실측 시가가 09:02 근사였음 — 실제 시가로 재검증 후 승격
-    needs_buzz: true  # candidates의 open_price(시가) 필요
+    needs_buzz: false  # 2026-08-05: 진입신호가 버즈 텍스트를 안 쓰는데 버즈 풀(16~24개)에
+                        # 묶여 신호 빈도 추정 자체가 틀렸었다. get_universe()가 KIS 상승률
+                        # 상위(자체 유니버스)로 대체 — Sim2/3/4/6과 같은 패턴
 
   - id: "sim9_1_donchian"
     module: "src.strategy.simulators.sim9_1_donchian"

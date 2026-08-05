@@ -450,10 +450,16 @@ class KISDataProvider:
     def get_price_quote(self, code: str) -> dict:
         """
         KIS inquire-price(FHKST01010100)로 현재가, PER, PBR, sector_name, 52주 고저 반환.
-        반환 키: price, change_rate_pct, per, pbr, sector_name, w52_hgpr, w52_lwpr
+        반환 키: price, change_rate_pct, per, pbr, sector_name, w52_hgpr, w52_lwpr,
+                open_price, day_high, day_low, prev_close
 
         52주 고저는 같은 응답에 이미 들어 있는데 버리고 있었다 — Sim8의 앵커 판정
         재료라 추가 콜 없이 함께 돌려준다.
+
+        [Sim9] open_price/day_high/day_low/prev_close도 같은 응답 블록이다 — 추가 콜 0.
+        Sim9가 버즈 유니버스 대신 이 API로 자체 유니버스를 쓰게 되면서(2026-08-05)
+        필요해졌다. data_fetcher._get_stock_details가 같은 필드를 이미 파싱하고
+        있었는데(버즈 경로 전용), 이 함수는 그걸 몰라서 버리고 있었다.
         """
         key = f"price_quote_{code}"
         cached = self._get_cached(key, self.TTL_REALTIME)
@@ -468,7 +474,8 @@ class KISDataProvider:
         out = body.get("output", {})
         if not out:
             result = {"price": 0, "change_rate_pct": 0.0, "per": 0.0, "pbr": 0.0,
-                      "sector_name": "", "w52_hgpr": 0, "w52_lwpr": 0}
+                      "sector_name": "", "w52_hgpr": 0, "w52_lwpr": 0,
+                      "open_price": 0, "day_high": 0, "day_low": 0, "prev_close": 0}
             self._set_cache(key, result)
             return result
 
@@ -480,6 +487,10 @@ class KISDataProvider:
             "sector_name": out.get("bstp_kor_isnm", "").strip(),
             "w52_hgpr": self._to_int(out.get("w52_hgpr", 0)),
             "w52_lwpr": self._to_int(out.get("w52_lwpr", 0)),
+            "open_price": self._to_int(out.get("stck_oprc", 0)),
+            "day_high": self._to_int(out.get("stck_hgpr", 0)),
+            "day_low": self._to_int(out.get("stck_lwpr", 0)),
+            "prev_close": self._to_int(out.get("stck_sdpr", 0)),
         }
         self._set_cache(key, result)
         return result

@@ -13,6 +13,9 @@ from src.strategy.registry import needs_buzz, _load_manifest
 
 
 # 2026-08-04 office-hours 설계 문서에서 확정한 마킹표.
+# sim9_gap_fade는 2026-08-05에 True→False로 바뀌었다: 진입신호(open_price/
+# day_high/day_low/prev_close)가 버즈 텍스트를 안 쓰는데 버즈 풀(런당 16~24개)에
+# 묶여 신호 빈도 추정이 틀렸다 — get_universe()를 KIS 상승률 상위로 옮겼다.
 EXPECTED_STATIC = {
     'sim0_libero': False,
     'sim_psych': True,
@@ -24,7 +27,7 @@ EXPECTED_STATIC = {
     'sim4_bull_daytrading': False,
     'sim7_report_follower': True,
     'sim8_accumulation': False,
-    'sim9_gap_fade': True,
+    'sim9_gap_fade': False,
     'sim9_1_donchian': True,
 }
 

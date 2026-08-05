@@ -152,12 +152,32 @@ class GapFadeSimulator(BaseSimulator):
       거래대금 10억+ 9,897 → 갭 +7%+ 174 → 장중 -6%- 29 → 일중위치 0.20- **18건**.
       즉 종목-일의 0.18%다. 월 환산 3.8건이고, 위에 적힌 '월 24건'은 다른(더 넓은)
       유니버스에서 나온 숫자다 — top100 기준으로는 그보다 훨씬 드물다.
-      장중 버즈 유니버스는 런당 후보가 45개 안팎이므로 기대 신호는 **약 12거래일에
-      1건**이다. 매매 0건이 여러 날 이어지는 것은 고장이 아니라 설계된 희소성이다.
-      진입 창(14:30~15:20)에 스크래퍼가 10분마다 도는 것은 확인됐다.
+    - ⚠ 2026-08-05까지는 버즈(게시글) 유니버스(런당 16~24개, 45개로 추정했던 것의
+      절반 이하)에 얹혀 있었다. 실측 기대 신호 ≈ 12거래일에 1건이라던 계산 자체가
+      틀린 전제였다 — 실제로는 그보다 3배 가까이 드물었을 것이다. 그 상태로 배포
+      이후(07-28~08-05, 실거래 약 6일) 매매 0건이었던 것은 통계적으로는 설명 가능한
+      범위였지만, 이 페이스로는 검증 자체가 불가능해 get_universe()를 KIS 상승률
+      상위(자체 유니버스)로 옮겼다(위 get_universe() 참고). 진입 창(14:30~15:20)에
+      스크래퍼가 10분마다 도는 것은 확인됐다.
     """
     def __init__(self, initial_cash=3000000):
         super().__init__("GapFade", initial_cash)
+
+    def get_universe(self):
+        """당일 등락률 상위(코스피, FHPST01700000)로 자체 유니버스를 쓴다.
+
+        진입 신호(open_price/day_high/day_low/prev_close)는 버즈(게시글) 텍스트를
+        전혀 쓰지 않는데도 버즈 후보 풀에 얹혀 있었다. 그 풀은 런당 16~24개뿐이라
+        (2026-08-05 실측) 아래 '12거래일에 1건' 추정이 전제한 45개보다 훨씬 작아
+        실제 기대 대기가 3배 가까이 늘어난다 — Sim2/3/4/6과 같은 이유로 KIS 자체
+        유니버스로 옮긴다. 갭+7% 후 장중 -6% 되밀려도 전일 종가 대비로는 대개
+        +5%대라 상승률 상위에 남으므로 limit을 넉넉히 잡는다.
+        """
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_fluctuation_rank(market='0001', sort='0', limit=50)
+        except Exception:
+            return None
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}

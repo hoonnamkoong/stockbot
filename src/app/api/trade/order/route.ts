@@ -141,10 +141,15 @@ export async function POST(request: Request) {
             console.error('[History Sync Error]', hErr);
         }
 
-        return NextResponse.json({ 
-            success: true, 
+        return NextResponse.json({
+            success: true,
             data: {
-                odno: result.ODNO || result.KRX_FWDG_ORD_ORGNO || 'UNKNOWN',
+                // KIS order-cash 응답은 ODNO/KRX_FWDG_ORD_ORGNO가 최상위가 아니라
+                // output 아래 있다(다른 KIS 콜의 output1/output2와 같은 규약,
+                // kis-api.ts의 다른 함수들 참고). 2026-08-05까지 이 라우트만
+                // 최상위에서 읽어 실전 주문마다 odno가 항상 'UNKNOWN'으로 빠졌다
+                // (E10 주문번호 캡처가 배포 이후 한 번도 성공한 적이 없었다).
+                odno: result.output?.ODNO || result.output?.KRX_FWDG_ORD_ORGNO || 'UNKNOWN',
                 rt_cd: result.rt_cd || '0',
                 msg: result.msg1 || '주문이 성공적으로 접수되었습니다.'
             }

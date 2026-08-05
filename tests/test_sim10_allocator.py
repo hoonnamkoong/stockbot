@@ -19,8 +19,10 @@ def _sim(tmp_path, regime):
 
 def test_bull_regime_enters_via_daytrade_logic(tmp_path):
     s = _sim(tmp_path, 'BULL')
+    # 90→110(기간변동 22.2%)은 유지하되 잔파도를 줘서 ADX를 상한(60) 아래로 유지한다
+    # (2026-08-05 Sim4-1 ADX 상한 도입 — 단조상승은 ADX=100이라 이제 거부된다).
     cand = [{'code': '111', 'name': '진입주', 'price': 1000, 'amount': 5_000_000_000,
-             'sparkline_price': [90, 95, 100, 105, 110], 'change_rate': '+3.0%',
+             'sparkline_price': [90, 97, 92, 101, 95, 110], 'change_rate': '+3.0%',
              'orgn_fake_ntby_qty': 100, 'frgn_fake_ntby_qty': 0, 'tick_power': 130.0}]
     s.run(cand, {'111': 1000})
     assert '111' in s.state['portfolio']

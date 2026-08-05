@@ -9,6 +9,12 @@ class BullMomentumSimulator(BaseSimulator):
     """
     MAX_HOLDINGS = 6
     POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% 투입)
+    # ADX 상한(2026-08-05, 심4+4-1 합산 26건 실거래 재집계로 확정):
+    # [0,40)→승률88.9%/+11.22%, [40,60)→100%/+13.46%, [60,80)→50%/-2.63%, [80,100]→28.6%/-6.25%.
+    # 60을 기점으로 승률·평균ROI가 뒤집힌다 — 추세가 이미 다 나온(과열) 종목을 진입시켜
+    # 반전에 물리는 패턴으로 해석. 구간당 4~9건이라 정밀한 임계값까진 못 정해 구간 경계인
+    # 60을 그대로 쓴다.
+    ADX_MAX = 60.0
 
     def __init__(self, initial_cash=3000000):
         super().__init__("Bull", initial_cash)
@@ -98,6 +104,7 @@ class BullMomentumSimulator(BaseSimulator):
             sparkline = stock.get('sparkline_price', [])
             adx = self.calculate_adx(sparkline) if sparkline else 0.0
             if adx < 15.0: continue  # 슬립 모드: 추세 약하면 신규 진입 없음
+            if adx >= self.ADX_MAX: continue  # 과열 모드: 추세가 이미 다 나온 종목은 거른다
 
             period_change = self.calc_period_change(sparkline)
             daily_change = self.parse_change_rate(stock)
@@ -105,7 +112,8 @@ class BullMomentumSimulator(BaseSimulator):
             orgn = stock.get('orgn_fake_ntby_qty', 0)
             frgn = stock.get('frgn_fake_ntby_qty', 0)
             has_inst = (orgn > 0 or frgn > 0)
-            if (5.0 <= period_change <= 40.0 and daily_change > 0 and adx >= 20.0
+            if (5.0 <= period_change <= 40.0 and daily_change > 0
+                    and 20.0 <= adx < self.ADX_MAX
                     and self.validate_tick_power(stock, threshold=120.0)
                     and has_inst):
                 qty = int(target_amount / price)

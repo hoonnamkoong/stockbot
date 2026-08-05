@@ -102,9 +102,12 @@ def test_sizing_grows_with_profit():
 
 # ---------------------------------------------------------------- 실제 투입률
 def _momentum_candidates(n):
-    """Sim4-1/Sim4 진입 조건(기간모멘텀 5~40%, ADX>=20, 당일상승, 수급, 유동성)을 모두 만족."""
+    """Sim4-1/Sim4 진입 조건(기간모멘텀 5~40%, ADX 20~60, 당일상승, 수급, 유동성)을 모두 만족.
+
+    900→1100(기간변동 22.2%)은 예전과 같지만 잔파도를 줘서 ADX를 상한(60) 아래로 유지한다
+    (2026-08-05 ADX 상한 도입 — 단조상승은 ADX=100이라 이제 거부된다)."""
     return [{'code': f'C{i}', 'name': f'종목{i}', 'price': 1_000, 'amount': 5_000_000_000,
-             'sparkline_price': [900, 950, 1000, 1050, 1100], 'change_rate': '+3.0%',
+             'sparkline_price': [900, 970, 920, 1010, 950, 1100], 'change_rate': '+3.0%',
              'orgn_fake_ntby_qty': 100, 'frgn_fake_ntby_qty': 0, 'tick_power': 130.0}
             for i in range(n)]
 

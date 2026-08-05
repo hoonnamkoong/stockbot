@@ -28,6 +28,12 @@ def _partial_days(p_item, today):   # sim4-1 고유(base에 없음)
 
 MAX_HOLDINGS = 6
 POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% 투입)
+# ADX 상한(2026-08-05, 심4+4-1 합산 26건 실거래 재집계로 확정):
+# [0,40)→승률88.9%/+11.22%, [40,60)→100%/+13.46%, [60,80)→50%/-2.63%, [80,100]→28.6%/-6.25%.
+# 60을 기점으로 승률·평균ROI가 뒤집힌다 — 추세가 이미 다 나온(과열) 종목을 진입시켜
+# 반전에 물리는 패턴으로 해석. 구간당 4~9건이라 정밀한 임계값까진 못 정해 구간 경계인
+# 60을 그대로 쓴다.
+ADX_MAX = 60.0
 
 
 def decide_bull_daytrade(view, candidates, current_prices):
@@ -88,12 +94,12 @@ def decide_bull_daytrade(view, candidates, current_prices):
             continue
         sparkline = stock.get('sparkline_price', [])
         adx = _adx(sparkline) if sparkline else 0.0
-        if adx < 20.0:
+        if adx < 20.0 or adx >= ADX_MAX:
             continue
         period_change = _period_change(sparkline)
         daily_change = _parse_change_rate(stock)
         has_inst = (stock.get('orgn_fake_ntby_qty', 0) > 0 or stock.get('frgn_fake_ntby_qty', 0) > 0)
-        if (5.0 <= period_change <= 40.0 and daily_change > 0 and adx >= 20.0
+        if (5.0 <= period_change <= 40.0 and daily_change > 0 and 20.0 <= adx < ADX_MAX
                 and _validate_tick(stock, 120.0) and has_inst):
             qty = int(target_amount / price)
             if qty > 0:

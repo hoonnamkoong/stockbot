@@ -79,6 +79,7 @@ def decide_sideways(view, candidates, current_prices):
     # 2. 진입: 넓은 채널 + 저점 근접 + 당일 급락 아님
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len(portfolio) - len(sold)
+    near_low_pcts = []  # 채널폭 통과 후보의 '저점 대비 %' — 진단용(아래 참고)
     for stock in candidates:
         if held >= MAX_HOLDINGS:
             break
@@ -93,6 +94,8 @@ def decide_sideways(view, candidates, current_prices):
         if not ch:
             continue
         low, high, width_pct = ch
+        if width_pct >= MIN_WIDTH_PCT:
+            near_low_pcts.append((code, (price / low - 1) * 100))
         daily_change = _parse_change_rate(stock)
         if (width_pct >= MIN_WIDTH_PCT
                 and price <= low * (1 + LOW_ZONE)
@@ -103,6 +106,16 @@ def decide_sideways(view, candidates, current_prices):
                                'quantity': qty, 'cooldown': None,
                                'reason': f"[레인지] 저점 매수 (채널폭 {width_pct:.1f}%, 저점 {low:.0f})"})
                 held += 1
+
+    # 진단(2026-08-05): 진입 신호가 며칠째 안 나오는 게 '저점 근처인데 다른 조건에
+    # 걸리는지' 아니면 '애초에 저점 근처 후보가 없는지' 로그가 없어 구분이 안 됐다.
+    # 버즈(인기·상승 종목) 후보와 저점진입 조건이 구조적으로 안 맞을 가능성(Sim9-1과
+    # 같은 패턴)을 확인하기 위한 최소 계측 — 매수가 없을 때만 한 줄 남긴다.
+    if not any(o['action'] == 'BUY' for o in orders) and near_low_pcts:
+        code, pct = min(near_low_pcts, key=lambda x: x[1])
+        print(f"[레인지] 진입 없음 — 채널폭 통과 {len(near_low_pcts)}개 중 "
+              f"저점에 가장 가까운 {code} 저점 대비 {pct:+.1f}% "
+              f"(기준 +{LOW_ZONE * 100:.0f}% 이내)")
     return orders
 
 

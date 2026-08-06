@@ -1,18 +1,22 @@
 name: Trading Lite (2min)
 
 # 스크래핑과 거래 액션을 분리한 두 워크플로 중 '거래' 쪽이다 (2026-08-06).
-#   - trading_lite.yml (2분, 이 파일) : 실전 매매 + 선택 심 페이퍼 갱신
-#   - scraper.yml      (10분)         : 스크래핑·AI·국면 갱신·나머지 심·텔레그램
+#   - trading_lite.yml (매 트리거, 이 파일) : 실전 매매 + 선택 심 페이퍼 갱신
+#   - scraper.yml      (10분에 한 번만 실제로 돎) : 스크래핑·AI·국면 갱신·나머지 심·텔레그램
 #
-# 태스커는 이 워크플로를 tasker_trigger_trade 이벤트로 2분마다 부른다
-# (스크래퍼 쪽 tasker_trigger 설정은 그대로 둔다).
+# [2026-08-07] 태스커 실전 설정에는 이벤트 타입을 나눠 보낼 방법이 없어서,
+# tasker_trigger 하나만 2분마다 온다는 게 확인됐다. 그래서 tasker_trigger도
+# 듣는다 — scraper.yml도 같은 이벤트를 듣지만 오프틱(10분이 안 됐을 때)에는
+# 곧바로 종료하므로(src/pipeline/scrape_gate.py), 실질적으로 이 워크플로가 매
+# 트리거를 처리하는 쪽이 된다. tasker_trigger_trade는 태스커에 별도 규칙을
+# 추가할 수 있게 되면 쓸 자리로 남겨둔다(둘 다 있어도 무해하다).
 #
 # 여기서 국면(run_regime_stage)을 갱신하지 않는 이유는 scripts/trade_lite.py 참고 —
 # 요약하면 regime_history가 호출마다 누적돼 평활이 왜곡되고, top100 breadth가
 # 종목당 1콜이라 2분 주기면 하루 약 19,500 KIS 콜이 된다.
 on:
   repository_dispatch:
-    types: [tasker_trigger_trade]
+    types: [tasker_trigger, tasker_trigger_trade]
   workflow_dispatch:
 
 # lite끼리만 묶는다. scraper.yml과 그룹을 공유하면 스크래퍼가 도는 4~5분 동안

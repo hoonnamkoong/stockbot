@@ -6,8 +6,11 @@
 Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 """
 
+import os
+
 from src.strategy.regime_state import read_regime
 from src.strategy.registry import needs_buzz as sim_needs_buzz
+from src.pipeline import scrape_gate
 from src.pipeline.context import PipelineContext
 from src.data.storage_manager import StorageManager
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
@@ -141,6 +144,22 @@ def run_pipeline(ctx: PipelineContext) -> None:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 파이프라인을 종료합니다.")
         return
 
+    # ── 스크래핑 게이트(2026-08-07) ──────────────────────────────
+    # 태스커가 tasker_trigger 이벤트 하나만 2분마다 보낸다는 게 드러나서,
+    # trading_lite.yml(2분 전용)뿐 아니라 이 워크플로도 같은 이벤트로 매 2분
+    # 불린다. 아직 스크래핑할 차례가 아니면 여기서 곧바로 끝낸다 — Stage 0(국면
+    # 갱신)조차 하지 않는다. 국면은 사이클당 한 번만 갱신돼야 하고(아래 Stage 0
+    # 주석 참고), 매매(Stage 0.5)는 trading_lite.yml이 같은 트리거로 독립적으로
+    # 이미 처리하므로 여기서 또 시도할 이유가 없다.
+    #
+    # FORCE_RUN은 휴장일 게이트뿐 아니라 이 게이트도 우회한다 — 수동으로
+    # "지금 당장 스크래핑"을 원해서 켠 옵션인데, 10분 게이트에 막히면 의도와
+    # 반대로 동작한다.
+    force_run = os.environ.get('FORCE_RUN', '').strip().lower() == 'true'
+    if not force_run and not scrape_gate.is_scrape_due(ctx.now_kst):
+        ctx.log("스크래핑 아직 아님(오프틱) — trading_lite.yml이 매매를 맡음. 종료합니다.")
+        return
+
     # ── Stage 0: 국면 판단 + 순서 가변 분기(E3) ───────────────────
     # 실전 계좌가 선택한 심이 네이버 게시글(버즈)을 안 쓰면(needs_buzz=False),
     # 스크래핑(Stage 1)을 기다리지 않고 매매부터 낸다. Sim0(리베로) 국면 갱신은
@@ -239,6 +258,11 @@ def run_pipeline(ctx: PipelineContext) -> None:
         deep_dive_report=deep_dive_report,
         sync_state=sync_state,
     )
+
+    # 성공적으로 끝까지 돈 사이클만 "방금 스크래핑했다"로 기록한다. 여기 도달하기
+    # 전에 예외로 죽으면 기록하지 않는다 — 그래야 다음 오프틱 판정이 "아직 신선함"
+    # 으로 잘못 착각하지 않고, 다음 틱에 바로 재시도한다.
+    scrape_gate.mark_scraped(ctx.now_kst)
 
     ctx.log("=" * 50)
     ctx.log("Pipeline 완료")

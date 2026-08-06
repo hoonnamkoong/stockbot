@@ -68,6 +68,56 @@ def _notify_holiday_check_failed(ctx: PipelineContext) -> None:
         ctx.log(f"[경고] 판정 실패 알림 발송에 실패했습니다: {e}")
 
 
+def trade_if_buzz_free(ctx: PipelineContext, trade_worker, regime: str | None) -> str | None:
+    """실전 선택 심이 버즈를 안 쓰면 스크래핑을 기다리지 않고 매매를 낸다(E3).
+
+    스크래퍼(10분)의 Stage 0.5와 trade_lite(2분)가 같은 코드를 쓴다 — 갈리면
+    두 경로의 동작이 어긋나고, 그건 program-trading-parity를 깨는 방식이다.
+
+    반환: 이번 호출에서 실제로 매매한 심 id, 안 했으면 None.
+
+    bool이 아니라 sim_id를 돌려주는 이유: 호출부가 "방금 무엇을 매매했는지" 알아야
+    할 때(예: trade_lite의 페이퍼 동기화) config를 다시 조회하면 안 된다 — 매매
+    실행 중(수초~수십초) config가 바뀌면 다른 심을 조회하게 되는 레이스가 생긴다.
+    이 함수가 실제로 매매를 결정한 그 값을 그대로 넘겨준다.
+    """
+    selected_sim = None
+    try:
+        selected_sim = peek_selected_sim(log=ctx.log)
+    except Exception as e:
+        ctx.log(f"[경고] 선택 심 조회 실패 — 스크래핑 후 매매(느린 경로)로 진행: {e}")
+        return None
+
+    if not selected_sim:
+        ctx.log("[Program] 선택된 심 없음(OFF) — 순서 변경 없음")
+        return None
+
+    try:
+        buzz_free = not sim_needs_buzz(selected_sim, regime)
+    except Exception as e:
+        # registry.needs_buzz()는 매니페스트에 없는 심이나 dynamic 심에
+        # classmethod가 없으면 예외를 던진다. 모르는 것을 "버즈 불필요"로 읽으면
+        # 스크래핑 없이 잘못된 유니버스로 매매가 나갈 수 있다 — 느린 경로로 미룬다.
+        ctx.log(f"[경고] needs_buzz 판정 실패 — 스크래핑 후 매매(느린 경로)로 진행: {e}")
+        return None
+
+    if buzz_free:
+        ctx.log(f"[Program] '{selected_sim}' 버즈 불필요(국면={regime}) — 스크래핑 전에 매매 실행")
+        try:
+            run_program_trading(
+                [], is_market_hours=ctx.is_market_hours(), now_kst=ctx.now_kst,
+                log=trade_worker.log, log_error=trade_worker.log_error,
+                enrich=trade_worker._enrich_universe,
+            )
+            return selected_sim
+        except Exception as e:
+            ctx.log(f"[경고] 조기 프로그램 매매 실패 — Stage 3에서 재시도: {e}")
+            return None
+
+    ctx.log(f"[Program] '{selected_sim}' 버즈 필요(국면={regime}) — 스크래핑 후 매매")
+    return None
+
+
 def run_pipeline(ctx: PipelineContext) -> None:
     """
     StockBot 메인 파이프라인을 실행합니다.
@@ -101,29 +151,10 @@ def run_pipeline(ctx: PipelineContext) -> None:
     with ctx.stage("Stage 0: 국면 판단"):
         regime = trade_worker.run_regime_stage()
 
-    program_traded_early = False
     with ctx.stage("Stage 0.5: 매매 순서 분기"):
-        selected_sim = None
-        try:
-            selected_sim = peek_selected_sim(log=ctx.log)
-        except Exception as e:
-            ctx.log(f"[경고] 선택 심 조회 실패 — 스크래핑 후 매매(느린 경로)로 진행: {e}")
-
-        if selected_sim and not sim_needs_buzz(selected_sim, regime):
-            ctx.log(f"[Program] '{selected_sim}' 버즈 불필요(국면={regime}) — 스크래핑 전에 매매 실행")
-            try:
-                run_program_trading(
-                    [], is_market_hours=ctx.is_market_hours(), now_kst=ctx.now_kst,
-                    log=trade_worker.log, log_error=trade_worker.log_error,
-                    enrich=trade_worker._enrich_universe,
-                )
-                program_traded_early = True
-            except Exception as e:
-                ctx.log(f"[경고] 조기 프로그램 매매 실패 — Stage 3에서 재시도: {e}")
-        elif selected_sim:
-            ctx.log(f"[Program] '{selected_sim}' 버즈 필요(국면={regime}) — 스크래핑 후 매매")
-        else:
-            ctx.log("[Program] 선택된 심 없음(OFF) — 순서 변경 없음")
+        # trade_if_buzz_free는 이제 sim_id|None을 돌려준다(trade_lite가 재조회 없이
+        # 쓰려고). 여기서는 bool만 필요하므로 명시적으로 좁힌다.
+        program_traded_early = trade_if_buzz_free(ctx, trade_worker, regime) is not None
 
     # ── Stage 1: 데이터 수집 및 1차 필터링 ───────────────────────
     with ctx.stage("Stage 1: 데이터 수집"):

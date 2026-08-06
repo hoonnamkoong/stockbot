@@ -285,7 +285,8 @@ class TradeEngineWorker(BaseWorker):
 
         return result.get('current_regime')
 
-    def _run_simulators(self, candidates: list[dict]) -> None:
+    def _run_simulators(self, candidates: list[dict], only_sim_id: str | None = None,
+                        allow_price_fallback: bool = True) -> None:
         """
         YAML Manifest의 active 시뮬레이터들을 실행합니다.
         실제 simulator.run(candidates, current_prices=dict) 시그니처 사용.
@@ -294,6 +295,14 @@ class TradeEngineWorker(BaseWorker):
 
         분석기 심(sim0_libero)은 여기서 돌지 않는다 — run_regime_stage()가
         사이클당 한 번 별도로 돈다(E3).
+
+        only_sim_id: 지정하면 그 심 하나만 돈다. trade_lite(2분 주기)가 실전 선택
+          심의 페이퍼 쌍둥이만 갱신하는 데 쓴다 — 전 심을 2분마다 돌리면 런이
+          153초로 120초 창을 넘겨 매 사이클이 겹친다(2026-08-06 실측).
+        allow_price_fallback: False면 네이버 직접 조회(_fetch_portfolio_prices)를
+          하지 않는다. lite 경로는 "스크래핑을 하지 않는다"가 전제라 이 폴백이 살아
+          있으면 2분마다 네이버를 두드리게 된다. 가격을 못 구한 보유 종목이 있는
+          심은 이번 사이클을 건너뛴다 — 0으로 폴백해 허위 손절을 내지 않는다.
         """
         try:
             # 1. 오늘 candidates 기반으로 현재가 구성
@@ -301,7 +310,19 @@ class TradeEngineWorker(BaseWorker):
                 s['code']: s.get('price', s.get('current_price', 0))
                 for s in candidates if s.get('code')
             }
-            simulators = [s for s in get_active_simulators() if not getattr(s, 'IS_ANALYZER', False)]
+            if only_sim_id:
+                # 인스턴스에는 매니페스트 id가 붙어 있지 않다. 이름으로 하나만 만든다.
+                # initial_cash는 기본값(매니페스트의 심 자본)을 쓴다 — 페이퍼 쌍둥이는
+                # 다른 심과 같은 조건이어야 비교가 성립한다(프로그램 예산이 아니다).
+                from src.strategy.registry import get_simulator_by_id
+                one = get_simulator_by_id(only_sim_id)
+                if one is None:
+                    self.log(f"시뮬레이터 동기화: '{only_sim_id}' 로드 실패 — 생략")
+                    return
+                simulators = [one]
+            else:
+                simulators = [s for s in get_active_simulators()
+                              if not getattr(s, 'IS_ANALYZER', False)]
             self.log(f"시뮬레이터 동기화 시작 ({len(simulators)}개 활성, {len(current_prices)}개 현재가)")
 
             # 2. 포트폴리오 종목 중 현재가 미확보된 코드 수집
@@ -312,11 +333,14 @@ class TradeEngineWorker(BaseWorker):
                         missing_codes.add(code)
 
             # 3. 미확보 종목 현재가를 네이버에서 조회하여 보강
-            if missing_codes:
+            if missing_codes and allow_price_fallback:
                 self.log(f"  현재가 미확보 {len(missing_codes)}개 종목 네이버 보강 조회")
                 extra = self._fetch_portfolio_prices(list(missing_codes))
                 current_prices.update(extra)
                 self.log(f"  보강 결과: { {k: v for k, v in extra.items()} }")
+            elif missing_codes:
+                self.log(f"  현재가 미확보 {len(missing_codes)}개 — 네이버 보강 생략"
+                         f"(lite 경로). 자체 유니버스로 못 채우는 심은 건너뜁니다.")
 
             for sim in simulators:
                 try:
@@ -335,6 +359,18 @@ class TradeEngineWorker(BaseWorker):
                     else:
                         sim_candidates = candidates
                         sim_prices = current_prices
+
+                    # 네이버 폴백을 끈 경로(lite)에서는 보유 종목 현재가가 비어 있을 수
+                    # 있다. 0을 현재가로 넘기면 심이 −100% 손실로 읽고 허위 손절을 낸다.
+                    # 모르는 값은 지어내지 않고 이번 사이클을 건너뛴다.
+                    if not allow_price_fallback:
+                        blind = [c for c in sim.state.get('portfolio', {})
+                                 if not sim_prices.get(c)]
+                        if blind:
+                            self.log(f"  {sim.__class__.__name__} 건너뜀 — 보유 "
+                                     f"{len(blind)}종목 현재가 측정 불가 {blind}")
+                            continue
+
                     sim.run(sim_candidates, current_prices=sim_prices)
                     self.log(f"  {sim.__class__.__name__} 완료")
                 except Exception as e:

@@ -4,6 +4,8 @@ import sys
 import traceback
 from datetime import datetime, timezone
 
+from src.trade import secret_store
+
 # ─── 경로 설정 ───────────────────────────────────────────────────────────────
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 _TRADE_DIR = os.path.join(_REPO_ROOT, 'trade')
@@ -120,6 +122,18 @@ def save_reservations(reservations: list) -> None:
         print(f"[TradeExecutor] 예약 목록 업데이트 완료 (잔여: {len(reservations)}건)")
 
 import csv
+import io
+
+TRADE_HISTORY_HEADER = ["timestamp", "symbol", "action", "price", "quantity",
+                        "total_amount", "roi", "reason"]
+
+
+def _csv_line(values: list) -> str:
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator='').writerow(values)
+    return buf.getvalue()
+
+
 def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[실전] KIS 체정 후 수동 기록", roi=None):
     filepath = os.path.join(_REPO_ROOT, 'data', 'trade_history_real.csv')
     file_exists = os.path.exists(filepath)
@@ -127,21 +141,44 @@ def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[�
     total_amount = qty * price
     # ROI 문자열 처리 (없으면 '-')
     roi_str = f"{roi:+.2f}%" if roi is not None else "-"
-    
+    row = [
+        now_kst.strftime('%Y-%m-%d %H:%M:%S'),
+        f"{name}({code})",
+        side.upper(),
+        f"{price:,.0f}",
+        qty,
+        f"{total_amount:,.0f}",
+        roi_str,
+        reason,
+    ]
+
     with open(filepath, 'a', encoding='utf-8-sig', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["timestamp", "symbol", "action", "price", "quantity", "total_amount", "roi", "reason"])
-        writer.writerow([
-            now_kst.strftime('%Y-%m-%d %H:%M:%S'), 
-            f"{name}({code})", 
-            side.upper(), 
-            f"{price:,.0f}", 
-            qty, 
-            f"{total_amount:,.0f}",
-            roi_str,
-            reason
-        ])
+            writer.writerow(TRADE_HISTORY_HEADER)
+        writer.writerow(row)
+
+    # 비공개 레포에도 직접 덧붙인다. 로컬 파일은 이 런 안에서만 살아 있고,
+    # git 배포로 올리면 다른 워크플로의 사본이 이 기록을 덮어쓸 수 있다.
+    _mirror_to_secret_repo(
+        lambda: secret_store.append_csv_row(
+            'trade_history_real.csv', _csv_line(row), _csv_line(TRADE_HISTORY_HEADER),
+            f'chore: trade {side.upper()} {code} {now_kst:%Y-%m-%d %H:%M}'),
+        'trade_history_real.csv')
+
+
+def _mirror_to_secret_repo(fn, label: str) -> None:
+    """실거래 기록을 비공개 레포에 반영. 실패해도 주문 처리를 멈추지 않는다.
+
+    다만 조용히 넘어가지는 않는다 — 기록 없는 체결은 수익률 집계에서 빠지고,
+    그게 2026-07-08에 179만원어치 청산이 통째로 누락된 방식이었다.
+    """
+    try:
+        if not fn():
+            print(f"[TradeExecutor] ⚠ {label} 비공개 레포 기록 실패 — "
+                  f"이 체결이 집계에서 누락될 수 있습니다. 수동 확인 필요.")
+    except Exception as e:
+        print(f"[TradeExecutor] ⚠ {label} 비공개 레포 기록 예외: {e}")
 
 
 # ─── 유틸리티: 종목명 자동 매칭 ─────────────────────────
@@ -205,6 +242,13 @@ def append_order_history(record: dict) -> None:
 
     history.insert(0, record)
     _save_json_file(ORDER_HISTORY_FILE, history)
+    # 비공개 레포에 직접 덧붙인다(git 배포가 아니라) — 위 append_trade_history_csv의
+    # 주석 참고. 두 워크플로가 각자 사본을 밀면 나중 것이 먼저 기록을 지운다.
+    _mirror_to_secret_repo(
+        lambda: secret_store.append_json_list(
+            'order_history.json', record,
+            f"chore: order {record.get('side', '')} {record.get('code', '')}"),
+        'order_history.json')
     # CSV에도 동시 기록 (ROI 포함)
     append_trade_history_csv(
         side=side,

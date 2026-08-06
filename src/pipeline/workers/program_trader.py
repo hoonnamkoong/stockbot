@@ -29,6 +29,8 @@ config(비공개 stockbot-secret/program_trading.json)가 ON이고 유효할 때
 
 import os
 import json
+import time
+import uuid
 import base64
 import requests
 from datetime import datetime, timedelta
@@ -67,11 +69,28 @@ _SECRET_BRANCH = 'main'
 _CONFIG_PATH = 'program_trading.json'
 _LEDGER_PATH = 'program_positions.json'
 
-_DUP_GUARD_MIN = 5   # 최근 N분 내 재실행 skip (중복 디스패치 방지)
-# 파이프라인이 10분 주기라 15분으로 두면 매 사이클이 걸려 실제 실행이 20분마다로
-# 반토막 났다(2026-07-29 Actions 로그 실측: 샘플한 런이 전부 '중복 방지 skip').
-# 막으려는 건 같은 사이클의 중복 디스패치(수초~1~2분)이므로 5분이면 충분하고,
-# Actions 스케줄 지터로 간격이 9분대로 좁아져도 통과한다.
+_DUP_GUARD_MIN = 1.5   # 최근 N분 내 재실행 skip (중복 디스패치 방지)
+# 이 값은 주기를 따라와야 한다. 파이프라인이 10분 주기일 때 15분으로 뒀더니 매 사이클이
+# 걸려 실제 실행이 20분마다로 반토막 났다(2026-07-29 Actions 로그 실측). 태스커가 2분
+# 주기로 좁혀지면서 5분도 같은 함정이 됐다 — t=0,6,12만 통과하고 t=2,4,8,10은 skip되어
+# 실효 간격이 6분이 된다. 막으려는 건 같은 사이클의 중복 디스패치(수초)이므로 1.5분이면
+# 충분하고, 정상 간격(2분)의 트리거는 통과한다.
+#
+# 주의: 이 가드는 '겹침 방지' 수단이 아니다. 런 실행시간(60~90초)이 가드와 비슷해서
+# 시간 기반 판정만으로는 동시 실행을 막을 수 없다. 그건 아래 원장 락이 한다.
+
+_LOCK_LEASE_MIN = 4   # 락 리스(분). 죽은 런의 락을 자동 회수하는 용도.
+# 런 최대 실행시간보다 길어야 실행 중인 런의 락이 안 뺏긴다. 정상 종료한 런은
+# 락을 명시적으로 비우므로(_release_payload) 리스가 길어도 다음 사이클을 막지 않는다.
+# 워크플로 job의 timeout-minutes를 이 값보다 짧게 걸어, 리스 만료 전에 런이 반드시
+# 죽게 만들어야 좀비 런이 생기지 않는다.
+
+_ORDER_LOOP_DEADLINE_SEC = 150   # 주문 루프 자체 예산(초). 리스(240초)보다 짧다.
+# 리스가 있다고 안심할 게 아니다 — KIS/Vercel이 느려져 이 런이 리스보다 오래
+# 살아있으면, 리스 만료 후 다음 런이 "죽은 런"으로 오판해 락을 회수하고 같은
+# 주문을 또 낸다(원래 런은 아직 살아서 나머지 주문을 계속 내는 중이다). 리스
+# 만료를 기다리지 않고 이 런 스스로 신규 주문을 멈추게 하는 게 유일한 확실한
+# 방어다. 클레임 이후 잔고 조회 등에 쓴 시간을 감안해 리스보다 여유 있게 짧게 잡는다.
 
 
 def _gh_token() -> str | None:
@@ -140,16 +159,21 @@ def _read_ledger_fresh(log=print) -> tuple[dict | None, str | None]:
         return None, None
 
 
-def _write_ledger(ledger: dict, sha: str | None, log=print) -> bool:
-    """원장을 GitHub(secret repo)에 직접 기록. sha 충돌(409/422) 시 fresh sha로 1회 재시도.
+def _write_ledger(ledger: dict, sha: str | None, log=print, retry_on_conflict: bool = True):
+    """원장을 GitHub(secret repo)에 직접 기록.
 
-    기록 실패는 예외를 올리지 않는다 — 다음 실행에서 매수 시 실잔고 이중 방어가
-    중복 매수를 차단하고, 매도된 포지션은 원장∩실보유 교집합에서 자연 제거된다.
+    retry_on_conflict=True(기본): sha 충돌(409/422) 시 fresh sha로 1회 재시도.
+      결과 기록 단계용 — 이미 락을 쥐고 있으므로 덮어써도 된다.
+    retry_on_conflict=False: 충돌이면 그대로 실패를 반환한다.
+      **락 선점 단계는 반드시 이쪽을 써야 한다** — 충돌은 "다른 런이 먼저 잡았다"는
+      뜻이고, 여기서 fresh sha로 재시도하면 남의 락을 덮어써 중복 주문이 난다.
+
+    반환: (성공 여부, 새 sha | None). 새 sha는 다음 PUT에 이어 쓸 수 있다.
     """
     token = _gh_token()
     if not token:
         log('[Program] GH 토큰 없음 → 원장 기록 불가')
-        return False
+        return False, None
     url = f'https://api.github.com/repos/{_SECRET_OWNER}/{_SECRET_REPO}/contents/{_LEDGER_PATH}'
     body = {
         'message': f"program ledger {ledger.get('last_run') or ''}".strip(),
@@ -162,17 +186,84 @@ def _write_ledger(ledger: dict, sha: str | None, log=print) -> bool:
     try:
         res = requests.put(url, headers=_gh_headers(token), json=body, timeout=10)
         if res.status_code in (409, 422):
+            if not retry_on_conflict:
+                return False, None
             cur = requests.get(f'{url}?ref={_SECRET_BRANCH}', headers=_gh_headers(token), timeout=10)
             if cur.status_code == 200:
                 body['sha'] = cur.json().get('sha')
                 res = requests.put(url, headers=_gh_headers(token), json=body, timeout=10)
         if res.status_code not in (200, 201):
             log(f'[Program] 원장 기록 실패 HTTP {res.status_code}')
-            return False
-        return True
+            return False, None
+        new_sha = ((res.json() or {}).get('content') or {}).get('sha')
+        return True, new_sha
     except Exception as e:
         log(f'[Program] 원장 기록 예외: {e}')
+        return False, None
+
+
+def _new_run_id() -> str:
+    """이번 런의 식별자. GitHub Actions 런이면 그 ID를 쓰고(로그 대조가 쉬움),
+    로컬 실행이면 난수로 만든다."""
+    gh = os.environ.get('GITHUB_RUN_ID')
+    attempt = os.environ.get('GITHUB_RUN_ATTEMPT') or '1'
+    if gh:
+        return f'gh-{gh}-{attempt}'
+    return f'local-{uuid.uuid4().hex[:12]}'
+
+
+def _lock_is_live(ledger: dict, now_kst: datetime) -> bool:
+    """다른 런이 원장 락을 쥐고 있는가.
+
+    파싱 불가한 lock_at은 '락 없음'이 아니라 '살아있음'으로 본다 — 모르는 것을
+    자유로 읽으면 중복 주문이 난다(fail-closed).
+    """
+    if not ledger.get('lock_run_id'):
         return False
+    raw = ledger.get('lock_at')
+    if not raw:
+        return True
+    try:
+        held_since = datetime.fromisoformat(raw)
+    except Exception:
+        return True
+    return (now_kst - held_since) < timedelta(minutes=_LOCK_LEASE_MIN)
+
+
+def _lock_held_by(ledger: dict, run_id: str) -> bool:
+    """이 원장의 락이 아직 내 것인가 (좀비 방어용, 결과 기록 직전 확인)."""
+    return ledger.get('lock_run_id') == run_id
+
+
+def _claim_payload(ledger: dict, run_id: str, now_kst: datetime) -> dict:
+    """락 선점용 원장 사본.
+
+    last_run은 건드리지 않는다 — 중복가드(_recently_ran)의 입력이고 락과 수명이
+    다르다. 선점 시점에 밀어버리면 주문이 실패해도 다음 사이클이 가드에 걸린다.
+    """
+    out = dict(ledger)
+    out['lock_run_id'] = run_id
+    out['lock_at'] = now_kst.isoformat()
+    return out
+
+
+def _release_payload(ledger: dict) -> dict:
+    """락 해제용 원장 사본. 정상 종료한 런은 리스를 기다리지 않고 바로 비운다."""
+    out = dict(ledger)
+    out['lock_run_id'] = None
+    out['lock_at'] = None
+    return out
+
+
+def _release_lock(ledger: dict, sha: str | None, log=print) -> None:
+    """락만 비우고 나간다 (주문 없이 중단하는 경로 전용).
+
+    실패해도 예외를 올리지 않는다 — 리스 만료로 자동 회수되므로 최악의 비용은
+    다음 몇 사이클을 못 도는 것이다.
+    """
+    ok, _ = _write_ledger(_release_payload(ledger), sha, log)
+    if not ok:
+        log(f'[Program] 락 해제 실패 — 리스({_LOCK_LEASE_MIN}분) 만료로 자동 회수됩니다')
 
 
 def _resolve_active_tag(sim_id: str, snapshot: dict) -> str:
@@ -369,7 +460,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         log(f"[Program] selected_sim '{sim_id}' 무효(화이트리스트 밖) — skip (fail-safe OFF)")
         return
 
-    # 3. 원장 fresh 조회 (fail-closed) + 중복 실행 가드
+    # 3. 원장 fresh 조회 (fail-closed) + 중복 실행 가드 + 락 선점
     ledger, ledger_sha = _read_ledger_fresh(log)
     if ledger is None:
         log_error('[Program] 원장 조회 실패 — skip (fail-closed: 원장 없이 진행 금지)')
@@ -378,15 +469,38 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         log('[Program] 최근 실행됨 — 중복 방지 skip')
         return
 
+    # 3-b. 원장 락 — 주문을 내기 전에 배타권을 잡는다.
+    # 시간 기반 가드만으로는 겹침을 못 막는다(런 실행시간 ≈ 주기). 두 런이 같은 원장을
+    # 읽고 둘 다 가드를 통과해 같은 주문을 두 번 내는 창을 여기서 닫는다.
+    if _lock_is_live(ledger, now_kst):
+        log(f"[Program] 다른 런이 실행 중(lock={ledger.get('lock_run_id')}) — skip")
+        return
+    run_id = _new_run_id()
+    claimed, ledger_sha = _write_ledger(
+        _claim_payload(ledger, run_id, now_kst), ledger_sha, log, retry_on_conflict=False)
+    if not claimed:
+        # 충돌 = 다른 런이 방금 잡았다. 여기서 fresh sha로 재시도하면 남의 락을
+        # 덮어써 중복 주문이 난다. 이번 사이클은 포기한다(fail-closed).
+        log('[Program] 락 선점 실패(다른 런이 선점) — skip')
+        return
+    ledger['lock_run_id'] = run_id
+    ledger['lock_at'] = now_kst.isoformat()
+    _lock_claimed_at = time.monotonic()  # 주문 루프 자체 데드라인 계산용(벽시계 아님)
+    log(f'[Program] 락 선점 (run_id={run_id})')
+    # ⚠ 여기부터는 주문 없이 나가는 모든 경로에서 _release_lock()을 불러야 한다.
+    #   빠뜨리면 리스({_LOCK_LEASE_MIN}분)가 만료될 때까지 다음 사이클이 전부 막힌다.
+
     # 4. 실계좌 잔고
     try:
         from src.trade.balance import get_balance
         bal = get_balance()
     except Exception as e:
         log_error(f'[Program] 잔고 조회 실패: {e} — skip')
+        _release_lock(ledger, ledger_sha, log)
         return
     if bal.get('error'):
         log_error(f"[Program] 잔고 오류: {bal.get('error')} — skip")
+        _release_lock(ledger, ledger_sha, log)
         return
     real_holdings = {h['code']: h for h in bal.get('holdings', []) if h.get('code')}
 
@@ -411,83 +525,91 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         effective_budget = real_account_value
     if effective_budget <= 0:
         log('[Program] 클램프 후 effective_budget<=0 — skip')
+        _release_lock(ledger, ledger_sha, log)
         return
 
-    # 5. 원장 ↔ 실보유 정합: 프로그램 포지션이 실제로 남아있는 것만 유지(수동 매도분 제거).
-    #    dict 전체 복사 — 심이 붙인 전략 플래그(partial_sold 등)를 그대로 보존.
-    #    사라진 포지션은 손익을 알 수 없으므로 지어내지 않되 미정산으로 기록한다.
-    today = now_kst.strftime('%Y-%m-%d')
-    positions = reconcile_positions(ledger, real_holdings, today, log_error)
-
-    # 6. 심 인스턴스화(화이트리스트). 사이징을 effective_budget 기준으로 스케일
-    #    → 시뮬(initial_cash/N 사이징)의 비례 축소 복제본으로 동작.
-    sim = get_simulator_by_id(sim_id, initial_cash=int(effective_budget))
-    if sim is None:
-        log(f"[Program] 심 인스턴스 생성 실패: {sim_id} — skip")
-        return
-
-    # 주의: sim.state는 _make_adapter가 스냅샷으로 갈아끼우기 전까지만 페이퍼 상태다.
-    paper_state = getattr(sim, 'state', None)
-
-    # 7. 심 전용 유니버스 적용 (페이퍼 경로 _run_simulators와 동일 의미론)
-    sim_candidates = _resolve_candidates(sim, candidates, enrich, log, log_error)
-
-    # 현재가 맵: 최종 후보 + 프로그램 보유 종목
-    current_prices = {}
-    for s in sim_candidates:
-        code = s.get('code')
-        px = s.get('price', s.get('current_price', 0))
-        if code and px:
-            current_prices[code] = float(px)
-    for c, p in positions.items():
-        cp = float(real_holdings[c].get('current_price') or 0)
-        if cp > 0:
-            current_prices.setdefault(c, cp)
-            if cp > p.get('peak_price', 0):
-                p['peak_price'] = cp  # 트레일링용 고점 갱신
-
-    # 7-b. [턴 회계] config가 연 턴을 원장에 반영. 표시 전용 — 실패해도 매매는 계속한다.
-    turn = ledger.get('turn') or {}
+    # 5~9. 정합 → 심 인스턴스화 → 유니버스 → 스냅샷 → 어댑터 → 심 실행.
+    # 이 블록 전체를 하나의 try로 묶는다 — 락 선점 이후 주문 없이 나가는 경로가
+    # 여럿인데(reconcile_positions, get_simulator_by_id, snapshot 구성 등) 하나씩
+    # 개별 가드를 달면 새로 추가되는 단계가 빠지기 쉽다. 여기서 예외가 나면
+    # 주문은 절대 못 나간 상태이므로, 무조건 락을 놓고 다음 사이클에 넘긴다.
     try:
-        cfg_turn = cfg.get('turn') or {}
-        if cfg_turn.get('id') and turn.get('id') != cfg_turn['id']:
-            turn = new_turn(
-                cfg_turn['id'],
-                cfg_turn.get('capital') or effective_budget,
-                positions,
-                cfg_turn.get('opening_basis'),
-                current_prices,
-            )
-            log(f"[Program] 새 턴 시작: {cfg_turn['id']} (자본 {turn['capital']:,.0f})")
-    except Exception as e:
-        log_error(f'[Program] 턴 열기 실패(무시): {e}')
-        turn = ledger.get('turn') or {}  # 기존 턴 레코드를 날리지 않는다(다음 실행이 재시도)
+        # 5. 원장 ↔ 실보유 정합: 프로그램 포지션이 실제로 남아있는 것만 유지(수동 매도분 제거).
+        #    dict 전체 복사 — 심이 붙인 전략 플래그(partial_sold 등)를 그대로 보존.
+        #    사라진 포지션은 손익을 알 수 없으므로 지어내지 않되 미정산으로 기록한다.
+        today = now_kst.strftime('%Y-%m-%d')
+        positions = reconcile_positions(ledger, real_holdings, today, log_error)
 
-    # 8. 실계좌 스냅샷 state 구성 (cash = effective_budget − 프로그램 기투자 원가)
-    invested_cost = sum(p['avg_price'] * p['quantity'] for p in positions.values())
-    snapshot_portfolio = {c: dict(p) for c, p in positions.items()}
-    for c, p in snapshot_portfolio.items():
-        p.setdefault('name', c)
-        p.setdefault('peak_price', p.get('avg_price', 0))
-        p.setdefault('entry_date', today)
-        p.setdefault('is_scaled_out', False)
-    snapshot = {
-        'cash': max(0.0, effective_budget - invested_cost),
-        'invested': invested_cost,
-        'portfolio': snapshot_portfolio,
-        'total_fees': 0, 'history': [effective_budget], 'daily_trades': [], 'peak_nav': effective_budget,
-        'cooldown_codes': dict(ledger.get('cooldown_codes', {})),  # 손절 쿨다운 영속화
-        'exec_path': 'program',  # 심이 진단 로그를 페이퍼와 분리하도록 알린다
-    }
-    # 이력 승계(현재 Sim1만 해당). 없으면 아무것도 안 넣는다 = 현행 동작.
-    snapshot.update(_psych_carry(paper_state))
+        # 6. 심 인스턴스화(화이트리스트). 사이징을 effective_budget 기준으로 스케일
+        #    → 시뮬(initial_cash/N 사이징)의 비례 축소 복제본으로 동작.
+        sim = get_simulator_by_id(sim_id, initial_cash=int(effective_budget))
+        if sim is None:
+            log(f"[Program] 심 인스턴스 생성 실패: {sim_id} — skip")
+            _release_lock(ledger, ledger_sha, log)
+            return
 
-    # 9. 어댑터(실잔고 이중 방어 포함) + 실행
-    orders = _make_adapter(sim, snapshot, today, real_holdings)
-    try:
+        # 주의: sim.state는 _make_adapter가 스냅샷으로 갈아끼우기 전까지만 페이퍼 상태다.
+        paper_state = getattr(sim, 'state', None)
+
+        # 7. 심 전용 유니버스 적용 (페이퍼 경로 _run_simulators와 동일 의미론)
+        sim_candidates = _resolve_candidates(sim, candidates, enrich, log, log_error)
+
+        # 현재가 맵: 최종 후보 + 프로그램 보유 종목
+        current_prices = {}
+        for s in sim_candidates:
+            code = s.get('code')
+            px = s.get('price', s.get('current_price', 0))
+            if code and px:
+                current_prices[code] = float(px)
+        for c, p in positions.items():
+            cp = float(real_holdings[c].get('current_price') or 0)
+            if cp > 0:
+                current_prices.setdefault(c, cp)
+                if cp > p.get('peak_price', 0):
+                    p['peak_price'] = cp  # 트레일링용 고점 갱신
+
+        # 7-b. [턴 회계] config가 연 턴을 원장에 반영. 표시 전용 — 실패해도 매매는 계속한다.
+        turn = ledger.get('turn') or {}
+        try:
+            cfg_turn = cfg.get('turn') or {}
+            if cfg_turn.get('id') and turn.get('id') != cfg_turn['id']:
+                turn = new_turn(
+                    cfg_turn['id'],
+                    cfg_turn.get('capital') or effective_budget,
+                    positions,
+                    cfg_turn.get('opening_basis'),
+                    current_prices,
+                )
+                log(f"[Program] 새 턴 시작: {cfg_turn['id']} (자본 {turn['capital']:,.0f})")
+        except Exception as e:
+            log_error(f'[Program] 턴 열기 실패(무시): {e}')
+            turn = ledger.get('turn') or {}  # 기존 턴 레코드를 날리지 않는다(다음 실행이 재시도)
+
+        # 8. 실계좌 스냅샷 state 구성 (cash = effective_budget − 프로그램 기투자 원가)
+        invested_cost = sum(p['avg_price'] * p['quantity'] for p in positions.values())
+        snapshot_portfolio = {c: dict(p) for c, p in positions.items()}
+        for c, p in snapshot_portfolio.items():
+            p.setdefault('name', c)
+            p.setdefault('peak_price', p.get('avg_price', 0))
+            p.setdefault('entry_date', today)
+            p.setdefault('is_scaled_out', False)
+        snapshot = {
+            'cash': max(0.0, effective_budget - invested_cost),
+            'invested': invested_cost,
+            'portfolio': snapshot_portfolio,
+            'total_fees': 0, 'history': [effective_budget], 'daily_trades': [], 'peak_nav': effective_budget,
+            'cooldown_codes': dict(ledger.get('cooldown_codes', {})),  # 손절 쿨다운 영속화
+            'exec_path': 'program',  # 심이 진단 로그를 페이퍼와 분리하도록 알린다
+        }
+        # 이력 승계(현재 Sim1만 해당). 없으면 아무것도 안 넣는다 = 현행 동작.
+        snapshot.update(_psych_carry(paper_state))
+
+        # 9. 어댑터(실잔고 이중 방어 포함) + 실행
+        orders = _make_adapter(sim, snapshot, today, real_holdings)
         sim.run(sim_candidates, current_prices=current_prices)
     except Exception as e:
-        log_error(f'[Program] 심 실행 예외: {e} — 주문 없이 종료')
+        log_error(f'[Program] 주문 준비/심 실행 실패(무시하고 락 해제): {e}')
+        _release_lock(ledger, ledger_sha, log)
         return
 
     # [턴 회계] 활성 전략 확정. Sim10이면 이번 run의 국면(하위 전략)이 스냅샷에 들어있다.
@@ -507,7 +629,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         ledger['last_run'] = now_kst.isoformat()
         ledger['sim'] = sim_id
         ledger['turn'] = turn
-        _write_ledger(ledger, ledger_sha, log)
+        _write_ledger(_release_payload(ledger), ledger_sha, log)
         return
 
     # 10. 안전 필터 + 집행
@@ -515,6 +637,14 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     executed = 0
     failed_codes: set = set()
     for i, o in enumerate(orders):
+        # 락 리스 데드라인 재확인 — KIS/Vercel이 느려져 이 런이 예상보다 오래 걸리면,
+        # 리스 만료를 기다리지 않고 스스로 신규 주문을 멈춘다. 안 그러면 리스가
+        # 만료된 줄 알고 들어온 다음 런과 동시에 주문을 내게 된다.
+        if time.monotonic() - _lock_claimed_at > _ORDER_LOOP_DEADLINE_SEC:
+            log(f"[Program] 주문 루프 데드라인 초과({_ORDER_LOOP_DEADLINE_SEC}초) — "
+                f"신규 주문 중단, 나머지 {len(orders) - i}건 다음 사이클로")
+            failed_codes.update(x['code'] for x in orders[i:])
+            break
         # 주문 직전 kill-switch 재확인 (실행 중 OFF/심 변경 감지)
         cfg2 = _read_config_fresh(log)
         if not cfg2 or not cfg2.get('enabled') or cfg2.get('selected_sim') != sim_id:
@@ -592,7 +722,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             failed_codes.add(code)
             log_error(f'[Program] 주문 집행 실패 {code}: {e}')
 
-    # 11. 전략 플래그 머지(체결 성공 종목만) + 원장 저장
+    # 11. 전략 플래그 머지(체결 성공 종목만) + 원장 저장 + 락 해제
     _merge_strategy_flags(positions, snapshot['portfolio'], failed_codes)
     ledger['positions'] = positions
     ledger['cooldown_codes'] = snapshot.get('cooldown_codes', {})
@@ -604,7 +734,21 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     except Exception as e:
         log_error(f'[Program] 턴 기준가 정리 실패(무시): {e}')
     ledger['turn'] = turn
-    _write_ledger(ledger, ledger_sha, log)
+
+    # 좀비 방어: 기록 직전에 락이 아직 내 것인지 확인한다. 리스가 만료될 만큼 오래
+    # 걸린 런은 그 사이 다른 런이 락을 회수해 같은 주문을 냈을 수 있다. 조용히
+    # 넘어가면 중복 체결을 모른 채 지나가므로, 덮어쓰지 않고 크게 남긴다.
+    current, current_sha = _read_ledger_fresh(log)
+    if current is not None and not _lock_held_by(current, run_id):
+        log_error(
+            f"[Program] ⚠ 락을 빼앗겼습니다(내 run_id={run_id}, "
+            f"현재={current.get('lock_run_id')}). 이 런의 결과를 덮어쓰지 않습니다 — "
+            f"중복 체결 가능성이 있으니 KIS 체결 내역을 확인하세요. "
+            f"체결 {executed}/{len(orders)}건.")
+        return
+    if current_sha:
+        ledger_sha = current_sha
+    _write_ledger(_release_payload(ledger), ledger_sha, log)
     log(f'[Program] 완료: {executed}/{len(orders)}건 체결 (sim={sim_id})')
 
 

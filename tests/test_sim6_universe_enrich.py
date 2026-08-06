@@ -105,23 +105,27 @@ def test_sim10_bear_universe_gets_change_rate_too():
     assert all('change_rate' in s for s in out)
 
 
-# ── 중복 가드가 10분 주기를 삼키지 않는다 ──────────────────────
+# ── 중복 가드가 매매 주기를 삼키지 않는다 ──────────────────────
+# 이 가드는 주기를 따라와야 하는 값이다. 실측으로 두 번 데인 적이 있다:
+#   2026-07-29 — 15분 가드 + 10분 주기 → 실행이 20분마다로 반토막
+#   2026-08-06 — 5분 가드 + 2분 주기(태스커 단축)면 t=0,6,12만 통과해 실효 6분
+# 지금은 trading_lite.yml이 2분 주기로 매매를 낸다.
 def _ran_ago(minutes):
     from src.pipeline.workers.program_trader import _recently_ran
     now = datetime.now(timezone(timedelta(hours=9)))
     return _recently_ran({'last_run': (now - timedelta(minutes=minutes)).isoformat()}, now)
 
 
+def test_dup_guard_allows_two_minute_cadence():
+    """trading_lite는 2분 주기다. 가드가 그보다 길면 매 사이클이 skip된다."""
+    assert _ran_ago(2) is False
+
+
 def test_dup_guard_allows_ten_minute_cadence():
-    """파이프라인은 10분 주기다. 가드가 그보다 길면 실행이 20분마다로 반토막 난다."""
+    """스크래퍼(10분) 경로도 그대로 통과한다."""
     assert _ran_ago(10) is False
 
 
-def test_dup_guard_allows_jittered_cadence():
-    """Actions 스케줄 지터로 간격이 9분대로 좁아져도 통과해야 한다."""
-    assert _ran_ago(9) is False
-
-
 def test_dup_guard_blocks_duplicate_dispatch():
-    """같은 사이클이 두 번 디스패치되는 것(수초~수분)은 계속 막는다."""
-    assert _ran_ago(2) is True
+    """같은 트리거가 두 번 들어오는 것(수초~1분)은 계속 막는다."""
+    assert _ran_ago(0.5) is True

@@ -12,9 +12,21 @@ on:
         description: 'Bypass market holiday check'
         required: false
         default: 'false'
+
+# 이 워크플로끼리는 겹치지 않게 한다(10분 주기라 평소엔 겹칠 일이 없지만, 수동 실행이
+# 태스커 런과 겹치면 db-data push가 부딪힌다). trading_lite.yml과는 **일부러 그룹을
+# 공유하지 않는다** — 같은 그룹에 넣으면 lite의 대기 트리거가 새 디스패치에 밀려
+# 취소되어 2분 거래 사이클이 조용히 사라진다(GitHub concurrency는 FIFO 큐가 아니라
+# "실행 중 1개 + 대기 1개"만 유지한다). 두 워크플로가 동시에 도는 경우의 안전은
+# 원장 락(program_trader)과 배포 파일 분리가 책임진다.
+concurrency:
+  group: stockbot-scraper
+  cancel-in-progress: false
+
 jobs:
   scrape-and-report:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul
@@ -146,25 +158,13 @@ jobs:
             echo "No changes to commit"
           fi
 
-      - name: Deploy private trade state (stockbot-secret)
-        if: success()
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          # 스크래퍼 런에서 갱신된 실거래 누적 기록을 비공개 레포에 보존
-          # (program_positions.json은 program_trader.py가 API로 직접 기록 — 여기서 다루지 않음)
-          git clone --depth 1 https://x-access-token:${GH_PAT}@github.com/hoonnamkoong/stockbot-secret.git secret_repo
-          for f in order_history.json trade_history_real.csv; do
-            [ -f "data/$f" ] && cp "data/$f" "secret_repo/$f"
-          done
-          cd secret_repo
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: private trade state $(date +'%Y-%m-%d %H:%M KST')"
-            git push origin main
-          else
-            echo "No private state changes"
-          fi
+      # [2026-08-06] 실거래 기록(order_history.json, trade_history_real.csv)의 git 배포를
+      # 걷어냈다. 이 파일들의 writer 워크플로가 선택 심에 따라 바뀌기 때문이다 —
+      # 버즈 불필요 심이면 trading_lite.yml(2분)이, 버즈 필요 심이면 이 워크플로가
+      # 주문을 낸다. 양쪽이 각자 런 시작 시점의 사본을 밀면 나중에 끝난 쪽이 먼저
+      # 기록된 체결을 덮어써 지운다(lost update).
+      #
+      # 대신 주문을 낸 프로세스가 GitHub contents API로 직접 덧붙인다
+      # (src/trade/secret_store.py). program_positions.json이 이미 같은 이유로
+      # 같은 방식을 쓴다 — writer 경로가 하나면 레이스가 생길 곳이 없다.
 

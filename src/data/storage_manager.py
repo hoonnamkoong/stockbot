@@ -68,24 +68,32 @@ class StorageManager:
                 print(f"[Storage] [Skip] Sync skipped: {filename} ({e})")
 
     def get_sync_files_list(self, now_kst: datetime) -> list[str]:
+        """동기화할 파일 목록. 심 이름은 매니페스트에서 파생한다.
+
+        예전엔 심 이름을 여기 직접 적어뒀는데, 2026-07-30 심 목록 통합에서 이 자리를
+        놓쳤다. 2026-08-04 실측(런 40개 전수)으로 사이클당 26개 시도 중 11개(42%)가
+        무의미했다 — 폐기된 심 4개를 계속 부르고, 살아있는 심 9개는 빠져 있었다.
+        새 심을 추가할 때 여기를 고칠 일이 없어야 그 사고가 다시 안 난다.
         """
-        동기화해야 할 파일 목록을 동적으로 생성합니다.
-        2026-01부터 현재 달까지의 모든 월별 엑셀 파일을 포함합니다.
-        """
-        # [Fix] 시뮬레이터 추가 시 동기화 누락 방지를 위한 자동 생성
-        SIM_NAMES = ['original', 'conservative', 'aggressive', 'conviction', 'psych', 'spillover', 'risk']
+        from src.strategy.registry import get_sim_registry
+
         base_files = [
             'sync_state.json',
             'consecutive_registry.json',
         ]
-        base_files += [f'sim_{n}_state.json' for n in SIM_NAMES]
-        base_files += [f'trade_history_sim_{n}.csv' for n in SIM_NAMES]
-        base_files += [
-            'trade_history_real.csv',
-            'reservations.json',
-        ]
-        # 월별 리서치 엑셀 (2026-01 ~ 현재)
-        curr = datetime(2026, 1, 1)
+        # 분석기(리베로)도 상태 파일을 쓰므로 포함한다.
+        for sim in get_sim_registry(include_analyzers=True):
+            base_files.append(sim['state_file'])
+            base_files.append(sim['csv_file'])
+        base_files.append('reservations.json')
+        # trade_history_real.csv는 여기 없다 — db-data에 올라가지 않는 비공개 파일이고
+        # (scraper.yml 배포 스텝이 명시적으로 제외), 이제는 주문 낸 프로세스가 GitHub
+        # API로 직접 쓴다(src/trade/secret_store.py). 부르면 매 사이클 404였다.
+
+        # 월별 리서치 엑셀: 활성 전략 시작월부터 이번 달까지.
+        # 2026-01 고정이던 시절엔 전략이 시작하지도 않은 1~3월 파일을 매번 404로
+        # 받아왔다.
+        curr = self._monthly_report_start(now_kst)
         while curr <= now_kst:
             base_files.append(f"reports/monthly_research_{curr.strftime('%Y-%m')}.xlsx")
             if curr.month == 12:
@@ -93,6 +101,21 @@ class StorageManager:
             else:
                 curr = datetime(curr.year, curr.month + 1, 1)
         return base_files
+
+    @staticmethod
+    def _monthly_report_start(now_kst: datetime) -> datetime:
+        """활성 전략의 since(월 초). 읽지 못하면 이번 달만 본다.
+
+        모르는 값을 2026-01 같은 과거로 폴백하면 존재하지 않는 파일을 다시 훑는다.
+        """
+        try:
+            from src.strategy.registry import get_active_strategy_since
+            since = get_active_strategy_since()
+            if since:
+                return datetime(since.year, since.month, 1)
+        except Exception:
+            pass
+        return datetime(now_kst.year, now_kst.month, 1)
 
     # ================================================================
     # [상태 파일] sync_state.json

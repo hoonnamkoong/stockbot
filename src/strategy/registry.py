@@ -13,6 +13,7 @@ strategy_manifest.yaml을 읽어 전략과 시뮬레이터를 동적으로 로�
 import importlib
 import os
 import yaml
+from datetime import date
 from typing import Any
 
 
@@ -76,6 +77,23 @@ def get_current_strategy() -> Any:
     cls = _load_class(cfg['module'], cfg['class'])
     print(f"[Registry] 전략 로드: {cfg['class']} ({cfg.get('description', '')})")
     return cls()
+
+
+def get_active_strategy_since() -> date | None:
+    """활성 전략의 since(시작일). 매니페스트에 없거나 못 읽으면 None.
+
+    "언제부터 이 전략의 산출물이 존재하는가"의 유일한 원천이다. 월별 리포트
+    동기화가 이 값보다 앞선 달을 훑으면 존재한 적 없는 파일을 계속 404로 받는다.
+    """
+    try:
+        manifest = _load_manifest()
+        cfg = (manifest.get('strategies') or {}).get(manifest.get('active_strategy'))
+        raw = (cfg or {}).get('since')
+        if not raw:
+            return None
+        return date.fromisoformat(str(raw))
+    except Exception:
+        return None
 
 
 def get_active_simulators() -> list:

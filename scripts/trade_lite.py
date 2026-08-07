@@ -31,9 +31,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from src.data.storage_manager import StorageManager
 from src.pipeline.context import PipelineContext
-from src.pipeline.orchestrator import trade_if_buzz_free
-from src.pipeline.workers.trade_engine import TradeEngineWorker
-from src.strategy.regime_state import read_regime
+from src.pipeline.orchestrator import run_trade_only_cycle
 
 
 DEPLOY_MANIFEST = os.path.join('data', '.lite_deploy_manifest')
@@ -80,33 +78,15 @@ def run_trade_lite(ctx: PipelineContext) -> None:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 종료합니다.")
         return
 
-    # 국면은 읽기만 한다(scraper.yml이 유일 writer). 못 읽으면 None이고,
-    # needs_buzz(dynamic)인 심은 그 값으로 판단한다.
-    regime, bull_score = read_regime('data')
-    score_txt = '측정 불가' if bull_score is None else f'{bull_score:.1f}'
-    ctx.log(f"국면(읽기 전용): {regime or '측정 불가'} / bull_score={score_txt}")
+    # 매매 본체는 scraper.yml의 오프틱 경로와 **같은 함수**를 쓴다. 이 파일에
+    # 복사본을 두면 두 경로가 조용히 갈라지고, 그건 program-trading-parity를
+    # 깨는 방식이다. 국면 읽기·페이퍼 동기화도 그 안에 있다.
+    traded_sim_id = run_trade_only_cycle(ctx, storage)
 
-    trade_worker = TradeEngineWorker(ctx, storage)
-
-    with ctx.stage("TradeLite: 매매"):
-        traded_sim_id = trade_if_buzz_free(ctx, trade_worker, regime)
-
-    # 실전이 돈 심의 페이퍼 쌍둥이만 같은 주기로 갱신한다. 실전만 2분으로 옮기고
-    # 페이퍼를 10분에 두면 대시보드의 페이퍼 성과가 실제 계좌와 갈라져서,
-    # '승자를 뽑아 실전에 올린다'는 방식의 근거가 무너진다.
-    #
-    # trade_if_buzz_free가 돌려준 sim_id를 그대로 쓴다 — peek_selected_sim()을
-    # 여기서 다시 부르지 않는다. 매매 실행 중(수초~수십초) config의 selected_sim이
-    # 바뀌면, 다시 조회한 값이 방금 매매한 심과 다를 수 있다. 그러면 이 동기화가
-    # 엉뚱한(어쩌면 버즈 필요) 심을 빈 candidates로 돌리게 된다.
+    # 배포 목록만 이 경로 고유다 — trading_lite.yml은 "내가 쓴 것만" 올리고,
+    # scraper.yml은 data/ 전체를 올린다(같은 concurrency 그룹이라 안전).
     if traded_sim_id:
-        with ctx.stage("TradeLite: 선택 심 페이퍼 동기화"):
-            try:
-                trade_worker._run_simulators(
-                    [], only_sim_id=traded_sim_id, allow_price_fallback=False)
-                _write_deploy_manifest(traded_sim_id, ctx.log)
-            except Exception as e:
-                ctx.log(f"[경고] 선택 심 페이퍼 동기화 실패(매매는 완료됨): {e}")
+        _write_deploy_manifest(traded_sim_id, ctx.log)
 
     ctx.log("=" * 50)
     ctx.log("TradeLite 완료")

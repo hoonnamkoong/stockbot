@@ -4,12 +4,25 @@ name: Trading Lite (2min)
 #   - trading_lite.yml (매 트리거, 이 파일) : 실전 매매 + 선택 심 페이퍼 갱신
 #   - scraper.yml      (10분에 한 번만 실제로 돎) : 스크래핑·AI·국면 갱신·나머지 심·텔레그램
 #
-# [2026-08-07] 태스커 실전 설정에는 이벤트 타입을 나눠 보낼 방법이 없어서,
-# tasker_trigger 하나만 2분마다 온다는 게 확인됐다. 그래서 tasker_trigger도
-# 듣는다 — scraper.yml도 같은 이벤트를 듣지만 오프틱(10분이 안 됐을 때)에는
-# 곧바로 종료하므로(src/pipeline/scrape_gate.py), 실질적으로 이 워크플로가 매
-# 트리거를 처리하는 쪽이 된다. tasker_trigger_trade는 태스커에 별도 규칙을
-# 추가할 수 있게 되면 쓸 자리로 남겨둔다(둘 다 있어도 무해하다).
+# ⚠ [2026-08-08] 이 워크플로는 **한 번도 실행된 적이 없다.**
+#
+# 태스커가 보내는 건 repository_dispatch가 아니라 workflow_dispatch다
+# (7일치 400런 실측: repository_dispatch 0건). workflow_dispatch는 지정한
+# 워크플로 하나에만 도달하므로, 태스커가 scraper.yml을 지정하는 한 여기까지
+# 오지 않는다. 아래 `on:`의 repository_dispatch 절은 현재 죽은 코드다.
+#
+# 08-07에 이 사실을 모른 채 scraper.yml이 오프틱 매매를 여기에 위임했고, 그
+# 결과 트리거 6개 중 5개가 인프라만 태우고 아무것도 하지 않았다 — 실전 매매
+# 간격이 10분에서 12분으로 늘어났다. 08-08에 scraper.yml이 오프틱에도 직접
+# 매매하도록 되돌렸다(src/pipeline/orchestrator.py의 run_trade_only_cycle).
+#
+# 그래서 지금 이 워크플로의 유일한 용도는 **수동 실행**이다. 매매 본체는
+# scraper.yml 오프틱 경로와 같은 함수를 쓰므로 동작은 어긋나지 않는다.
+#
+# 되살리려면(태스커를 repository_dispatch로 바꾸는 경우) 반드시 함께 할 것:
+#   scraper.yml의 오프틱 매매를 다시 꺼야 한다. 두 워크플로는 concurrency
+#   그룹이 달라 동시에 돌 수 있고, 그러면 같은 사이클에 주문이 두 번 나갈 수
+#   있다(원장 락이 막지만 그건 마지막 방어선이지 설계가 아니다).
 #
 # 여기서 국면(run_regime_stage)을 갱신하지 않는 이유는 scripts/trade_lite.py 참고 —
 # 요약하면 regime_history가 호출마다 누적돼 평활이 왜곡되고, top100 breadth가

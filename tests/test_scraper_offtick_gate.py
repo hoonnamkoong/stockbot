@@ -1,10 +1,17 @@
-"""run_pipeline이 오프틱에서 실제로 아무것도 안 하는지 (scrape_gate 배선).
+"""run_pipeline의 오프틱 경로가 "매매는 하되 스크래핑·국면갱신은 안 한다"인지.
 
-2026-08-07에 태스커가 tasker_trigger 하나만 2분마다 보낸다는 게 드러나서,
-scraper.yml도 매 2분 호출된다. 오프틱(10분이 안 됐을 때)에 Stage 0(국면 갱신)
-까지 돌면, trade_lite 감사에서 잡았던 것과 같은 문제(국면 이력 오염, KIS 콜
-폭증)가 scraper.yml에서도 재발한다 — 여기서는 게이트가 Stage 0 진입 자체를
-막는지, 그리고 성공적으로 끝까지 돈 사이클만 mark_scraped를 호출하는지 본다.
+태스커가 2분마다 부르지만 스크래핑은 10분에 한 번만 한다. 오프틱에 Stage 0
+(국면 갱신)까지 돌면 국면 이력이 오염되고 KIS 콜이 폭증한다.
+
+**2026-08-08 사양 변경.** 이 파일은 원래 "오프틱은 아무것도 안 한다"를 못박고
+있었다(`test_offtick_never_touches_trade_engine_worker`). 그 위임 대상이던
+trading_lite.yml이 **한 번도 불린 적이 없다는 게 실측으로 드러났다** — 태스커는
+repository_dispatch가 아니라 workflow_dispatch를 보내고, 그건 지정한 워크플로
+하나에만 도달한다. 그래서 오프틱 5/6이 아무 일도 안 했고 실전 매매 간격이
+10분에서 12분으로 늘어났다.
+
+교훈: 단위 테스트는 "위임한다"를 검증했지만 **위임 대상이 실재하는지는 아무도
+검증하지 않았다.** 실행 이력 0건인 워크플로는 어떤 실패 목록에도 안 뜬다.
 """
 import os
 import sys
@@ -47,24 +54,72 @@ class _Ctx:
         return mock.MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: False)
 
 
-def test_offtick_never_touches_trade_engine_worker():
-    """오프틱이면 TradeEngineWorker를 아예 만들지 않는다 = Stage 0(국면 갱신)
-    자체가 안 돈다."""
+def test_offtick_trades_but_does_not_scrape_or_update_regime():
+    """오프틱은 매매를 한다. 단 스크래핑과 국면 갱신은 하지 않는다.
+
+    이 셋을 한 테스트에 묶은 건 의도적이다 — "매매한다"만 보면 국면 갱신이
+    슬쩍 딸려 들어와도 통과하고, "국면 갱신 안 한다"만 보면 08-07처럼 매매까지
+    같이 죽어도 통과한다. 두 실패가 서로를 가린다.
+    """
     ctx = _Ctx()
     with mock.patch.object(orchestrator, 'TradeEngineWorker') as tw, \
          mock.patch.object(orchestrator, 'StorageManager'), \
          mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None), \
+         mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None) as tbf, \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped') as mark:
         orchestrator.run_pipeline(ctx)
 
-    tw.assert_not_called()
-    df.assert_not_called()
+    tbf.assert_called_once()                              # 매매는 한다
+    assert tbf.call_args[0][2] == 'BULL'                  # 읽어온 국면을 그대로 넘긴다
+    tw.return_value.run_regime_stage.assert_not_called()  # 국면 갱신은 안 한다
+    df.assert_not_called()                                # 스크래핑도 안 한다
     mark.assert_not_called()
     assert any('오프틱' in m for m in ctx.logs)
+
+
+def test_offtick_syncs_only_the_traded_sims_paper_twin():
+    """실전이 돈 심의 페이퍼 쌍둥이만 같은 주기로 갱신한다.
+
+    안 그러면 대시보드의 페이퍼 성과가 실제 계좌와 갈라져서 '승자를 뽑아 실전에
+    올린다'는 방식의 근거가 무너진다.
+    """
+    ctx = _Ctx()
+    with mock.patch.object(orchestrator, 'TradeEngineWorker') as tw, \
+         mock.patch.object(orchestrator, 'StorageManager'), \
+         mock.patch.object(orchestrator, 'DataFetcherWorker'), \
+         mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
+         mock.patch.object(orchestrator, 'NotifierWorker'), \
+         mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value='sim4_1'), \
+         mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
+         mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
+        orchestrator.run_pipeline(ctx)
+
+    tw.return_value._run_simulators.assert_called_once_with(
+        [], only_sim_id='sim4_1', allow_price_fallback=False)
+
+
+def test_offtick_paper_sync_failure_does_not_break_the_run():
+    """페이퍼 동기화가 죽어도 매매는 이미 끝났다 — 예외가 런을 실패로 만들면
+    안 된다(실패한 런은 배포 스텝을 건너뛴다)."""
+    ctx = _Ctx()
+    with mock.patch.object(orchestrator, 'TradeEngineWorker') as tw, \
+         mock.patch.object(orchestrator, 'StorageManager'), \
+         mock.patch.object(orchestrator, 'DataFetcherWorker'), \
+         mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
+         mock.patch.object(orchestrator, 'NotifierWorker'), \
+         mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value='sim4_1'), \
+         mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
+         mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
+        tw.return_value._run_simulators.side_effect = RuntimeError('KIS 다운')
+        orchestrator.run_pipeline(ctx)   # 예외가 새어나오면 실패
+
+    assert any('페이퍼 동기화 실패' in m for m in ctx.logs)
 
 
 def _configure_full_run_mocks(tw, storage_cls, df):

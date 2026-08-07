@@ -16,6 +16,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from scripts import trade_lite
+from src.pipeline import orchestrator
 
 KST = timezone(timedelta(hours=9))
 
@@ -43,11 +44,17 @@ class _Ctx:
 
 
 def _run(ctx, traded_sim_id='sim4_bull_daytrading', regime='BULL'):
-    """traded_sim_id: trade_if_buzz_free가 돌려주는 값. None이면 매매 안 함."""
+    """traded_sim_id: trade_if_buzz_free가 돌려주는 값. None이면 매매 안 함.
+
+    매매 본체는 orchestrator.run_trade_only_cycle로 옮겨졌다(scraper.yml 오프틱
+    경로와 공유 — 복사본을 두면 두 경로가 갈린다). 그래서 patch 대상이
+    trade_lite가 아니라 orchestrator다. 여기서 검증하는 건 여전히
+    "trade_lite를 태웠을 때의 관측 가능한 동작"이다.
+    """
     with mock.patch.object(trade_lite, 'StorageManager'), \
-         mock.patch.object(trade_lite, 'TradeEngineWorker') as worker_cls, \
-         mock.patch.object(trade_lite, 'read_regime', return_value=(regime, 55.0)) as rr, \
-         mock.patch.object(trade_lite, 'trade_if_buzz_free',
+         mock.patch.object(orchestrator, 'TradeEngineWorker') as worker_cls, \
+         mock.patch.object(orchestrator, 'read_regime', return_value=(regime, 55.0)) as rr, \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free',
                            return_value=traded_sim_id) as tif, \
          mock.patch.object(trade_lite, '_write_deploy_manifest') as deploy:
         trade_lite.run_trade_lite(ctx)
@@ -160,9 +167,9 @@ def test_paper_sync_failure_does_not_break_the_run():
     """페이퍼 동기화는 부가 작업이다 — 실패해도 이미 나간 매매를 되돌리지 않는다."""
     ctx = _Ctx()
     with mock.patch.object(trade_lite, 'StorageManager'), \
-         mock.patch.object(trade_lite, 'TradeEngineWorker') as worker_cls, \
-         mock.patch.object(trade_lite, 'read_regime', return_value=('BULL', 55.0)), \
-         mock.patch.object(trade_lite, 'trade_if_buzz_free',
+         mock.patch.object(orchestrator, 'TradeEngineWorker') as worker_cls, \
+         mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 55.0)), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free',
                            return_value='sim4_bull_daytrading'):
         worker_cls.return_value._run_simulators.side_effect = RuntimeError('boom')
         trade_lite.run_trade_lite(ctx)

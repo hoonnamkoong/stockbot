@@ -121,6 +121,46 @@ def trade_if_buzz_free(ctx: PipelineContext, trade_worker, regime: str | None) -
     return None
 
 
+def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str | None:
+    """스크래핑 없이 매매 + 선택 심 페이퍼 동기화만 하고 끝나는 사이클.
+
+    scraper.yml의 오프틱 호출과 trading_lite.yml이 이 함수를 공유한다 — 갈리면
+    두 경로의 동작이 어긋나고, 그건 program-trading-parity를 깨는 방식이다.
+    휴장일 판정은 호출자가 이미 했다고 본다(중복 호출 = KIS 콜 낭비).
+
+    국면은 **읽기만** 한다. run_regime_stage()는 사이클당 한 번만 돌아야 하고
+    (regime_history가 호출마다 누적돼 평활이 왜곡된다), top100 breadth가 종목당
+    1콜이라 오프틱마다 돌리면 하루 수천 콜이 된다. writer는 스크래핑 사이클뿐이다.
+
+    반환: 실제로 매매한 심 id, 안 했으면 None.
+    """
+    regime, bull_score = read_regime('data')
+    score_txt = '측정 불가' if bull_score is None else f'{bull_score:.1f}'
+    ctx.log(f"국면(읽기 전용): {regime or '측정 불가'} / bull_score={score_txt}")
+
+    trade_worker = TradeEngineWorker(ctx, storage)
+
+    with ctx.stage("매매(스크래핑 없음)"):
+        traded_sim_id = trade_if_buzz_free(ctx, trade_worker, regime)
+
+    # 실전이 돈 심의 페이퍼 쌍둥이만 같은 주기로 갱신한다. 실전만 2분으로 옮기고
+    # 페이퍼를 10분에 두면 대시보드의 페이퍼 성과가 실제 계좌와 갈라져서,
+    # '승자를 뽑아 실전에 올린다'는 방식의 근거가 무너진다.
+    #
+    # trade_if_buzz_free가 돌려준 sim_id를 그대로 쓴다 — peek_selected_sim()을
+    # 여기서 다시 부르지 않는다. 매매 실행 중(수초~수십초) config의 selected_sim이
+    # 바뀌면, 다시 조회한 값이 방금 매매한 심과 다를 수 있다.
+    if traded_sim_id:
+        with ctx.stage("선택 심 페이퍼 동기화"):
+            try:
+                trade_worker._run_simulators(
+                    [], only_sim_id=traded_sim_id, allow_price_fallback=False)
+            except Exception as e:
+                ctx.log(f"[경고] 선택 심 페이퍼 동기화 실패(매매는 완료됨): {e}")
+
+    return traded_sim_id
+
+
 def run_pipeline(ctx: PipelineContext) -> None:
     """
     StockBot 메인 파이프라인을 실행합니다.
@@ -144,20 +184,30 @@ def run_pipeline(ctx: PipelineContext) -> None:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 파이프라인을 종료합니다.")
         return
 
-    # ── 스크래핑 게이트(2026-08-07) ──────────────────────────────
-    # 태스커가 tasker_trigger 이벤트 하나만 2분마다 보낸다는 게 드러나서,
-    # trading_lite.yml(2분 전용)뿐 아니라 이 워크플로도 같은 이벤트로 매 2분
-    # 불린다. 아직 스크래핑할 차례가 아니면 여기서 곧바로 끝낸다 — Stage 0(국면
-    # 갱신)조차 하지 않는다. 국면은 사이클당 한 번만 갱신돼야 하고(아래 Stage 0
-    # 주석 참고), 매매(Stage 0.5)는 trading_lite.yml이 같은 트리거로 독립적으로
-    # 이미 처리하므로 여기서 또 시도할 이유가 없다.
+    # ── 스크래핑 게이트 ─────────────────────────────────────────
+    # 태스커가 2분마다 이 워크플로를 부르지만 스크래핑은 10분에 한 번만 한다
+    # (네이버 부하). 아직 차례가 아니면 매매만 하고 끝낸다 — Stage 0(국면 갱신)은
+    # 하지 않는다. 국면은 사이클당 한 번만 갱신돼야 하고(아래 Stage 0 주석),
+    # top100 breadth가 종목당 1콜이라 2분마다 돌리면 하루 수천 KIS 콜이 된다.
+    #
+    # [2026-08-08] 여기서 곧바로 return 하던 것을 되돌렸다. 08-07에 오프틱 매매를
+    # trading_lite.yml에 위임했는데, **그 워크플로는 한 번도 불린 적이 없다** —
+    # 태스커가 보내는 건 repository_dispatch가 아니라 workflow_dispatch이고,
+    # workflow_dispatch는 지정한 워크플로 하나에만 도달한다(7일치 400런 실측:
+    # repository_dispatch 0건). 그래서 오프틱 5/6이 인프라만 태우고 아무것도 하지
+    # 않았고, 실전 매매 간격이 10분에서 12분으로 오히려 늘어났다.
+    #
+    # 여기서 매매하는 것이 안전한 이유: 오프틱 런과 스크래핑 런은 같은 워크플로,
+    # 같은 concurrency 그룹(stockbot-scraper)이라 직렬화된다 — 배포 스텝이
+    # 서로의 산출물을 되돌리는 lost update가 생길 수 없다.
     #
     # FORCE_RUN은 휴장일 게이트뿐 아니라 이 게이트도 우회한다 — 수동으로
     # "지금 당장 스크래핑"을 원해서 켠 옵션인데, 10분 게이트에 막히면 의도와
     # 반대로 동작한다.
     force_run = os.environ.get('FORCE_RUN', '').strip().lower() == 'true'
     if not force_run and not scrape_gate.is_scrape_due(ctx.now_kst):
-        ctx.log("스크래핑 아직 아님(오프틱) — trading_lite.yml이 매매를 맡음. 종료합니다.")
+        ctx.log("스크래핑 아직 아님(오프틱) — 매매만 수행합니다.")
+        run_trade_only_cycle(ctx, storage)
         return
 
     # ── Stage 0: 국면 판단 + 순서 가변 분기(E3) ───────────────────

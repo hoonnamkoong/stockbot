@@ -10,13 +10,18 @@
 import os
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # 이 비율을 넘는 페이지가 실패하면 그 런의 게시글 수는 실제보다 작다.
 DEGRADED_PAGE_FAIL_RATIO = 0.10
 
 # KRX 정규장 마감 (종가 단일가 종료)
 MARKET_CLOSE_HHMM = (15, 30)
+
+# cycle_id 격자 폭(초). 서로 다른 런에서 관측한 값을 같은 시각으로 묶는 단위다.
+# 태스커 주기(120초)에 맞췄다 — 런보다 촘촘하면 격자가 비고, 성글면 한 격자에
+# 여러 관측이 겹쳐 조인이 1:N이 된다.
+CYCLE_SECONDS = 120
 
 
 class PipelineContext:
@@ -27,8 +32,21 @@ class PipelineContext:
     VERSION = "50.0"
 
     def __init__(self):
-        # 실행 시각을 생성 시점에 고정 (KST)
-        self.now_kst: datetime = datetime.utcnow() + timedelta(hours=9)
+        # 실행 시각을 생성 시점에 고정 (KST). 시계는 여기서 한 번만 읽는다 —
+        # now_kst와 cycle_id가 각자 읽으면 격자 경계에서 갈릴 수 있다.
+        _utc: datetime = datetime.now(timezone.utc)
+        self.now_kst: datetime = (_utc + timedelta(hours=9)).replace(tzinfo=None)
+
+        # 서로 다른 런·서로 다른 심이 남긴 관측을 "같은 시각"으로 묶는 격자 번호.
+        # 이게 없으면 각자 datetime.now()를 찍어 수 초씩 어긋나고, (ts, code) 조인이
+        # 깨진다 — 심1과 심1-1이 같은 순간에 서로 다른 판단을 했는지 볼 수 없다.
+        #
+        # epoch 초에는 타임존이 없다. 그래서 UTC에서 바로 나눈다. naive KST
+        # datetime에 .timestamp()를 쓰면 실행 머신의 로컬 타임존으로 해석되어
+        # 9시간(또는 그 이상) 어긋난다 — 여기서 now_kst를 재료로 쓰지 않는 이유다.
+        # KST 오프셋(32400초)이 120의 배수라 격자 자체는 어느 쪽으로 재도 같다.
+        self.cycle_id: int = int(_utc.timestamp()) // CYCLE_SECONDS
+
         self.start_minute: int = self.now_kst.minute
         self.today_str: str = self.now_kst.strftime('%Y%m%d')
         self.today_display: str = self.now_kst.strftime('%Y.%m.%d')

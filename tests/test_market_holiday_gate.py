@@ -12,7 +12,7 @@ from datetime import datetime
 import pytest
 
 import src.market_calendar as mc
-from src.pipeline.context import PipelineContext
+from src.pipeline.context import PipelineContext, CYCLE_SECONDS
 
 
 def ctx_at(when: datetime) -> PipelineContext:
@@ -20,6 +20,9 @@ def ctx_at(when: datetime) -> PipelineContext:
     ctx.now_kst = when
     ctx.today_str = when.strftime('%Y%m%d')
     ctx.today_display = when.strftime('%Y.%m.%d')
+    # __init__을 건너뛰므로 직접 채운다. 진단 로그의 조인 키라 없으면
+    # run_pipeline이 AttributeError로 죽는다.
+    ctx.cycle_id = int(when.timestamp()) // CYCLE_SECONDS
     return ctx
 
 

@@ -32,6 +32,7 @@ class _Ctx:
 
     def __init__(self, trading=True):
         self.now_kst = datetime(2026, 8, 7, 10, 32, tzinfo=KST)
+        self.cycle_id = 900000
         self._trading = trading
         self.logs = []
 

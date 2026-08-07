@@ -12,6 +12,7 @@ from src.strategy.regime_state import read_regime
 from src.strategy.registry import needs_buzz as sim_needs_buzz
 from src.pipeline import scrape_gate
 from src.pipeline.context import PipelineContext
+from src.data import sim_diag
 from src.data.storage_manager import StorageManager
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
 from src.pipeline.workers.llm_analyzer import LLMAnalyzerWorker
@@ -134,6 +135,11 @@ def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str |
 
     반환: 실제로 매매한 심 id, 안 했으면 None.
     """
+    # run_pipeline 안에서 불릴 때는 이미 세팅돼 있다(같은 값). trade_lite가
+    # 단독 진입점으로 부를 때를 위해 여기서도 세운다 — 두 경로 중 하나만
+    # 덮으면 그 경로의 로그만 조인 키가 빈다.
+    sim_diag.set_cycle(ctx.cycle_id)
+
     regime, bull_score = read_regime('data')
     score_txt = '측정 불가' if bull_score is None else f'{bull_score:.1f}'
     ctx.log(f"국면(읽기 전용): {regime or '측정 불가'} / bull_score={score_txt}")
@@ -167,6 +173,11 @@ def run_pipeline(ctx: PipelineContext) -> None:
     Stage 1 → 2 → 3 → 4 순서로 Worker를 호출합니다.
     """
     storage = StorageManager()
+
+    # 이번 사이클의 격자 번호를 진단 로거에 알린다. 이게 없으면 각 심이 각자
+    # datetime.now()를 찍어 수 초씩 어긋나고, 심끼리의 (cycle_id, code) 조인과
+    # forward return용 t+N 조인이 둘 다 성립하지 않는다.
+    sim_diag.set_cycle(ctx.cycle_id)
 
     ctx.log("=" * 50)
     ctx.log(f"StockBot Pipeline V{PipelineContext.VERSION} 시작")

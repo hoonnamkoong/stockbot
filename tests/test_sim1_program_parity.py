@@ -126,11 +126,21 @@ def test_program_path_writes_separate_diag_file():
             sim_diag.DATA_DIR = orig
 
 
-def test_diag_columns_unchanged():
-    """컬럼을 늘리면 헤더 회전이 일어나 07-29 수확분이 갈라진다."""
+def test_diag_columns_are_pinned():
+    """컬럼을 늘리면 헤더 회전이 일어나 그 전 수확분이 `_v*`로 갈라진다.
+
+    COLUMNS는 전 심 공용 단일 리스트라, 한 심 때문에 열을 늘리면 **모든 심의**
+    이번 달 파일이 회전한다. 그래서 실수로 늘어나는 것을 여기서 막는다.
+
+    회전 이력 (분석할 때 `_v*`를 이어붙여야 하는 경계):
+      - 2026-07-29 이력 파생 8열 추가
+      - 2026-08-08 `cycle_id` 추가 — 심끼리·t+N 조인의 키. 이 열이 없으면 각 심이
+        각자 datetime.now()를 찍어 수 초씩 어긋난다.
+    """
     from src.data import sim_diag
+    assert sim_diag.COLUMNS[0] == 'cycle_id'
     assert sim_diag.COLUMNS[-1] == 'ignition4'
-    assert len(sim_diag.COLUMNS) == 33
+    assert len(sim_diag.COLUMNS) == 34
 
 
 # ── Task 3: 승계 + 파리티 ───────────────────────────────────

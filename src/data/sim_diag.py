@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 DATA_DIR = 'data'
 
 COLUMNS = [
+    'cycle_id',          # 조인 키. PipelineContext.cycle_id (120초 격자)
     'ts', 'sim', 'code', 'name',
     'decision',          # entry | skip
     'reason',            # skip 사유 (첫 번째로 걸린 게이트)
@@ -31,6 +32,25 @@ COLUMNS = [
     'z_hype', 'd_sov', 'd_hype', 'accel', 'accel_d1',
     'hist_missing', 'hist_days_ago', 'ignition4',
 ]
+
+
+# 이번 사이클의 격자 번호. 파이프라인 진입점이 사이클 시작에 한 번 세팅한다.
+#
+# 왜 인자가 아니라 모듈 상태인가: 시뮬레이터는 ctx를 들고 있지 않다(생성자가
+# initial_cash만 받는다). 전 심의 생성자에 cycle_id를 흘리면 변경이 넓어지는데,
+# "지금이 몇 번째 사이클인가"는 본질적으로 주변 컨텍스트지 심의 속성이 아니다.
+#
+# 세팅 안 된 채로 쓰면 값이 빈칸으로 남는다. 여기서 시계를 다시 읽어 추정하지
+# 않는 이유: 그러면 런이 격자 경계를 넘을 때 같은 사이클의 행들이 서로 다른
+# 번호를 받아 조인이 조용히 깨진다. 빈칸은 "안 붙었다"가 눈에 보이지만,
+# 어긋난 번호는 안 보인다.
+_cycle_id = None
+
+
+def set_cycle(cycle_id) -> None:
+    """이번 사이클의 격자 번호를 정한다(PipelineContext.cycle_id)."""
+    global _cycle_id
+    _cycle_id = cycle_id
 
 
 def month_path(sim: str, today: str = None) -> str:
@@ -102,6 +122,10 @@ def append(sim: str, records: list, path: str = None) -> int:
                 row = {c: r.get(c, '') for c in COLUMNS}
                 row['ts'] = row['ts'] or ts
                 row['sim'] = sim
+                # 한 사이클의 모든 행은 같은 번호를 받아야 한다 — 심끼리, 그리고
+                # 나중에 t+N 행과 조인하는 근거가 이것뿐이다.
+                if row['cycle_id'] == '' and _cycle_id is not None:
+                    row['cycle_id'] = _cycle_id
                 w.writerow(row)
         return len(records)
     except Exception:

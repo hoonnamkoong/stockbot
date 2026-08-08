@@ -107,6 +107,51 @@ def test_scraper_does_not_trade_when_ownership_is_undecidable():
     assert tw.return_value.run.call_args.kwargs['skip_program_trading'] is True
 
 
+# ── 배포 제외 (2026-08-09) ──────────────────────────────────────────
+# Stage 3 제외는 "그 심을 다시 계산하지 않는다"일 뿐이다. 배포 스텝의
+# `cp data/*.json`은 심을 돌렸는지와 무관하게 파일을 올리는데, 그 파일은 이 런이
+# 시작할 때 db-data에서 받아온 4~5분 전 사본이다. db_data_repo는 배포 시점에 새로
+# clone하므로 그 사이 trading.yml이 push한 최신 상태가 들어 있고, cp가 그것을 옛
+# 사본으로 덮어쓴다 — 60초 루프 4~5분치가 통째로 되돌아간다(lost update).
+# 파일을 안 만드는 것과 파일을 안 올리는 것은 다른 문제다.
+
+def test_deploy_exclude_lists_the_paper_files_trading_owns(tmp_path):
+    path = str(tmp_path / 'data' / '.scraper_deploy_exclude')
+    names = orchestrator.write_deploy_exclude('sim4_bull_daytrading', path=path)
+
+    assert names, '선택 심의 상태·이력 파일이 제외 목록에 없다'
+    with open(path, encoding='utf-8') as f:
+        written = f.read().split()
+    assert written == names
+    assert any(n.endswith('.json') for n in names)
+    assert any(n.endswith('.csv') for n in names)
+
+
+def test_deploy_exclude_is_emptied_when_trading_owns_nothing(tmp_path):
+    """남아 있는 옛 목록이 엉뚱한 심을 배포에서 빼면, 그 심은 스크래퍼가
+    갱신했는데도 db-data에 영영 도달하지 못한다. 항상 덮어쓴다."""
+    path = str(tmp_path / 'data' / '.scraper_deploy_exclude')
+    orchestrator.write_deploy_exclude('sim4_bull_daytrading', path=path)
+    assert orchestrator.write_deploy_exclude(None, path=path) == []
+    with open(path, encoding='utf-8') as f:
+        assert f.read().strip() == ''
+
+
+def test_the_run_writes_the_exclude_list_for_the_sim_trading_owns(tmp_path):
+    """소유권 판정과 배포 제외가 갈리면 안 된다 — 같은 값에서 나와야 한다."""
+    written = {}
+    with mock.patch.object(orchestrator, 'write_deploy_exclude',
+                           side_effect=lambda sim_id, *a, **kw: written.setdefault('sim', sim_id)):
+        _run(buzz_needed=False)
+    assert written['sim'] == 'sim4_bull_daytrading'
+
+    written.clear()
+    with mock.patch.object(orchestrator, 'write_deploy_exclude',
+                           side_effect=lambda sim_id, *a, **kw: written.setdefault('sim', sim_id)):
+        _run(buzz_needed=True)
+    assert written['sim'] is None, '스크래퍼가 매매하는 심은 스크래퍼가 배포한다'
+
+
 # ── 국면 ────────────────────────────────────────────────────────────
 
 def test_scraper_never_updates_the_regime():

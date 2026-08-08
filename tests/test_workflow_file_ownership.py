@@ -104,6 +104,23 @@ def test_scraper_accepts_and_forwards_the_regime_handed_to_it():
     assert 'REGIME_HINT:' in scraper, 'regime 입력이 파이썬에 전달되지 않는다'
 
 
+def test_scraper_deploy_consults_the_runtime_exclude_list():
+    """선택 심의 페이퍼 쌍둥이는 정적 case문으로 못 막는다 — 어느 심인지는
+    program_trading.json이 정하므로 런타임에만 안다. Stage 3에서 안 돌리는 것만으로는
+    부족하다: 배포 스텝의 cp는 심을 돌렸는지와 무관하게 **런 시작 시점 사본**을
+    올려 그 사이 trading.yml이 push한 4~5분치를 되돌린다(2026-08-09)."""
+    from src.pipeline.orchestrator import DEPLOY_EXCLUDE_REL
+    name = os.path.basename(DEPLOY_EXCLUDE_REL)
+    deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
+
+    assert name in deploy, f'배포 스텝이 {name}을 읽지 않는다'
+    # json·csv 두 루프 모두에 걸려야 한다. 상태 파일만 막고 거래 이력을 되돌리면
+    # 대시보드의 페이퍼 성과가 실계좌와 갈라진다.
+    json_loop, csv_loop = deploy.split('for f in data/*.csv', 1)
+    assert 'owned_by_trading' in json_loop.split('for f in data/*.json', 1)[1]
+    assert 'owned_by_trading' in csv_loop
+
+
 def test_scraper_does_not_deploy_money_files():
     """순위 스냅샷의 writer는 trading.yml이다. scraper가 `data/*.json`·`*.csv`를
     통째로 밀면 `rank_state.json`이 런 시작 시점 사본으로 되돌아가고, 그러면

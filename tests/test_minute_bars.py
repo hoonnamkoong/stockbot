@@ -12,6 +12,7 @@ KIS 분봉(FHKST03010200)은 **당일치만** 조회된다. 과거로 확장할 
 """
 import os
 import sys
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -129,3 +130,46 @@ def test_codes_are_deduped():
 def test_missing_file_is_empty_not_an_error(tmp_path):
     """순위 스냅샷이 아직 없는 날(최초 배포)에 EOD 잡이 죽으면 안 된다."""
     assert codes_for_date(str(tmp_path / 'nope.csv'), '20260810') == []
+
+
+# ── 전량 결손 (2026-08-09) ──────────────────────────────────────────
+# KISDataProvider._get은 실패해도 예외 없이 {}를 돌려준다(토큰 만료·유량 초과·
+# rt_cd≠0). 예외만 세면 토큰이 죽은 날 13앵커 × 전 종목이 조용히 비는데 로그에는
+# `0행 저장`이 성공처럼 찍힌다. KIS 분봉은 당일치만 조회되므로 **그날 데이터는
+# 영구 손실**이고, 다음 날 알아채도 복구할 방법이 없다.
+
+def _run_main(monkeypatch, tmp_path, bars_for_call):
+    import scripts.save_minute_bars as smb
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    from datetime import datetime, timezone, timedelta
+    now = (datetime.now(timezone.utc) + timedelta(hours=9))
+    (tmp_path / 'data' / f"money_{now.strftime('%Y-%m')}.csv").write_text(
+        f"cycle_id,ts,code\n1,{now.strftime('%Y-%m-%d')}T09:00:00,005930\n",
+        encoding='utf-8')
+
+    provider = mock.MagicMock()
+    provider.get_minute_bars.side_effect = bars_for_call
+    monkeypatch.setattr('src.trade.kis_data_provider.KISDataProvider',
+                        lambda *a, **k: provider)
+    monkeypatch.setattr(smb.time, 'sleep', lambda *_: None)
+    alert = mock.MagicMock(return_value=True)
+    monkeypatch.setattr(smb.alerts, 'send_alert', alert)
+    smb.main()
+    return alert
+
+
+def test_all_empty_responses_raise_a_human_alert(monkeypatch, tmp_path):
+    """예외 없이 전부 빈 응답 = 토큰이 죽었다. 워크플로는 초록색이라 여기서
+    안 알리면 아무도 모른다."""
+    alert = _run_main(monkeypatch, tmp_path, lambda *a, **k: [])
+
+    assert alert.call_count == 1
+    assert '분봉' in alert.call_args[0][0]
+
+
+def test_a_normal_day_does_not_alert(monkeypatch, tmp_path):
+    alert = _run_main(monkeypatch, tmp_path,
+                      lambda *a, **k: [{'hhmm': '0900', 'price': 100, 'volume': 10}])
+
+    alert.assert_not_called()

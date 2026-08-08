@@ -119,6 +119,10 @@ jobs:
       - name: Save minute bars (KIS)
         if: steps.gate.outputs.run == 'true'
         env:
+          # 이 스텝은 `|| echo`로 감싸여 있어 실패해도 워크플로가 초록색이다.
+          # 전량 결손(토큰 사망)은 그날치를 영구히 잃으므로 사람에게 가야 한다.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
           KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}

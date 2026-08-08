@@ -138,6 +138,10 @@ class KISDataProvider:
             pass
 
     def _set_rank_cache(self, key: str, data: list):
+        """**자르지 않은 전량**을 넣는다. limit은 캐시 키가 아니라 호출자별
+        잘라내기다 — 자른 뒤 캐시하면 limit이 작은 호출자가 먼저 도는 것만으로
+        뒤 호출자의 응답이 조용히 줄어든다(2026-08-09: 순위 스냅샷이 200종목을
+        요청했는데 앞서 돈 심의 30행 캐시를 받아 코스닥 순위가 170만큼 밀렸다)."""
         KISDataProvider._rank_cache[key] = (time.time(), data)
 
     def _get(self, url: str, tr_id: str, params: dict, timeout: int = 5) -> dict:
@@ -525,10 +529,13 @@ class KISDataProvider:
         sort: '0'=상승률, '1'=하락률
         반환: [{code, name, price, change_rate, acml_vol, amount}, ...]
         """
+        # limit은 키에 넣지 않는다. 순위 API는 몇 종목을 가져오든 호출이 1번이므로
+        # (본문에서 전량을 파싱해 캐시한다) limit별로 키를 나누면 같은 응답을 두 번
+        # 받게 되고, "추가 API 호출 0"이라는 순위 스냅샷의 전제가 깨진다.
         key = f"fluctuation_rank_{market}_{sort}"
         cached = self._get_rank_cached(key, self.TTL_REALTIME)
         if cached is not None:
-            return cached
+            return cached[:limit]
 
         body = self._get(
             "/uapi/domestic-stock/v1/ranking/fluctuation",
@@ -554,8 +561,11 @@ class KISDataProvider:
         if not isinstance(rows, list):
             rows = [rows] if rows else []
 
+        # **자르기 전에** 캐시한다. limit은 캐시 키가 아니다(아래 _set_rank_cache
+        # 주석 참고) — 자른 뒤 캐시하면 먼저 도는 심(limit=30)이 뒤에 오는
+        # 순위 스냅샷(limit=200)의 응답을 잘라먹는다.
         result = []
-        for r in rows[:limit]:
+        for r in rows:
             code = r.get("stck_shrn_iscd", "").strip()
             if not code:
                 continue
@@ -575,7 +585,7 @@ class KISDataProvider:
         self._set_rank_cache(key, result)
         # 방금 만든 result도 캐시가 참조하는 바로 그 리스트다 — 이 호출자에게도
         # 복사본을 줘야 뒤이어 도는 다른 심의 enrichment가 이 심의 사본을 오염시키지 않는다.
-        return [dict(row) for row in result]
+        return [dict(row) for row in result[:limit]]
 
     # ──────────────────────────────────────────────────
     # 9. 외국인/기관 순매수 상위 (FHPTJ04400000)
@@ -587,10 +597,10 @@ class KISDataProvider:
         etc_cls: '0'=전체, '1'=외국인, '2'=기관
         반환: [{code, name, price, frgn_fake_ntby_qty, orgn_fake_ntby_qty, amount}, ...]
         """
-        key = f"frgn_inst_rank_{market}_{etc_cls}"
+        key = f"frgn_inst_rank_{market}_{etc_cls}"   # limit은 키가 아니다(위와 같은 이유)
         cached = self._get_rank_cached(key, self.TTL_REALTIME)
         if cached is not None:
-            return cached
+            return cached[:limit]
 
         body = self._get(
             "/uapi/domestic-stock/v1/quotations/foreign-institution-total",
@@ -608,8 +618,9 @@ class KISDataProvider:
         if not isinstance(rows, list):
             rows = [rows] if rows else []
 
+        # 자르기 전에 캐시한다 — 이유는 get_fluctuation_rank와 같다.
         result = []
-        for r in rows[:limit]:
+        for r in rows:
             code = r.get("mksc_shrn_iscd", "").strip()
             if not code:
                 continue
@@ -633,7 +644,7 @@ class KISDataProvider:
         self._set_rank_cache(key, result)
         # 방금 만든 result도 캐시가 참조하는 바로 그 리스트다 — 이 호출자에게도
         # 복사본을 줘야 뒤이어 도는 다른 심의 enrichment가 이 심의 사본을 오염시키지 않는다.
-        return [dict(row) for row in result]
+        return [dict(row) for row in result[:limit]]
 
     # ──────────────────────────────────────────────────
     # 10. 재무비율 수익성 순위 (FHPST01750000)

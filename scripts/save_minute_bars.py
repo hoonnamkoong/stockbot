@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from src import alerts
 from src.data.minute_bars import anchor_times, codes_for_date, merge_bars
 
 COLUMNS = ['date', 'code', 'hhmm', 'price', 'volume']
@@ -69,17 +70,33 @@ def main() -> None:
         batches = []
         for a in anchors:
             try:
-                batches.append(p.get_minute_bars(code, a))
+                bars = p.get_minute_bars(code, a)
             except Exception as e:
-                failed += 1
+                bars = []
                 print(f'[분봉] {code} {a} 실패: {e}')
+            # **빈 응답도 실패로 센다.** KISDataProvider._get은 실패해도 예외 없이
+            # {}를 준다(토큰 만료·유량 초과·rt_cd≠0) — 예외만 세면 토큰이 죽은 날
+            # 13앵커 × 전 종목이 조용히 비는데 아래 로그는 '조회 실패 0콜'이 된다.
+            if not bars:
+                failed += 1
+            else:
+                batches.append(bars)
             time.sleep(CALL_GAP_SEC)
         n = append_bars(date_str, code, merge_bars(*batches), path)
         total += n
     # 결손을 조용히 넘기지 않는다 — 분봉이 비면 신호 검정 자체가 성립하지 않는데
     # 로그가 조용하면 '그날은 신호가 없었다'로 오독된다.
     print(f'[분봉] {len(codes)}종목 / {total}행 저장 → {path}'
-          + (f' (조회 실패 {failed}콜)' if failed else ''))
+          + (f' (빈 응답·실패 {failed}콜)' if failed else ''))
+
+    if total == 0:
+        # 로그만으로는 부족하다. 이 잡은 `|| echo`로 감싸여 있어 워크플로가 초록색이고,
+        # KIS 분봉은 **당일치만** 조회되므로 다음 날 알아채도 복구할 방법이 없다.
+        alerts.send_alert(
+            f"<b>분봉 저장 실패</b>\n\n"
+            f"{date_str} — 대상 {len(codes)}종목이 전부 빈 응답({failed}콜)입니다.\n"
+            f"KIS 토큰 또는 유량을 확인하세요.\n"
+            f"⚠️ 분봉은 당일치만 조회됩니다 — 이 하루의 가격 해상도는 복구할 수 없습니다.")
 
 
 if __name__ == '__main__':

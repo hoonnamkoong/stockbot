@@ -64,11 +64,6 @@ def selected_sim_and_buzz(ctx: PipelineContext,
         return selected, None
 
 
-def selected_sim_needs_buzz(ctx: PipelineContext, regime: str | None) -> bool | None:
-    """선택된 심이 버즈(네이버 게시글)를 필요로 하는가. 판정은 위와 같다."""
-    return selected_sim_and_buzz(ctx, regime)[1]
-
-
 def trade_if_buzz_free(ctx: PipelineContext, trade_worker,
                        regime: str | None) -> tuple[str | None, list | None]:
     """선택 심이 버즈를 안 쓰면 매매를 낸다. 쓰면 아무것도 하지 않는다(scraper 소관).
@@ -83,14 +78,18 @@ def trade_if_buzz_free(ctx: PipelineContext, trade_worker,
     라이브 랭킹이라 다른 종목 집합이 나올 수 있고, 그러면 실전과 페이퍼 쌍둥이가
     서로 다른 입력으로 판단한다.
     """
-    needs = selected_sim_needs_buzz(ctx, regime)
+    # 조회는 **한 번뿐이다.** 여기서 다시 부르면 (1) 그 호출은 감싸이지 않아
+    # GitHub 조회 실패가 run_trade_loop까지 튀어 런이 죽고(if: success()인 배포
+    # 스텝이 통째로 건너뛰어져 그 런의 국면·순위 갱신이 유실된다), (2) 두 호출
+    # 사이에 selected_sim이 바뀌면 소유권을 판정한 심과 실제로 매매하는 심이
+    # 갈린다. id를 함께 돌려받는 이유가 위 docstring에 있다.
+    selected, needs = selected_sim_and_buzz(ctx, regime)
     if needs is None:
         return None, None
     if needs:
         ctx.log(f"[Program] 버즈 필요 심(국면={regime}) — scraper.yml 소관, 여기서는 매매하지 않음")
         return None, None
 
-    selected = peek_selected_sim(log=ctx.log)
     ctx.log(f"[Program] '{selected}' 버즈 불필요(국면={regime}) — 매매 실행")
     try:
         used_candidates = run_program_trading(

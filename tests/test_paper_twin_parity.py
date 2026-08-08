@@ -36,8 +36,6 @@ def _call(program_result):
     ctx = _Ctx()
     with mock.patch.object(trading_cycle, 'selected_sim_and_buzz',
                            return_value=('sim4_bull_daytrading', False)), \
-         mock.patch.object(trading_cycle, 'peek_selected_sim',
-                           return_value='sim4_bull_daytrading'), \
          mock.patch.object(trading_cycle, 'run_program_trading',
                            return_value=program_result):
         return trading_cycle.trade_if_buzz_free(ctx, mock.MagicMock(), 'BULL')
@@ -57,3 +55,25 @@ def test_empty_universe_still_counts_as_a_real_run():
     """빈 리스트는 '못 돌았다'가 아니라 '돌았는데 후보가 없었다'이다 —
     그 사이클의 보유 종목 관리(손절·익절)는 실제로 일어났다."""
     assert _call([]) == ('sim4_bull_daytrading', [])
+
+
+def test_the_selected_sim_is_looked_up_exactly_once():
+    """선택 심 조회는 한 사이클에 한 번뿐이어야 한다(2026-08-09 발견).
+
+    이 조회는 GitHub API를 직접 읽는다 — `selected_sim_and_buzz`가 굳이 try로
+    감싼 이유다. 두 번째 호출을 맨몸으로 두면 두 가지가 난다.
+
+      1. 예외가 `run_trade_loop`까지 튀어 런이 죽는다. 그러면 `if: success()`인
+         배포 스텝이 통째로 건너뛰어져 그 런의 국면·순위 갱신이 유실된다.
+      2. 두 호출 사이(수 초)에 selected_sim이 바뀌면 소유권을 판정한 심과 실제로
+         매매한 심이 갈린다 — 버즈 필요 심을 빈 후보로 실전 매매할 수 있다.
+    """
+    ctx = _Ctx()
+    peek = mock.Mock(side_effect=['sim4_bull_daytrading',
+                                  RuntimeError('GitHub 조회 실패')])
+    with mock.patch.object(trading_cycle, 'peek_selected_sim', peek), \
+         mock.patch.object(trading_cycle, 'sim_needs_buzz', return_value=False), \
+         mock.patch.object(trading_cycle, 'run_program_trading', return_value=[]):
+        assert trading_cycle.trade_if_buzz_free(ctx, mock.MagicMock(), 'BULL') == \
+            ('sim4_bull_daytrading', [])
+    assert peek.call_count == 1, f'선택 심을 {peek.call_count}번 조회했다'

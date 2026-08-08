@@ -164,7 +164,20 @@ jobs:
           # 여기서 올리면 이 런이 시작할 때 받아온 사본으로 국면을 되돌린다 —
           # 두 워크플로는 concurrency 그룹이 달라 실제로 동시에 돌기 때문에
           # 그 되돌림이 상시 일어난다(lost update). 여기서는 읽기만 한다.
+          # [소유권 — 런타임] 선택 심의 페이퍼 쌍둥이는 trading.yml이 60초마다
+          # 갱신·배포한다. 어느 심인지는 program_trading.json이 정하므로 아래 정적
+          # case문에 못 넣는다 — 이 런이 실행 중에 적어둔 목록을 읽는다
+          # (src/pipeline/orchestrator.write_deploy_exclude).
+          # Stage 3에서 안 돌리는 것만으로는 부족하다: 이 cp는 심을 돌렸는지와
+          # 무관하게 **런 시작 시점 사본**을 올려, 그 사이 trading.yml이 push한
+          # 4~5분치 페이퍼 매매를 되돌린다(lost update).
+          EXCLUDE_LIST=data/.scraper_deploy_exclude
+          owned_by_trading() {
+            [ -s "$EXCLUDE_LIST" ] && grep -qxF "$1" "$EXCLUDE_LIST"
+          }
+
           for f in data/*.json; do
+            if owned_by_trading "$(basename "$f")"; then continue; fi
             case "$(basename "$f")" in
               kis_token_cache.json|token.json|kis_token.json|token_result.json|portfolio.json|order_history.json|order_status.json|history.json|program_positions.json|program_trading.json) continue ;;
               sim_libero_state.json|regime_gate_state.json) continue ;;
@@ -176,6 +189,7 @@ jobs:
           done
           # 실거래 CSV는 비공개 레포로만 (public 배포 제외)
           for f in data/*.csv; do
+            if owned_by_trading "$(basename "$f")"; then continue; fi
             case "$(basename "$f")" in
               trade_history_real.csv) continue ;;
               regime_observations.csv|trade_history_sim_libero.csv) continue ;;

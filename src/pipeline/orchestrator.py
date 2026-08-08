@@ -49,6 +49,53 @@ def active_only(items: list) -> list:
     return [x for x in items if _status_of(x) == '활성']
 
 
+DEPLOY_EXCLUDE_REL = os.path.join('data', '.scraper_deploy_exclude')
+
+
+def write_deploy_exclude(sim_id: str | None, log=print,
+                         path: str = DEPLOY_EXCLUDE_REL) -> list[str]:
+    """trading.yml이 writer인 파일 이름을 배포 스텝에 넘긴다. 반환은 적어 넣은 이름들.
+
+    **Stage 3에서 그 심을 안 돌리는 것만으로는 부족하다.** 배포 스텝의
+    `cp data/*.json`은 심을 돌렸는지와 무관하게 파일을 올리는데, 그 파일은 이 런이
+    시작할 때 db-data에서 받아온 4~5분 전 사본이다. db_data_repo는 배포 시점에 새로
+    clone하므로 그 사이 trading.yml이 push한 최신 상태가 들어 있고, 위 cp가 그것을
+    옛 사본으로 덮어쓴다 — 60초 루프 4~5분치가 통째로 되돌아간다(lost update).
+    파일을 안 만드는 것과 파일을 안 올리는 것은 다른 문제다.
+
+    정적 case문에 못 넣는 이유: 선택 심은 program_trading.json이 정하므로 런타임에만
+    안다. 그래서 이름을 파일로 넘긴다.
+
+    항상 쓴다(제외할 게 없으면 빈 파일) — 남아 있는 옛 목록이 엉뚱한 심을 빼면
+    그 심은 스크래퍼가 갱신하고도 db-data에 도달하지 못한다.
+
+    실패는 예외로 올리지 않는다. 여기서 죽으면 스크래핑 산출물 전체가 배포를 못 하는데,
+    그건 되돌림보다 나쁘다 — 대신 로그에 남긴다.
+    """
+    names: list[str] = []
+    if sim_id:
+        try:
+            from src.strategy.registry import get_sim_registry
+            entry = next((s for s in get_sim_registry(include_analyzers=True)
+                          if s['id'] == sim_id), None)
+            if entry:
+                names = [os.path.basename(entry['state_file']),
+                         os.path.basename(entry['csv_file'])]
+            else:
+                log(f"[Deploy] '{sim_id}' 레지스트리에 없음 — 배포 제외 없이 진행")
+        except Exception as e:
+            log(f"[경고] 배포 제외 목록 작성 실패(되돌림 위험): {e}")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(''.join(f'{n}\n' for n in names))
+        if names:
+            log(f"[Deploy] 배포 제외(trading.yml 소유): {names}")
+    except Exception as e:
+        log(f"[경고] 배포 제외 목록 기록 실패(되돌림 위험): {e}")
+    return names
+
+
 def _notify_holiday_check_failed(ctx: PipelineContext) -> None:
     """거래일 판정 불가를 알린다.
 
@@ -122,6 +169,9 @@ def run_pipeline(ctx: PipelineContext) -> None:
         # 돌리면 그 사이 페이퍼 매매가 통째로 되돌아간다(lost update).
         # 판정 불가(None)면 trading.yml도 안 돌리므로 여기서 빼면 안 된다.
         paper_owned_elsewhere = selected_sim if buzz_needed is False else None
+        # Stage 3 제외(돌리지 않는다)와 배포 제외(올리지 않는다)는 다른 문제다.
+        # 둘 다 같은 값에서 나와야 판정이 갈리지 않는다.
+        write_deploy_exclude(paper_owned_elsewhere, ctx.log)
         if scraper_owns_trading:
             ctx.log("[Program] 버즈 필요 심 — 이 워크플로가 Stage 3에서 매매합니다.")
         else:

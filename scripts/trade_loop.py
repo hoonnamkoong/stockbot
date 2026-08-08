@@ -193,6 +193,7 @@ def collect_rank_snapshot(ctx, log=print) -> bool:
 
     p = KISDataProvider()
     rows: list[dict] = []
+    missing: list[str] = []
     # 코스피·코스닥 등락률 + 외인/기관 순매수. 3콜로 200~300종목.
     for label, fetch in (
         ('등락률(코스피)', lambda: p.get_fluctuation_rank(market='0001', limit=200)),
@@ -200,11 +201,25 @@ def collect_rank_snapshot(ctx, log=print) -> bool:
         ('외인기관 순매수', lambda: p.get_foreign_institution_rank(limit=200)),
     ):
         try:
-            rows += fetch() or []
+            got = fetch() or []
         except Exception as e:
-            log(f'[순위] {label} 조회 실패(나머지로 계속): {e}')
-    if not rows:
-        log('[순위] 응답 없음 — 이번 사이클 기록 생략')
+            log(f'[순위] {label} 조회 실패: {e}')
+            got = []
+        if not got:
+            missing.append(label)
+        rows += got
+    if missing:
+        # **부분 스냅샷을 적느니 이 사이클을 건너뛴다.** rank_map은 세 블록을 이어
+        # 붙인 연결 위치로 1부터 번호를 매기므로, 블록 하나가 비면 그 뒤 블록이
+        # 통째로 앞당겨진다 — 가만히 있던 종목 수백 개에 블록 크기(~200)만 한
+        # 가짜 delta가 찍히고, 그게 CSV와 rank_state.json에 그대로 박힌다.
+        # 그리고 이 결손은 except로 안 잡힌다: KISDataProvider._get은 실패해도
+        # 예외 없이 {}를 준다(토큰 만료·유량 초과·rt_cd≠0). 장중에 빈 블록은
+        # 정상이 아니다 — 세 순위 모두 항상 200종목을 채운다.
+        # 직전 상태(rank_state.json)도 그대로 둔다. 다음 성공 사이클이 마지막
+        # 정상 스냅샷과 비교하면 창이 넓어질 뿐, 방향을 지어내지는 않는다.
+        log(f'[순위] {", ".join(missing)} 결손 — 이번 사이클 기록 생략'
+            f'(부분 스냅샷은 그 뒤 전 종목에 가짜 delta를 만든다)')
         return False
 
     curr = rs.rank_map(rows)
@@ -252,7 +267,8 @@ def regime_output_files() -> list[str]:
 
 def _write_deploy_manifest(sim_id: str | None, log=print,
                            include_regime: bool = False,
-                           include_money=None) -> None:
+                           include_money=None,
+                           include_alerts: bool = False) -> None:
     """이번 런이 실제로 갱신한 파일 이름을 적어둔다. 워크플로 배포 스텝이 읽는다.
 
     "바뀐 파일을 전부 올린다"로는 안 된다. 이 런은 선택 심 하나(+국면)만 갱신하는데
@@ -267,6 +283,11 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
             names += regime_output_files()
         if include_money is not None:
             names += money_output_files(include_money)
+        if include_alerts:
+            # 알림 쿨다운 기록. 평소에는 스크래퍼가 data/*.json으로 올리지만,
+            # 휴장 판정 실패 분기에서는 스크래퍼가 아예 안 뜬다 — 그때 여기서
+            # 안 올리면 아무도 안 올려서 매 런이 '첫 알림'이 된다.
+            names.append(alerts.STATE_FILENAME)
         if sim_id:
             from src.strategy.registry import get_sim_registry
             entry = next((s for s in get_sim_registry(include_analyzers=True)
@@ -300,6 +321,11 @@ def run_trade_loop(ctx: PipelineContext) -> None:
         # 여기서 return하면 스크래퍼도 안 뜬다(dispatch가 아래에 있다). 즉 봇이
         # 통째로 멈추는데 워크플로는 초록색이다 — 사람 경로가 반드시 필요하다.
         alerts.notify_holiday_check_failed(ctx.today_display, ctx.now_kst, ctx.log)
+        # 쿨다운 기록은 db-data를 왕복해야 **다음 런에** 보인다. 이 분기는 아래
+        # 매니페스트 기록보다 앞에서 return하고 스크래퍼도 (dispatch가 아래에
+        # 있으므로) 안 뜬다 — 여기서 안 올리면 아무도 안 올려서 억제가 무력화되고
+        # 09:00~15:30 2분 간격 195건이 나간다. 억제 없는 알림은 알림이 없는 것과 같다.
+        _write_deploy_manifest(None, ctx.log, include_alerts=True)
         return
     if not trading:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 종료합니다.")

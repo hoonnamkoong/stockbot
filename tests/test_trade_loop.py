@@ -421,6 +421,38 @@ def test_undecidable_trading_day_alerts_a_human(stub):
     assert sent.call_args.kwargs['cooldown_min'] == 60
 
 
+def test_the_alert_cooldown_file_is_deployed_when_the_holiday_check_fails(stub):
+    """쿨다운 기록은 db-data를 왕복해야 **다음 런에** 보인다(2026-08-09).
+
+    이 분기는 루프 끝의 매니페스트 기록보다 앞에서 return하고, 스크래퍼도
+    (dispatch가 아래에 있으므로) 안 뜬다 — 여기서 안 올리면 아무도 안 올린다.
+    그러면 매 런이 '첫 알림'이 되어 09:00~15:30 2분 간격 **195건**이 나간다.
+    억제 없는 알림은 rate limit에 걸리거나 사람이 둔감해져서, 어느 쪽이든
+    알림이 없는 것과 같다 — 이 커밋이 막으려던 바로 그 수치다.
+    """
+    calls = []
+    stub.setattr(trade_loop.alerts, 'send_alert_once', mock.MagicMock(return_value=True))
+    stub.setattr(trade_loop, '_write_deploy_manifest',
+                 lambda sim, log=print, **kw: calls.append(kw))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock())
+    ctx = _Ctx()
+    ctx.is_trading_day = lambda: None
+
+    trade_loop.run_trade_loop(ctx)
+
+    assert calls, '판정 불가 분기가 배포 목록을 아예 안 쓴다'
+    assert calls[0].get('include_alerts') is True
+
+
+def test_the_manifest_can_carry_the_alert_cooldown_file(tmp_path, monkeypatch):
+    from src import alerts as alerts_mod
+    monkeypatch.chdir(tmp_path)
+    trade_loop._write_deploy_manifest(None, log=lambda *a: None, include_alerts=True)
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert lines == [alerts_mod.STATE_FILENAME]
+
+
 def test_holiday_does_not_alert(stub):
     """휴장은 장애가 아니다. 매주 토·일에 울리면 알림이 무의미해진다."""
     sent = mock.MagicMock(return_value=True)
@@ -531,3 +563,59 @@ def test_money_files_are_deployed(tmp_path, monkeypatch):
 
     assert 'rank_state.json' in names
     assert 'money_2026-08.csv' in names
+
+
+# ── 부분 결손 (2026-08-09) ──────────────────────────────────────────
+# rank_map은 세 블록을 이어 붙인 **연결 위치**로 1부터 번호를 매긴다. 블록 하나가
+# 비면 그 뒤 블록이 통째로 앞당겨져, 실제로는 가만히 있던 종목 수백 개에 블록
+# 크기만 한 가짜 delta가 찍힌다. 그리고 KISDataProvider._get은 실패해도 예외
+# 없이 {}를 주므로(토큰 만료·유량 초과·rt_cd≠0) 이 결손은 except로 안 잡힌다.
+
+class _StubProvider:
+    """블록별로 무엇을 돌려줄지 지정한다."""
+
+    def __init__(self, fluctuation, foreign):
+        self._fluctuation = fluctuation
+        self._foreign = foreign
+
+    def get_fluctuation_rank(self, market='0001', limit=30, **kw):
+        return list(self._fluctuation.get(market, []))
+
+    def get_foreign_institution_rank(self, limit=30, **kw):
+        return list(self._foreign)
+
+
+def _rows(prefix, n):
+    return [{'code': f'{prefix}{i:04d}', 'name': f'종목{i}', 'price': 1000,
+             'change_rate': '+1.00%', 'acml_vol': 100, 'amount': 100000}
+            for i in range(n)]
+
+
+def _collect_with(monkeypatch, tmp_path, provider):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    import src.trade.kis_data_provider as kdp
+    monkeypatch.setattr(kdp, 'KISDataProvider', lambda *a, **k: provider)
+    logs = []
+    ok = trade_loop.collect_rank_snapshot(_Ctx(), logs.append)
+    return ok, logs
+
+
+def test_rank_snapshot_is_skipped_when_a_block_came_back_empty(monkeypatch, tmp_path):
+    """부분 스냅샷을 적느니 이 사이클을 건너뛴다 — 빈 블록 하나가 그 뒤 전부에
+    가짜 delta를 만든다. 조회 실패를 0으로 폴백하지 않는다는 원칙과 같다."""
+    provider = _StubProvider({'0001': _rows('A', 5), '1001': []}, _rows('C', 5))
+    ok, logs = _collect_with(monkeypatch, tmp_path, provider)
+
+    assert ok is False
+    assert not (tmp_path / 'data' / 'rank_state.json').exists(), \
+        '직전 스냅샷을 부분 결과로 덮어쓰면 다음 사이클의 delta까지 오염된다'
+    assert any('결손' in m for m in logs), f'무엇이 비었는지 로그에 없다: {logs}'
+
+
+def test_rank_snapshot_records_when_all_three_blocks_answered(monkeypatch, tmp_path):
+    provider = _StubProvider({'0001': _rows('A', 5), '1001': _rows('B', 5)}, _rows('C', 5))
+    ok, _ = _collect_with(monkeypatch, tmp_path, provider)
+
+    assert ok is True
+    assert (tmp_path / 'data' / 'rank_state.json').exists()

@@ -2,10 +2,10 @@
 
 왜 git이 아니라 API인가:
   실거래 기록(order_history.json, trade_history_real.csv)의 writer가 어느
-  워크플로인지는 **선택 심에 따라 바뀐다**. 버즈 불필요 심이면 trading_lite(2분)가,
-  버즈 필요 심이면 scraper(10분)가 주문을 낸다. 게다가 scraper도 Stage 0.5에서
-  버즈 불필요 심을 매매한다. 두 워크플로가 각자 런 시작 시점의 사본을 git으로
-  밀면, 나중에 끝난 쪽이 먼저 기록된 주문을 덮어써 지운다(lost update).
+  워크플로인지는 **선택 심에 따라 바뀐다**. 버즈 불필요 심이면 trading.yml(60초
+  루프)이, 버즈 필요 심이면 scraper.yml(10분)이 주문을 낸다. 두 워크플로는
+  concurrency 그룹이 달라 동시에 돌 수 있고, 각자 런 시작 시점의 사본을 git으로
+  밀면 나중에 끝난 쪽이 먼저 기록된 주문을 덮어써 지운다(lost update).
 
   워크플로가 만지지 않고 주문 낸 프로세스가 직접 기록하면 writer 경로가 하나가
   되어 이 문제가 사라진다. 원장(program_positions.json)이 이미 같은 이유로

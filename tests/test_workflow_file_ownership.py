@@ -1,0 +1,84 @@
+"""워크플로 사이의 파일 소유권 — 같은 파일을 둘이 배포하면 조용히 되돌아간다.
+
+2026-08-08 구조 변경으로 국면(리베로)의 writer가 trading.yml로 옮겨갔다.
+그런데 scraper.yml의 배포 스텝은 `data/*.json`·`data/*.csv`를 통째로 밀기 때문에,
+제외하지 않으면 이 런이 **시작할 때 받아온 사본**으로 국면을 되돌린다.
+두 워크플로는 concurrency 그룹이 달라 실제로 동시에 도므로 상시 일어난다.
+
+되돌림은 실패로 안 보인다 — 워크플로는 초록색이고 국면 값만 몇 분 과거다.
+그래서 코드가 아니라 배포 규칙 자체를 테스트한다.
+"""
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+WF = os.path.join(os.path.dirname(__file__), '..', '.github', 'workflows')
+
+
+def _text(name: str) -> str:
+    with open(os.path.join(WF, name), encoding='utf-8') as f:
+        return f.read()
+
+
+def _regime_files() -> list[str]:
+    """국면 갱신이 쓰는 파일 — 매니페스트에서 파생한다(심 이름이 바뀌어도 따라간다)."""
+    from scripts.trade_loop import regime_output_files
+    return regime_output_files()
+
+
+def test_scraper_does_not_deploy_regime_files():
+    scraper = _text('scraper.yml')
+    # 배포 스텝의 case 문에 제외로 등장해야 한다.
+    deploy = scraper.split('Deploy Data to db-data branch', 1)[1]
+    # case 문의 제외 arm은 `a.json|b.csv) continue ;;` 처럼 묶여 있을 수 있다.
+    # 파일명이 있는 줄에 continue가 함께 있으면 제외된 것으로 본다.
+    skipped = {line for line in deploy.splitlines() if 'continue' in line}
+    for name in _regime_files():
+        assert any(name in line for line in skipped), (
+            f'{name}이 scraper.yml 배포 제외 목록에 없다. trading.yml이 유일 '
+            f'writer인데 여기서 올리면 런 시작 시점 사본으로 국면이 되돌아간다.')
+
+
+def test_trading_deploys_only_what_the_manifest_lists():
+    """trading.yml은 data/ 전체가 아니라 매니페스트에 적힌 것만 올려야 한다 —
+    전체를 밀면 스크래퍼가 방금 갱신한 산출물을 낡은 사본으로 되돌린다."""
+    trading = _text('trading.yml')
+    assert '.lite_deploy_manifest' in trading
+    assert 'cp -r data/' not in trading, 'data/ 전체 복사가 있으면 스크래퍼 산출물을 되돌린다'
+
+
+def test_the_two_workflows_do_not_share_a_concurrency_group():
+    """그룹을 공유하면 매매의 대기 트리거가 새 디스패치에 밀려 취소된다 —
+    GitHub concurrency는 FIFO 큐가 아니라 '실행 중 1개 + 대기 1개'만 유지한다."""
+    def group(name):
+        m = re.search(r'concurrency:\s*\n\s*group:\s*(\S+)', _text(name))
+        assert m, f'{name}에 concurrency 그룹이 없다'
+        return m.group(1)
+
+    assert group('scraper.yml') != group('trading.yml')
+
+
+def test_trading_can_dispatch_the_scraper():
+    """actions: write가 없으면 dispatch가 403으로 조용히 실패하고, 스크래핑이
+    영영 안 돈다(매매는 계속 돌아서 알아채기 어렵다)."""
+    trading = _text('trading.yml')
+    assert re.search(r'permissions:.*?\n(?:\s+\w+:\s*\w+\n)*?\s+actions:\s*write',
+                     trading, re.S), 'trading.yml에 actions: write 권한이 필요하다'
+
+
+def test_scraper_is_not_wired_to_the_tasker_event_anymore():
+    """태스커는 trading.yml을 부른다. scraper.yml이 같은 이벤트를 계속 듣고
+    있으면 두 워크플로가 모두 2분마다 떠서 분리한 의미가 사라진다."""
+    scraper = _text('scraper.yml')
+    on_block = scraper.split('jobs:', 1)[0]
+    assert 'tasker_trigger]' not in on_block
+    assert re.search(r'types:\s*\[tasker_trigger\b(?!_)', on_block) is None
+
+
+def test_both_workflows_notify_on_failure():
+    """조용히 죽으면 안 된다. 매매는 돈이 걸려 있고, 스크래퍼는 죽어도 매매가
+    계속 돌기 때문에 오히려 알아채기 어렵다."""
+    for name in ('scraper.yml', 'trading.yml'):
+        assert 'if: failure()' in _text(name), f'{name}에 실패 알림이 없다'

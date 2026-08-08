@@ -16,8 +16,11 @@ import json
 import glob
 import time
 import urllib.request
-import pandas as pd
 from datetime import datetime
+
+# pandas는 월별 엑셀을 쓸 때만 필요하다(update_monthly_excel 한 곳). 모듈 최상단에서
+# 불러오면 실전 매매 경로까지 pandas+numpy를 끌고 들어간다 — 매매 워크플로는 2분마다
+# 새 컨테이너에서 pip install을 하므로, 안 쓰는 의존성 하나가 매 사이클 비용이 된다.
 from typing import Optional
 
 from src.data.schemas import StockData, SyncState, ReportEntry
@@ -268,6 +271,7 @@ class StorageManager:
                 'Key Drivers': d.get('deep_dive_text', str(d.get('posts_summary', '')))[:2000],
             })
 
+        import pandas as pd   # 지연 import — 모듈 주석 참고
         new_df = pd.DataFrame(new_rows)
 
         try:

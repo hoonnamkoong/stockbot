@@ -307,7 +307,7 @@ class TradeEngineWorker(BaseWorker):
         분석기 심(sim0_libero)은 여기서 돌지 않는다 — run_regime_stage()가
         사이클당 한 번 별도로 돈다(E3).
 
-        only_sim_id: 지정하면 그 심 하나만 돈다. trade_lite(2분 주기)가 실전 선택
+        only_sim_id: 지정하면 그 심 하나만 돈다. trade_loop(60초 주기)가 실전 선택
           심의 페이퍼 쌍둥이만 갱신하는 데 쓴다 — 전 심을 2분마다 돌리면 런이
           153초로 120초 창을 넘겨 매 사이클이 겹친다(2026-08-06 실측).
         allow_price_fallback: False면 네이버 직접 조회(_fetch_portfolio_prices)를

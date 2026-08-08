@@ -1,30 +1,39 @@
 name: Stock Scraper Schedule
 
-# 스크래퍼는 태스커 신호로만 돈다 (docs/SCRAPER_OPERATION_SPEC.md).
-# GitHub cron은 발화가 수 분~수 시간 밀려 태스커 런과 겹쳤고, 두 런이 연달아
-# 네이버를 두드리면 페이지 수집이 무너졌다. 장 마감 후 데이터 수집은 eod_data.yml이 맡는다.
+# 스크래핑·AI·심 전부 + **버즈 필요 심의 매매**를 담당한다.
 #
-# [2026-08-07] 태스커가 이 이벤트(tasker_trigger)를 2분마다 보낸다(trading_lite.yml과
-# 공유). 실제로 스크래핑을 도는 건 그중 10분에 한 번뿐이다 — 나머지는 파이썬 쪽
-# 게이트(src/pipeline/scrape_gate.py)가 곧바로 종료시킨다. 그래야 게시글 수집
-# 빈도(=네이버 부하)가 늘지 않고, 국면(regime_history)도 사이클당 한 번만 갱신된다.
-# 오프틱 매매는 trading_lite.yml이 같은 트리거로 독립적으로 처리한다.
+# [2026-08-08] 태스커가 더 이상 이 워크플로를 직접 부르지 않는다.
+# 태스커 → trading.yml → (10분 격자일 때만) 이 워크플로.
+#
+# 방향을 뒤집은 이유: 예전에는 태스커 → scraper.yml이었고 매매가 그 안에서
+# 곁다리로 돌았는데, 4분짜리 스크래핑 런이 도는 동안 들어온 2분 트리거가
+# concurrency에 밀려 취소됐다 — 08-07 실측 196런 중 26런(13%)이 그렇게 사라졌고,
+# 그만큼 매매 사이클이 통째로 없어졌다. 이제 매매가 상위에 있어 스크래핑에
+# 막히지 않고, 스크래퍼가 죽어도 매매와 국면은 산다.
+#
+# GitHub cron은 쓰지 않는다 — 발화가 수 분~수 시간 밀려 태스커 런과 겹쳤고,
+# 두 런이 연달아 네이버를 두드리면 페이지 수집이 무너졌다
+# (docs/SCRAPER_OPERATION_SPEC.md). 장 마감 후 수집은 eod_data.yml이 맡는다.
+#
+# **국면(sim_libero_state.json)은 여기서 갱신하지 않는다.** writer는 trade_loop
+# 하나다 — 국면은 최근 5회 관측의 과반으로 확정되므로 두 곳에서 갱신하면 같은
+# 순간이 두 번 누적되어 평활이 왜곡된다. 여기서는 읽기만 한다.
 on:
-  repository_dispatch:
-    types: [tasker_trigger]
   workflow_dispatch:
     inputs:
       force_run:
         description: 'Bypass market holiday check'
         required: false
         default: 'false'
+  # 태스커가 repository_dispatch로 바뀌는 경우를 위해 남겨둔다(현재 미사용).
+  repository_dispatch:
+    types: [tasker_trigger_scrape]
 
-# 이 워크플로끼리는 겹치지 않게 한다(10분 주기라 평소엔 겹칠 일이 없지만, 수동 실행이
-# 태스커 런과 겹치면 db-data push가 부딪힌다). trading_lite.yml과는 **일부러 그룹을
-# 공유하지 않는다** — 같은 그룹에 넣으면 lite의 대기 트리거가 새 디스패치에 밀려
-# 취소되어 2분 거래 사이클이 조용히 사라진다(GitHub concurrency는 FIFO 큐가 아니라
-# "실행 중 1개 + 대기 1개"만 유지한다). 두 워크플로가 동시에 도는 경우의 안전은
-# 원장 락(program_trader)과 배포 파일 분리가 책임진다.
+# trading.yml과는 **일부러 그룹을 공유하지 않는다** — 같은 그룹에 넣으면 매매의
+# 대기 트리거가 새 디스패치에 밀려 취소되어 매매 사이클이 조용히 사라진다
+# (GitHub concurrency는 FIFO 큐가 아니라 "실행 중 1개 + 대기 1개"만 유지한다).
+# 두 워크플로가 동시에 도는 경우의 안전은 원장 락(program_trader)과 배포 파일
+# 분리가 책임진다.
 concurrency:
   group: stockbot-scraper
   cancel-in-progress: false
@@ -140,15 +149,25 @@ jobs:
           #   - 토큰류: 비공개 레포 stockbot-secret 전담
           #   - 실거래 기록(order_history/trade_history_real/history): 비공개 레포 라운드트립
           #   - 스냅샷(portfolio/order_status): writer 없음 → 미배포
+          #
+          # [소유권] sim_libero_state.json / trade_history_sim_libero.csv /
+          # regime_observations.csv 는 **trading.yml이 유일 writer다.**
+          # 여기서 올리면 이 런이 시작할 때 받아온 사본으로 국면을 되돌린다 —
+          # 두 워크플로는 concurrency 그룹이 달라 실제로 동시에 돌기 때문에
+          # 그 되돌림이 상시 일어난다(lost update). 여기서는 읽기만 한다.
           for f in data/*.json; do
             case "$(basename "$f")" in
               kis_token_cache.json|token.json|kis_token.json|token_result.json|portfolio.json|order_history.json|order_status.json|history.json|program_positions.json|program_trading.json) continue ;;
+              sim_libero_state.json) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done
           # 실거래 CSV는 비공개 레포로만 (public 배포 제외)
           for f in data/*.csv; do
-            [ "$(basename "$f")" = "trade_history_real.csv" ] && continue
+            case "$(basename "$f")" in
+              trade_history_real.csv) continue ;;
+              regime_observations.csv|trade_history_sim_libero.csv) continue ;;
+            esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done
           # KOSPI top100 종가 CSV는 eod_data.yml이 소유한다 (여기서 배포하지 않는다).
@@ -189,7 +208,7 @@ jobs:
 
       # [2026-08-06] 실거래 기록(order_history.json, trade_history_real.csv)의 git 배포를
       # 걷어냈다. 이 파일들의 writer 워크플로가 선택 심에 따라 바뀌기 때문이다 —
-      # 버즈 불필요 심이면 trading_lite.yml(2분)이, 버즈 필요 심이면 이 워크플로가
+      # 버즈 불필요 심이면 trading.yml(60초 루프)이, 버즈 필요 심이면 이 워크플로가
       # 주문을 낸다. 양쪽이 각자 런 시작 시점의 사본을 밀면 나중에 끝난 쪽이 먼저
       # 기록된 체결을 덮어써 지운다(lost update).
       #

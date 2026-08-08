@@ -1,0 +1,15 @@
+# 실전 매매 워크플로(trading.yml) 전용 의존성.
+#
+# 왜 스크래퍼와 나누는가: 이 워크플로는 2분마다 새 컨테이너에서 pip install을
+# 한다. requirements-scraper.txt를 그대로 쓰면 pandas·scikit-learn·pyarrow·
+# pdfplumber·google-genai까지 깔려 설치에만 24초가 든다(2026-08-07 실측).
+# 셋업이 길수록 루프에 남는 예산이 줄고, 그게 곧 매매 주기의 하한이다 —
+# 셋업 47초로는 태스커 2분 창에 한 바퀴밖에 못 돈다(=2분 매매).
+#
+# 여기 있는 것만으로 도는지는 tests/test_trade_loop_imports.py가 지킨다.
+# 새 의존성을 매매 경로에 들이기 전에 그 비용이 매 사이클 값인지 먼저 볼 것.
+requests==2.31.0
+beautifulsoup4==4.12.3
+pydantic>=2.0
+pyyaml>=6.0
+python-dotenv

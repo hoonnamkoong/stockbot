@@ -12,7 +12,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.data import sim_diag
-from src.pipeline import orchestrator
+from src.pipeline import orchestrator, trading_cycle
 from src.pipeline.context import PipelineContext, CYCLE_SECONDS
 
 KST = timezone(timedelta(hours=9))
@@ -94,28 +94,31 @@ def _reset_cycle():
 def test_run_pipeline_sets_the_cycle():
     _reset_cycle()
     ctx = _Ctx(cycle_id=999)
-    with mock.patch.object(orchestrator, 'TradeEngineWorker'), \
-         mock.patch.object(orchestrator, 'StorageManager'), \
-         mock.patch.object(orchestrator, 'DataFetcherWorker'), \
+    with mock.patch.object(orchestrator, 'TradeEngineWorker') as tw, \
+         mock.patch.object(orchestrator, 'StorageManager') as sm, \
+         mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)), \
-         mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
+         mock.patch.object(orchestrator, 'selected_sim_needs_buzz', return_value=None), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
+        tw.return_value.run.return_value = ([], [], None)
+        df.return_value.run.return_value = []
+        sm.return_value.load_sync_state.return_value = (
+            mock.MagicMock(daily_reported_info=[]), {})
         orchestrator.run_pipeline(ctx)
 
     assert sim_diag._cycle_id == 999
 
 
 def test_trade_only_cycle_sets_the_cycle_on_its_own():
-    """trade_lite가 단독 진입점으로 부를 때도 조인 키가 붙어야 한다."""
+    """매매 루프가 단독 진입점으로 부를 때도 조인 키가 붙어야 한다."""
     _reset_cycle()
     ctx = _Ctx(cycle_id=777)
-    with mock.patch.object(orchestrator, 'TradeEngineWorker'), \
-         mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)):
-        orchestrator.run_trade_only_cycle(ctx, mock.MagicMock())
+    with mock.patch.object(trading_cycle, 'TradeEngineWorker'), \
+         mock.patch.object(trading_cycle, 'read_regime', return_value=('BULL', 60.0)), \
+         mock.patch.object(trading_cycle, 'trade_if_buzz_free', return_value=(None, None)):
+        trading_cycle.run_trade_only_cycle(ctx, mock.MagicMock())
 
     assert sim_diag._cycle_id == 777
 

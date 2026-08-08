@@ -1,0 +1,165 @@
+name: Trading (실전 매매)
+
+# 태스커가 **직접** 부르는 워크플로다. 실전 매매의 본체이며, 스크래핑은 여기서
+# 필요할 때만 깨운다(scraper.yml dispatch).
+#
+# [2026-08-08] 방향을 뒤집었다. 예전에는 태스커 → scraper.yml이었고 매매가 그
+# 안에서 곁다리로 돌았는데, 스크래핑이 매매를 세 가지 방식으로 방해했다.
+#   1. concurrency 그룹이 같아, 4분짜리 스크래핑 런이 도는 동안 들어온 트리거가
+#      대기열에 밀려 취소됐다 — 08-07 실측 196런 중 26런(13%)이 그렇게 사라졌다.
+#   2. 같은 프로세스라 스크래핑이 느려지면 매매도 늦었다.
+#   3. 스크래퍼가 죽으면 매매도 죽었다.
+# 이제 매매가 상위에 있고 스크래퍼가 종속이다. 스크래퍼가 죽어도 매매와 국면은 산다.
+#
+# 태스커 간격은 2분 그대로다. 1분 매매는 런 하나가 셋업을 한 번만 내고 안에서
+# 두 바퀴 도는 방식으로 얻는다(scripts/trade_loop.py 참고) — 새 런을 60초마다
+# 띄우는 건 셋업만 20초라 물리적으로 불가능하다.
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [tasker_trigger, tasker_trigger_trade]
+
+# 스크래퍼와 **그룹을 공유하지 않는다.** 그게 이 분리의 핵심이다.
+# cancel-in-progress: false — 진행 중인 런을 취소하면 주문 루프 한가운데서
+# 죽어 락이 리스(4분) 만료까지 남는다. 루프 예산이 태스커 간격보다 짧아
+# 정상적으로는 겹치지 않는다.
+concurrency:
+  group: stockbot-trading
+  cancel-in-progress: false
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    # 원장 락 리스(_LOCK_LEASE_MIN=4분)보다 짧아야 한다. 리스가 만료될 때까지
+    # 살아 있는 런이 있으면 다른 런이 락을 회수해 같은 주문을 낼 수 있다.
+    timeout-minutes: 3
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+    permissions:
+      contents: write
+      # scraper.yml을 dispatch하려면 필요하다. workflow_dispatch와
+      # repository_dispatch는 GitHub이 재귀 방지 규칙에서 예외로 둔 두 이벤트라
+      # GITHUB_TOKEN으로도 새 런이 생성된다.
+      actions: write
+    steps:
+      - name: Checkout content
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'scripts/requirements-trade.txt'
+
+      # 스크래퍼 requirements를 쓰지 않는다. pandas·sklearn·pyarrow·pdfplumber·
+      # google-genai까지 깔면 설치에만 24초가 들고(08-07 실측), 그만큼 루프
+      # 예산이 줄어 두 바퀴가 안 돈다 = 1분 매매가 2분 매매로 되돌아간다.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements-trade.txt
+
+      - name: Fetch remote data (db-data)
+        run: |
+          # --depth 1: 최신 스냅샷만 필요하다. 2분마다 도는 경로에서 전체 이력을
+          # 받으면 그 비용이 매 트리거마다 든다(db-data는 하루 수십 커밋이 쌓인다).
+          git fetch --depth 1 origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet"
+          if git show-ref --verify refs/heads/db-data 2>/dev/null; then
+            git checkout db-data -- data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
+          fi
+          mkdir -p data
+          echo "[System] Remote data synchronized."
+
+      - name: Manage KIS Token
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python scripts/token_manager.py
+
+      - name: Run trade loop
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_EVENT_NAME: "${{ github.event_name }}"
+        run: PYTHONPATH=. python scripts/trade_loop.py
+
+      # 배포 대상은 이 워크플로가 실제로 쓴 것만이다. data/ 전체를 밀면 스크래퍼가
+      # 방금 갱신한 파일(스크래핑 산출물·나머지 심 상태)을 런 시작 시점의 낡은
+      # 사본으로 되돌린다 — 두 워크플로는 concurrency 그룹이 달라 동시에 돈다.
+      #
+      # 실거래 기록(program_positions.json / order_history.json /
+      # trade_history_real.csv)은 여기 없다 — 주문 낸 프로세스가 GitHub API로 직접
+      # 쓴다(src/trade/secret_store.py). 그래서 어느 워크플로가 주문했든 writer가 하나다.
+      #
+      # 국면 파일(sim_libero_state.json 등)은 이 워크플로가 유일 writer이므로
+      # 매니페스트에 함께 들어간다(trade_loop가 갱신한 사이클에 한해).
+      - name: Deploy state (db-data)
+        if: success()
+        run: |
+          if [ ! -f data/.lite_deploy_manifest ]; then
+            echo "[Deploy] 배포 목록 없음 — 생략"
+            exit 0
+          fi
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git clone --depth 1 --branch db-data \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {
+            echo "[Deploy] db-data 브랜치 clone 실패 — 이번 사이클 배포 생략"
+            exit 0
+          }
+          mkdir -p db_data_repo/data
+          copied=0
+          while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            [ -f "data/$name" ] || continue
+            cp "data/$name" "db_data_repo/data/" && copied=$((copied+1))
+          done < data/.lite_deploy_manifest
+          echo "[Deploy] 배포 파일 $copied개"
+          cd db_data_repo
+          git add -A data/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(trade): sim state $(date +'%Y-%m-%d %H:%M KST')"
+          # 스크래퍼가 그 사이 push했으면 non-fast-forward가 난다. 남의 커밋 위에
+          # 내 것을 얹어 다시 시도한다(덮어쓰지 않는다). shallow clone이라
+          # unshallow 후 rebase한다.
+          for i in 1 2 3; do
+            if git push origin db-data; then
+              echo "[Deploy] push 성공 (시도 $i)"
+              exit 0
+            fi
+            echo "[Deploy] push 충돌 — rebase 후 재시도 ($i/3)"
+            git fetch --unshallow origin db-data 2>/dev/null || git fetch origin db-data
+            git pull --rebase origin db-data || { echo "[Deploy] rebase 실패"; exit 1; }
+          done
+          echo "[Deploy] push 3회 실패"
+          exit 1
+
+      # 실전 주문을 내는 워크플로다 — 조용히 죽으면 안 된다.
+      # cancelled에는 걸리지 않는다(if: failure()).
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="HTML" \
+            -d text="🚨 <b>StockBot 실전 매매 실패</b>%0A%0A매매 워크플로 런이 실패했습니다.%0A${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            || echo "[Notify] 텔레그램 발송 실패"

@@ -106,19 +106,21 @@ def test_sim10_bear_universe_gets_change_rate_too():
 
 
 # ── 중복 가드가 매매 주기를 삼키지 않는다 ──────────────────────
-# 이 가드는 주기를 따라와야 하는 값이다. 실측으로 두 번 데인 적이 있다:
+# 이 가드는 주기를 따라와야 하는 값이다. 실측으로 세 번 데인 적이 있다:
 #   2026-07-29 — 15분 가드 + 10분 주기 → 실행이 20분마다로 반토막
 #   2026-08-06 — 5분 가드 + 2분 주기(태스커 단축)면 t=0,6,12만 통과해 실효 6분
-# 지금은 trading_lite.yml이 2분 주기로 매매를 낸다.
+#   2026-08-08 — 1.5분 가드 + 60초 루프 → 두 바퀴 중 한 바퀴 skip, 실효 2분.
+#                1분 매매를 만들어놓고 가드가 그걸 되돌리는 형태였다.
+# 지금은 trading.yml이 60초 루프로 매매를 낸다(scripts/trade_loop).
 def _ran_ago(minutes):
     from src.pipeline.workers.program_trader import _recently_ran
     now = datetime.now(timezone(timedelta(hours=9)))
     return _recently_ran({'last_run': (now - timedelta(minutes=minutes)).isoformat()}, now)
 
 
-def test_dup_guard_allows_two_minute_cadence():
-    """trading_lite는 2분 주기다. 가드가 그보다 길면 매 사이클이 skip된다."""
-    assert _ran_ago(2) is False
+def test_dup_guard_allows_the_trade_loop_cadence():
+    """매매 루프는 60초 주기다. 가드가 그보다 길면 바퀴가 조용히 skip된다."""
+    assert _ran_ago(1) is False
 
 
 def test_dup_guard_allows_ten_minute_cadence():
@@ -127,5 +129,8 @@ def test_dup_guard_allows_ten_minute_cadence():
 
 
 def test_dup_guard_blocks_duplicate_dispatch():
-    """같은 트리거가 두 번 들어오는 것(수초~1분)은 계속 막는다."""
-    assert _ran_ago(0.5) is True
+    """같은 트리거가 두 번 들어오는 것(수초)은 계속 막는다.
+
+    막으려는 건 '같은 사이클의 중복 디스패치'이지 '정상 주기의 다음 바퀴'가
+    아니다. 그래서 가드는 매매 주기(60초)보다 확실히 짧아야 한다."""
+    assert _ran_ago(0.2) is True

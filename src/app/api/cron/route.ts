@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import { pickWorkflow } from '@/lib/cron-target';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -54,11 +55,12 @@ export async function GET(request: Request) {
         }
 
         // 1. Check if scraping time (Removed hardcoded hours -> Run on trigger)
-        // User manages schedule via Tasker (Hourly)
+        // User manages schedule via Tasker (2분 간격)
 
-        // 장 시작 전(KST 7시대) 호출은 KIS 토큰 선발급 워크플로우로 분기한다.
-        // GitHub cron 미발화 문제를 우회해, 09:00 첫 스크래퍼가 항상 유효 토큰을 만나게 함.
-        const WORKFLOW_FILE = hour === 7 ? 'token_refresh.yml' : 'scraper.yml';
+        // 어느 워크플로로 보낼지는 src/lib/cron-target.ts가 정한다.
+        // 여기 인라인으로 두면 라우트를 node --test로 import할 수 없어 아무도
+        // 검증하지 못한다 — 2026-08-07에 정확히 그 모양으로 하루를 잃었다.
+        const WORKFLOW_FILE = pickWorkflow(hour);
 
         console.log(`[Cron] Trigger received (${hour}:${minute.toString().padStart(2, '0')} KST). Dispatching ${WORKFLOW_FILE}...`);
 
@@ -99,7 +101,9 @@ export async function GET(request: Request) {
             success: true,
             time: `${hour}:${minute.toString().padStart(2, '0')} KST`,
             dispatched: WORKFLOW_FILE,
-            scrapingTriggered: WORKFLOW_FILE === 'scraper.yml'
+            // 매매 트리거인지 토큰 선발급인지. 스크래핑은 여기서 직접 부르지
+            // 않는다 — trading.yml이 10분 격자에서 scraper.yml을 깨운다.
+            tradingTriggered: WORKFLOW_FILE === 'trading.yml'
         });
 
     } catch (error: any) {

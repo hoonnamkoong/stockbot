@@ -65,6 +65,12 @@ def stub(monkeypatch, tmp_path):
     monkeypatch.setattr(trade_loop, 'refresh_regime', mock.MagicMock())
     monkeypatch.setattr(trade_loop, 'dispatch_scraper', mock.MagicMock())
     monkeypatch.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: False)
+    # 게이트 상태 파일은 절대 경로(레포의 data/)를 본다 — 막지 않으면 테스트가
+    # 실제 상태 파일을 읽고 쓰며 서로에게 영향을 준다.
+    monkeypatch.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: False)
+    monkeypatch.setattr(trade_loop.scrape_gate, 'mark_regime', mock.MagicMock())
+    # 순위 스냅샷은 KIS를 부른다. 막지 않으면 테스트가 네트워크를 탄다.
+    monkeypatch.setattr(trade_loop, 'collect_rank_snapshot', mock.MagicMock(return_value=False))
     monkeypatch.setattr(trade_loop.PipelineContext, 'from_env',
                         classmethod(lambda cls: _Ctx()))
     return monkeypatch
@@ -126,6 +132,7 @@ def test_exits_immediately_when_there_is_nothing_to_trade(stub):
 
 def test_refreshes_regime_and_wakes_scraper_only_when_due(stub):
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
     _budget(stub, 1)
 
@@ -150,6 +157,7 @@ def test_regime_is_refreshed_before_trading(stub):
     한 사이클 낡은 국면으로 판단한다."""
     order = []
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'refresh_regime', lambda *a, **k: order.append('regime'))
     stub.setattr(trade_loop, 'run_trade_only_cycle',
                  lambda *a, **k: order.append('trade'))
@@ -177,6 +185,7 @@ def test_scraper_dispatch_failure_does_not_stop_trading(stub):
 def test_regime_refresh_failure_does_not_stop_trading(stub):
     """국면 갱신이 실패하면 직전 국면으로 매매한다 — 멈추는 것보다 낫다."""
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'refresh_regime',
                  mock.MagicMock(side_effect=RuntimeError('boom')))
     cycles = mock.MagicMock(return_value=None)
@@ -220,7 +229,7 @@ def test_deploy_manifest_written_once_after_the_loop(stub, tmp_path):
     """바퀴마다 배포하면 db-data에 하루 수백 커밋이 쌓인다."""
     written = []
     stub.setattr(trade_loop, '_write_deploy_manifest',
-                 lambda sim, log=print, include_regime=False: written.append(sim))
+                 lambda sim, log=print, **kw: written.append(sim))
     stub.setattr(trade_loop, 'run_trade_only_cycle',
                  mock.MagicMock(return_value='sim4_bull_daytrading'))
     _budget(stub, 2)
@@ -233,7 +242,7 @@ def test_deploy_manifest_written_once_after_the_loop(stub, tmp_path):
 def test_no_manifest_when_nothing_traded_and_regime_untouched(stub):
     written = []
     stub.setattr(trade_loop, '_write_deploy_manifest',
-                 lambda sim, log=print, include_regime=False: written.append(sim))
+                 lambda sim, log=print, **kw: written.append(sim))
     stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
     _budget(stub, 1)
 
@@ -248,8 +257,9 @@ def test_regime_files_are_deployed_even_when_nothing_traded(stub):
     얼어붙은 국면을 읽게 된다 — 실패가 아니라 '조용히 낡은 값으로 매매'다."""
     calls = []
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, '_write_deploy_manifest',
-                 lambda sim, log=print, include_regime=False:
+                 lambda sim, log=print, include_regime=False, **kw:
                      calls.append((sim, include_regime)))
     stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
     _budget(stub, 1)
@@ -264,10 +274,11 @@ def test_regime_files_are_not_deployed_when_refresh_failed(stub):
     워크플로의 갱신을 되돌린다."""
     calls = []
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'refresh_regime',
                  mock.MagicMock(side_effect=RuntimeError('boom')))
     stub.setattr(trade_loop, '_write_deploy_manifest',
-                 lambda sim, log=print, include_regime=False:
+                 lambda sim, log=print, include_regime=False, **kw:
                      calls.append((sim, include_regime)))
     stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
     _budget(stub, 1)
@@ -340,3 +351,183 @@ def test_dup_guard_is_shorter_than_the_trade_interval():
     assert _DUP_GUARD_MIN * 60 < trade_loop.TRADE_INTERVAL_SEC, (
         f'중복가드 {_DUP_GUARD_MIN}분이 매매 주기 '
         f'{trade_loop.TRADE_INTERVAL_SEC}초보다 길거나 같다 — 바퀴가 skip된다')
+
+
+# ── 국면 게이트 분리 (2026-08-08 회귀) ───────────────────────────────
+# 국면과 스크래핑은 주기가 같을 뿐 다른 일이다. 스크래핑 게이트는 스크래퍼가
+# 끝나야 닫히는데 그게 4~5분 뒤라, 같이 쓰면 그 사이 trading 런들이 국면을
+# 격자당 3번 갱신한다.
+
+def test_regime_is_not_refreshed_again_while_the_scraper_is_still_running(stub):
+    """스크래핑 게이트는 아직 열려 있어도(스크래퍼 미완료) 국면은 닫혀 있다."""
+    stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: False)
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    _budget(stub, 1)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    trade_loop.refresh_regime.assert_not_called()
+    trade_loop.dispatch_scraper.assert_called_once()
+
+
+def test_marks_the_regime_gate_after_a_successful_refresh(stub):
+    marks = mock.MagicMock()
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'mark_regime', marks)
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    _budget(stub, 1)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    marks.assert_called_once()
+
+
+def test_does_not_mark_the_regime_gate_when_the_refresh_failed(stub):
+    """실패를 기록하면 다음 격자까지 낡은 국면으로 매매한다 — 다음 틱에 재시도."""
+    marks = mock.MagicMock()
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'mark_regime', marks)
+    stub.setattr(trade_loop, 'refresh_regime',
+                 mock.MagicMock(side_effect=RuntimeError('boom')))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    _budget(stub, 1)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    marks.assert_not_called()
+
+
+def test_regime_gate_file_is_deployed_with_the_regime(tmp_path, monkeypatch):
+    """게이트 파일이 db-data에 안 올라가면 다음 런이 못 읽어 다시 격자당 3회로
+    돌아간다 — 게이트를 만든 의미가 사라진다."""
+    assert 'regime_gate_state.json' in trade_loop.regime_output_files()
+
+
+def test_undecidable_trading_day_alerts_a_human(stub):
+    """판정 불가면 매매도 스크래핑도 안 돈다(dispatch보다 앞에서 return한다).
+    그런데 이 알림은 orchestrator에만 있었다 — 스크래퍼를 깨우는 게 이 함수라,
+    **정확히 그 시나리오에서 알림이 도달 불가**였다. 워크플로는 초록색이다."""
+    sent = mock.MagicMock(return_value=True)
+    stub.setattr(trade_loop.alerts, 'send_alert_once', sent)
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock())
+    ctx = _Ctx()
+    ctx.is_trading_day = lambda: None
+
+    trade_loop.run_trade_loop(ctx)
+
+    assert sent.call_count == 1
+    assert sent.call_args[0][0] == 'holiday_check_failed'
+    assert sent.call_args.kwargs['cooldown_min'] == 60
+
+
+def test_holiday_does_not_alert(stub):
+    """휴장은 장애가 아니다. 매주 토·일에 울리면 알림이 무의미해진다."""
+    sent = mock.MagicMock(return_value=True)
+    stub.setattr(trade_loop.alerts, 'send_alert_once', sent)
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock())
+    ctx = _Ctx()
+    ctx.is_trading_day = lambda: False
+
+    trade_loop.run_trade_loop(ctx)
+
+    sent.assert_not_called()
+
+
+# ── 국면 인계 (2026-08-08) ──────────────────────────────────────────
+# 스크래퍼는 dispatch +30초쯤에 db-data를 체크아웃하는데, trade_loop가 갱신한
+# 국면은 루프가 끝난 +75초에야 push된다. 즉 스크래퍼는 **정상 경로에서 항상**
+# 직전 격자의 국면을 읽는다. 파일로 주고받는 한 이 순서는 못 뒤집으므로,
+# 방금 계산한 값을 dispatch에 실어 보낸다.
+
+def test_dispatch_carries_the_regime_it_just_computed(monkeypatch):
+    posts = []
+    monkeypatch.setattr(trade_loop, '_gh_token', lambda: 'tok')
+    monkeypatch.setattr(trade_loop, 'scraper_is_running', lambda log=print: False)
+    monkeypatch.setattr(trade_loop.requests, 'post',
+                        lambda url, **kw: posts.append(kw) or mock.MagicMock(status_code=204))
+
+    trade_loop.dispatch_scraper(_Ctx(), log=lambda *a: None, regime='BULL')
+
+    assert posts[0]['json']['inputs']['regime'] == 'BULL'
+
+
+def test_dispatch_omits_the_hint_when_the_regime_is_unknown(monkeypatch):
+    """모르는 값을 빈 문자열로 실어 보내면 스크래퍼가 '국면 없음'과 구분하지
+    못한다. 힌트가 없으면 스크래퍼는 파일을 읽는다(한 격자 낡았지만 값은 있다)."""
+    posts = []
+    monkeypatch.setattr(trade_loop, '_gh_token', lambda: 'tok')
+    monkeypatch.setattr(trade_loop, 'scraper_is_running', lambda log=print: False)
+    monkeypatch.setattr(trade_loop.requests, 'post',
+                        lambda url, **kw: posts.append(kw) or mock.MagicMock(status_code=204))
+
+    trade_loop.dispatch_scraper(_Ctx(), log=lambda *a: None, regime=None)
+
+    assert 'inputs' not in posts[0]['json']
+
+
+def test_the_dispatched_regime_is_the_one_just_refreshed(stub):
+    """직전 격자 값이 아니라 방금 갱신한 값을 넘겨야 한다 — 그게 이 인계의 전부다."""
+    stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
+    stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
+    stub.setattr(trade_loop, 'refresh_regime', mock.MagicMock(return_value='SIDEWAYS'))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    _budget(stub, 1)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    assert trade_loop.dispatch_scraper.call_args.kwargs['regime'] == 'SIDEWAYS'
+
+
+# ── 순위 스냅샷 (2026-08-09) ────────────────────────────────────────
+# 게시글 증분은 가격에 후행한다(+0.082). 열망의 본체는 돈이고, 그건 KIS 순위에
+# 먼저 나타난다. 순위 API는 몇 종목을 가져오든 호출 1번인데 지금은 결과가 매번
+# 버려진다 — 저장하고 빼기만 하면 추가 호출 0인 신호가 생긴다.
+
+def test_rank_snapshot_runs_once_per_run_not_per_turn(stub):
+    """수집 주기는 루프 주기와 무관한 상수여야 한다. 바퀴마다 찍으면 루프 튜닝이
+    신호를 조용히 오염시키고, cycle_id 격자(120초)와도 어긋난다."""
+    snap = mock.MagicMock()
+    stub.setattr(trade_loop, 'collect_rank_snapshot', snap)
+    stub.setattr(trade_loop, 'run_trade_only_cycle',
+                 mock.MagicMock(return_value='sim4_bull_daytrading'))
+    _budget(stub, 3)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    assert snap.call_count == 1
+
+
+def test_rank_snapshot_failure_does_not_stop_trading(stub):
+    """페이퍼 신호 수집이 실전 매매를 막으면 안 된다."""
+    stub.setattr(trade_loop, 'collect_rank_snapshot',
+                 mock.MagicMock(side_effect=RuntimeError('boom')))
+    cycles = mock.MagicMock(return_value='sim4_bull_daytrading')
+    stub.setattr(trade_loop, 'run_trade_only_cycle', cycles)
+    _budget(stub, 1)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    assert cycles.call_count == 1
+
+
+def test_rank_snapshot_happens_after_trading(stub):
+    """매매가 KIS 유량을 먼저 쓴다. 순위 수집이 앞서면 주문이 유량에 밀린다."""
+    order = []
+    stub.setattr(trade_loop, 'collect_rank_snapshot', lambda *a, **k: order.append('rank'))
+    stub.setattr(trade_loop, 'run_trade_only_cycle',
+                 lambda *a, **k: order.append('trade'))
+    _budget(stub, 1)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    assert order == ['trade', 'rank']
+
+
+def test_money_files_are_deployed(tmp_path, monkeypatch):
+    """직전 스냅샷이 db-data를 왕복하지 못하면 매 사이클이 warmup이 되고
+    delta가 영원히 비어 신호가 통째로 사라진다."""
+    names = trade_loop.money_output_files(datetime(2026, 8, 10, 10, 0))
+
+    assert 'rank_state.json' in names
+    assert 'money_2026-08.csv' in names

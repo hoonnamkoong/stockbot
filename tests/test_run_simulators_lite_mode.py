@@ -142,3 +142,43 @@ def test_only_sim_id_missing_is_not_fatal():
 
     with mock.patch('src.strategy.registry.get_simulator_by_id', return_value=None):
         w._run_simulators([], only_sim_id='nonexistent_sim')
+
+
+
+# ── 파일당 writer 하나 (2026-08-08) ──────────────────────────────────
+# 실전 선택 심의 페이퍼 쌍둥이는 trading.yml이 60초마다 갱신하고 배포한다.
+# 스크래퍼가 같은 심을 자기 스냅샷(런 시작 시점)에서 다시 돌려 data/*.json을
+# 통째로 밀면 그 4~5분치 페이퍼 매매가 되돌아간다(lost update). 워크플로는
+# 초록색이고 숫자만 과거로 간다. 심을 상태 파일로 식별하는 이유: 같은 클래스가
+# 여러 번 등장할 수 있고(파라미터만 다른 변형), 매니페스트의 신원은 파일이다.
+
+class _NamedSim(_FakeSim):
+    def __init__(self, state_file, **kw):
+        super().__init__(**kw)
+        self.state_file = os.path.join('/repo/data', state_file)
+
+
+def test_the_sim_owned_by_trading_yml_is_not_run_here():
+    mine = _NamedSim('sim_bulldaytrade_state.json')
+    other = _NamedSim('sim_psych_state.json')
+    w = _worker()
+
+    with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
+                    return_value=[mine, other]):
+        w._run_simulators([], exclude_sim_id='sim4_bull_daytrading')
+
+    assert mine.ran_with is None, 'trading.yml이 소유한 심을 스크래퍼가 또 돌렸다'
+    assert other.ran_with is not None, '나머지 심은 여기서 돌아야 한다'
+
+
+def test_nothing_is_excluded_when_no_owner_is_given():
+    """소유권 판정 불가(None)면 trading.yml도 그 심을 안 돌린다 — 여기서 빼면
+    아무도 안 돌려 페이퍼가 멈춘다."""
+    mine = _NamedSim('sim_bulldaytrade_state.json')
+    w = _worker()
+
+    with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
+                    return_value=[mine]):
+        w._run_simulators([], exclude_sim_id=None)
+
+    assert mine.ran_with is not None

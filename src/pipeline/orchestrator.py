@@ -6,13 +6,15 @@
 Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 """
 
+import os
+
 from src import alerts
 from src.strategy.regime_state import read_regime
 from src.pipeline import scrape_gate
 from src.pipeline.context import PipelineContext
 from src.data import sim_diag
 from src.data.storage_manager import StorageManager
-from src.pipeline.trading_cycle import selected_sim_needs_buzz
+from src.pipeline.trading_cycle import selected_sim_and_buzz
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
 from src.pipeline.workers.llm_analyzer import LLMAnalyzerWorker
 from src.pipeline.workers.trade_engine import TradeEngineWorker
@@ -27,10 +29,6 @@ def _status_of(item) -> str:
 
 
 SIM7_BULL_SCORE_MIN = 45.0
-
-# 휴장 판정 실패 알림의 반복 억제 간격(분). 트리거가 2분이라 억제가 없으면
-# 하루 195건이 된다. 장중(6.5시간)에 6~7번 울리는 셈이라 무시하기는 어렵다.
-HOLIDAY_ALERT_COOLDOWN_MIN = 60
 
 
 def sim7_should_buy(strong_picks: list, bull_score) -> bool:
@@ -54,27 +52,10 @@ def active_only(items: list) -> list:
 def _notify_holiday_check_failed(ctx: PipelineContext) -> None:
     """거래일 판정 불가를 알린다.
 
-    should_notify()의 정각(0~2분) 제한을 일부러 우회한다 — 이건 리포트가
-    아니라 "봇이 멈췄다"는 장애 신호이고, 15/30/45분 런에서 침묵하면
-    장애를 놓친다.
-
-    다만 태스커가 2분 주기가 되면서 우회만으로는 안 된다. chk-holiday가 하루
-    종일 죽으면 같은 알림이 195건 나가고, 그러면 텔레그램 rate limit에 걸리거나
-    사람이 둔감해진다 — 어느 쪽이든 알림이 없는 것과 같아진다. 60분 쿨다운을
-    두어 "장중에 몇 번"으로 줄인다(끄지는 않는다: 복구 여부를 계속 알려야 한다).
+    문구·쿨다운은 src/alerts.py에 있다 — trade_loop(매매 경로)도 같은 실패를
+    같은 문구로 알려야 하고, 복사본을 두면 두 경로가 갈린다.
     """
-    alerts.send_alert_once(
-        'holiday_check_failed',
-        f"<b>휴장 판정 실패</b>\n\n"
-        f"{ctx.today_display} — 거래일 여부를 확인하지 못해 봇을 정지했습니다.\n"
-        f"KIS chk-holiday 조회에 실패했습니다.\n\n"
-        f"수동 실행: scraper.yml → Run workflow → force_run 체크\n"
-        f"⚠️ <b>먼저 오늘이 휴장일이 아님을 직접 확인한 뒤에만 사용하세요.</b>\n"
-        f"이 옵션은 휴장일 게이트를 완전히 우회하며, 켜면 실매수 주문이 나갑니다.",
-        now=ctx.now_kst,
-        cooldown_min=HOLIDAY_ALERT_COOLDOWN_MIN,
-        log=ctx.log,
-    )
+    alerts.notify_holiday_check_failed(ctx.today_display, ctx.now_kst, ctx.log)
 
 
 def run_pipeline(ctx: PipelineContext) -> None:
@@ -114,18 +95,33 @@ def run_pipeline(ctx: PipelineContext) -> None:
     # 그리고 이 워크플로는 스크래퍼가 죽어도 매매가 살아야 한다는 이유로
     # trade_loop가 dispatch하는 종속 워크플로가 됐다 — 매매의 입력인 국면을
     # 여기서 만들면 그 종속 방향이 거꾸로 된다.
+    #
+    # 다만 **파일로 읽으면 정상 경로에서 항상 한 격자 낡은 값**이다. 이 워크플로가
+    # db-data를 체크아웃하는 시점(dispatch +30초)이 trade_loop의 배포 시점(+75초)
+    # 보다 빠르기 때문이다. 레이스가 아니라 정해진 순서다. 그래서 trade_loop가
+    # 방금 계산한 국면을 dispatch inputs로 실어 보내고, 있으면 그걸 우선한다.
     trade_worker = TradeEngineWorker(ctx, storage)
     with ctx.stage("Stage 0: 국면 읽기"):
         regime, bull_score_dbg = read_regime('data')
-        ctx.log(f"국면(읽기 전용): {regime or '측정 불가'}")
+        handed = (os.environ.get('REGIME_HINT') or '').strip()
+        if handed:
+            ctx.log(f"국면(trade_loop 인계): {handed} / 파일값 {regime or '측정 불가'}")
+            regime = handed
+        else:
+            ctx.log(f"국면(파일, 인계값 없음): {regime or '측정 불가'}")
 
     # 실전 주문의 소유자는 어느 순간에도 하나다(src/pipeline/trading_cycle.py).
     #   needs_buzz == False → trading.yml(60초 루프)이 낸다. 여기서는 손 뗀다.
     #   needs_buzz == True  → 그 심의 입력이 스크래핑 결과이므로 Stage 3이 낸다.
     # 판정 불가(None)면 아무도 내지 않는다 — 모르는 채로 주문하지 않는다.
     with ctx.stage("Stage 0.5: 매매 소유권 판정"):
-        buzz_needed = selected_sim_needs_buzz(ctx, regime)
+        selected_sim, buzz_needed = selected_sim_and_buzz(ctx, regime)
         scraper_owns_trading = buzz_needed is True
+        # 페이퍼 쌍둥이도 writer가 하나여야 한다. trading.yml이 매매하는 심은
+        # 그쪽이 60초마다 갱신·배포하므로, 여기서 런 시작 시점 스냅샷으로 다시
+        # 돌리면 그 사이 페이퍼 매매가 통째로 되돌아간다(lost update).
+        # 판정 불가(None)면 trading.yml도 안 돌리므로 여기서 빼면 안 된다.
+        paper_owned_elsewhere = selected_sim if buzz_needed is False else None
         if scraper_owns_trading:
             ctx.log("[Program] 버즈 필요 심 — 이 워크플로가 Stage 3에서 매매합니다.")
         else:
@@ -153,7 +149,8 @@ def run_pipeline(ctx: PipelineContext) -> None:
         sync_state, _ = storage.load_sync_state(ctx.today_str)
         final_picks, simulation_results, sell_candidate = trade_worker.run(
             active_only(stocks), sync_state,
-            skip_program_trading=not scraper_owns_trading)
+            skip_program_trading=not scraper_owns_trading,
+            paper_owned_elsewhere=paper_owned_elsewhere)
 
     # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
     deep_dive_report = ""

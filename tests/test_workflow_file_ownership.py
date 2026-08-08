@@ -82,3 +82,35 @@ def test_both_workflows_notify_on_failure():
     계속 돌기 때문에 오히려 알아채기 어렵다."""
     for name in ('scraper.yml', 'trading.yml'):
         assert 'if: failure()' in _text(name), f'{name}에 실패 알림이 없다'
+
+
+def test_trading_has_a_manual_holiday_bypass():
+    """휴장 판정 실패 알림이 안내하는 복구 경로다. trading.yml에 force_run이
+    없으면 실전 매매를 수동으로 되살릴 방법이 없다 — 스크래퍼의 force_run은
+    스크래핑만 되살리고, 버즈 불필요 심의 주문은 trading.yml에만 있다."""
+    trading = _text('trading.yml')
+    assert 'force_run' in trading, 'trading.yml에 force_run 입력이 없다'
+    assert 'FORCE_RUN:' in trading, 'force_run 입력이 파이썬에 전달되지 않는다'
+
+
+def test_scraper_accepts_and_forwards_the_regime_handed_to_it():
+    """trade_loop가 dispatch inputs로 국면을 실어 보낸다. 입력이 선언돼 있지
+    않으면 GitHub이 422로 거절하고, dispatch 자체가 실패해 **스크래핑이 통째로
+    멈춘다** — 로그에만 남는 조용한 실패다."""
+    scraper = _text('scraper.yml')
+    on_block = scraper.split('jobs:', 1)[0]
+    assert re.search(r'^\s+regime:\s*$', on_block, re.M), \
+        'scraper.yml에 regime 입력이 선언돼 있지 않다'
+    assert 'REGIME_HINT:' in scraper, 'regime 입력이 파이썬에 전달되지 않는다'
+
+
+def test_scraper_does_not_deploy_money_files():
+    """순위 스냅샷의 writer는 trading.yml이다. scraper가 `data/*.json`·`*.csv`를
+    통째로 밀면 `rank_state.json`이 런 시작 시점 사본으로 되돌아가고, 그러면
+    **매 사이클이 warmup이 되어 delta가 영원히 빈다** — 신호가 통째로 사라진다.
+    2026-08-08 국면 파일에서 똑같은 함정을 겪었다."""
+    deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
+    skipped = {line for line in deploy.splitlines() if 'continue' in line}
+    for pat in ('rank_state.json', 'money_'):
+        assert any(pat in line for line in skipped), (
+            f'{pat}가 scraper.yml 배포 제외에 없다')

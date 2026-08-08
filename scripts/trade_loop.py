@@ -52,6 +52,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import requests
 
+from src import alerts
 from src.data.storage_manager import StorageManager
 from src.pipeline import scrape_gate
 from src.pipeline.context import PipelineContext
@@ -115,13 +116,21 @@ def scraper_is_running(log=print) -> bool:
         return False
 
 
-def dispatch_scraper(ctx, log=print) -> None:
+def dispatch_scraper(ctx, log=print, regime: str | None = None) -> None:
     """scraper.yml을 깨운다. 응답을 기다리지 않는다 — 매매가 스크래핑에 묶이면
     이 구조를 만든 이유가 사라진다.
 
     GITHUB_TOKEN으로도 된다: workflow_dispatch와 repository_dispatch는 GitHub이
     재귀 방지 규칙에서 명시적으로 예외 처리한 두 이벤트다. 다만 그 경우
     워크플로에 `permissions: actions: write`가 있어야 한다.
+
+    regime: 방금 갱신한 국면을 함께 넘긴다. 파일로만 주고받으면 스크래퍼는
+      **정상 경로에서 항상** 한 격자 낡은 값을 읽는다 — 스크래퍼가 db-data를
+      체크아웃하는 시점(dispatch +30초)이 이 런의 배포 시점(+75초)보다 빠르기
+      때문이다. Sim10처럼 국면이 소유자를 바꾸는 심에서는 그 어긋남이 국면
+      전환 격자에 이중 주문(양쪽 다 '내 소관')이나 무주문(양쪽 다 '네 소관')이
+      된다. 값을 모르면(None) 넘기지 않는다 — 스크래퍼가 '국면 없음'과
+      '안 넘어옴'을 구분해야 파일 폴백을 쓸 수 있다.
     """
     token = _gh_token()
     if not token:
@@ -132,11 +141,14 @@ def dispatch_scraper(ctx, log=print) -> None:
         return
     url = (f'https://api.github.com/repos/{_REPO}/actions/workflows/'
            f'{_SCRAPER_WORKFLOW}/dispatches')
+    payload = {'ref': os.environ.get('GITHUB_REF_NAME') or 'main'}
+    if regime:
+        payload['inputs'] = {'regime': regime}
     res = requests.post(
         url,
         headers={'Authorization': f'token {token}',
                  'Accept': 'application/vnd.github.v3+json'},
-        json={'ref': os.environ.get('GITHUB_REF_NAME') or 'main'},
+        json=payload,
         timeout=10)
     if res.status_code in (204, 201, 200):
         log('[Scraper] dispatch 완료')
@@ -157,6 +169,66 @@ def refresh_regime(ctx, storage, log=print) -> None:
     from src.pipeline.workers.trade_engine import TradeEngineWorker
     regime = TradeEngineWorker(ctx, storage).run_regime_stage()
     log(f'[국면] 갱신 완료: {regime or "판단 불가"}')
+    return regime
+
+
+def collect_rank_snapshot(ctx, log=print) -> bool:
+    """KIS 순위를 찍고 직전 스냅샷과의 차분을 기록한다. 런당 한 번.
+
+    **추가 API 호출이 0인 신호다.** 순위 API는 몇 종목을 가져오든 호출 1번이고
+    (`rows[:limit]`으로 자를 뿐), 지금 그 결과는 매 사이클 버려진다
+    (`_set_rank_cache`가 TTL 캐시라 직전 스냅샷이 남지 않는다). 저장하고 빼기만
+    하면 "게시글 증분의 돈 버전"이 생긴다 — 게시글은 가격에 후행하지만
+    (직전 10분 수익률과 +0.082) 순위는 사는 행위 자체다.
+
+    런당 한 번인 이유: 수집 주기가 루프 주기를 따라가면 루프 튜닝이 신호를
+    조용히 오염시킨다. 태스커 트리거가 120초이므로 런당 1회가 곧 cycle_id
+    격자(120초)와 일치하고, 그래야 sim_diag·1분봉과 조인된다.
+
+    반환: 기록했으면 True. 실패는 예외로 올리지 않는다 — 페이퍼 신호 수집이
+    실전 매매를 막으면 안 된다.
+    """
+    from src.data import rank_snapshot as rs
+    from src.trade.kis_data_provider import KISDataProvider
+
+    p = KISDataProvider()
+    rows: list[dict] = []
+    # 코스피·코스닥 등락률 + 외인/기관 순매수. 3콜로 200~300종목.
+    for label, fetch in (
+        ('등락률(코스피)', lambda: p.get_fluctuation_rank(market='0001', limit=200)),
+        ('등락률(코스닥)', lambda: p.get_fluctuation_rank(market='1001', limit=200)),
+        ('외인기관 순매수', lambda: p.get_foreign_institution_rank(limit=200)),
+    ):
+        try:
+            rows += fetch() or []
+        except Exception as e:
+            log(f'[순위] {label} 조회 실패(나머지로 계속): {e}')
+    if not rows:
+        log('[순위] 응답 없음 — 이번 사이클 기록 생략')
+        return False
+
+    curr = rs.rank_map(rows)
+    diff = rs.diff_ranks(rs.load_state('data'), curr)
+    n = rs.append_records(rs.build_records(ctx.cycle_id, ctx.now_kst, rows, diff),
+                          rs.month_path(ctx.now_kst, 'data'))
+    rs.save_state(curr, ctx.now_kst, 'data')
+    new = sum(1 for v in diff.values() if v['is_new'])
+    log(f'[순위] {n}행 기록 (종목 {len(curr)} / 신규 진입 {new})')
+    return True
+
+
+def money_output_files(now) -> list[str]:
+    """순위 스냅샷이 쓰는 파일들(data/ 기준 상대 이름).
+
+    ⚠ `rank_state.json`이 db-data를 왕복하지 못하면 컨테이너가 새로 뜰 때마다
+    직전 스냅샷이 사라져 **모든 사이클이 warmup**이 되고 delta가 영원히 빈다.
+    2026-08-08 국면 게이트에서 똑같은 함정을 겪었다.
+
+    파일명은 런타임에 현재 월을 해석해야 한다 — 배포 스텝이 `[ -f data/$name ]`로
+    한 줄씩 존재를 검사하므로 와일드카드가 매칭되지 않는다.
+    """
+    from src.data.rank_snapshot import STATE_FILENAME, month_path
+    return [STATE_FILENAME, os.path.basename(month_path(now, 'data'))]
 
 
 def regime_output_files() -> list[str]:
@@ -169,7 +241,9 @@ def regime_output_files() -> list[str]:
     from src.strategy.registry import get_sim_registry
     from src.strategy.regime_observations import OBS_PATH_REL
 
-    out = [os.path.basename(OBS_PATH_REL)]
+    # 게이트 파일도 함께 올린다. 이게 db-data에 도달하지 못하면 다음 런이 "아직
+    # 안 갱신했다"로 읽어 격자당 3회로 되돌아간다 — 게이트를 만든 의미가 사라진다.
+    out = [os.path.basename(OBS_PATH_REL), 'regime_gate_state.json']
     for s in get_sim_registry(include_analyzers=True):
         if s['analyzer']:
             out += [s['state_file'], s['csv_file']]
@@ -177,7 +251,8 @@ def regime_output_files() -> list[str]:
 
 
 def _write_deploy_manifest(sim_id: str | None, log=print,
-                           include_regime: bool = False) -> None:
+                           include_regime: bool = False,
+                           include_money=None) -> None:
     """이번 런이 실제로 갱신한 파일 이름을 적어둔다. 워크플로 배포 스텝이 읽는다.
 
     "바뀐 파일을 전부 올린다"로는 안 된다. 이 런은 선택 심 하나(+국면)만 갱신하는데
@@ -190,6 +265,8 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
         names = []
         if include_regime:
             names += regime_output_files()
+        if include_money is not None:
+            names += money_output_files(include_money)
         if sim_id:
             from src.strategy.registry import get_sim_registry
             entry = next((s for s in get_sim_registry(include_analyzers=True)
@@ -220,6 +297,9 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     trading = ctx.is_trading_day()
     if trading is None:
         ctx.log(f"[중단] 거래일 여부를 판정할 수 없습니다({ctx.today_display}).")
+        # 여기서 return하면 스크래퍼도 안 뜬다(dispatch가 아래에 있다). 즉 봇이
+        # 통째로 멈추는데 워크플로는 초록색이다 — 사람 경로가 반드시 필요하다.
+        alerts.notify_holiday_check_failed(ctx.today_display, ctx.now_kst, ctx.log)
         return
     if not trading:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 종료합니다.")
@@ -231,17 +311,27 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     #
     # 둘 다 실패해도 매매는 계속한다 — 국면은 직전 값이 남아 있고, 스크래핑은
     # 다음 격자에 다시 시도된다. 매매를 멈출 이유가 아니다.
+    # 두 게이트는 격자가 같을 뿐 **다른 게이트다.** 스크래핑 게이트는 스크래퍼가
+    # 끝나 db-data에 반영돼야 닫히는데 그게 4~5분 뒤라, 국면까지 그걸 쓰면 그
+    # 사이 2분마다 들어오는 런이 전부 국면을 다시 갱신한다(격자당 3회, 평활
+    # 시간상수 50분 → 14분). 국면 게이트는 이 워크플로가 직접 닫는다.
     regime_refreshed = False
-    if scrape_gate.is_scrape_due(ctx.now_kst):
+    fresh_regime = None
+    if scrape_gate.is_regime_due(ctx.now_kst):
         with ctx.stage("국면 갱신"):
             try:
-                refresh_regime(ctx, storage, ctx.log)
+                fresh_regime = refresh_regime(ctx, storage, ctx.log)
+                # 성공한 갱신만 기록한다. 실패를 기록하면 다음 격자까지 낡은
+                # 국면으로 매매하게 된다 — 다음 틱에 재시도하는 편이 낫다.
+                scrape_gate.mark_regime(ctx.now_kst)
                 regime_refreshed = True
             except Exception as e:
                 ctx.log(f"[경고] 국면 갱신 실패(직전 국면으로 매매 계속): {e}")
+
+    if scrape_gate.is_scrape_due(ctx.now_kst):
         with ctx.stage("스크래퍼 깨우기"):
             try:
-                dispatch_scraper(ctx, ctx.log)
+                dispatch_scraper(ctx, ctx.log, regime=fresh_regime)
             except Exception as e:
                 ctx.log(f"[경고] 스크래퍼 dispatch 실패(다음 격자에 재시도): {e}")
 
@@ -275,14 +365,25 @@ def run_trade_loop(ctx: PipelineContext) -> None:
         # 매매가 오래 걸린 바퀴만큼 다음 간격이 늘어난다.
         time.sleep(max(0.0, TRADE_INTERVAL_SEC - (time.monotonic() - turn_started)))
 
+    # ── 순위 스냅샷 (런당 1회, 매매 뒤) ────────────────────────────
+    # 매매가 KIS 유량을 먼저 쓴다. 순위 수집이 앞서면 주문이 유량에 밀린다.
+    # 실패해도 매매에는 영향이 없다 — 페이퍼 신호 수집이 실전을 막으면 안 된다.
+    money_written = False
+    with ctx.stage("순위 스냅샷"):
+        try:
+            money_written = collect_rank_snapshot(ctx, ctx.log)
+        except Exception as e:
+            ctx.log(f"[경고] 순위 스냅샷 실패(다음 사이클에 재시도): {e}")
+
     # 배포 목록은 루프가 끝난 뒤 한 번만 쓴다. 바퀴마다 밀면 db-data에 하루
     # 수백 커밋이 쌓인다.
     #
     # 국면 파일은 매매 여부와 무관하게 올려야 한다 — 이 워크플로가 국면의 유일
     # writer이므로, 매매를 안 한 사이클이라고 빼먹으면 갱신한 국면이 db-data에
     # 도달하지 못하고 모두가 얼어붙은 값을 읽게 된다.
-    if traded_sim_id or regime_refreshed:
-        _write_deploy_manifest(traded_sim_id, ctx.log, include_regime=regime_refreshed)
+    if traded_sim_id or regime_refreshed or money_written:
+        _write_deploy_manifest(traded_sim_id, ctx.log, include_regime=regime_refreshed,
+                               include_money=ctx.now_kst if money_written else None)
 
     ctx.log("=" * 50)
     ctx.log(f"TradeLoop 완료 ({turn}바퀴)")

@@ -73,8 +73,8 @@ def _run(buzz_needed, regime='BULL'):
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=(regime, 60.0)), \
-         mock.patch.object(orchestrator, 'selected_sim_needs_buzz',
-                           return_value=buzz_needed), \
+         mock.patch.object(orchestrator, 'selected_sim_and_buzz',
+                           return_value=('sim4_bull_daytrading', buzz_needed)), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
         _full_run_mocks(tw, sm, df)
         orchestrator.run_pipeline(ctx)
@@ -127,8 +127,8 @@ def test_ownership_is_decided_with_the_regime_that_was_read():
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('SIDEWAYS', 50.0)), \
-         mock.patch.object(orchestrator, 'selected_sim_needs_buzz',
-                           return_value=True) as needs, \
+         mock.patch.object(orchestrator, 'selected_sim_and_buzz',
+                           return_value=('sim10_orchestrator', True)) as needs, \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
         _full_run_mocks(tw, sm, df)
         orchestrator.run_pipeline(ctx)
@@ -147,7 +147,8 @@ def test_successful_run_marks_scraped():
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'selected_sim_needs_buzz', return_value=True), \
+         mock.patch.object(orchestrator, 'selected_sim_and_buzz',
+                           return_value=('sim_psych', True)), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped') as mark:
         _full_run_mocks(tw, sm, df)
         orchestrator.run_pipeline(ctx)
@@ -163,7 +164,8 @@ def test_failed_run_does_not_mark_scraped():
          mock.patch.object(orchestrator, 'StorageManager'), \
          mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'selected_sim_needs_buzz', return_value=True), \
+         mock.patch.object(orchestrator, 'selected_sim_and_buzz',
+                           return_value=('sim_psych', True)), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped') as mark:
         df.return_value.run.side_effect = RuntimeError('네이버 다운')
         try:
@@ -183,3 +185,71 @@ def test_holiday_stops_before_anything():
 
     tw.assert_not_called()
     df.assert_not_called()
+
+
+# ── 국면 인계 (2026-08-08) ──────────────────────────────────────────
+# 이 워크플로가 db-data를 체크아웃하는 시점(dispatch +30초)은 trade_loop가 갱신한
+# 국면을 push하는 시점(+75초)보다 빠르다. 즉 파일로 읽으면 **정상 경로에서 항상**
+# 한 격자 낡은 국면이다. 국면이 소유자를 바꾸는 심(Sim10)에서는 그 어긋남이
+# 이중 주문이나 무주문이 된다. 그래서 dispatch가 값을 실어 보낸다.
+
+def _ownership_regime(monkeypatch, file_regime='SIDEWAYS'):
+    """소유권 판정에 실제로 들어간 국면 값을 돌려준다."""
+    ctx = _Ctx()
+    with mock.patch.object(orchestrator, 'TradeEngineWorker') as tw, \
+         mock.patch.object(orchestrator, 'StorageManager') as sm, \
+         mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
+         mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
+         mock.patch.object(orchestrator, 'NotifierWorker'), \
+         mock.patch.object(orchestrator, 'read_regime', return_value=(file_regime, 50.0)), \
+         mock.patch.object(orchestrator, 'selected_sim_and_buzz',
+                           return_value=('sim4_bull_daytrading', False)) as needs, \
+         mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
+        _full_run_mocks(tw, sm, df)
+        orchestrator.run_pipeline(ctx)
+    return needs.call_args[0][1]
+
+
+def test_prefers_the_regime_handed_over_by_trading_yml(monkeypatch):
+    monkeypatch.setenv('REGIME_HINT', 'BULL')
+    assert _ownership_regime(monkeypatch, file_regime='SIDEWAYS') == 'BULL'
+
+
+def test_falls_back_to_the_file_when_nothing_was_handed_over(monkeypatch):
+    """수동 실행에는 인계값이 없다. 한 격자 낡았어도 값이 있는 편이 낫다."""
+    monkeypatch.delenv('REGIME_HINT', raising=False)
+    assert _ownership_regime(monkeypatch, file_regime='SIDEWAYS') == 'SIDEWAYS'
+
+
+def test_blank_hint_is_not_a_regime(monkeypatch):
+    """GitHub은 미지정 입력을 빈 문자열로 채운다 — 빈 값을 국면으로 읽으면
+    '측정 불가'가 아니라 '알 수 없는 국면'이 되어 판정이 예외로 떨어진다."""
+    monkeypatch.setenv('REGIME_HINT', '')
+    assert _ownership_regime(monkeypatch, file_regime='SIDEWAYS') == 'SIDEWAYS'
+
+
+# ── 페이퍼 쌍둥이의 writer도 하나다 (2026-08-08) ────────────────────
+
+def test_the_sim_owned_by_trading_yml_is_excluded_from_stage3():
+    """trading.yml은 실전이 돌린 심의 페이퍼 쌍둥이를 60초마다 갱신하고 배포한다.
+    여기서 같은 심을 런 시작 시점 스냅샷으로 다시 돌려 data/*.json을 통째로 밀면
+    그 4~5분치가 되돌아간다 — 실전과 페이퍼가 갈리는 방식이다."""
+    tw, _ = _run(buzz_needed=False)
+
+    assert tw.return_value.run.call_args.kwargs['paper_owned_elsewhere'] \
+        == 'sim4_bull_daytrading'
+
+
+def test_nothing_is_excluded_when_the_scraper_owns_the_trading():
+    """버즈 필요 심은 여기서 매매하고 여기서 페이퍼도 돌린다."""
+    tw, _ = _run(buzz_needed=True)
+
+    assert tw.return_value.run.call_args.kwargs['paper_owned_elsewhere'] is None
+
+
+def test_nothing_is_excluded_when_ownership_is_undecidable():
+    """판정 불가면 trading.yml도 그 심을 안 돌린다 — 여기서 빼면 아무도 안 돌려
+    페이퍼가 그 사이클을 통째로 잃는다."""
+    tw, _ = _run(buzz_needed=None)
+
+    assert tw.return_value.run.call_args.kwargs['paper_owned_elsewhere'] is None

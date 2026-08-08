@@ -112,6 +112,27 @@ jobs:
             echo "[EOD] db-data clone 실패 — 심 실행 건너뜀(백지 상태 매매 방지)"
           fi
 
+      # 당일 1분봉 저장. KIS 분봉은 **당일치만** 조회되므로 과거로 소급할 수 없다 —
+      # 그날 안에 받아두지 않으면 그 하루의 가격 해상도를 영영 잃는다.
+      # 신호(순위 차분)는 120초 격자인데 diag 가격은 10분 격자라, 이게 없으면
+      # 검정력이 구조적으로 나쁘다.
+      - name: Save minute bars (KIS)
+        if: steps.gate.outputs.run == 'true'
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          mkdir -p data
+          if git clone --branch db-data --depth 1               https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git money_repo 2>/dev/null; then
+            cp money_repo/data/money_*.csv data/ 2>/dev/null || echo "[분봉] 순위 스냅샷 없음(최초 배포)"
+            cp money_repo/data/minute_*.csv data/ 2>/dev/null || true
+            rm -rf money_repo
+          fi
+          PYTHONPATH=. python scripts/save_minute_bars.py || echo "[분봉] 실패 — 나머지 배포는 계속한다"
+
       - name: Deploy CSV to db-data
         if: steps.gate.outputs.run == 'true'
         run: |
@@ -141,6 +162,11 @@ jobs:
           # 파일별로 나눠서 서로 실패가 전염되지 않게 한다.
           for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv; do
             [ -f "../data/$f" ] && cp "../data/$f" "data/$f" && git add "data/$f"
+          done
+          # 1분봉. 위와 같은 이유로 별도 루프다 — 파일 하나가 없다고 심9-1 상태까지
+          # 같이 add에 실패하면 안 된다.
+          for f in ../data/minute_*.csv; do
+            [ -f "$f" ] && cp "$f" "data/$(basename "$f")" && git add "data/$(basename "$f")"
           done
           if ! git diff --cached --quiet; then
             git commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')"

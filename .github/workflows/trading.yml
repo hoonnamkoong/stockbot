@@ -16,6 +16,14 @@ name: Trading (실전 매매)
 # 띄우는 건 셋업만 20초라 물리적으로 불가능하다.
 on:
   workflow_dispatch:
+    inputs:
+      force_run:
+        # 휴장 판정(KIS chk-holiday)이 실패하면 이 워크플로가 매매도 스크래핑도
+        # 하지 않고 멈춘다. 그때 사람이 되살리는 유일한 경로다 — 알림 문구가
+        # 이 옵션을 안내한다(src/alerts.py). 켜면 실매수 주문이 나간다.
+        description: 'Bypass market holiday check'
+        required: false
+        default: 'false'
   repository_dispatch:
     types: [tasker_trigger, tasker_trigger_trade]
 
@@ -94,6 +102,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
+          FORCE_RUN: "${{ github.event.inputs.force_run }}"
         run: PYTHONPATH=. python scripts/trade_loop.py
 
       # 배포 대상은 이 워크플로가 실제로 쓴 것만이다. data/ 전체를 밀면 스크래퍼가

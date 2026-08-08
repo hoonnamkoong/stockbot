@@ -136,3 +136,35 @@ def test_interval_constant_matches_agreed_freshness():
     """버즈 필요 심 신선도는 10분 유지로 합의됐다(2026-08-06) — 상수가 그와
     어긋나면 조용히 신선도가 나빠진다."""
     assert scrape_gate.SCRAPE_INTERVAL_MIN == 10
+
+
+# ── 국면 게이트 (2026-08-08 회귀) ─────────────────────────────────────
+# 국면 갱신은 스크래핑과 같은 10분 격자를 쓰지만 **주기가 같을 뿐 다른 일**이다.
+# 스크래핑 게이트를 같이 쓰면, writer(scraper.yml 완료 시점)와 reader(trading.yml)
+# 사이에 db-data 왕복 4~5분이 끼어 그동안 게이트가 계속 열려 있고, 국면이 격자당
+# 3번 갱신된다 — 평활 시간상수 50분이 14분이 되는 알고리즘 변경이다.
+
+def test_regime_gate_closes_even_while_the_scraper_is_still_running(tmp_path):
+    """스크래퍼가 아직 안 끝나 스크래핑 게이트는 열려 있어도, 국면은 이번
+    격자에 이미 갱신했으므로 닫혀 있어야 한다."""
+    d = str(tmp_path)
+    scrape_gate.mark_scraped(datetime(2026, 8, 10, 8, 55), d)   # 직전 격자 스크래핑
+
+    assert scrape_gate.is_regime_due(datetime(2026, 8, 10, 9, 0, 40), d) is True
+    scrape_gate.mark_regime(datetime(2026, 8, 10, 9, 0, 40), d)
+
+    # 스크래퍼는 09:05에야 끝난다 → 그때까지 스크래핑 게이트는 열려 있다.
+    assert scrape_gate.is_scrape_due(datetime(2026, 8, 10, 9, 2, 40), d) is True
+    assert scrape_gate.is_regime_due(datetime(2026, 8, 10, 9, 2, 40), d) is False
+    assert scrape_gate.is_regime_due(datetime(2026, 8, 10, 9, 4, 40), d) is False
+
+
+def test_regime_gate_opens_on_the_next_grid(tmp_path):
+    d = str(tmp_path)
+    scrape_gate.mark_regime(datetime(2026, 8, 10, 9, 0, 40), d)
+    assert scrape_gate.is_regime_due(datetime(2026, 8, 10, 9, 10, 40), d) is True
+
+
+def test_regime_gate_is_open_when_never_refreshed(tmp_path):
+    """모르면 갱신 쪽으로 fail — 국면 없이 도는 것보다 한 번 더 도는 게 낫다."""
+    assert scrape_gate.is_regime_due(NOW, data_dir=str(tmp_path)) is True

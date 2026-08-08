@@ -100,7 +100,8 @@ def test_run_pipeline_sets_the_cycle():
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'selected_sim_needs_buzz', return_value=None), \
+         mock.patch.object(orchestrator, 'selected_sim_and_buzz',
+                           return_value=(None, None)), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
         tw.return_value.run.return_value = ([], [], None)
         df.return_value.run.return_value = []

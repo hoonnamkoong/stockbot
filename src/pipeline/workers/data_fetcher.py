@@ -13,6 +13,7 @@ import os
 import time
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from src import alerts
 from src.pipeline.context import PipelineContext
 from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
@@ -27,6 +28,44 @@ PAGE_WORKERS = 8    # 종목당 동시에 긁을 토론방 페이지 수
 PAGE_RETRIES = 3
 PAGE_RETRY_WAIT = 0.5
 POST_LIMIT = 30       # 종목당 LLM에 넘길 게시글 수 (공감 상위). 2026-07-28: 5 → 30
+
+
+# KIS inquire-price(FHKST01010100)에서 체결강도를 담는 필드.
+# 상수로 뺀 이유: diag 4,576행이 전부 0인데 원인이 "필드명이 틀렸다"인지
+# "토큰이 없어 블록을 건너뛴다"인지 가릴 수 없었다. 이름을 한 곳에 두면
+# 진단 메시지와 실제 조회가 같은 값을 가리킨다.
+TICK_POWER_FIELD = 'tday_rltv'
+
+
+def tick_power_probe(out: dict) -> str | None:
+    """체결강도 필드가 응답에 없을 때 무엇이 왔는지 한 줄로 돌려준다.
+
+    0을 결손으로 읽는다 — KIS가 미집계를 '0'으로 주면 유효값으로 착각하게 되고,
+    그게 정확히 지금 상태(전부 0인데 정상처럼 보임)를 재생산한다.
+
+    정상일 때 None을 돌려준다. 종목마다 찍으면 로그가 20배가 된다.
+    """
+    try:
+        if float(out.get(TICK_POWER_FIELD) or 0) > 0:
+            return None
+    except (TypeError, ValueError):
+        pass
+    return (f"[진단] KIS inquire-price 응답에 '{TICK_POWER_FIELD}'가 없거나 0 — "
+            f"받은 키: {sorted(out)[:40] or '(빈 응답)'}")
+
+
+def missing_field_alert(field: str, missing: int, total: int) -> str | None:
+    """전량 결손일 때만 사람에게 보낼 문구를 돌려준다.
+
+    일부 결손은 종목 사정(신규상장·거래정지)일 수 있어 로그로 충분하다.
+    **전량 결손은 측정이 죽었다는 뜻이고, 그건 '신호가 없는 날'과 구분되지 않은
+    채 몇 주가 간다** — tick_power가 실제로 그렇게 7~8월 내내 0이었다.
+    """
+    if total <= 0 or missing < total:
+        return None
+    return (f"<b>{field} 전량 결손</b>\n\n"
+            f"후보 {total}종목 전부에서 {field}를 얻지 못했습니다.\n"
+            f"이 값을 쓰는 심은 판단 자체가 불가능하고, 로그에는 '신호 없음'으로 보입니다.")
 
 
 def classify(count: int, threshold: int, adopted: set, code: str = '') -> str | None:
@@ -59,6 +98,8 @@ class DataFetcherWorker(BaseWorker):
         super().__init__(ctx)
         self.storage = storage
         self._reset_body_stats()
+        # 체결강도 진단은 런당 한 번만 남긴다(종목마다 찍으면 20배).
+        self._tick_probe_logged = False
 
     def run(self) -> list[StockData]:
         """
@@ -108,8 +149,12 @@ class DataFetcherWorker(BaseWorker):
             self.kis_base_url = get_base_url()
             self.kis_app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
             self.kis_app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
+            # 토큰이 비면 체결강도 블록이 통째로 건너뛰어지고 tick_power가 전부
+            # 0이 된다. 그게 diag 4,576행이 전부 0인 원인의 후보 두 개 중 하나다.
+            if not self.kis_token:
+                self.log_error("KIS 토큰이 비었습니다 — 체결강도 조회를 건너뜁니다")
         except Exception as e:
-            self.log_error(f"KIS API 초기화 실패: {e}")
+            self.log_error(f"KIS API 초기화 실패: {e} — 체결강도 조회 불가")
             self.kis_token = None
 
         # 4. 병렬 수집 및 1차 필터링
@@ -219,6 +264,13 @@ class DataFetcherWorker(BaseWorker):
             missing = sum(1 for s in results_raw if not s.get(field))
             if missing:
                 self.log_error(f"{field} 결손 {missing}/{len(results_raw)}종목 — {note}")
+            # 전량 결손은 로그로 끝내면 안 된다. tick_power가 정확히 그렇게
+            # 7~8월 내내 0이었고, 아무도 몰랐다.
+            outage = missing_field_alert(field, missing, len(results_raw))
+            if outage:
+                alerts.send_alert_once(f'field_outage_{field}', f"{outage}\n{note}",
+                                       now=self.ctx.now_kst, cooldown_min=180,
+                                       log=self.log)
 
         # 7. Pydantic 변환 (타입 안전성 확보)
         results: list[StockData] = []
@@ -298,8 +350,15 @@ class DataFetcherWorker(BaseWorker):
                 if r.status_code == 200:
                     out = r.json().get('output', {})
                     # 체결강도
-                    if out.get('tday_rltv'):
-                        details['tick_power'] = float(out['tday_rltv'])
+                    probe = tick_power_probe(out)
+                    if probe is None:
+                        details['tick_power'] = float(out[TICK_POWER_FIELD])
+                    elif not self._tick_probe_logged:
+                        # 런당 한 번만. 이 한 줄이 "필드명이 틀렸다"와 "응답이
+                        # 비었다"를 가른다 — 지금은 그 둘을 구분할 수 없어
+                        # 어느 쪽을 고쳐야 하는지 모른다.
+                        self._tick_probe_logged = True
+                        self.log_error(probe)
                     # 기존 Naver 데이터 KIS로 보강 (더 정확)
                     if out.get('stck_prpr'):
                         details['price'] = int(out['stck_prpr'])

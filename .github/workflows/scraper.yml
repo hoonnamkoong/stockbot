@@ -25,6 +25,14 @@ on:
         description: 'Bypass market holiday check'
         required: false
         default: 'false'
+      regime:
+        # trade_loop가 방금 갱신한 국면. 파일(db-data)로 읽으면 이 런이 체크아웃하는
+        # 시점이 trade_loop의 배포보다 빨라 **항상 한 격자 낡은 값**이 온다.
+        # Sim10처럼 국면이 매매 소유자를 바꾸는 심에서는 그 어긋남이 국면 전환
+        # 격자에 이중 주문이나 무주문이 된다. 비어 있으면(수동 실행) 파일을 쓴다.
+        description: 'Regime handed over by trading.yml (blank = read from file)'
+        required: false
+        default: ''
   # 태스커가 repository_dispatch로 바뀌는 경우를 위해 남겨둔다(현재 미사용).
   repository_dispatch:
     types: [tasker_trigger_scrape]
@@ -122,6 +130,7 @@ jobs:
           KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
           GH_PAT: ${{ secrets.GH_PAT }}
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
+          REGIME_HINT: "${{ github.event.inputs.regime }}"
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
         run: PYTHONPATH=. python scripts/scraper.py
 
@@ -158,7 +167,10 @@ jobs:
           for f in data/*.json; do
             case "$(basename "$f")" in
               kis_token_cache.json|token.json|kis_token.json|token_result.json|portfolio.json|order_history.json|order_status.json|history.json|program_positions.json|program_trading.json) continue ;;
-              sim_libero_state.json) continue ;;
+              sim_libero_state.json|regime_gate_state.json) continue ;;
+              # 순위 스냅샷도 trading.yml이 유일 writer다. 되돌리면 직전 스냅샷이
+              # 사라져 매 사이클이 warmup이 되고 delta가 영원히 빈다.
+              rank_state.json) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done
@@ -167,6 +179,7 @@ jobs:
             case "$(basename "$f")" in
               trade_history_real.csv) continue ;;
               regime_observations.csv|trade_history_sim_libero.csv) continue ;;
+              money_*.csv) continue ;;   # 순위 스냅샷 — writer는 trading.yml
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done

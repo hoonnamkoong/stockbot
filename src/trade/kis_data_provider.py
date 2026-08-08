@@ -227,6 +227,26 @@ class KISDataProvider:
             return {}
         return {"price": price, "prev_close": prev_close}
 
+    def get_minute_bars(self, code: str, anchor_hhmmss: str) -> list[dict]:
+        """당일 분봉 — anchor 시각 **이전** 30건. [{'hhmm','price','volume'}].
+
+        캐시를 쓰지 않는다: 마감 후 1회성 수집이라 TTL 캐시가 오히려 같은 앵커의
+        재조회를 막는다. 파싱·병합은 src/data/minute_bars.py(순수 함수)가 한다.
+        """
+        from src.data.minute_bars import parse_rows
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice",
+            "FHKST03010200",
+            {
+                "FID_ETC_CLS_CODE": "",
+                "FID_COND_MRKT_DIV_CODE": "J",
+                "FID_INPUT_ISCD": code,
+                "FID_INPUT_HOUR_1": anchor_hhmmss,
+                "FID_PW_DATA_INCU_YN": "Y",
+            },
+        )
+        return parse_rows(body)
+
     # ──────────────────────────────────────────────────
     # 2. 재무 수익성비율 (ROE 등)
     # ──────────────────────────────────────────────────

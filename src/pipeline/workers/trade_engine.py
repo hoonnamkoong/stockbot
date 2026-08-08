@@ -86,21 +86,31 @@ class TradeEngineWorker(BaseWorker):
         stocks: list[StockData],
         sync_state: SyncState,
         skip_program_trading: bool = False,
+        paper_owned_elsewhere: str | None = None,
     ) -> tuple[list, list, dict]:
         """
         전략 판단과 딥다이브 대상 선정을 수행합니다.
 
-        skip_program_trading: orchestrator가 이미 이번 사이클에 프로그램 매매를
-        Stage 1 이전(순서 가변 분기, E3)에 실행했으면 True — 원장 last_run
-        중복가드가 막아주긴 하지만, 불필요한 GitHub API 왕복을 아예 피한다.
+        skip_program_trading: 이번 사이클의 실전 주문을 다른 워크플로(trading.yml)가
+        낸다면 True. 원장 락·중복가드가 막아주긴 하지만, 불필요한 GitHub API
+        왕복을 아예 피한다.
+
+        paper_owned_elsewhere: 그 심의 **페이퍼 쌍둥이도** trading.yml이 갱신·배포
+        한다는 뜻이다. 여기서 같은 심을 런 시작 시점 스냅샷으로 다시 돌리면
+        그 사이(4~5분) 페이퍼 매매가 되돌아간다 — 파일당 writer는 하나여야 한다.
 
         Returns:
             (final_picks, simulation_results, sell_candidate)
         """
-        if not stocks:
-            return [], [], None
-
-        # dict 목록으로 변환 (기존 코드 호환)
+        # 신규 버즈 종목이 없어도 계속 간다. 여기서 빠져나가면 전 페이퍼 심이 그
+        # 사이클을 통째로 건너뛰고(보유 종목 손절·익절도 안 된다), 버즈 필요 심이
+        # 실전이면 **그 사이클의 실전 매매도 사라진다** — 그 경로의 주문 주체는
+        # Stage 3 하나뿐이다. orchestrator Stage 2가 "신규 종목 없어도 Stage 3을
+        # 실행하려고" 빈 리스트로 넘겨주는 것도 같은 이유다.
+        #
+        # 후보가 비어도 안전하다: 심은 현재가 없는 종목을 이미 걸러내고
+        # (`if cur <= 0: continue`), 보유 종목 가격은 _run_simulators의 네이버
+        # 보강이 채운다.
         candidates = [s.to_dict() for s in stocks]
 
         # 1. StrategyEngine으로 전략 판단
@@ -199,7 +209,7 @@ class TradeEngineWorker(BaseWorker):
             self.log(f"[{session_name} 세션] 정각 아님 - 종목 상태 기록 생략")
 
         # 6. 시뮬레이터 실행 (Registry에서 자동 로드; sim0_libero는 run_regime_stage()가 별도로 돔)
-        self._run_simulators(candidates)
+        self._run_simulators(candidates, exclude_sim_id=paper_owned_elsewhere)
 
         # 7. 프로그램 매매(실전 계좌 자동 심 운용) — config ON & 유효 시에만 실주문(내부 fail-closed)
         # 버즈 불필요 심은 orchestrator가 Stage 1 이전에 이미 실행했다(skip_program_trading=True).
@@ -297,7 +307,8 @@ class TradeEngineWorker(BaseWorker):
 
     def _run_simulators(self, candidates: list[dict], only_sim_id: str | None = None,
                         allow_price_fallback: bool = True,
-                        universe_override: list[dict] | None = None) -> None:
+                        universe_override: list[dict] | None = None,
+                        exclude_sim_id: str | None = None) -> None:
         """
         YAML Manifest의 active 시뮬레이터들을 실행합니다.
         실제 simulator.run(candidates, current_prices=dict) 시그니처 사용.
@@ -314,6 +325,11 @@ class TradeEngineWorker(BaseWorker):
           하지 않는다. lite 경로는 "스크래핑을 하지 않는다"가 전제라 이 폴백이 살아
           있으면 2분마다 네이버를 두드리게 된다. 가격을 못 구한 보유 종목이 있는
           심은 이번 사이클을 건너뛴다 — 0으로 폴백해 허위 손절을 내지 않는다.
+        exclude_sim_id: 그 심을 여기서 돌리지 않는다. trading.yml이 60초 루프로
+          이미 돌리고 배포하는 심을 스크래퍼가 자기 스냅샷(런 시작 시점)에서 다시
+          돌리면, data/*.json 통째 배포가 그 4~5분치 페이퍼 매매를 되돌린다
+          (lost update). 파일당 writer는 하나여야 한다. 심의 신원은 클래스가
+          아니라 **상태 파일**로 본다 — 같은 클래스의 변형이 여럿 있을 수 있다.
         universe_override: 프로그램 매매가 방금 확정한 유니버스를 그대로 쓴다
           (only_sim_id와 함께 쓴다). 이게 없으면 오프틱 사이클이 유니버스를 두 번
           만든다 — 실전 경로에서 한 번, 여기서 또 한 번. 부하가 두 배인 것보다
@@ -340,6 +356,11 @@ class TradeEngineWorker(BaseWorker):
             else:
                 simulators = [s for s in get_active_simulators()
                               if not getattr(s, 'IS_ANALYZER', False)]
+                skip_file = self._state_file_of(exclude_sim_id)
+                if skip_file:
+                    simulators = [s for s in simulators
+                                  if os.path.basename(getattr(s, 'state_file', '')) != skip_file]
+                    self.log(f"  '{exclude_sim_id}' 제외 — trading.yml이 그 심의 writer다")
             self.log(f"시뮬레이터 동기화 시작 ({len(simulators)}개 활성, {len(current_prices)}개 현재가)")
 
             # 2. 포트폴리오 종목 중 현재가 미확보된 코드 수집
@@ -402,6 +423,24 @@ class TradeEngineWorker(BaseWorker):
             self.log("시뮬레이터 동기화 완료")
         except Exception as e:
             self.log_error(f"시뮬레이터 전체 실패: {e}")
+
+    @staticmethod
+    def _state_file_of(sim_id: str | None) -> str | None:
+        """매니페스트가 그 심에 물려둔 상태 파일 이름. 못 찾으면 None.
+
+        못 찾았다고 전 심을 돌리는 쪽으로 fail한다 — 제외에 실패해 한 번 겹치는
+        것이 심을 통째로 빠뜨리는 것보다 낫다.
+        """
+        if not sim_id:
+            return None
+        try:
+            from src.strategy.registry import get_sim_registry
+            for s in get_sim_registry(include_analyzers=True):
+                if s['id'] == sim_id:
+                    return s['state_file']
+        except Exception:
+            pass
+        return None
 
     def _enrich_universe(self, stocks: list[dict]) -> list[dict]:
         """

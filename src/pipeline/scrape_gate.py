@@ -24,9 +24,20 @@ MIN_GAP_MIN = SCRAPE_INTERVAL_MIN / 2   # 연속 스크래핑 바닥(is_scrape_d
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
 _STATE_FILENAME = 'scrape_gate_state.json'
 
+# 국면 갱신은 같은 10분 격자를 쓰지만 **다른 게이트다.** 상태 파일을 나눈 이유는
+# writer가 다르기 때문이다: 스크래핑 게이트는 scraper.yml이 완료 시점에 쓰고,
+# 국면 게이트는 trading.yml이 갱신 직후에 쓴다. 하나로 합쳐 두면 스크래퍼가
+# 끝나 db-data에 반영될 때까지(셋업 50초 + 수행 4분 + 배포) 게이트가 계속 열려
+# 있어, 그 사이 2분마다 들어오는 trading 런이 전부 국면을 다시 갱신한다.
+# 2026-08-08 실측 재현: 09:00~09:30에 10회(격자당 3회) — 최근 5회 관측의 과반으로
+# 국면을 확정하므로 평활 시간상수가 50분에서 14분으로 줄어든다.
+# 예전에는 두 판정이 같은 워크플로 안에 있어 concurrency 그룹이 상호배제를
+# 대신해줬다. 워크플로를 분리하면서 그 보호막이 사라졌다.
+_REGIME_STATE_FILENAME = 'regime_gate_state.json'
 
-def _state_path(data_dir: str | None) -> str:
-    return os.path.join(data_dir or DEFAULT_DATA_DIR, _STATE_FILENAME)
+
+def _state_path(data_dir: str | None, filename: str = _STATE_FILENAME) -> str:
+    return os.path.join(data_dir or DEFAULT_DATA_DIR, filename)
 
 
 def _slot(now_kst: datetime) -> int:
@@ -81,6 +92,35 @@ def is_scrape_due(now_kst: datetime, data_dir: str | None = None) -> bool:
     # 동작이다. 격자 폭의 절반을 바닥으로 깐다. 이 값은 트리거 격자(2분) 근처가
     # 아니므로 셋업 지터가 판정을 뒤집지 못한다(그게 예전 방식의 실패 원인이었다).
     return (now_kst - last_at).total_seconds() / 60 >= MIN_GAP_MIN
+
+
+def is_regime_due(now_kst: datetime, data_dir: str | None = None) -> bool:
+    """지금 국면(Sim0 리베로)을 갱신할 차례인가.
+
+    격자는 스크래핑과 같다(같은 10분). 다른 것은 **누가 기록하는가**뿐이다 —
+    이 게이트는 trading.yml이 갱신 직후에 닫으므로, 스크래퍼가 4~5분 뒤에나
+    끝나는 것과 무관하게 격자당 한 번만 열린다.
+
+    상태를 못 읽으면 갱신 쪽으로 fail한다. 국면 없이 도는 것보다 한 번 더 도는
+    편이 낫다(중복 갱신은 평활을 왜곡하지만, 결측은 매매 소유권 판정 자체를
+    막는다).
+    """
+    try:
+        with open(_state_path(data_dir, _REGIME_STATE_FILENAME), 'r', encoding='utf-8') as f:
+            last_slot = int(json.load(f)['last_regime_slot'])
+    except Exception:
+        return True
+    return _slot(now_kst) > last_slot
+
+
+def mark_regime(now_kst: datetime, data_dir: str | None = None) -> None:
+    """방금 국면을 갱신했다고 기록한다. 갱신에 성공한 직후에만 부른다 —
+    실패한 갱신을 기록하면 다음 격자까지 국면이 낡은 채로 남는다."""
+    path = _state_path(data_dir, _REGIME_STATE_FILENAME)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump({'last_regime_slot': _slot(now_kst),
+                   'last_regime_at': now_kst.isoformat()}, f, ensure_ascii=False)
 
 
 def mark_scraped(now_kst: datetime, data_dir: str | None = None) -> None:

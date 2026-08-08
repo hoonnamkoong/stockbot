@@ -74,6 +74,39 @@ def send_alert_once(key: str, text: str, now: datetime, cooldown_min: int = 60,
     return True
 
 
+# 휴장 판정 실패 알림의 반복 억제 간격(분). 트리거가 2분이라 억제가 없으면
+# 하루 195건이 된다. 장중(6.5시간)에 6~7번 울리는 셈이라 무시하기는 어렵다.
+HOLIDAY_ALERT_COOLDOWN_MIN = 60
+
+
+def notify_holiday_check_failed(today_display: str, now: datetime, log=print) -> bool:
+    """거래일 판정 불가 — 봇이 통째로 멈춘다는 신호.
+
+    **매매 경로와 스크래핑 경로가 같은 함수를 쓴다.** 2026-08-08 구조 변경으로
+    스크래퍼는 trade_loop가 깨우는 종속 워크플로가 됐는데, 이 알림이 스크래퍼
+    쪽에만 있었다 — 판정에 실패하면 trade_loop가 dispatch보다 앞에서 return하므로
+    **정확히 그 시나리오에서 알림이 도달할 수 없었다.** 양쪽에 복사본을 두면
+    문구가 갈리므로 여기 하나만 둔다.
+
+    should_notify()의 정각 제한을 받지 않는다(모듈 docstring 참고) — 이건
+    리포트가 아니라 "봇이 멈췄다"이고, 15/30/45분 런에서 침묵하면 장애를 놓친다.
+    """
+    return send_alert_once(
+        'holiday_check_failed',
+        f"<b>휴장 판정 실패</b>\n\n"
+        f"{today_display} — 거래일 여부를 확인하지 못해 봇을 정지했습니다.\n"
+        f"KIS chk-holiday 조회에 실패했습니다.\n"
+        f"매매·스크래핑이 모두 멈춥니다(매매가 스크래퍼를 깨우는 구조).\n\n"
+        f"수동 실행: trading.yml(실전 매매) / scraper.yml(스크래핑) → Run workflow\n"
+        f"→ force_run 체크\n"
+        f"⚠️ <b>먼저 오늘이 휴장일이 아님을 직접 확인한 뒤에만 사용하세요.</b>\n"
+        f"이 옵션은 휴장일 게이트를 완전히 우회하며, 켜면 실매수 주문이 나갑니다.",
+        now=now,
+        cooldown_min=HOLIDAY_ALERT_COOLDOWN_MIN,
+        log=log,
+    )
+
+
 def _load_state(path: str) -> dict:
     try:
         with open(path, 'r', encoding='utf-8') as f:

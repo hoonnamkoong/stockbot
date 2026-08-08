@@ -188,7 +188,16 @@ def _run_full(ledger, orders, monotonic_seq=None, raise_in='none',
         mock.patch('src.trade_executor.append_order_history'),
     ]
     if monotonic_seq is not None:
-        patches.append(mock.patch.object(pt.time, 'monotonic', side_effect=monotonic_seq))
+        # 마지막 값을 계속 되돌려준다. 고정 길이 리스트를 그대로 쓰면
+        # run_program_trading이 monotonic()을 한 번 더 부르게 되는 변경마다
+        # 이 테스트가 StopIteration으로 깨진다 — 검증하려는 건 호출 횟수가
+        # 아니라 "데드라인을 넘겼을 때의 동작"이다.
+        seq = list(monotonic_seq)
+
+        def _clock():
+            return seq.pop(0) if len(seq) > 1 else seq[0]
+
+        patches.append(mock.patch.object(pt.time, 'monotonic', side_effect=_clock))
 
     with _apply(patches):
         pt.run_program_trading([], is_market_hours=True, now_kst=NOW,

@@ -75,3 +75,9 @@ node_modules
 
 # KOSPI top100 종가 CSV — 원본은 db-data 브랜치. main의 사본이 낡아 db-data를 역행시킨 이력 있음.
 output/kospi_top100_close.csv
+
+# 오프틱 매매 런이 "내가 실제로 쓴 파일"을 적어두는 목록 (trading_lite.yml 배포 스텝 전용).
+# 런 안에서만 유효한 산출물이라 main에 들어가면 안 된다.
+data/.lite_deploy_manifest
+# 알림 반복 억제 상태 — 원본은 db-data. main의 사본은 의미가 없다.
+data/alert_dedup.json

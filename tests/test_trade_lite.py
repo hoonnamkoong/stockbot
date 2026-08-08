@@ -44,8 +44,9 @@ class _Ctx:
         return mock.MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: False)
 
 
-def _run(ctx, traded_sim_id='sim4_bull_daytrading', regime='BULL'):
-    """traded_sim_id: trade_if_buzz_free가 돌려주는 값. None이면 매매 안 함.
+def _run(ctx, traded_sim_id='sim4_bull_daytrading', regime='BULL', used_candidates=None):
+    """traded_sim_id: trade_if_buzz_free가 돌려주는 심 id. None이면 매매 안 함.
+    used_candidates: 그 매매가 실제로 쓴 후보 목록(페이퍼가 재조회 없이 물려받는다).
 
     매매 본체는 orchestrator.run_trade_only_cycle로 옮겨졌다(scraper.yml 오프틱
     경로와 공유 — 복사본을 두면 두 경로가 갈린다). 그래서 patch 대상이
@@ -56,7 +57,7 @@ def _run(ctx, traded_sim_id='sim4_bull_daytrading', regime='BULL'):
          mock.patch.object(orchestrator, 'TradeEngineWorker') as worker_cls, \
          mock.patch.object(orchestrator, 'read_regime', return_value=(regime, 55.0)) as rr, \
          mock.patch.object(orchestrator, 'trade_if_buzz_free',
-                           return_value=traded_sim_id) as tif, \
+                           return_value=(traded_sim_id, used_candidates)) as tif, \
          mock.patch.object(trade_lite, '_write_deploy_manifest') as deploy:
         trade_lite.run_trade_lite(ctx)
         return worker_cls.return_value, rr, tif, deploy
@@ -90,6 +91,19 @@ def test_syncs_only_the_sim_that_trade_if_buzz_free_returned():
     assert kwargs['only_sim_id'] == 'sim4_bull_daytrading'
     assert kwargs['allow_price_fallback'] is False
     deploy.assert_called_once_with('sim4_bull_daytrading', mock.ANY)
+
+
+def test_paper_twin_reuses_the_universe_the_real_trade_used():
+    """페이퍼 쌍둥이는 실전이 쓴 그 후보 목록으로 돌아야 한다.
+
+    여기서 get_universe()를 다시 부르면 수십 초 뒤의 라이브 랭킹이라 다른
+    '당일 등락률 상위 30'이 나올 수 있고, 그러면 실전과 페이퍼가 서로 다른
+    입력으로 판단한다 — "심 선택 = 실전 정확히 동일 동작"이 깨진다.
+    """
+    used = [{'code': '005930', 'price': 70000}]
+    worker, _, _, _ = _run(_Ctx(), used_candidates=used)
+
+    assert worker._run_simulators.call_args.kwargs['universe_override'] is used
 
 
 def test_does_not_requery_selected_sim_after_trading():
@@ -171,7 +185,7 @@ def test_paper_sync_failure_does_not_break_the_run():
          mock.patch.object(orchestrator, 'TradeEngineWorker') as worker_cls, \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 55.0)), \
          mock.patch.object(orchestrator, 'trade_if_buzz_free',
-                           return_value='sim4_bull_daytrading'):
+                           return_value=('sim4_bull_daytrading', None)):
         worker_cls.return_value._run_simulators.side_effect = RuntimeError('boom')
         trade_lite.run_trade_lite(ctx)
 

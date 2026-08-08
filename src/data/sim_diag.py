@@ -54,9 +54,30 @@ def set_cycle(cycle_id) -> None:
 
 
 def month_path(sim: str, today: str = None) -> str:
+    """이번 달 진단 로그의 쓰기 경로.
+
+    ⚠ 읽을 때는 이 경로 하나만 열면 안 된다. COLUMNS가 바뀐 달은
+    `_move_stale_if_needed`가 옛 파일을 `..._v1.csv`로 비켜놓고 정규 경로를 새로
+    시작하므로, 그 달의 기록이 두 파일로 나뉜다. 정규 경로만 읽으면 컬럼 변경
+    이전 행이 조용히 통째로 빠진다 — `month_glob()`을 쓸 것.
+    """
     d = ''.join(ch for ch in str(today or _today()) if ch.isdigit())
     ym = f"{d[:4]}-{d[4:6]}" if len(d) >= 6 else 'unknown'
     return os.path.join(DATA_DIR, f"{sim}_diag_{ym}.csv")
+
+
+def month_files(sim: str, today: str = None) -> list:
+    """그 달 진단 로그의 **모든** 파일 (정규 경로 + 컬럼 변경으로 갈라진 _vN).
+
+    오래된 것부터 반환한다. 분석은 이걸 써야 한다 — month_path() 하나만 읽으면
+    컬럼이 바뀐 달의 앞부분을 못 본다(2026-08에 cycle_id가 추가되며 실제로
+    sim1_diag_2026-08.csv가 갈라졌다).
+    """
+    import glob
+    base, ext = os.path.splitext(month_path(sim, today))
+    # _v1, _v2 … 가 시간순으로 앞선다(옛 파일이 먼저 비켜났다).
+    versioned = sorted(glob.glob(f"{base}_v*{ext}"))
+    return versioned + ([base + ext] if os.path.exists(base + ext) else [])
 
 
 def _today() -> str:

@@ -35,6 +35,7 @@ import base64
 import requests
 from datetime import datetime, timedelta
 
+from src import alerts
 from src.pipeline.context import MARKET_CLOSE_HHMM
 from src.pipeline.workers.program_turn import (
     REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
@@ -436,8 +437,18 @@ def peek_selected_sim(log=print) -> str | None:
 
 
 def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: datetime,
-                        log=print, log_error=print, enrich=None) -> None:
-    """프로그램 매매 1회 실행. 모든 게이트 통과 시에만 실주문."""
+                        log=print, log_error=print, enrich=None) -> list[dict] | None:
+    """프로그램 매매 1회 실행. 모든 게이트 통과 시에만 실주문.
+
+    반환: 이번 실행이 심에게 실제로 넘긴 후보 목록(심 전용 유니버스를 적용·보강한
+    최종본). 게이트에 막혀 심을 돌리지 못했으면 None.
+
+    왜 돌려주는가: 오프틱 사이클에서 페이퍼 쌍둥이가 같은 유니버스를 써야 한다.
+    페이퍼 쪽이 get_universe()를 다시 부르면 수십 초 뒤의 라이브 랭킹이라 다른
+    종목 집합이 나올 수 있고, 그러면 실전과 페이퍼가 다른 입력으로 판단한다 —
+    "심 선택 = 실전 정확히 동일 동작"이 무너지는 방식이다. 조회 비용(네이버 30
+    페이지)이 절반으로 주는 건 부수 효과다.
+    """
     # 1. config fresh 조회 (fail-closed)
     cfg = _read_config_fresh(log)
     if not cfg or not cfg.get('enabled'):
@@ -630,12 +641,29 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         ledger['sim'] = sim_id
         ledger['turn'] = turn
         _write_ledger(_release_payload(ledger), ledger_sha, log)
-        return
+        return sim_candidates
 
     # 10. 안전 필터 + 집행
     from src.trade_executor import place_order_via_vercel, append_order_history
     executed = 0
     failed_codes: set = set()
+
+    # 준비 단계(잔고 조회 → 정합 → 유니버스 보강 → 심 실행)에 쓴 시간. 정상은
+    # 10초대지만(2026-08-07 실측 Stage 0.5 = 12.4초), KIS나 네이버가 느려지면
+    # 이것만으로 주문 예산을 다 먹을 수 있다. 그러면 아래 루프가 첫 바퀴에서
+    # 곧바로 끊겨 **매 사이클 체결 0건인데 로그는 정상으로 보이는** 상태가 된다.
+    # 그건 조용한 정지이므로 따로 구분해 알린다.
+    prep_sec = time.monotonic() - _lock_claimed_at
+    log(f'[Program] 주문 준비 {prep_sec:.1f}초 / 예산 {_ORDER_LOOP_DEADLINE_SEC}초')
+    if prep_sec > _ORDER_LOOP_DEADLINE_SEC:
+        msg = (f'주문 준비에만 {prep_sec:.0f}초가 걸려 예산'
+               f'({_ORDER_LOOP_DEADLINE_SEC}초)을 넘겼습니다. 이번 사이클은 주문을 '
+               f'내지 않습니다({len(orders)}건 보류). 계속되면 매매가 사실상 멈춥니다 — '
+               f'KIS/네이버 응답 지연을 확인하세요.')
+        log_error(f'[Program] ⚠ {msg}')
+        alerts.send_alert_once('program_prep_over_budget', msg, now_kst,
+                               cooldown_min=60, log=log)
+
     for i, o in enumerate(orders):
         # 락 리스 데드라인 재확인 — KIS/Vercel이 느려져 이 런이 예상보다 오래 걸리면,
         # 리스 만료를 기다리지 않고 스스로 신규 주문을 멈춘다. 안 그러면 리스가
@@ -740,16 +768,21 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     # 넘어가면 중복 체결을 모른 채 지나가므로, 덮어쓰지 않고 크게 남긴다.
     current, current_sha = _read_ledger_fresh(log)
     if current is not None and not _lock_held_by(current, run_id):
-        log_error(
-            f"[Program] ⚠ 락을 빼앗겼습니다(내 run_id={run_id}, "
-            f"현재={current.get('lock_run_id')}). 이 런의 결과를 덮어쓰지 않습니다 — "
-            f"중복 체결 가능성이 있으니 KIS 체결 내역을 확인하세요. "
-            f"체결 {executed}/{len(orders)}건.")
-        return
+        msg = (f"락을 빼앗겼습니다(내 run_id={run_id}, "
+               f"현재={current.get('lock_run_id')}). 이 런의 결과를 덮어쓰지 않습니다 — "
+               f"중복 체결 가능성이 있으니 KIS 체결 내역을 확인하세요. "
+               f"체결 {executed}/{len(orders)}건.")
+        log_error(f'[Program] ⚠ {msg}')
+        # 실제 돈이 두 번 나갔을 수 있는 유일한 신호다. log_error는 print라
+        # Actions 로그에만 남는다 — 사람에게 직접 보낸다. 반복 억제는 걸지
+        # 않는다: 체결 건마다 확인해야 할 사고다.
+        alerts.send_alert(f'프로그램 매매 원장 락 상실\n\n{msg}', log)
+        return sim_candidates
     if current_sha:
         ledger_sha = current_sha
     _write_ledger(_release_payload(ledger), ledger_sha, log)
     log(f'[Program] 완료: {executed}/{len(orders)}건 체결 (sim={sim_id})')
+    return sim_candidates
 
 
 # 매수 판단가 대비 허용 괴리(%). 초과하면 그 진입은 포기한다.

@@ -100,7 +100,7 @@ def test_run_pipeline_sets_the_cycle():
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)), \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
         orchestrator.run_pipeline(ctx)
@@ -114,7 +114,7 @@ def test_trade_only_cycle_sets_the_cycle_on_its_own():
     ctx = _Ctx(cycle_id=777)
     with mock.patch.object(orchestrator, 'TradeEngineWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None):
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)):
         orchestrator.run_trade_only_cycle(ctx, mock.MagicMock())
 
     assert sim_diag._cycle_id == 777

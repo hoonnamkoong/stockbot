@@ -69,7 +69,7 @@ def test_offtick_trades_but_does_not_scrape_or_update_regime():
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None) as tbf, \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)) as tbf, \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped') as mark:
         orchestrator.run_pipeline(ctx)
@@ -95,13 +95,13 @@ def test_offtick_syncs_only_the_traded_sims_paper_twin():
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value='sim4_1'), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=('sim4_1', None)), \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
         orchestrator.run_pipeline(ctx)
 
     tw.return_value._run_simulators.assert_called_once_with(
-        [], only_sim_id='sim4_1', allow_price_fallback=False)
+        [], only_sim_id='sim4_1', allow_price_fallback=False, universe_override=None)
 
 
 def test_offtick_paper_sync_failure_does_not_break_the_run():
@@ -114,7 +114,7 @@ def test_offtick_paper_sync_failure_does_not_break_the_run():
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
          mock.patch.object(orchestrator, 'read_regime', return_value=('BULL', 60.0)), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value='sim4_1'), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=('sim4_1', None)), \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):
         tw.return_value._run_simulators.side_effect = RuntimeError('KIS 다운')
@@ -138,7 +138,7 @@ def test_ontick_runs_full_pipeline_and_marks_scraped():
          mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)), \
          mock.patch.object(orchestrator, 'read_regime', return_value=(None, None)), \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=True), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped') as mark:
@@ -158,7 +158,7 @@ def test_force_run_bypasses_the_scrape_gate():
          mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)), \
          mock.patch.object(orchestrator, 'read_regime', return_value=(None, None)), \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=False), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped') as mark, \
@@ -177,7 +177,7 @@ def test_failed_run_does_not_mark_scraped():
     with mock.patch.object(orchestrator, 'TradeEngineWorker') as tw, \
          mock.patch.object(orchestrator, 'StorageManager'), \
          mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
-         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=None), \
+         mock.patch.object(orchestrator, 'trade_if_buzz_free', return_value=(None, None)), \
          mock.patch.object(orchestrator.scrape_gate, 'is_scrape_due', return_value=True), \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped') as mark:
         tw.return_value.run_regime_stage.return_value = 'BULL'

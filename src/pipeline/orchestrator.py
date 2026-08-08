@@ -8,6 +8,7 @@ Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 
 import os
 
+from src import alerts
 from src.strategy.regime_state import read_regime
 from src.strategy.registry import needs_buzz as sim_needs_buzz
 from src.pipeline import scrape_gate
@@ -29,6 +30,10 @@ def _status_of(item) -> str:
 
 
 SIM7_BULL_SCORE_MIN = 45.0
+
+# 휴장 판정 실패 알림의 반복 억제 간격(분). 트리거가 2분이라 억제가 없으면
+# 하루 195건이 된다. 장중(6.5시간)에 6~7번 울리는 셈이라 무시하기는 어렵다.
+HOLIDAY_ALERT_COOLDOWN_MIN = 60
 
 
 def sim7_should_buy(strong_picks: list, bull_score) -> bool:
@@ -55,46 +60,54 @@ def _notify_holiday_check_failed(ctx: PipelineContext) -> None:
     should_notify()의 정각(0~2분) 제한을 일부러 우회한다 — 이건 리포트가
     아니라 "봇이 멈췄다"는 장애 신호이고, 15/30/45분 런에서 침묵하면
     장애를 놓친다.
+
+    다만 태스커가 2분 주기가 되면서 우회만으로는 안 된다. chk-holiday가 하루
+    종일 죽으면 같은 알림이 195건 나가고, 그러면 텔레그램 rate limit에 걸리거나
+    사람이 둔감해진다 — 어느 쪽이든 알림이 없는 것과 같아진다. 60분 쿨다운을
+    두어 "장중에 몇 번"으로 줄인다(끄지는 않는다: 복구 여부를 계속 알려야 한다).
     """
-    try:
-        from src.telegram_manager import TelegramManager
-        sent = TelegramManager().send_message(
-            f"⚠️ <b>휴장 판정 실패</b>\n\n"
-            f"{ctx.today_display} — 거래일 여부를 확인하지 못해 봇을 정지했습니다.\n"
-            f"KIS chk-holiday 조회에 실패했습니다.\n\n"
-            f"수동 실행: scraper.yml → Run workflow → force_run 체크\n"
-            f"⚠️ <b>먼저 오늘이 휴장일이 아님을 직접 확인한 뒤에만 사용하세요.</b>\n"
-            f"이 옵션은 휴장일 게이트를 완전히 우회하며, 켜면 실매수 주문이 나갑니다."
-        )
-        if not sent:
-            ctx.log("[경고] 판정 실패 알림 발송에 실패했습니다: send_message가 False를 반환했습니다.")
-    except Exception as e:
-        ctx.log(f"[경고] 판정 실패 알림 발송에 실패했습니다: {e}")
+    alerts.send_alert_once(
+        'holiday_check_failed',
+        f"<b>휴장 판정 실패</b>\n\n"
+        f"{ctx.today_display} — 거래일 여부를 확인하지 못해 봇을 정지했습니다.\n"
+        f"KIS chk-holiday 조회에 실패했습니다.\n\n"
+        f"수동 실행: scraper.yml → Run workflow → force_run 체크\n"
+        f"⚠️ <b>먼저 오늘이 휴장일이 아님을 직접 확인한 뒤에만 사용하세요.</b>\n"
+        f"이 옵션은 휴장일 게이트를 완전히 우회하며, 켜면 실매수 주문이 나갑니다.",
+        now=ctx.now_kst,
+        cooldown_min=HOLIDAY_ALERT_COOLDOWN_MIN,
+        log=ctx.log,
+    )
 
 
-def trade_if_buzz_free(ctx: PipelineContext, trade_worker, regime: str | None) -> str | None:
+def trade_if_buzz_free(ctx: PipelineContext, trade_worker,
+                       regime: str | None) -> tuple[str | None, list | None]:
     """실전 선택 심이 버즈를 안 쓰면 스크래핑을 기다리지 않고 매매를 낸다(E3).
 
     스크래퍼(10분)의 Stage 0.5와 trade_lite(2분)가 같은 코드를 쓴다 — 갈리면
     두 경로의 동작이 어긋나고, 그건 program-trading-parity를 깨는 방식이다.
 
-    반환: 이번 호출에서 실제로 매매한 심 id, 안 했으면 None.
+    반환: (매매한 심 id, 그 매매가 쓴 후보 목록). 매매를 안 했으면 (None, None).
 
     bool이 아니라 sim_id를 돌려주는 이유: 호출부가 "방금 무엇을 매매했는지" 알아야
     할 때(예: trade_lite의 페이퍼 동기화) config를 다시 조회하면 안 된다 — 매매
     실행 중(수초~수십초) config가 바뀌면 다른 심을 조회하게 되는 레이스가 생긴다.
     이 함수가 실제로 매매를 결정한 그 값을 그대로 넘겨준다.
+
+    후보 목록을 함께 돌려주는 이유도 같은 계열이다. 페이퍼 쌍둥이가 유니버스를
+    다시 조회하면 수십 초 뒤의 라이브 랭킹이라 다른 종목 집합이 나올 수 있고,
+    그러면 실전과 페이퍼가 다른 입력으로 판단한다.
     """
     selected_sim = None
     try:
         selected_sim = peek_selected_sim(log=ctx.log)
     except Exception as e:
         ctx.log(f"[경고] 선택 심 조회 실패 — 스크래핑 후 매매(느린 경로)로 진행: {e}")
-        return None
+        return None, None
 
     if not selected_sim:
         ctx.log("[Program] 선택된 심 없음(OFF) — 순서 변경 없음")
-        return None
+        return None, None
 
     try:
         buzz_free = not sim_needs_buzz(selected_sim, regime)
@@ -103,23 +116,23 @@ def trade_if_buzz_free(ctx: PipelineContext, trade_worker, regime: str | None) -
         # classmethod가 없으면 예외를 던진다. 모르는 것을 "버즈 불필요"로 읽으면
         # 스크래핑 없이 잘못된 유니버스로 매매가 나갈 수 있다 — 느린 경로로 미룬다.
         ctx.log(f"[경고] needs_buzz 판정 실패 — 스크래핑 후 매매(느린 경로)로 진행: {e}")
-        return None
+        return None, None
 
     if buzz_free:
         ctx.log(f"[Program] '{selected_sim}' 버즈 불필요(국면={regime}) — 스크래핑 전에 매매 실행")
         try:
-            run_program_trading(
+            used_candidates = run_program_trading(
                 [], is_market_hours=ctx.is_market_hours(), now_kst=ctx.now_kst,
                 log=trade_worker.log, log_error=trade_worker.log_error,
                 enrich=trade_worker._enrich_universe,
             )
-            return selected_sim
+            return selected_sim, used_candidates
         except Exception as e:
             ctx.log(f"[경고] 조기 프로그램 매매 실패 — Stage 3에서 재시도: {e}")
-            return None
+            return None, None
 
     ctx.log(f"[Program] '{selected_sim}' 버즈 필요(국면={regime}) — 스크래핑 후 매매")
-    return None
+    return None, None
 
 
 def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str | None:
@@ -147,7 +160,7 @@ def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str |
     trade_worker = TradeEngineWorker(ctx, storage)
 
     with ctx.stage("매매(스크래핑 없음)"):
-        traded_sim_id = trade_if_buzz_free(ctx, trade_worker, regime)
+        traded_sim_id, used_candidates = trade_if_buzz_free(ctx, trade_worker, regime)
 
     # 실전이 돈 심의 페이퍼 쌍둥이만 같은 주기로 갱신한다. 실전만 2분으로 옮기고
     # 페이퍼를 10분에 두면 대시보드의 페이퍼 성과가 실제 계좌와 갈라져서,
@@ -156,11 +169,16 @@ def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str |
     # trade_if_buzz_free가 돌려준 sim_id를 그대로 쓴다 — peek_selected_sim()을
     # 여기서 다시 부르지 않는다. 매매 실행 중(수초~수십초) config의 selected_sim이
     # 바뀌면, 다시 조회한 값이 방금 매매한 심과 다를 수 있다.
+    #
+    # 유니버스도 마찬가지로 실전이 쓴 그 목록을 그대로 넘긴다. 여기서 다시
+    # get_universe()를 부르면 수십 초 뒤의 라이브 랭킹이라 다른 종목 집합이
+    # 나올 수 있고, 그러면 실전과 페이퍼 쌍둥이가 다른 입력으로 판단한다.
     if traded_sim_id:
         with ctx.stage("선택 심 페이퍼 동기화"):
             try:
                 trade_worker._run_simulators(
-                    [], only_sim_id=traded_sim_id, allow_price_fallback=False)
+                    [], only_sim_id=traded_sim_id, allow_price_fallback=False,
+                    universe_override=used_candidates)
             except Exception as e:
                 ctx.log(f"[경고] 선택 심 페이퍼 동기화 실패(매매는 완료됨): {e}")
 
@@ -232,9 +250,10 @@ def run_pipeline(ctx: PipelineContext) -> None:
         regime = trade_worker.run_regime_stage()
 
     with ctx.stage("Stage 0.5: 매매 순서 분기"):
-        # trade_if_buzz_free는 이제 sim_id|None을 돌려준다(trade_lite가 재조회 없이
-        # 쓰려고). 여기서는 bool만 필요하므로 명시적으로 좁힌다.
-        program_traded_early = trade_if_buzz_free(ctx, trade_worker, regime) is not None
+        # trade_if_buzz_free는 (sim_id, 쓴 후보)를 돌려준다(오프틱 경로가 재조회
+        # 없이 쓰려고). 스크래핑 사이클은 뒤에서 Stage 1이 후보를 새로 만들고
+        # Stage 3이 전 심을 돌리므로 여기서는 "매매했는가"만 필요하다.
+        program_traded_early = trade_if_buzz_free(ctx, trade_worker, regime)[0] is not None
 
     # ── Stage 1: 데이터 수집 및 1차 필터링 ───────────────────────
     with ctx.stage("Stage 1: 데이터 수집"):

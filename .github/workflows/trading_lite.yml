@@ -43,6 +43,15 @@ concurrency:
 jobs:
   trade:
     runs-on: ubuntu-latest
+    # ⚠ 수동 실행 가드. 이 워크플로는 태스커가 도달하지 못해 사실상 죽어 있는데,
+    # Actions UI에는 "Run workflow" 버튼이 그대로 노출된다. 무심코 누르면 진짜
+    # 주문이 나가고, 그때 scraper.yml이 동시에 돌고 있으면 concurrency 그룹이
+    # 달라 막히지 않는다 — 남는 방어가 원장 락 하나뿐인데 그건 마지막 방어선이지
+    # 설계가 아니다(파일 상단 주석).
+    #
+    # 되살릴 때(태스커를 repository_dispatch로 바꿀 때) 이 조건을 지우고, 동시에
+    # scraper.yml의 오프틱 매매를 꺼야 한다. 둘은 반드시 함께 바뀐다.
+    if: github.event_name == 'repository_dispatch'
     # 원장 락 리스(_LOCK_LEASE_MIN=4분)보다 짧아야 한다. 리스가 만료될 때까지
     # 살아 있는 런이 있으면 다른 런이 락을 회수해 같은 주문을 낼 수 있다.
     timeout-minutes: 3
@@ -151,3 +160,17 @@ jobs:
           done
           echo "[Deploy] push 3회 실패"
           exit 1
+
+      # 매매를 내는 워크플로다 — 조용히 죽으면 안 된다. scraper.yml과 같은 이유로
+      # cancelled에는 걸리지 않는다(if: failure()).
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="HTML" \
+            -d text="🚨 <b>StockBot 매매(lite) 실패</b>%0A%0A워크플로 런이 실패했습니다.%0A${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            || echo "[Notify] 텔레그램 발송 실패"

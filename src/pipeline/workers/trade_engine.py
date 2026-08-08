@@ -286,7 +286,8 @@ class TradeEngineWorker(BaseWorker):
         return result.get('current_regime')
 
     def _run_simulators(self, candidates: list[dict], only_sim_id: str | None = None,
-                        allow_price_fallback: bool = True) -> None:
+                        allow_price_fallback: bool = True,
+                        universe_override: list[dict] | None = None) -> None:
         """
         YAML Manifest의 active 시뮬레이터들을 실행합니다.
         실제 simulator.run(candidates, current_prices=dict) 시그니처 사용.
@@ -303,6 +304,12 @@ class TradeEngineWorker(BaseWorker):
           하지 않는다. lite 경로는 "스크래핑을 하지 않는다"가 전제라 이 폴백이 살아
           있으면 2분마다 네이버를 두드리게 된다. 가격을 못 구한 보유 종목이 있는
           심은 이번 사이클을 건너뛴다 — 0으로 폴백해 허위 손절을 내지 않는다.
+        universe_override: 프로그램 매매가 방금 확정한 유니버스를 그대로 쓴다
+          (only_sim_id와 함께 쓴다). 이게 없으면 오프틱 사이클이 유니버스를 두 번
+          만든다 — 실전 경로에서 한 번, 여기서 또 한 번. 부하가 두 배인 것보다
+          파리티가 문제다: 두 조회는 수십 초 차이라 서로 다른 '당일 등락률 상위
+          30'을 볼 수 있고, 그러면 실전과 그 페이퍼 쌍둥이가 다른 유니버스로
+          판단한다.
         """
         try:
             # 1. 오늘 candidates 기반으로 현재가 구성
@@ -348,9 +355,15 @@ class TradeEngineWorker(BaseWorker):
                     # scripts/run_eod_sims.py가 마감 후 1회 돌린다.
                     if getattr(sim, 'IS_EOD', False):
                         continue
-                    own_universe = sim.get_universe()
+                    # 넘겨받은 유니버스가 있으면 다시 만들지 않는다. 빈 리스트는
+                    # '유니버스가 비었다'가 아니라 '넘겨받은 게 없다'로 읽는다 —
+                    # 빈 유니버스로 돌리면 보유 종목 현재가가 통째로 사라져
+                    # 허위 손절이 난다.
+                    sim_candidates = universe_override or None
+                    own_universe = None if sim_candidates else sim.get_universe()
                     if own_universe:
                         sim_candidates = self._enrich_universe(own_universe)
+                    if sim_candidates:
                         sim_prices = dict(current_prices)
                         sim_prices.update({
                             s['code']: s.get('price', s.get('current_price', 0))

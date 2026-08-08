@@ -56,7 +56,10 @@ jobs:
 
       - name: Fetch remote data (db-data)
         run: |
-          git fetch origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet"
+          # --depth 1: 필요한 건 최신 스냅샷뿐이다. db-data는 하루 수십~수백 커밋이
+          # 쌓이는 브랜치(2026-08 기준 335커밋·33MB)라, 이 워크플로가 2분마다 도는
+          # 지금 전체 이력을 받으면 그 비용이 매 트리거마다 든다.
+          git fetch --depth 1 origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet"
           if git show-ref --verify refs/heads/db-data 2>/dev/null; then
             git checkout db-data -- data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
           fi
@@ -121,7 +124,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
           
           # 별도 디렉토리에 db-data 브랜치 체크아웃
-          git clone --branch db-data https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {
+          # --depth 1: 여기서 하는 일은 "최신 위에 커밋 하나 얹어 push"뿐이라 이력이
+          # 필요 없다. 이 워크플로가 2분마다 돌게 된 지금은 매 트리거 비용이다.
+          git clone --depth 1 --branch db-data https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {
             mkdir db_data_repo
             cd db_data_repo
             git init
@@ -163,6 +168,24 @@ jobs:
           else
             echo "No changes to commit"
           fi
+
+      # 워크플로가 통째로 깨진 경우(파이썬 예외, 배포 실패, 의존성 설치 실패)의 유일한
+      # 통보 경로다. 파이썬 안에서 난 장애는 src/alerts.py가 직접 보내지만, 파이썬이
+      # 시작조차 못 했으면 그쪽은 돌지 않는다.
+      #
+      # cancelled에는 걸리지 않는다(if: failure()). 2분 트리거가 스크래핑 런과 겹칠 때
+      # concurrency가 대기 런을 취소하는 건 정상 동작이라 알릴 게 없다.
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="HTML" \
+            -d text="🚨 <b>StockBot 스크래퍼 실패</b>%0A%0A워크플로 런이 실패했습니다.%0A${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            || echo "[Notify] 텔레그램 발송 실패"
 
       # [2026-08-06] 실거래 기록(order_history.json, trade_history_real.csv)의 git 배포를
       # 걷어냈다. 이 파일들의 writer 워크플로가 선택 심에 따라 바뀌기 때문이다 —

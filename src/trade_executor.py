@@ -4,6 +4,7 @@ import sys
 import traceback
 from datetime import datetime, timezone
 
+from src import alerts
 from src.trade import secret_store
 
 # ─── 경로 설정 ───────────────────────────────────────────────────────────────
@@ -172,13 +173,19 @@ def _mirror_to_secret_repo(fn, label: str) -> None:
 
     다만 조용히 넘어가지는 않는다 — 기록 없는 체결은 수익률 집계에서 빠지고,
     그게 2026-07-08에 179만원어치 청산이 통째로 누락된 방식이었다.
+
+    print만으로는 부족하다는 게 2026-08-08 점검에서 드러났다. 이 줄은 Actions
+    로그에만 남아 아무도 보지 않는다 — 사람에게 직접 보낸다.
     """
     try:
         if not fn():
-            print(f"[TradeExecutor] ⚠ {label} 비공개 레포 기록 실패 — "
-                  f"이 체결이 집계에서 누락될 수 있습니다. 수동 확인 필요.")
+            msg = (f"{label} 비공개 레포 기록 실패 — "
+                   f"이 체결이 수익률 집계에서 누락될 수 있습니다. 수동 확인 필요.")
+            print(f"[TradeExecutor] ⚠ {msg}")
+            alerts.send_alert(f'실거래 기록 실패\n\n{msg}')
     except Exception as e:
         print(f"[TradeExecutor] ⚠ {label} 비공개 레포 기록 예외: {e}")
+        alerts.send_alert(f'실거래 기록 예외\n\n{label}: {e}')
 
 
 # ─── 유틸리티: 종목명 자동 매칭 ─────────────────────────

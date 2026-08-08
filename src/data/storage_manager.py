@@ -46,7 +46,24 @@ class StorageManager:
         GitHub db-data 브랜치에서 지정된 파일들을 로컬로 동기화합니다.
         캐시 우회를 위해 타임스탬프 쿼리를 붙입니다.
         기존 load_sync_state()의 파일 동기화 로직을 대체합니다.
+
+        [2026-08-08] Actions 안에서는 아무것도 하지 않는다.
+        워크플로가 런 시작에 `git checkout db-data -- data/`로 이미 진짜 최신본을
+        받아왔다. 여기서 CDN 사본을 덮어쓰면 그 최신본을 과거로 되감는다 —
+        raw.githubusercontent는 캐시버스터(`?t=`)로도 안 깨진다(2026-07-10 확인).
+
+        예전엔 동기화 목록이 옛 심 3개 하드코딩이라 피해가 작았다. 목록이
+        매니페스트 기반이 되면서 실전 계좌가 돌리는 심의 상태 파일까지 대상이
+        됐고, 오프틱 매매가 2분마다 그 상태를 db-data에 밀기 시작하면 되감기
+        창이 상시화된다. git 객체가 유일한 진실이다.
+
+        로컬 실행에는 그 체크아웃이 없으므로 CDN 경로를 그대로 둔다.
         """
+        if os.environ.get('GITHUB_ACTIONS'):
+            print(f"[Storage] Actions 실행 — CDN 동기화 생략 "
+                  f"(db-data 체크아웃이 최신본, {len(filenames)}개 대상)")
+            return
+
         ts = int(time.time())
         for filename in filenames:
             url = f"{self.GITHUB_RAW_BASE}/{filename}?t={ts}"

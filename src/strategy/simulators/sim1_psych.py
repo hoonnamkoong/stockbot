@@ -393,7 +393,12 @@ class PsychDivergenceSimulator(BaseSimulator):
         # 프로그램 매매 경로는 별도 파일로 간다. 같은 CSV에 섞이면 같은 사이클·
         # 같은 종목이 2행씩 들어가 분포 분석이 이중계상된다. 진단 키 이름은
         # Sim1이 소유한다 — 매니페스트 id(sim_psych)와 진단 키(sim1)가 다르다.
-        sim_diag.append('sim1_program' if self.state.get('exec_path') == 'program' else 'sim1',
-                        diags)
+        # 반환값을 버리지 않는다. append는 실패해도 예외를 올리지 않고 0을
+        # 돌려주므로, 여기서 안 보면 "진단이 안 남았다"를 아무도 모른다 —
+        # 실제로 db-data에 diag 파일이 0개인 것을 몇 주 지나 발견했다(08-09).
+        diag_key = 'sim1_program' if self.state.get('exec_path') == 'program' else 'sim1'
+        wrote = sim_diag.append(diag_key, diags, log=print)
+        if wrote != len(diags):
+            print(f'[diag] {diag_key}: {len(diags)}행 중 {wrote}행만 기록됐습니다')
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

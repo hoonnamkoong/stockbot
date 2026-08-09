@@ -120,17 +120,39 @@ def _move_stale_if_needed(path) -> bool:
     return False
 
 
-def append(sim: str, records: list, path: str = None) -> int:
+def _say(log, msg: str) -> None:
+    """로거가 터져도 심을 죽이지 않는다."""
+    try:
+        log(msg)
+    except Exception:
+        pass
+
+
+def append(sim: str, records: list, path: str = None, log=print) -> int:
     """진단 행들을 추가한다. 추가된 행 수 반환.
 
-    로깅 실패로 심이 죽으면 안 되므로 모든 예외를 삼킨다.
+    로깅 실패로 심이 죽으면 안 되므로 모든 예외를 삼킨다. **다만 시끄럽게
+    삼킨다** — 0을 돌려주는 길이 셋인데(records 비었음 / 옛 헤더 파일을 못
+    비켜놓음 / 예외) 예전에는 전부 같은 `return 0`이라 로그에서 구분되지 않았다.
+
+    2026-08-09에 db-data의 diag 파일이 0개인 것이 드러났는데, 원인을 특정할 수
+    없었던 이유가 정확히 이것이다. "진단을 남기는 장치"가 자기 실패를 진단하지
+    못하면 그 장치는 없는 것과 같다.
+
+    정상 경로는 조용하다 — 사이클마다 성공 로그를 찍으면 그게 소음이 되어
+    실패 줄을 덮는다. 성공은 반환값으로 말한다(호출부가 그걸 로그에 남긴다).
     """
     if not records:
+        _say(log, f'[diag] {sim}: 기록할 행이 없습니다(records 비어 있음) — '
+                  f'후보가 0개였거나 판단 루프에 도달하지 못했습니다')
         return 0
     try:
         path = path or month_path(sim)
         if not _move_stale_if_needed(path):
-            # 옛 파일을 비켜놓지 못했으면 로그를 쓰지 않아 데이터 정합성 유지
+            # 옛 파일을 비켜놓지 못했으면 로그를 쓰지 않아 데이터 정합성 유지.
+            # 판단 자체는 옳다(열이 어긋나느니 안 쓰는 게 낫다) — 침묵만 고친다.
+            _say(log, f'[diag] {sim}: 옛 헤더 파일을 비켜놓지 못해 이번 기록을 '
+                      f'생략합니다 — {path}')
             return 0
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
         ts = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')
@@ -149,5 +171,6 @@ def append(sim: str, records: list, path: str = None) -> int:
                     row['cycle_id'] = _cycle_id
                 w.writerow(row)
         return len(records)
-    except Exception:
+    except Exception as e:
+        _say(log, f'[diag] {sim}: 기록 실패 — {type(e).__name__}: {e} (경로 {path})')
         return 0

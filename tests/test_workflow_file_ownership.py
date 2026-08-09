@@ -151,6 +151,20 @@ def test_trading_does_not_deploy_the_report_gate_state():
     assert STATE_FILENAME not in names
 
 
+def test_scraper_deploys_the_sim_diag_logs():
+    """진단 CSV(`sim1_diag_YYYY-MM.csv`)는 scraper.yml의 `data/*.csv` 기본 경로로
+    나간다. 2026-08-09에 db-data의 diag 파일이 0개인 것이 드러났는데, 원인이
+    '쓰기 실패'인지 '배포 누락'인지 가르려면 배포 쪽을 먼저 고정해야 한다.
+
+    여기가 통과하는데도 파일이 없으면 원인은 쓰기 쪽이다(로그가 이제 말해준다)."""
+    deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
+    skipped = {line for line in deploy.splitlines() if 'continue' in line}
+
+    assert 'for f in data/*.csv' in deploy, 'csv 배포 루프가 사라졌다'
+    assert not any('diag' in line for line in skipped), (
+        'diag CSV가 배포 제외에 들어갔다 — 진단이 db-data에 영영 도달하지 못한다')
+
+
 def test_scraper_does_not_deploy_money_files():
     """순위 스냅샷의 writer는 trading.yml이다. scraper가 `data/*.json`·`*.csv`를
     통째로 밀면 `rank_state.json`이 런 시작 시점 사본으로 되돌아가고, 그러면

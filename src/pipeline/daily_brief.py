@@ -143,6 +143,13 @@ def collect_sim_brief(data_dir: str, today_str: str) -> list[dict]:
     ]
 
 
-def should_send_brief(should_notify: bool, hour: int) -> bool:
-    """15시 정각 회차에서만 True. should_notify() 게이트는 건드리지 않는다."""
-    return bool(should_notify) and hour == 15
+def should_send_brief(now_kst, data_dir=None) -> bool:
+    """15시 마감 브리핑을 보낼 차례인가.
+
+    [2026-08-09] 예전에는 `should_notify() and hour == 15`였다. 리포트 게이트에
+    얹혀 있었다는 뜻인데, 리포트를 하루 2회(11:00·14:00)로 옮기는 순간 **브리핑이
+    통째로 죽는다.** 브리핑은 다른 물건이므로(실전 계좌 잔고 + 심별 현황) 슬롯을
+    나눠 독립적으로 판정한다.
+    """
+    from src.report.gate import brief_due
+    return brief_due(now_kst, data_dir)

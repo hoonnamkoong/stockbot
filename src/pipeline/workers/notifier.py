@@ -17,6 +17,7 @@ from src.data.schemas import StockData, SyncState
 from src.data.storage_manager import StorageManager
 from src.telegram_manager import TelegramManager
 from src.pipeline.daily_brief import build_daily_brief, collect_sim_brief, should_send_brief
+from src.report import gate as report_gate
 
 
 class NotifierWorker(BaseWorker):
@@ -45,22 +46,32 @@ class NotifierWorker(BaseWorker):
         # 1. 멀티데이 집계 저장
         self._aggregate_multi_day(all_stocks)
 
-        # 2. 텔레그램 발송 (조건 충족 시에만)
-        if self.ctx.should_notify():
-            self.safe_run(
+        # 슬롯 판정은 **런당 한 번만** 한다. 발송 직후에 슬롯을 닫으므로, 아래에서
+        # should_notify()를 다시 물으면 False가 되어 reported_codes 갱신이 조용히
+        # 건너뛰어진다. 잡아 쓰고 맨 마지막에 닫는다.
+        slot = self.ctx.report_slot() if self.ctx.should_notify() else None
+        data_dir = getattr(self.ctx, '_report_data_dir', None)
+
+        # 2. 텔레그램 발송 (슬롯이 열려 있을 때만)
+        sent_ok = False
+        if slot:
+            sent_ok = self.safe_run(
                 self._send_report,
                 self._send_fallback_summary,
                 all_stocks, final_picks, deep_dive_report, sync_state
-            )
+            ) is True
         else:
-            self.log(f"발송 스킵 (이벤트: {self.ctx.github_event}, 분: {self.ctx.start_minute})")
+            self.log(f"발송 스킵 (이벤트: {self.ctx.github_event}, "
+                     f"슬롯 없음: {self.ctx.now_kst.strftime('%H:%M')})")
 
-        # 2-1. 15:00 마감 브리핑 (실전 계좌 + 심별 현황)
-        if should_send_brief(self.ctx.should_notify(), self.ctx.now_kst.hour):
-            self.safe_run(self._send_daily_brief, self._brief_fallback)
+        # 2-1. 15:00 마감 브리핑 — 리포트와 **다른 슬롯이다.** 예전에는 should_notify()에
+        # 얹혀 있어서, 리포트를 11/14시로 옮기는 순간 브리핑이 통째로 죽었다.
+        if should_send_brief(self.ctx.now_kst, data_dir):
+            if self.safe_run(self._send_daily_brief, self._brief_fallback) is True:
+                report_gate.mark_sent(report_gate.BRIEF_SLOT, self.ctx.now_kst, data_dir)
 
         # 3. reported_codes 상태 업데이트 (현재 수집 종목 추가)
-        if self.ctx.should_notify():
+        if slot:
             reported = sync_state.reported_codes
             for s in all_stocks:
                 if s.get('code') and s['code'] not in reported:
@@ -71,14 +82,25 @@ class NotifierWorker(BaseWorker):
         if self.ctx.is_market_hours():
             self._run_trade_executor()
 
+        # 5. 슬롯 닫기 — **발송에 성공했을 때만.** 실패를 '보냈다'로 적으면 그날
+        # 회차가 통째로 사라진다. 창(40분)이 아직 열려 있으면 다음 스크래핑
+        # 사이클이 재시도할 수 있어야 한다(scrape_gate.mark_scraped와 같은 이유).
+        if slot and sent_ok:
+            report_gate.mark_sent(slot, self.ctx.now_kst, data_dir)
+            self.log(f"{slot} 리포트 발송 완료 — 슬롯을 닫습니다")
+
     def _send_report(
         self,
         all_stocks: list,
         final_picks: list,
         report: str,
         sync_state: SyncState,
-    ) -> None:
-        """실제 TelegramManager 메서드로 리포트 발송."""
+    ) -> bool:
+        """실제 TelegramManager 메서드로 리포트 발송. 끝까지 갔으면 True.
+
+        반환값으로 슬롯을 닫을지 정한다 — safe_run은 fallback으로 넘어가도 값을
+        돌려주므로, 여기서 True를 명시하지 않으면 실패와 성공을 구분할 수 없다.
+        """
         # 대시보드 링크 먼저 발송
         self.tg.send_dashboard_link()
 
@@ -117,6 +139,8 @@ class NotifierWorker(BaseWorker):
             except Exception as e:
                 self.log_error(f"순위 알림 발송 실패: {e}")
 
+        return True
+
     def _send_fallback_summary(self, all_stocks, final_picks, report, sync_state) -> None:
         """텔레그램 발송 실패 시 최소한의 정보만 발송."""
         try:
@@ -127,8 +151,8 @@ class NotifierWorker(BaseWorker):
         except Exception:
             pass
 
-    def _send_daily_brief(self) -> None:
-        """15:00 마감 브리핑을 별도 메시지로 발송."""
+    def _send_daily_brief(self) -> bool:
+        """15:00 마감 브리핑을 별도 메시지로 발송. 성공했으면 True."""
         from src.trade.balance import get_balance
 
         try:
@@ -141,6 +165,7 @@ class NotifierWorker(BaseWorker):
         if not sent:
             raise RuntimeError("마감 브리핑 텔레그램 발송 실패")
         self.log("15:00 마감 브리핑 발송 완료")
+        return True
 
     def _brief_fallback(self) -> None:
         """브리핑 조립·발송 실패. 숫자를 지어내지 않고 실패만 알린다."""

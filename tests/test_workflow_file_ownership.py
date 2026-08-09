@@ -121,6 +121,36 @@ def test_scraper_deploy_consults_the_runtime_exclude_list():
     assert 'owned_by_trading' in csv_loop
 
 
+def test_scraper_deploys_the_report_gate_state():
+    """리포트 슬롯 상태의 writer는 scraper.yml이다(리포트가 그쪽 소관이다).
+
+    **이게 db-data를 왕복하지 못하면 슬롯이 영원히 안 닫힌다.** 매 런이 새
+    컨테이너라 "아직 안 보냈다"로 읽고, 40분 창 안의 스크래핑 네 번이 전부
+    리포트를 발송한다 — 하루 2회 합의가 하루 8회가 된다.
+
+    별도 조치가 필요한 게 아니라 `data/*.json` 기본 경로에 걸리면 된다.
+    여기서 지키는 건 "누가 실수로 제외 목록에 넣지 않았는가"다.
+    """
+    from src.report.gate import STATE_FILENAME
+    deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
+    skipped = {line for line in deploy.splitlines() if 'continue' in line}
+
+    assert 'for f in data/*.json' in deploy, 'json 배포 루프가 사라졌다'
+    assert not any(STATE_FILENAME in line for line in skipped), (
+        f'{STATE_FILENAME}이 배포 제외에 들어갔다 — 슬롯이 영원히 안 닫힌다')
+
+
+def test_trading_does_not_deploy_the_report_gate_state():
+    """writer는 하나여야 한다. trading.yml이 런 시작 시점 사본을 올리면
+    스크래퍼가 방금 닫은 슬롯이 다시 열린다(lost update)."""
+    from src.report.gate import STATE_FILENAME
+    import scripts.trade_loop as trade_loop
+
+    names = trade_loop.regime_output_files() + trade_loop.money_output_files(
+        __import__('datetime').datetime(2026, 8, 10, 11, 0))
+    assert STATE_FILENAME not in names
+
+
 def test_scraper_does_not_deploy_money_files():
     """순위 스냅샷의 writer는 trading.yml이다. scraper가 `data/*.json`·`*.csv`를
     통째로 밀면 `rank_state.json`이 런 시작 시점 사본으로 되돌아가고, 그러면

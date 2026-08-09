@@ -226,11 +226,29 @@ def test_missing_state_json_silent_no_log(tmp_path, capsys):
 from src.pipeline.daily_brief import should_send_brief
 
 
-def test_brief_only_at_15h_notify_round():
-    assert should_send_brief(should_notify=True,  hour=15) is True
-    assert should_send_brief(should_notify=True,  hour=14) is False
-    assert should_send_brief(should_notify=True,  hour=9)  is False
-    assert should_send_brief(should_notify=False, hour=15) is False
+def test_brief_only_in_the_fifteen_slot(tmp_path):
+    """[2026-08-09] 예전에는 `should_notify() and hour == 15`였다. 리포트가
+    하루 2회(11:00·14:00)로 옮겨가면서 그 결합을 끊었다 — 안 끊었으면 브리핑이
+    통째로 죽는다. 이제 15:00 전용 슬롯이고 40분 재시도 창을 갖는다."""
+    from datetime import datetime
+    d = str(tmp_path)
+
+    assert should_send_brief(datetime(2026, 8, 10, 15, 0), d) is True
+    assert should_send_brief(datetime(2026, 8, 10, 15, 30), d) is True
+    assert should_send_brief(datetime(2026, 8, 10, 14, 59), d) is False
+    assert should_send_brief(datetime(2026, 8, 10, 9, 1), d) is False
+    assert should_send_brief(datetime(2026, 8, 10, 15, 41), d) is False
+
+
+def test_report_slots_do_not_consume_the_brief(tmp_path):
+    """11시·14시 리포트를 둘 다 보냈어도 브리핑은 따로 열려야 한다."""
+    from datetime import datetime
+    from src.report import gate
+    d = str(tmp_path)
+    gate.mark_sent('11:00', datetime(2026, 8, 10, 11, 2), d)
+    gate.mark_sent('14:00', datetime(2026, 8, 10, 14, 1), d)
+
+    assert should_send_brief(datetime(2026, 8, 10, 15, 5), d) is True
 
 
 # --- 픽스 2: send_message 실패를 발송 완료로 기록하지 않는다 -----------------

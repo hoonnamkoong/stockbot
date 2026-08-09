@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src import alerts
-from src.data.minute_bars import anchor_times, codes_for_date, merge_bars
+from src.data.minute_bars import anchor_times, codes_for_date, drop_date, merge_bars
 
 COLUMNS = ['date', 'code', 'hhmm', 'price', 'volume']
 
@@ -64,6 +64,11 @@ def main() -> None:
     from src.trade.kis_data_provider import KISDataProvider
     p = KISDataProvider()
     path = month_path(now)
+    # 재실행분은 덧붙이는 게 아니라 **대체한다.** 이 잡은 `|| echo`로 감싸여 있어
+    # 실패해도 워크플로가 초록색이고, 사람이 다시 돌리는 일이 실제로 있다.
+    dropped = drop_date(path, date_str)
+    if dropped:
+        print(f'[분봉] {date_str} 기존 {dropped}행 제거 — 이번 수집분으로 대체합니다')
     anchors = anchor_times()
     total, failed = 0, 0
     for code in codes:

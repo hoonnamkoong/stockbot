@@ -19,7 +19,6 @@ import os
 from datetime import datetime
 
 SCRAPE_INTERVAL_MIN = 10   # 2026-08-06 합의 — 버즈 필요 심 신선도를 여기서 지킨다.
-MIN_GAP_MIN = SCRAPE_INTERVAL_MIN / 2   # 연속 스크래핑 바닥(is_scrape_due 주석 참고)
 
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
 _STATE_FILENAME = 'scrape_gate_state.json'
@@ -74,24 +73,27 @@ def is_scrape_due(now_kst: datetime, data_dir: str | None = None) -> bool:
         # slot이 없는 상태 파일은 이 방식 도입 전(2026-08-08 이전) 것이다.
         # 시각에서 격자를 되계산해 이어간다 — '모른다'로 읽고 매 틱 스크래핑하면
         # 네이버 부하가 5배가 된다.
-        last_at = datetime.fromisoformat(raw['last_scrape_at'])
+        #
+        # last_scrape_at은 **그 폴백일 때만** 읽는다. 판정에 쓰지도 않는 값을 먼저
+        # 파싱하면, 그 값만 없는 파일에서 KeyError → except → '스크래핑' 으로 떨어져
+        # 매 2분 네이버를 두드리게 된다.
         last_slot = raw.get('last_scrape_slot')
         if last_slot is None:
-            last_slot = _slot(last_at)
+            last_slot = _slot(datetime.fromisoformat(raw['last_scrape_at']))
     except Exception:
         return True
 
     # 부등호가 아니라 '다른 격자인가'로 묻지 않는다. 시계가 뒤로 간 경우(미래
     # 타임스탬프)에 무리하게 스크래핑을 강제하지 않으려면 전진만 허용해야 한다.
-    if _slot(now_kst) <= int(last_slot):
-        return False
-
-    # 격자만으로는 경계 직전에 시작한 런을 못 막는다. 셋업이 평소보다 오래 걸려
-    # 파이썬이 09:09:58에 시작하면, 6초 뒤 :10 트리거가 다음 격자라 곧바로 또
-    # 스크래핑한다 — 네이버를 연달아 두드리는 건 이 게이트가 막으려던 바로 그
-    # 동작이다. 격자 폭의 절반을 바닥으로 깐다. 이 값은 트리거 격자(2분) 근처가
-    # 아니므로 셋업 지터가 판정을 뒤집지 못한다(그게 예전 방식의 실패 원인이었다).
-    return (now_kst - last_at).total_seconds() / 60 >= MIN_GAP_MIN
+    #
+    # **격자가 판정의 전부다.** 예전에는 여기에 "직전 스크래핑으로부터 5분"이라는
+    # 바닥값이 하나 더 있었는데, mark_scraped가 완료 시점에 불린다는 것과 맞물려
+    # 오히려 위상을 밀어냈다: 스크래핑이 4~5분 걸리므로 :00 격자 런은 :04~:06에
+    # 끝나고, 그러면 :10 격자와의 간격이 4~6분이라 바닥값 5분이 매 사이클 동전
+    # 던지기가 된다. 걸리는 순간 :12로 밀리고, 한 번 밀리면 돌아오지 못한다
+    # (2026-08-07 회귀와 같은 형태). 연속 스크래핑은 dispatch 쪽의
+    # scraper_is_running()이 막는다 — 실행 중이면 애초에 부르지 않는다.
+    return _slot(now_kst) > int(last_slot)
 
 
 def is_regime_due(now_kst: datetime, data_dir: str | None = None) -> bool:
@@ -128,7 +130,8 @@ def mark_scraped(now_kst: datetime, data_dir: str | None = None) -> None:
     path = _state_path(data_dir)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
-        # last_scrape_at은 판정에 쓰지 않는다 — 사람이 로그·db-data에서 "마지막
-        # 스크래핑이 언제였나"를 읽을 수 있게 남긴다.
+        # last_scrape_at은 격자 판정에 직접 쓰이지 않는다. 남기는 이유는 둘이다:
+        # slot이 없는 옛 상태 파일에서 격자를 되계산하는 폴백(is_scrape_due), 그리고
+        # 사람이 db-data에서 "마지막 스크래핑이 언제였나"를 읽을 수 있게.
         json.dump({'last_scrape_slot': _slot(now_kst),
                    'last_scrape_at': now_kst.isoformat()}, f, ensure_ascii=False)

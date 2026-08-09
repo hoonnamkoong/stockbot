@@ -52,6 +52,20 @@ def read_regime_state(data_dir=None) -> dict | None:
         return None
 
 
+def regime_hint() -> str | None:
+    """trade_loop이 dispatch inputs로 실어 보낸 국면. 없거나 알 수 없는 값이면 None.
+
+    파일로만 주고받으면 스크래퍼는 **정상 경로에서 항상** 한 격자 낡은 값을 읽는다
+    — 스크래퍼가 db-data를 체크아웃하는 시점(dispatch +30초)이 trade_loop의 배포
+    시점(+75초)보다 빠르기 때문이다. 레이스가 아니라 정해진 순서다.
+
+    검증을 여기서 하는 이유는 read_regime과 같다: 알 수 없는 값이 인계값이라는
+    이유로 무사통과하면 파일값을 밀어내고 국면이 통째로 사라진다.
+    """
+    v = (os.environ.get('REGIME_HINT') or '').strip()
+    return v if v in VALID_REGIMES else None
+
+
 def read_regime(data_dir=None) -> tuple:
     """(regime, bull_score). 판단할 수 없으면 각각 None이다.
 
@@ -59,10 +73,17 @@ def read_regime(data_dir=None) -> tuple:
     호출자의 == 비교가 전부 빗나가 '아무것도 아닌 국면'이 조용히 생긴다.
     bull_score는 숫자로 읽히지 않으면 None이다(0.0이 아니다 — 0점은 '최악의 장'
     이라는 뜻이고, 모르는 것과 다르다).
+
+    **인계값(REGIME_HINT)이 파일보다 우선한다.** 이 적용을 호출자에 두면 갈린다 —
+    실제로 orchestrator의 소유권 판정만 인계값을 쓰고 Sim10·Sim6은 파일을 읽던
+    시절, 국면 전환 격자에서 "스크래퍼가 매매한다"고 정해놓고 정작 Sim10은 이전
+    국면의 하위 전략·유니버스로 실주문을 냈다. 국면 파일의 유일한 창구가 여기이므로
+    여기가 인계값의 유일한 관문이기도 하다.
+
+    bull_score는 인계 대상이 아니다(dispatch inputs에 없다). 파일값을 그대로 쓴다 —
+    한 격자 낡을 수 있지만 지어내지 않는다.
     """
-    d = read_regime_state(data_dir)
-    if d is None:
-        return None, None
+    d = read_regime_state(data_dir) or {}
     regime = d.get('current_regime')
     if regime not in VALID_REGIMES:
         regime = None
@@ -70,4 +91,4 @@ def read_regime(data_dir=None) -> tuple:
         bull_score = float(d['bull_score'])
     except (KeyError, TypeError, ValueError):
         bull_score = None
-    return regime, bull_score
+    return (regime_hint() or regime), bull_score

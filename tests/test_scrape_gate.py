@@ -1,9 +1,12 @@
-"""scraper.yml 자체 게이팅 — 태스커가 tasker_trigger 하나만 2분마다 보낸다는 게
-2026-08-07에 드러나서(별도 매매 워크플로 전용 이벤트는 실전에서 안 쓰임),
-scraper.yml도 같은 이벤트로 매 2분 불린다. 스크래핑(Stage 1~4)까지 매번 돌면
-신선도 10분 유지·네이버 부하 억제라는 애초 목표가 깨진다. 여기서 "지금이
-스크래핑할 차례인가"만 판정한다 — 판정 자체는 순수 함수로 분리해 GH Actions
-없이 테스트한다.
+"""스크래핑·국면 갱신 주기 게이트 — 태스커가 2분마다 trading.yml을 부르는데
+스크래핑(Stage 1~4)까지 매 2분 돌면 신선도 10분 유지·네이버 부하 억제라는
+애초 목표가 깨진다. 여기서 "지금이 스크래핑할 차례인가"만 판정하고,
+trade_loop이 그 답을 보고 scraper.yml을 dispatch한다.
+
+writer는 scraper.yml(완료 시점), reader는 trade_loop 하나다. 국면 게이트는
+격자만 같을 뿐 writer가 trading.yml이라 파일이 따로다.
+
+판정 자체는 순수 함수로 분리해 GH Actions 없이 시간만 바꿔가며 테스트한다.
 """
 import os
 import sys
@@ -84,19 +87,44 @@ def test_schedule_stays_on_the_ten_minute_grid_despite_jitter(tmp_path):
     assert scraped_minutes == [0, 10, 20, 30, 40, 50] * len(jitter)
 
 
-def test_run_starting_just_before_a_slot_boundary_does_not_scrape_twice(tmp_path):
-    """격자만으로 판정하면 경계 직전에 시작한 런이 연속 스크래핑을 만든다.
+def test_a_scrape_that_finished_recently_still_lets_the_next_grid_through(tmp_path):
+    """2026-08-09. 예전에는 '직전 스크래핑으로부터 5분'이라는 바닥값이 있었다.
 
-    셋업이 평소(약 52초)보다 오래 걸려 :08 트리거의 파이썬이 09:09:58에
-    시작하면, 6초 뒤 :10 트리거는 다음 격자라 곧바로 또 스크래핑 대상이 된다.
-    네이버를 연달아 두드리는 건 이 게이트가 애초에 막으려던 바로 그 동작이다.
+    **mark_scraped는 완료 시점에 불린다.** 스크래핑은 4~5분 걸리므로 :00 격자에
+    시작한 런은 :04~:06에 끝나고, 그러면 :10 격자와의 간격이 4~6분이다 — 바닥값
+    5분이 매 사이클 동전 던지기가 되어 절반쯤 :12로 밀린다. 한 번 밀리면 격자로
+    영영 못 돌아온다(08-07 회귀와 같은 형태).
+
+    연속 스크래핑을 막는 건 이 바닥값이 아니라 dispatch 쪽의 scraper_is_running()
+    이다(scripts/trade_loop.py). 실행 중이면 애초에 dispatch하지 않는다.
     """
-    scrape_gate.mark_scraped(NOW.replace(hour=9, minute=9, second=58), data_dir=str(tmp_path))
-    next_tick = NOW.replace(hour=9, minute=10, second=4)
-    assert scrape_gate.is_scrape_due(next_tick, data_dir=str(tmp_path)) is False
-    # 다음 격자에서는 정상적으로 재개한다(한 사이클만 건너뛴다).
-    assert scrape_gate.is_scrape_due(NOW.replace(hour=9, minute=20, second=6),
+    scrape_gate.mark_scraped(NOW.replace(hour=9, minute=5, second=30), data_dir=str(tmp_path))
+
+    assert scrape_gate.is_scrape_due(NOW.replace(hour=9, minute=10, second=4),
                                      data_dir=str(tmp_path)) is True
+
+
+def test_the_grid_is_the_only_thing_that_decides(tmp_path):
+    """같은 격자 안에서는 완료 직후든 8분 뒤든 닫혀 있다."""
+    scrape_gate.mark_scraped(NOW.replace(hour=9, minute=0, second=30), data_dir=str(tmp_path))
+
+    for minute, second in ((0, 40), (2, 10), (8, 59)):
+        assert scrape_gate.is_scrape_due(
+            NOW.replace(hour=9, minute=minute, second=second),
+            data_dir=str(tmp_path)) is False
+
+
+def test_a_state_file_with_a_slot_but_no_timestamp_still_gates(tmp_path):
+    """`last_scrape_at`은 이제 폴백 전용이다 — 없다고 게이트가 열리면 안 된다.
+
+    파싱을 무조건 먼저 하면 KeyError가 나고, 그 except가 '모른다 → 스크래핑'으로
+    떨어져 매 2분 네이버를 두드린다. 판정에 안 쓰는 값 때문에 판정이 뒤집히는 꼴이다.
+    """
+    (tmp_path / 'scrape_gate_state.json').write_text(
+        json.dumps({'last_scrape_slot': scrape_gate._slot(NOW)}), encoding='utf-8')
+
+    assert scrape_gate.is_scrape_due(NOW + timedelta(minutes=2), data_dir=str(tmp_path)) is False
+    assert scrape_gate.is_scrape_due(NOW + timedelta(minutes=10), data_dir=str(tmp_path)) is True
 
 
 def test_reads_legacy_state_without_slot(tmp_path):

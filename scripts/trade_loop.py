@@ -116,7 +116,7 @@ def scraper_is_running(log=print) -> bool:
         return False
 
 
-def dispatch_scraper(ctx, log=print, regime: str | None = None) -> None:
+def dispatch_scraper(log=print, regime: str | None = None) -> None:
     """scraper.yml을 깨운다. 응답을 기다리지 않는다 — 매매가 스크래핑에 묶이면
     이 구조를 만든 이유가 사라진다.
 
@@ -156,8 +156,13 @@ def dispatch_scraper(ctx, log=print, regime: str | None = None) -> None:
         log(f'[Scraper] dispatch 실패 HTTP {res.status_code}')
 
 
-def refresh_regime(ctx, storage, log=print) -> None:
-    """Sim0(리베로) 국면을 갱신한다. **이 프로세스가 유일 writer다.**
+def refresh_regime(ctx, storage, log=print) -> str | None:
+    """Sim0(리베로) 국면을 갱신하고 확정 국면을 돌려준다(판단 불가면 None).
+
+    반환값은 dispatch_scraper가 스크래퍼에 실어 보낸다 — 파일로만 주고받으면
+    스크래퍼가 정상 경로에서 항상 한 격자 낡은 값을 읽는다.
+
+    **이 프로세스가 유일 writer다.**
 
     scraper.yml은 읽기만 한다. 두 곳에서 갱신하면 같은 순간이 regime_history에
     두 번 누적되어 평활이 왜곡된다(sim0_libero._confirm_regime).
@@ -172,7 +177,21 @@ def refresh_regime(ctx, storage, log=print) -> None:
     return regime
 
 
-def collect_rank_snapshot(ctx, log=print) -> bool:
+# 순위 블록. 이름이 CSV의 source 컬럼이 되고, 상태 파일의 키가 되고, 조인 키의
+# 한 자리가 된다 — 한 번 정하면 바꿀 때 옛 행과 뜻이 갈린다.
+#
+# frgn_inst의 market 기본값이 '0001'(코스피)이라 kospi_updown과 상시 겹친다.
+# 겹침 자체는 정상이다. 문제는 예전처럼 세 블록을 이어붙여 1..N을 매길 때다 —
+# 중복이 순위 자리를 소비하지 않아, 사이클마다 달라지는 교집합 크기만큼 뒤
+# 블록이 통째로 밀렸다.
+RANK_BLOCKS = (
+    ('kospi_updown', '등락률(코스피)', lambda p: p.get_fluctuation_rank(market='0001', limit=200)),
+    ('kosdaq_updown', '등락률(코스닥)', lambda p: p.get_fluctuation_rank(market='1001', limit=200)),
+    ('frgn_inst', '외인기관 순매수', lambda p: p.get_foreign_institution_rank(limit=200)),
+)
+
+
+def collect_rank_snapshot(log=print):
     """KIS 순위를 찍고 직전 스냅샷과의 차분을 기록한다. 런당 한 번.
 
     **추가 API 호출이 0인 신호다.** 순위 API는 몇 종목을 가져오든 호출 1번이고
@@ -185,51 +204,49 @@ def collect_rank_snapshot(ctx, log=print) -> bool:
     조용히 오염시킨다. 태스커 트리거가 120초이므로 런당 1회가 곧 cycle_id
     격자(120초)와 일치하고, 그래야 sim_diag·1분봉과 조인된다.
 
-    반환: 기록했으면 True. 실패는 예외로 올리지 않는다 — 페이퍼 신호 수집이
-    실전 매매를 막으면 안 된다.
+    **런 시작 컨텍스트를 받지 않고 여기서 시계를 다시 읽는다.** 이 함수는 매매
+    루프가 끝난 뒤에 불리므로 런 시작보다 최대 85초 뒤다 — 시작 시각으로 적으면
+    120초 격자에서 상시 한 칸 어긋나고, 그러면 조인된다는 전제 자체가 거짓이 된다.
+
+    반환: 기록했으면 그때의 시각(datetime), 아니면 None. 실패는 예외로 올리지
+    않는다 — 페이퍼 신호 수집이 실전 매매를 막으면 안 된다.
     """
     from src.data import rank_snapshot as rs
     from src.trade.kis_data_provider import KISDataProvider
 
     p = KISDataProvider()
-    rows: list[dict] = []
+    blocks: list[tuple] = []
     missing: list[str] = []
-    # 코스피·코스닥 등락률 + 외인/기관 순매수. 3콜로 200~300종목.
-    for label, fetch in (
-        ('등락률(코스피)', lambda: p.get_fluctuation_rank(market='0001', limit=200)),
-        ('등락률(코스닥)', lambda: p.get_fluctuation_rank(market='1001', limit=200)),
-        ('외인기관 순매수', lambda: p.get_foreign_institution_rank(limit=200)),
-    ):
+    for source, label, fetch in RANK_BLOCKS:
         try:
-            got = fetch() or []
+            got = fetch(p) or []
         except Exception as e:
             log(f'[순위] {label} 조회 실패: {e}')
             got = []
         if not got:
             missing.append(label)
-        rows += got
+        blocks.append((source, got))
     if missing:
-        # **부분 스냅샷을 적느니 이 사이클을 건너뛴다.** rank_map은 세 블록을 이어
-        # 붙인 연결 위치로 1부터 번호를 매기므로, 블록 하나가 비면 그 뒤 블록이
-        # 통째로 앞당겨진다 — 가만히 있던 종목 수백 개에 블록 크기(~200)만 한
-        # 가짜 delta가 찍히고, 그게 CSV와 rank_state.json에 그대로 박힌다.
+        # **부분 스냅샷을 적느니 이 사이클을 건너뛴다.** 빈 블록을 그대로 저장하면
+        # 다음 사이클에 그 블록 전 종목이 '신규 진입'으로 잡히고, 그 다음 사이클에는
+        # 전 종목이 '이탈'로 사라진다 — 없는 사건을 두 번 만든다.
         # 그리고 이 결손은 except로 안 잡힌다: KISDataProvider._get은 실패해도
         # 예외 없이 {}를 준다(토큰 만료·유량 초과·rt_cd≠0). 장중에 빈 블록은
         # 정상이 아니다 — 세 순위 모두 항상 200종목을 채운다.
         # 직전 상태(rank_state.json)도 그대로 둔다. 다음 성공 사이클이 마지막
         # 정상 스냅샷과 비교하면 창이 넓어질 뿐, 방향을 지어내지는 않는다.
         log(f'[순위] {", ".join(missing)} 결손 — 이번 사이클 기록 생략'
-            f'(부분 스냅샷은 그 뒤 전 종목에 가짜 delta를 만든다)')
-        return False
+            f'(부분 스냅샷은 없는 진입·이탈을 만든다)')
+        return None
 
-    curr = rs.rank_map(rows)
-    diff = rs.diff_ranks(rs.load_state('data'), curr)
-    n = rs.append_records(rs.build_records(ctx.cycle_id, ctx.now_kst, rows, diff),
-                          rs.month_path(ctx.now_kst, 'data'))
-    rs.save_state(curr, ctx.now_kst, 'data')
-    new = sum(1 for v in diff.values() if v['is_new'])
-    log(f'[순위] {n}행 기록 (종목 {len(curr)} / 신규 진입 {new})')
-    return True
+    snap_ctx = PipelineContext.from_env()
+    now = snap_ctx.now_kst
+    state, records = rs.snapshot(blocks, rs.load_state('data'), snap_ctx.cycle_id, now)
+    n = rs.append_records(records, rs.month_path(now, 'data'))
+    rs.save_state(state, now, 'data')
+    log(f'[순위] {n}행 기록 ('
+        + ' / '.join(f'{src} {len(m)}종목' for src, m in state.items()) + ')')
+    return now
 
 
 def money_output_files(now) -> list[str]:
@@ -325,7 +342,8 @@ def run_trade_loop(ctx: PipelineContext) -> None:
         # 매니페스트 기록보다 앞에서 return하고 스크래퍼도 (dispatch가 아래에
         # 있으므로) 안 뜬다 — 여기서 안 올리면 아무도 안 올려서 억제가 무력화되고
         # 09:00~15:30 2분 간격 195건이 나간다. 억제 없는 알림은 알림이 없는 것과 같다.
-        _write_deploy_manifest(None, ctx.log, include_alerts=True)
+        _write_deploy_manifest(None, ctx.log,
+                               include_alerts=alerts.state_was_written())
         return
     if not trading:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 종료합니다.")
@@ -357,7 +375,7 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     if scrape_gate.is_scrape_due(ctx.now_kst):
         with ctx.stage("스크래퍼 깨우기"):
             try:
-                dispatch_scraper(ctx, ctx.log, regime=fresh_regime)
+                dispatch_scraper(ctx.log, regime=fresh_regime)
             except Exception as e:
                 ctx.log(f"[경고] 스크래퍼 dispatch 실패(다음 격자에 재시도): {e}")
 
@@ -394,10 +412,10 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     # ── 순위 스냅샷 (런당 1회, 매매 뒤) ────────────────────────────
     # 매매가 KIS 유량을 먼저 쓴다. 순위 수집이 앞서면 주문이 유량에 밀린다.
     # 실패해도 매매에는 영향이 없다 — 페이퍼 신호 수집이 실전을 막으면 안 된다.
-    money_written = False
+    money_at = None
     with ctx.stage("순위 스냅샷"):
         try:
-            money_written = collect_rank_snapshot(ctx, ctx.log)
+            money_at = collect_rank_snapshot(ctx.log)
         except Exception as e:
             ctx.log(f"[경고] 순위 스냅샷 실패(다음 사이클에 재시도): {e}")
 
@@ -407,9 +425,17 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     # 국면 파일은 매매 여부와 무관하게 올려야 한다 — 이 워크플로가 국면의 유일
     # writer이므로, 매매를 안 한 사이클이라고 빼먹으면 갱신한 국면이 db-data에
     # 도달하지 못하고 모두가 얼어붙은 값을 읽게 된다.
-    if traded_sim_id or regime_refreshed or money_written:
+    #
+    # 알림 쿨다운도 이 런이 기록했으면 함께 올린다. 예전에는 휴장 판정 실패 분기
+    # 에서만 올렸는데, program_prep_over_budget(쿨다운 60분)은 정상 경로에서 나므로
+    # 그쪽 억제가 통째로 무력화돼 2분마다 발송됐다.
+    alerts_written = alerts.state_was_written()
+    if traded_sim_id or regime_refreshed or money_at or alerts_written:
+        # 배포 목록의 월별 파일명은 **기록한 시각**에서 나와야 한다. 런 시작 시각을
+        # 쓰면 월 경계를 넘어간 런에서 방금 쓴 파일이 아니라 지난달 파일을 올린다.
         _write_deploy_manifest(traded_sim_id, ctx.log, include_regime=regime_refreshed,
-                               include_money=ctx.now_kst if money_written else None)
+                               include_money=money_at,
+                               include_alerts=alerts_written)
 
     ctx.log("=" * 50)
     ctx.log(f"TradeLoop 완료 ({turn}바퀴)")

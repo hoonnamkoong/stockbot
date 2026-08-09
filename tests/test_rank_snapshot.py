@@ -30,8 +30,8 @@ def test_rank_is_one_based_in_list_order():
 
 
 def test_duplicate_codes_keep_the_best_rank():
-    """여러 순위 API를 합치면 같은 종목이 두 번 올 수 있다."""
-    assert rank_map(_rows('A', 'B', 'A'))['A'] == 1
+    """한 블록 안의 중복은 응답 이상이다. 뒤 종목의 순위를 밀지 않는다."""
+    assert rank_map(_rows('A', 'B', 'A')) == {'A': 1, 'B': 2}
 
 
 def test_rows_without_code_are_skipped():
@@ -91,14 +91,6 @@ from src.data.rank_snapshot import (
 from datetime import datetime
 
 
-def test_state_round_trips(tmp_path):
-    """컨테이너가 매 런 새로 뜬다. 직전 스냅샷이 db-data를 왕복하지 못하면
-    매 사이클이 warmup이 되어 delta가 영원히 None이다."""
-    save_state({'A': 1, 'B': 2}, datetime(2026, 8, 10, 10, 0), str(tmp_path))
-
-    assert load_state(str(tmp_path)) == {'A': 1, 'B': 2}
-
-
 def test_missing_state_is_none_not_empty(tmp_path):
     """빈 dict를 돌려주면 '직전에 아무 종목도 없었다'가 되어 전 종목이 신규로
     잡히는데 warmup 표시가 안 붙는다. 모르는 것은 None이다."""
@@ -115,10 +107,11 @@ def test_records_carry_the_join_key_and_the_diff():
     rows = [{'code': 'A', 'name': '가', 'price': 1000, 'change_rate': '+3.00%',
              'amount': 5_000_000_000, 'acml_vol': 1234}]
     recs = build_records(cycle_id=999, now=datetime(2026, 8, 10, 10, 0),
-                         rows=rows, diff=diff_ranks({'A': 4}, {'A': 1}))
+                         source='kospi', rows=rows,
+                         diff=diff_ranks({'A': 4}, {'A': 1}))
 
     r = recs[0]
-    assert r['cycle_id'] == 999 and r['code'] == 'A'
+    assert r['cycle_id'] == 999 and r['code'] == 'A' and r['source'] == 'kospi'
     assert r['rank'] == 1 and r['prev_rank'] == 4 and r['delta'] == 3
     assert r['price'] == 1000 and r['amount'] == 5_000_000_000
 
@@ -126,7 +119,8 @@ def test_records_carry_the_join_key_and_the_diff():
 def test_new_entry_delta_is_blank_in_csv(tmp_path):
     """None을 0으로 적으면 '변화 없음'과 뭉개진다. CSV에서는 빈칸이어야 한다."""
     rows = [{'code': 'A', 'name': '가'}]
-    recs = build_records(1, datetime(2026, 8, 10, 10, 0), rows, diff_ranks({}, {'A': 1}))
+    recs = build_records(1, datetime(2026, 8, 10, 10, 0), 'kospi', rows,
+                         diff_ranks({}, {'A': 1}))
     p = str(tmp_path / 'm.csv')
     append_records(recs, p)
 
@@ -139,8 +133,8 @@ def test_appends_do_not_rewrite_the_header(tmp_path):
     p = str(tmp_path / 'm.csv')
     rows = [{'code': 'A', 'name': '가'}]
     d = diff_ranks({'A': 1}, {'A': 1})
-    append_records(build_records(1, datetime(2026, 8, 10, 10, 0), rows, d), p)
-    append_records(build_records(2, datetime(2026, 8, 10, 10, 2), rows, d), p)
+    append_records(build_records(1, datetime(2026, 8, 10, 10, 0), 'kospi', rows, d), p)
+    append_records(build_records(2, datetime(2026, 8, 10, 10, 2), 'kospi', rows, d), p)
 
     lines = open(p, encoding='utf-8').read().strip().split('\n')
     assert lines[0].startswith(COLUMNS[0]) and len(lines) == 3
@@ -148,3 +142,125 @@ def test_appends_do_not_rewrite_the_header(tmp_path):
 
 def test_monthly_file_name():
     assert month_path(datetime(2026, 8, 10), 'data').endswith('money_2026-08.csv')
+
+
+# ── 블록별 순위 공간 (2026-08-09) ────────────────────────────────────
+# 세 순위(코스피 등락률·코스닥 등락률·외인기관 순매수)를 이어붙여 1..N을 매기던
+# 시절의 병:
+#   ① 중복 코드가 순위 자리를 소비하지 않아, 사이클마다 달라지는 교집합 크기만큼
+#      뒤 블록이 통째로 밀렸다 — 가만히 있던 수백 종목에 가짜 delta가 찍혔다.
+#      외인기관 순위의 market 기본값이 '0001'(코스피)이라 1번 블록과 정면으로 겹친다.
+#   ② delta가 "등락률 순위가 올랐다"인지 "블록이 바뀌었다"인지 구분되지 않았다.
+#   ③ 두 블록에 걸친 종목이 같은 cycle_id로 두 행이 되어 조인이 1:N이었다.
+# 순위 공간을 블록별로 나누면 셋이 한꺼번에 사라진다.
+
+from src.data.rank_snapshot import snapshot  # noqa: E402
+
+
+def _blocks(**by_source):
+    return [(src, _rows(*codes)) for src, codes in by_source.items()]
+
+
+def test_each_block_counts_from_one():
+    """코스닥 1위는 1위다. 코스피 200종목 뒤에 붙여 201위로 적으면 그 숫자는
+    아무 뜻도 없고, 앞 블록 크기가 흔들릴 때마다 같이 흔들린다."""
+    _, recs = snapshot(_blocks(kospi=('A', 'B'), kosdaq=('C',)),
+                       prev=None, cycle_id=1, now=datetime(2026, 8, 10, 10, 0))
+
+    by = {(r['source'], r['code']): r['rank'] for r in recs}
+    assert by[('kospi', 'A')] == 1 and by[('kospi', 'B')] == 2
+    assert by[('kosdaq', 'C')] == 1
+
+
+def test_a_shrinking_block_does_not_shift_another_blocks_ranks():
+    """이게 A1의 본체다. 한 블록의 종목 수가 사이클마다 달라져도(중복·파싱 실패)
+    다른 블록의 순위는 움직이면 안 된다 — 움직이면 그 delta는 전부 가짜다."""
+    now = datetime(2026, 8, 10, 10, 0)
+    state1, _ = snapshot(_blocks(kospi=('A', 'B', 'C'), frgn=('X', 'Y')),
+                         prev=None, cycle_id=1, now=now)
+    _, recs2 = snapshot(_blocks(kospi=('A',), frgn=('X', 'Y')),
+                        prev=state1, cycle_id=2, now=now)
+
+    frgn = {r['code']: r for r in recs2 if r['source'] == 'frgn'}
+    assert frgn['X']['rank'] == 1 and frgn['Y']['rank'] == 2
+    assert frgn['X']['delta'] == 0 and frgn['Y']['delta'] == 0
+
+
+def test_a_code_in_two_blocks_is_one_row_per_block():
+    """겹침은 정상이다(외인기관 기본 시장이 코스피다). 두 행이되 source로
+    갈려야 (cycle_id, source, code) 조인이 1:1이 된다."""
+    _, recs = snapshot(_blocks(kospi=('A',), frgn=('A',)),
+                       prev=None, cycle_id=1, now=datetime(2026, 8, 10, 10, 0))
+
+    keys = [(r['cycle_id'], r['source'], r['code']) for r in recs]
+    assert len(keys) == len(set(keys)) == 2
+
+
+def test_a_duplicate_inside_one_block_is_a_single_row():
+    """같은 블록 안의 중복은 응답 이상이다 — 행을 두 번 적으면 조인이 1:N이 된다."""
+    _, recs = snapshot([('kospi', _rows('A', 'B', 'A'))],
+                       prev=None, cycle_id=1, now=datetime(2026, 8, 10, 10, 0))
+
+    assert [r['code'] for r in recs] == ['A', 'B']
+
+
+def test_a_brand_new_block_is_warmup_not_a_surge():
+    """블록을 추가한 첫 사이클에 그 블록 전체가 '신규 진입'으로 트리거되면 안 된다."""
+    now = datetime(2026, 8, 10, 10, 0)
+    state1, _ = snapshot(_blocks(kospi=('A',)), prev=None, cycle_id=1, now=now)
+    _, recs2 = snapshot(_blocks(kospi=('A',), kosdaq=('C',)),
+                        prev=state1, cycle_id=2, now=now)
+
+    kosdaq = next(r for r in recs2 if r['source'] == 'kosdaq')
+    assert kosdaq['warmup'] == 1 and kosdaq['is_new'] == 1
+    assert next(r for r in recs2 if r['source'] == 'kospi')['warmup'] == 0
+
+
+# ── 상태 파일도 블록별이다 ──────────────────────────────────────────
+
+def test_state_round_trips_per_source(tmp_path):
+    save_state({'kospi': {'A': 1}, 'frgn': {'A': 3}},
+               datetime(2026, 8, 10, 10, 0), str(tmp_path))
+
+    assert load_state(str(tmp_path)) == {'kospi': {'A': 1}, 'frgn': {'A': 3}}
+
+
+def test_an_empty_previous_block_is_warmup_not_a_mass_entry():
+    """직전 상태에 그 source 키는 있는데 안이 빈 경우.
+
+    KIS가 응답 shape를 바꿔 전 행에서 code를 못 뽑으면 rank_map이 {}가 되고,
+    그게 그대로 저장된다(fetch는 성공했으니 결손 검사에 안 걸린다). 다음 사이클에
+    `{}`를 '직전에 아무것도 없었다'로 읽으면 200종목이 warmup 표시 없이 전부
+    '신규 진입'으로 잡혀 급등 신호가 된다 — load_state가 빈 상태를 None으로
+    돌려주는 것과 같은 이유로, 빈 블록도 '모른다'여야 한다.
+    """
+    _, recs = snapshot(_blocks(kospi=('A', 'B')), prev={'kospi': {}},
+                       cycle_id=1, now=datetime(2026, 8, 10, 10, 0))
+
+    assert all(r['warmup'] == 1 for r in recs), '빈 직전 블록이 급등으로 읽혔다'
+
+
+def test_flat_legacy_state_is_discarded(tmp_path):
+    """구 포맷({code: rank})을 그대로 읽으면 source 이름 자리에 종목코드가 앉는다.
+    한 사이클 warmup을 감수하고 버리는 편이, 뜻이 다른 숫자를 비교하는 것보다 낫다."""
+    import json
+    (tmp_path / 'rank_state.json').write_text(
+        json.dumps({'at': 'x', 'ranks': {'A': 1, 'B': 2}}), encoding='utf-8')
+
+    assert load_state(str(tmp_path)) is None
+
+
+def test_append_moves_a_file_whose_header_no_longer_matches(tmp_path):
+    """스키마가 바뀌면 옛 행은 뜻이 다르다. 헤더 하나에 폭이 다른 행을 이어 붙이면
+    그 파일은 조용히 어긋난 채 자란다."""
+    p = str(tmp_path / 'm.csv')
+    with open(p, 'w', encoding='utf-8') as f:
+        f.write('cycle_id,ts,code\n1,2026-08-10T10:00:00,A\n')
+    _, recs = snapshot(_blocks(kospi=('A',)), prev=None, cycle_id=2,
+                       now=datetime(2026, 8, 10, 10, 2))
+    append_records(recs, p)
+
+    import csv
+    got = list(csv.DictReader(open(p, encoding='utf-8')))
+    assert [r['code'] for r in got] == ['A'] and got[0]['source'] == 'kospi'
+    assert os.path.exists(p + '.legacy'), '옛 행을 지우지 않고 옆으로 치운다'

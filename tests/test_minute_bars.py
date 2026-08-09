@@ -44,6 +44,12 @@ def test_anchor_count_is_enough_but_not_wasteful():
     assert 13 <= len(anchor_times()) <= 15
 
 
+def test_anchors_have_no_duplicates():
+    """같은 앵커를 두 번 부르면 종목마다 KIS 호출 하나가 통째로 낭비된다."""
+    a = anchor_times()
+    assert len(a) == len(set(a))
+
+
 # ── 파싱 ────────────────────────────────────────────────────────────
 
 def _row(hhmmss, price, vol='100'):
@@ -141,7 +147,7 @@ def test_missing_file_is_empty_not_an_error(tmp_path):
 def _run_main(monkeypatch, tmp_path, bars_for_call):
     import scripts.save_minute_bars as smb
     monkeypatch.chdir(tmp_path)
-    (tmp_path / 'data').mkdir()
+    (tmp_path / 'data').mkdir(exist_ok=True)   # 재실행 테스트가 두 번 부른다
     from datetime import datetime, timezone, timedelta
     now = (datetime.now(timezone.utc) + timedelta(hours=9))
     (tmp_path / 'data' / f"money_{now.strftime('%Y-%m')}.csv").write_text(
@@ -173,3 +179,41 @@ def test_a_normal_day_does_not_alert(monkeypatch, tmp_path):
                       lambda *a, **k: [{'hhmm': '0900', 'price': 100, 'volume': 10}])
 
     alert.assert_not_called()
+
+
+# ── 재실행 (2026-08-09) ─────────────────────────────────────────────
+# EOD 잡은 db-data에서 그달 파일을 받아온 뒤 덧붙인다. 실패해서 다시 돌리면
+# 이미 들어 있는 당일 행 위에 같은 분이 또 쌓여, 그 분의 거래량이 두 배로 보이고
+# as-of 조인이 1:N이 된다.
+
+from src.data.minute_bars import drop_date  # noqa: E402
+
+
+def test_drop_date_removes_only_that_day(tmp_path):
+    p = tmp_path / 'minute_2026-08.csv'
+    p.write_text('date,code,hhmm,price,volume\n'
+                 '20260810,005930,0900,100,10\n'
+                 '20260811,005930,0900,200,20\n'
+                 '20260810,000660,0901,300,30\n', encoding='utf-8')
+
+    assert drop_date(str(p), '20260810') == 2
+    lines = p.read_text(encoding='utf-8').strip().split('\n')
+    assert len(lines) == 2 and lines[1].startswith('20260811')
+
+
+def test_drop_date_on_a_missing_file_is_zero(tmp_path):
+    """최초 배포일에는 그달 파일이 없다 — 여기서 죽으면 그날 분봉을 통째로 잃는다."""
+    assert drop_date(str(tmp_path / 'nope.csv'), '20260810') == 0
+
+
+def test_rerunning_the_day_replaces_instead_of_duplicating(monkeypatch, tmp_path):
+    import csv as _csv
+    bars = lambda *a, **k: [{'hhmm': '0900', 'price': 100, 'volume': 10}]
+    _run_main(monkeypatch, tmp_path, bars)
+    _run_main(monkeypatch, tmp_path, bars)
+
+    p = next((tmp_path / 'data').glob('minute_*.csv'))
+    with open(p, encoding='utf-8') as f:
+        rows = list(_csv.DictReader(f))
+    keys = [(r['date'], r['code'], r['hhmm']) for r in rows]
+    assert len(keys) == len(set(keys)), f'재실행분이 중복으로 쌓였다: {keys}'

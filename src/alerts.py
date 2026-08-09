@@ -116,10 +116,35 @@ def _load_state(path: str) -> dict:
         return {}
 
 
+# 이 프로세스가 쿨다운 기록을 갱신했는가. 배포 목록이 이걸 보고 정한다.
+_state_written = False
+
+
+def state_was_written() -> bool:
+    """이 런에서 쿨다운 기록이 바뀌었는가 — 즉 db-data에 올려야 하는가.
+
+    쿨다운은 **다음 런에** 보여야 뜻이 있는데, 매 런이 새 컨테이너다. 안 올리면
+    억제가 통째로 무력화되어 program_prep_over_budget(60분 쿨다운)이 2분마다
+    나간다. 반대로 안 바뀐 파일을 매번 올리면, 그 사이 스크래퍼가 기록한 쿨다운을
+    런 시작 시점 사본으로 되돌린다(lost update) — 두 워크플로는 concurrency
+    그룹이 달라 실제로 동시에 돈다. 그래서 '바꾼 런만' 올린다.
+
+    ⚠️ 이 파일은 **writer가 둘이다**(trading.yml·scraper.yml 양쪽이 알림을 낸다).
+    scraper.yml은 `data/*.json`을 통째로 올리므로, 스크래퍼 배포(격자당 1회)가
+    직전 trading 런의 기록을 런 시작 사본으로 되돌리는 창이 남아 있다. 정확히
+    고치려면 배포가 cp가 아니라 키별 병합이어야 한다. 지금은 억제 간격이
+    "2분마다"에서 "최대 10분마다"로 좁혀진 상태이고, 그보다 촘촘한 억제가
+    필요해지면 그때 병합으로 간다.
+    """
+    return _state_written
+
+
 def _save_state(path: str, state: dict, log=print) -> None:
+    global _state_written
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(state, f, ensure_ascii=False)
+        _state_written = True
     except Exception as e:
         log(f'[Alerts] 쿨다운 기록 실패(다음 사이클에 중복 발송될 수 있음): {e}')

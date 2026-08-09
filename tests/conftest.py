@@ -17,3 +17,6 @@ def _isolate_alert_dedup(tmp_path, monkeypatch):
          실행 순서에 따라 통과했다 실패했다 한다(2026-08-08에 실제로 겪었다).
     """
     monkeypatch.setattr('src.alerts.DEFAULT_DATA_DIR', str(tmp_path / 'alert_state'))
+    # "이 런이 쿨다운을 기록했는가"도 프로세스 상태다. 안 되돌리면 앞 테스트가
+    # 켜둔 플래그 때문에 뒤 테스트가 배포 목록에 알림 파일을 넣는다.
+    monkeypatch.setattr('src.alerts._state_written', False)

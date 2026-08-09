@@ -419,18 +419,15 @@ class BaseSimulator:
         return False
 
     def _load_trade_logs(self):
-        """CSV에서 매매 기록을 파싱합니다 (JSON 이중 기록 제거 후 CSV가 유일한 소스)."""
+        """CSV에서 매매 기록을 파싱합니다. **CSV가 유일한 소스다.**
+
+        예전에는 `sim_<name>_log.json`이 있으면 그쪽을 우선했다(마이그레이션 호환).
+        그런데 그 파일을 쓰는 코드는 이미 없어서(reset에서 지우기만 한다), writer
+        없는 파일이 reader를 가로채는 구조였다 — 어느 배포 목록·제외 목록에도 없어
+        누가 올려도 아무도 모르고, 승률·수익률이 여기서 나오므로 가려진 순간
+        대시보드의 성과 숫자가 통째로 낡은 사본이 된다(2026-08-09 제거).
+        """
         logs = []
-        # [호환성] 기존 JSON 로그가 있으면 우선 사용 (마이그레이션 기간)
-        if os.path.exists(self.log_file):
-            try:
-                with open(self.log_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                if data:
-                    return data
-            except Exception:
-                pass
-        # CSV에서 파싱
         if os.path.exists(self.csv_file):
             try:
                 with open(self.csv_file, 'r', encoding='utf-8-sig') as f:

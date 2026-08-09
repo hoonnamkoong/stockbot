@@ -27,14 +27,17 @@ def anchor_times() -> list[str]:
     """
     close = int(SESSION_CLOSE[:2]) * 60 + int(SESSION_CLOSE[2:])
     open_ = int(SESSION_OPEN[:2]) * 60 + int(SESSION_OPEN[2:])
+    first = open_ + ANCHOR_STEP_MIN
     out = []
     t = close
-    while t >= open_ + ANCHOR_STEP_MIN:
+    while t >= first:
         out.append(f'{t // 60:02d}{t % 60:02d}00')
         t -= ANCHOR_STEP_MIN
-    out.append(f'{open_ // 60 + (ANCHOR_STEP_MIN // 60):02d}'
-               f'{(open_ + ANCHOR_STEP_MIN) % 60:02d}00')
-    return list(dict.fromkeys(out))
+    # 세션 길이가 ANCHOR_STEP_MIN의 배수가 아니면 루프가 개장 구간까지 못 내려온다.
+    # 지금 상수(390분 / 30분)에서는 딱 맞아떨어져 이 분기가 돌지 않는다.
+    if t + ANCHOR_STEP_MIN > first:
+        out.append(f'{first // 60:02d}{first % 60:02d}00')
+    return out
 
 
 def parse_rows(body: dict) -> list[dict]:
@@ -71,6 +74,31 @@ def merge_bars(*batches) -> list[dict]:
         for r in batch or []:
             by_min[r['hhmm']] = r
     return [by_min[k] for k in sorted(by_min)]
+
+
+def drop_date(path: str, yyyymmdd: str) -> int:
+    """월별 분봉 파일에서 그날 행을 걷어낸다. 지운 행 수를 돌려준다.
+
+    EOD 잡은 db-data에서 그달 파일을 받아온 뒤 덧붙인다. 실패해서 다시 돌리면
+    이미 들어 있는 당일 행 위에 같은 분이 또 쌓여, 그 분의 거래량이 두 배로
+    보이고 as-of 조인이 1:N이 된다. 저장 직전에 그날을 한 번 비우고 시작한다.
+
+    파일이 없으면 0이다 — 최초 배포일에 여기서 죽으면 그날 분봉을 통째로 잃는다.
+    """
+    import csv as _csv
+    try:
+        with open(path, 'r', newline='', encoding='utf-8') as f:
+            rows = list(_csv.DictReader(f))
+    except FileNotFoundError:
+        return 0
+    keep = [r for r in rows if (r.get('date') or '') != yyyymmdd]
+    if len(keep) == len(rows):
+        return 0
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        w = _csv.DictWriter(f, fieldnames=list(rows[0].keys()), extrasaction='ignore')
+        w.writeheader()
+        w.writerows(keep)
+    return len(rows) - len(keep)
 
 
 def codes_for_date(csv_path: str, yyyymmdd: str) -> list[str]:

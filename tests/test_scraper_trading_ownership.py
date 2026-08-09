@@ -239,14 +239,23 @@ def test_holiday_stops_before_anything():
 # 이중 주문이나 무주문이 된다. 그래서 dispatch가 값을 실어 보낸다.
 
 def _ownership_regime(monkeypatch, file_regime='SIDEWAYS'):
-    """소유권 판정에 실제로 들어간 국면 값을 돌려준다."""
+    """소유권 판정에 실제로 들어간 국면 값을 돌려준다.
+
+    read_regime을 통째로 가짜로 바꾸지 않는다 — 인계값 적용이 그 함수 **안**에
+    있기 때문이다(2026-08-09). 여기를 mock하면 정작 검사하려는 로직을 건너뛰고
+    "orchestrator가 인계값을 쓴다"는 통과가 아무것도 보장하지 않게 된다.
+    대신 파일 읽기만 가짜로 두어 진짜 read_regime이 돌게 한다.
+    """
     ctx = _Ctx()
     with mock.patch.object(orchestrator, 'TradeEngineWorker') as tw, \
          mock.patch.object(orchestrator, 'StorageManager') as sm, \
          mock.patch.object(orchestrator, 'DataFetcherWorker') as df, \
          mock.patch.object(orchestrator, 'LLMAnalyzerWorker'), \
          mock.patch.object(orchestrator, 'NotifierWorker'), \
-         mock.patch.object(orchestrator, 'read_regime', return_value=(file_regime, 50.0)), \
+         mock.patch('src.strategy.regime_state.read_regime_state',
+                    return_value={'current_regime': file_regime, 'bull_score': 50.0}), \
+         mock.patch.object(orchestrator, 'read_regime_state',
+                           return_value={'current_regime': file_regime}), \
          mock.patch.object(orchestrator, 'selected_sim_and_buzz',
                            return_value=('sim4_bull_daytrading', False)) as needs, \
          mock.patch.object(orchestrator.scrape_gate, 'mark_scraped'):

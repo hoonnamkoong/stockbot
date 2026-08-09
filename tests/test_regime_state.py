@@ -87,6 +87,50 @@ def test_two_analyzers_is_an_error(monkeypatch):
         rs.regime_state_filename()
 
 
+# ── ③ 인계값(REGIME_HINT)이 파일보다 우선한다 ─────────────────────────
+# trade_loop이 dispatch inputs로 실어 보낸 국면이다. 파일로만 읽으면 스크래퍼는
+# **정상 경로에서 항상** 한 격자 낡은 값을 본다(체크아웃 +30초 < 배포 +75초).
+# 소유권 판정만 인계값을 쓰고 심들은 파일을 읽던 시절, 국면 전환 격자에서 Sim10이
+# 이전 국면의 하위 전략·유니버스로 실주문을 냈다.
+
+def test_hint_wins_over_the_file(tmp_path, monkeypatch):
+    monkeypatch.setenv('REGIME_HINT', 'BEAR')
+    d = _write(tmp_path, {'current_regime': 'BULL', 'bull_score': 71.0})
+    # bull_score는 인계 대상이 아니다 — 파일값을 그대로 쓴다(지어내지 않는다).
+    assert read_regime(d) == ('BEAR', 71.0)
+
+
+def test_unknown_hint_is_ignored(tmp_path, monkeypatch):
+    """오타·빈 문자열이 파일값을 밀어내면 국면이 통째로 사라진다."""
+    d = _write(tmp_path, {'current_regime': 'BULL', 'bull_score': 71.0})
+    for bad in ('BANANA', '', '   '):
+        monkeypatch.setenv('REGIME_HINT', bad)
+        assert read_regime(d) == ('BULL', 71.0)
+
+
+def test_hint_works_without_a_file(tmp_path, monkeypatch):
+    """스크래퍼가 db-data를 못 받은 런에서도 인계값만으로 국면을 안다."""
+    monkeypatch.setenv('REGIME_HINT', 'SIDEWAYS')
+    assert read_regime(str(tmp_path)) == ('SIDEWAYS', None)
+
+
+def test_sim10_sees_the_hint(tmp_path, monkeypatch):
+    """이 테스트가 A2의 본체다 — 인계값이 소유권 판정에서 멈추면 안 된다."""
+    from src.strategy.simulators.sim10_orchestrator import Sim10OrchestratorSimulator
+    monkeypatch.setenv('REGIME_HINT', 'BEAR')
+    sim = Sim10OrchestratorSimulator.__new__(Sim10OrchestratorSimulator)
+    sim.data_dir = _write(tmp_path, {'current_regime': 'BULL', 'bull_score': 71.0})
+    assert sim._read_regime() == ('BEAR', 71.0)
+
+
+def test_sim6_sees_the_hint(tmp_path, monkeypatch):
+    from src.strategy.simulators.sim6_bear_hedge import BearHedgeSimulator
+    monkeypatch.setenv('REGIME_HINT', 'BEAR')
+    sim = BearHedgeSimulator.__new__(BearHedgeSimulator)
+    sim.data_dir = _write(tmp_path, {'current_regime': 'BULL', 'bull_score': 71.0})
+    assert sim._read_regime() == 'BEAR'
+
+
 # ── 소비자가 계약을 유지하는가 ────────────────────────────────────────
 
 def test_sim6_returns_regime_only(tmp_path):

@@ -76,7 +76,7 @@ node_modules
 # KOSPI top100 종가 CSV — 원본은 db-data 브랜치. main의 사본이 낡아 db-data를 역행시킨 이력 있음.
 output/kospi_top100_close.csv
 
-# 오프틱 매매 런이 "내가 실제로 쓴 파일"을 적어두는 목록 (trading_lite.yml 배포 스텝 전용).
+# 매매 런이 "내가 실제로 쓴 파일"을 적어두는 목록 (trading.yml 배포 스텝 전용).
 # 런 안에서만 유효한 산출물이라 main에 들어가면 안 된다.
 data/.lite_deploy_manifest
 # 스크래핑 런이 "trading.yml이 writer라 내가 올리면 안 되는 파일"을 적어두는 목록

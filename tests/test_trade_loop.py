@@ -70,7 +70,7 @@ def stub(monkeypatch, tmp_path):
     monkeypatch.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: False)
     monkeypatch.setattr(trade_loop.scrape_gate, 'mark_regime', mock.MagicMock())
     # 순위 스냅샷은 KIS를 부른다. 막지 않으면 테스트가 네트워크를 탄다.
-    monkeypatch.setattr(trade_loop, 'collect_rank_snapshot', mock.MagicMock(return_value=False))
+    monkeypatch.setattr(trade_loop, 'collect_rank_snapshot', mock.MagicMock(return_value=None))
     monkeypatch.setattr(trade_loop.PipelineContext, 'from_env',
                         classmethod(lambda cls: _Ctx()))
     return monkeypatch
@@ -319,7 +319,7 @@ def test_does_not_dispatch_while_the_scraper_is_already_running(monkeypatch):
     post = mock.MagicMock()
     monkeypatch.setattr(trade_loop.requests, 'post', post)
 
-    trade_loop.dispatch_scraper(_Ctx(), log=lambda *a: None)
+    trade_loop.dispatch_scraper(log=lambda *a: None)
 
     post.assert_not_called()
 
@@ -330,7 +330,7 @@ def test_dispatches_when_the_scraper_is_idle(monkeypatch):
     post = mock.MagicMock(return_value=mock.MagicMock(status_code=204))
     monkeypatch.setattr(trade_loop.requests, 'post', post)
 
-    trade_loop.dispatch_scraper(_Ctx(), log=lambda *a: None)
+    trade_loop.dispatch_scraper(log=lambda *a: None)
 
     post.assert_called_once()
     assert 'scraper.yml/dispatches' in post.call_args[0][0]
@@ -431,7 +431,9 @@ def test_the_alert_cooldown_file_is_deployed_when_the_holiday_check_fails(stub):
     알림이 없는 것과 같다 — 이 커밋이 막으려던 바로 그 수치다.
     """
     calls = []
-    stub.setattr(trade_loop.alerts, 'send_alert_once', mock.MagicMock(return_value=True))
+    # send_alert_once를 통째로 mock하지 않는다 — 쿨다운 기록이 실제로 남았는지가
+    # 이 테스트의 전부다. 텔레그램 층만 갈아끼운다.
+    stub.setattr(trade_loop.alerts, 'send_alert', mock.MagicMock(return_value=True))
     stub.setattr(trade_loop, '_write_deploy_manifest',
                  lambda sim, log=print, **kw: calls.append(kw))
     stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock())
@@ -442,6 +444,45 @@ def test_the_alert_cooldown_file_is_deployed_when_the_holiday_check_fails(stub):
 
     assert calls, '판정 불가 분기가 배포 목록을 아예 안 쓴다'
     assert calls[0].get('include_alerts') is True
+
+
+def test_the_alert_cooldown_file_is_deployed_on_an_ordinary_run(stub):
+    """휴장 분기만이 아니다(2026-08-09).
+
+    program_prep_over_budget은 쿨다운 60분인데 매 런이 새 컨테이너다. 기록이
+    db-data를 왕복하지 못하면 억제가 통째로 무력화되어 2분마다 발송된다 —
+    휴장 분기에서 고쳤던 것과 정확히 같은 병이 정상 경로에 남아 있었다.
+    """
+    calls = []
+    stub.setattr(trade_loop.alerts, 'send_alert', mock.MagicMock(return_value=True))
+    stub.setattr(trade_loop, '_write_deploy_manifest',
+                 lambda sim, log=print, **kw: calls.append(kw))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'collect_rank_snapshot', lambda *a, **k: None)
+    ctx = _Ctx()
+    # 매매도 국면 갱신도 순위 수집도 없는 런에서 알림만 났다.
+    trade_loop.alerts.send_alert_once('program_prep_over_budget', 'x', ctx.now_kst,
+                                      log=lambda *a: None)
+
+    trade_loop.run_trade_loop(ctx)
+
+    assert calls, '알림만 난 런이 배포 목록을 아예 안 쓴다'
+    assert calls[0].get('include_alerts') is True
+
+
+def test_a_run_that_alerted_nothing_does_not_deploy_the_cooldown_file(stub):
+    """안 바뀐 파일을 올리면, 그 사이 스크래퍼가 기록한 쿨다운을 런 시작 시점
+    사본으로 되돌린다(lost update). 기록한 런만 올린다."""
+    calls = []
+    stub.setattr(trade_loop, '_write_deploy_manifest',
+                 lambda sim, log=print, **kw: calls.append(kw))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value='sim4'))
+    stub.setattr(trade_loop, 'collect_rank_snapshot', lambda *a, **k: None)
+    _budget(stub, 1)
+
+    trade_loop.run_trade_loop(_Ctx())
+
+    assert calls and calls[0].get('include_alerts') is False
 
 
 def test_the_manifest_can_carry_the_alert_cooldown_file(tmp_path, monkeypatch):
@@ -479,7 +520,7 @@ def test_dispatch_carries_the_regime_it_just_computed(monkeypatch):
     monkeypatch.setattr(trade_loop.requests, 'post',
                         lambda url, **kw: posts.append(kw) or mock.MagicMock(status_code=204))
 
-    trade_loop.dispatch_scraper(_Ctx(), log=lambda *a: None, regime='BULL')
+    trade_loop.dispatch_scraper(log=lambda *a: None, regime='BULL')
 
     assert posts[0]['json']['inputs']['regime'] == 'BULL'
 
@@ -493,7 +534,7 @@ def test_dispatch_omits_the_hint_when_the_regime_is_unknown(monkeypatch):
     monkeypatch.setattr(trade_loop.requests, 'post',
                         lambda url, **kw: posts.append(kw) or mock.MagicMock(status_code=204))
 
-    trade_loop.dispatch_scraper(_Ctx(), log=lambda *a: None, regime=None)
+    trade_loop.dispatch_scraper(log=lambda *a: None, regime=None)
 
     assert 'inputs' not in posts[0]['json']
 
@@ -597,17 +638,24 @@ def _collect_with(monkeypatch, tmp_path, provider):
     import src.trade.kis_data_provider as kdp
     monkeypatch.setattr(kdp, 'KISDataProvider', lambda *a, **k: provider)
     logs = []
-    ok = trade_loop.collect_rank_snapshot(_Ctx(), logs.append)
-    return ok, logs
+    at = trade_loop.collect_rank_snapshot(logs.append)
+    return at, logs
+
+
+def _money_rows(tmp_path):
+    import csv as _csv
+    p = next((tmp_path / 'data').glob('money_*.csv'))
+    with open(p, encoding='utf-8') as f:
+        return list(_csv.DictReader(f))
 
 
 def test_rank_snapshot_is_skipped_when_a_block_came_back_empty(monkeypatch, tmp_path):
-    """부분 스냅샷을 적느니 이 사이클을 건너뛴다 — 빈 블록 하나가 그 뒤 전부에
-    가짜 delta를 만든다. 조회 실패를 0으로 폴백하지 않는다는 원칙과 같다."""
+    """부분 스냅샷을 적느니 이 사이클을 건너뛴다 — 빈 블록은 그 블록의 delta를
+    통째로 지어내게 만든다. 조회 실패를 0으로 폴백하지 않는다는 원칙과 같다."""
     provider = _StubProvider({'0001': _rows('A', 5), '1001': []}, _rows('C', 5))
-    ok, logs = _collect_with(monkeypatch, tmp_path, provider)
+    at, logs = _collect_with(monkeypatch, tmp_path, provider)
 
-    assert ok is False
+    assert at is None
     assert not (tmp_path / 'data' / 'rank_state.json').exists(), \
         '직전 스냅샷을 부분 결과로 덮어쓰면 다음 사이클의 delta까지 오염된다'
     assert any('결손' in m for m in logs), f'무엇이 비었는지 로그에 없다: {logs}'
@@ -615,7 +663,46 @@ def test_rank_snapshot_is_skipped_when_a_block_came_back_empty(monkeypatch, tmp_
 
 def test_rank_snapshot_records_when_all_three_blocks_answered(monkeypatch, tmp_path):
     provider = _StubProvider({'0001': _rows('A', 5), '1001': _rows('B', 5)}, _rows('C', 5))
-    ok, _ = _collect_with(monkeypatch, tmp_path, provider)
+    at, _ = _collect_with(monkeypatch, tmp_path, provider)
 
-    assert ok is True
+    assert at is not None
     assert (tmp_path / 'data' / 'rank_state.json').exists()
+
+
+def test_each_rank_api_is_its_own_source_counting_from_one(monkeypatch, tmp_path):
+    """세 순위를 이어붙여 1..N을 매기면, 사이클마다 달라지는 중복 개수만큼 뒤
+    블록이 밀려 가만히 있던 종목에 가짜 delta가 찍힌다(외인기관 순위의 market
+    기본값이 '0001'이라 코스피 등락률과 상시 겹친다)."""
+    provider = _StubProvider({'0001': _rows('A', 5), '1001': _rows('B', 5)}, _rows('C', 5))
+    _collect_with(monkeypatch, tmp_path, provider)
+    rows = _money_rows(tmp_path)
+
+    assert len({r['source'] for r in rows}) == 3, '블록이 source로 갈리지 않았다'
+    for src in {r['source'] for r in rows}:
+        ranks = sorted(int(r['rank']) for r in rows if r['source'] == src)
+        assert ranks == [1, 2, 3, 4, 5], f'{src} 순위가 1부터가 아니다: {ranks}'
+
+
+def test_a_code_in_two_rank_apis_is_one_row_per_source(monkeypatch, tmp_path):
+    """겹침은 정상이다. (cycle_id, source, code)가 유일해야 조인이 1:1이 된다."""
+    shared = _rows('A', 3)
+    provider = _StubProvider({'0001': shared, '1001': _rows('B', 3)}, shared)
+    _collect_with(monkeypatch, tmp_path, provider)
+    rows = _money_rows(tmp_path)
+
+    keys = [(r['cycle_id'], r['source'], r['code']) for r in rows]
+    assert len(keys) == len(set(keys)), '같은 (cycle_id, source, code)가 두 번 적혔다'
+    assert len([r for r in rows if r['code'] == 'A0000']) == 2
+
+
+def test_snapshot_is_stamped_at_query_time_not_run_start(monkeypatch, tmp_path):
+    """조회는 런 시작보다 최대 85초 뒤다(매매 루프가 먼저 돈다). 런 시작 시각으로
+    적으면 120초 격자에서 상시 한 칸 어긋나 sim_diag·1분봉과 조인되지 않는다."""
+    provider = _StubProvider({'0001': _rows('A', 2), '1001': _rows('B', 2)}, _rows('C', 2))
+    at, _ = _collect_with(monkeypatch, tmp_path, provider)
+    rows = _money_rows(tmp_path)
+
+    assert at.year >= 2026, '실제 조회 시각이어야 한다'
+    assert rows[0]['ts'] == at.isoformat(timespec='seconds')
+    assert int(rows[0]['cycle_id']) != _Ctx().cycle_id, \
+        '런 시작 컨텍스트의 격자를 그대로 쓰고 있다'

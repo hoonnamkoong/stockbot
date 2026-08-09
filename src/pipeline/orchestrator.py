@@ -9,7 +9,7 @@ Worker 인터페이스가 실제 코드와 일치하도록 수정됨.
 import os
 
 from src import alerts
-from src.strategy.regime_state import read_regime
+from src.strategy.regime_state import read_regime, read_regime_state, regime_hint
 from src.pipeline import scrape_gate
 from src.pipeline.context import PipelineContext
 from src.data import sim_diag
@@ -147,13 +147,17 @@ def run_pipeline(ctx: PipelineContext) -> None:
     # db-data를 체크아웃하는 시점(dispatch +30초)이 trade_loop의 배포 시점(+75초)
     # 보다 빠르기 때문이다. 레이스가 아니라 정해진 순서다. 그래서 trade_loop가
     # 방금 계산한 국면을 dispatch inputs로 실어 보내고, 있으면 그걸 우선한다.
+    #
+    # 인계값의 적용은 read_regime 안에 있다 — 여기서 하지 않는다. 예전에 여기서만
+    # 적용했더니 소유권 판정은 인계값을, Sim10·Sim6은 파일값을 보게 되어, 국면 전환
+    # 격자에서 "스크래퍼가 매매한다"고 정해놓고 정작 Sim10은 이전 국면의 하위
+    # 전략·유니버스로 실주문을 냈다. 창구가 하나면 관문도 하나여야 한다.
     trade_worker = TradeEngineWorker(ctx, storage)
     with ctx.stage("Stage 0: 국면 읽기"):
-        regime, bull_score_dbg = read_regime('data')
-        handed = (os.environ.get('REGIME_HINT') or '').strip()
-        if handed:
-            ctx.log(f"국면(trade_loop 인계): {handed} / 파일값 {regime or '측정 불가'}")
-            regime = handed
+        regime, _ = read_regime('data')
+        if regime_hint():
+            on_disk = (read_regime_state('data') or {}).get('current_regime')
+            ctx.log(f"국면(trade_loop 인계): {regime} / 파일값 {on_disk or '측정 불가'}")
         else:
             ctx.log(f"국면(파일, 인계값 없음): {regime or '측정 불가'}")
 

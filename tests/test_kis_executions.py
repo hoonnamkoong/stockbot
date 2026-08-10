@@ -130,3 +130,47 @@ def test_find_execution_by_odno_returns_none_when_not_found():
          mock.patch.dict(os.environ, _env(), clear=False), \
          mock.patch('src.trade.executions.requests.get', return_value=_fake_response([])):
         assert executions.find_execution_by_odno('0000000001') is None
+
+
+from src.trade.executions import FILLED, UNFILLED, UNKNOWN, lookup_execution
+
+
+def test_lookup_returns_filled_with_the_fill(monkeypatch):
+    fill = {'odno': '0007441100', 'code': '353200', 'name': '대덕전자',
+            'side': 'SELL', 'price': 108000.0, 'qty': 1, 'amount': 108000.0,
+            'time': '20260810 094437'}
+    monkeypatch.setattr(executions, '_request_executions', lambda *a, **k: [fill])
+
+    status, got = lookup_execution('0007441100')
+
+    assert status == FILLED
+    assert got == fill
+
+
+def test_lookup_returns_unfilled_when_query_succeeds_with_no_rows(monkeypatch):
+    """조회는 됐는데 체결이 없다 = 미체결. 취소해도 되는 상태다."""
+    monkeypatch.setattr(executions, '_request_executions', lambda *a, **k: [])
+
+    assert lookup_execution('0007441100') == (UNFILLED, None)
+
+
+def test_lookup_returns_unknown_when_query_itself_fails(monkeypatch):
+    """조회 실패는 미체결이 아니다 — 이걸 섞으면 팔린 포지션을 되살린다."""
+    monkeypatch.setattr(executions, '_request_executions', lambda *a, **k: None)
+
+    assert lookup_execution('0007441100') == (UNKNOWN, None)
+
+
+def test_lookup_without_odno_is_unknown_not_unfilled(monkeypatch):
+    """주문번호가 없으면 추적 자체가 불가능하다. 미체결로 단정하면 안 된다."""
+    monkeypatch.setattr(executions, '_request_executions', lambda *a, **k: [])
+
+    assert lookup_execution('') == (UNKNOWN, None)
+    assert lookup_execution('UNKNOWN') == (UNKNOWN, None)
+
+
+def test_lookup_ignores_rows_for_other_orders(monkeypatch):
+    monkeypatch.setattr(executions, '_request_executions',
+                        lambda *a, **k: [{'odno': '9999999999', 'qty': 5, 'price': 100.0}])
+
+    assert lookup_execution('0007441100') == (UNFILLED, None)

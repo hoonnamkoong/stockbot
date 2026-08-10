@@ -4,6 +4,8 @@ import os
 import datetime
 from datetime import timedelta, timezone
 
+from src.trade import fees
+
 
 def get_kst_now():
     # [V8.9.9.21] 시스템 환경과 무관하게 한국 표준시(UTC+9) 강제 적용
@@ -96,9 +98,13 @@ class BaseSimulator:
     [Strategy DNA Engine] 모든 시뮬레이터의 부모 클래스.
     - V8.6.2: 상태 영속성(JSON), 실시간 NAV 산출, 3M 초기화
     """
-    BUY_FEE_RATE = 0.00015   # 매수 수수료율
-    SELL_FEE_RATE = 0.00015  # 매도 수수료율
-    SELL_TAX_RATE = 0.0018   # 증권거래세율
+    # 요율 정의는 src/trade/fees.py 하나다. 여기 숫자를 직접 적으면 실전 원장과
+    # 갈리고, 그 어긋남이 2026-08-10까지 프로그램 매매 실현손익에서 수수료가
+    # 통째로 빠져 있던 형태였다. 클래스 속성으로 남겨 두는 건 하위 심의 오버라이드
+    # 호환 때문이다.
+    BUY_FEE_RATE = fees.BUY_FEE_RATE    # 매수 수수료율
+    SELL_FEE_RATE = fees.SELL_FEE_RATE  # 매도 수수료율
+    SELL_TAX_RATE = fees.SELL_TAX_RATE  # 증권거래세율
     IS_ANALYZER = False      # True면 매매하지 않는 분석기(리베로). reset 시 자본 부여 제외
     IS_EOD = False           # True면 장중 10분 루프에서 제외하고 마감 후 1회만 실행(일봉 전략)
 

@@ -37,9 +37,32 @@ from datetime import datetime, timedelta
 
 from src import alerts
 from src.pipeline.context import MARKET_CLOSE_HHMM
+from src.trade.fees import realized_pnl_after_fees
 from src.pipeline.workers.program_turn import (
     REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
 )
+
+
+def accrue_realized_pnl(ledger: dict, positions: dict, code: str,
+                        qty: int, price: float) -> float:
+    """매도 체결분의 실현손익을 원장에 누적한다. 반환은 이번에 더한 값.
+
+    **비용을 뺀 값을 적는다.** 2026-08-10까지는 단순 차액이었고, 그래서 대덕전자
+    1주 매도에서 원장 -3,500원 / KIS 실측 -3,723원으로 223원이 벌어졌다. 매도마다
+    같은 방향으로 벌어지는 편향이라 매매가 잦을수록 커진다.
+
+    realized_pnl은 표시용이 아니라 effective_budget(복리)의 근거다 — 부풀린 채로
+    두면 다음 매수의 주문 크기까지 함께 부풀어 오른다.
+
+    원장에 없는 종목은 기준가가 없으므로 아무것도 하지 않는다. 손익을 지어내는
+    대신 계상하지 않는다([[no-fabricated-financial-values]]).
+    """
+    pos = positions.get(code)
+    if not pos:
+        return 0.0
+    delta = realized_pnl_after_fees(qty, pos['avg_price'], price)
+    ledger['realized_pnl'] = round(ledger.get('realized_pnl', 0) + delta, 2)
+    return delta
 
 
 def _buy_allowed(now_kst) -> bool:
@@ -715,9 +738,8 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 # _apply_order_to_positions가 positions[code]를 지우거나 수량을 줄이기 전에 계산해야 함.
                 # price는 KIS 확정 체결가가 아닌 주문가 추정치 — 원장의 avg_price/peak_price와 동일한
                 # 근사 정밀도(기존 설계와 일관).
-                if side == 'sell' and code in positions:
-                    realized_delta = qty * (price - positions[code]['avg_price'])
-                    ledger['realized_pnl'] = round(ledger.get('realized_pnl', 0) + realized_delta, 2)
+                if side == 'sell':
+                    accrue_realized_pnl(ledger, positions, code, qty, price)
                 # [턴 회계] 표시 전용 별도 트랙(기준가 대비). 실패해도 매매·원장은 계속한다.
                 try:
                     if turn:

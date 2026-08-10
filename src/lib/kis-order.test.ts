@@ -57,3 +57,34 @@ test('종목코드와 수량이 문자열로 실린다', () => {
   assert.equal(body.ORD_QTY, '7');
   assert.equal(typeof body.ORD_QTY, 'string', 'KIS는 숫자형을 받지 않는다');
 });
+
+test('지정가 매수는 ORD_DVSN=00과 실제 단가를 싣는다', () => {
+  const { body } = buildOrderRequest('353200', 3, 'buy',
+    { ...REAL, ordType: 'limit', limitPrice: 111000 });
+
+  assert.equal(body.ORD_DVSN, '00', '00=지정가');
+  assert.equal(body.ORD_UNPR, '111000');
+});
+
+test('ordType을 안 주면 기존 시장가 그대로다 — 호출부를 안 고쳐도 동작이 안 바뀐다', () => {
+  const { body } = buildOrderRequest('005930', 1, 'buy', REAL);
+
+  assert.equal(body.ORD_DVSN, '01');
+  assert.equal(body.ORD_UNPR, '0');
+});
+
+test('지정가인데 단가가 없거나 0이면 시장가로 떨어지지 않는다 — 던진다', () => {
+  // 조용히 시장가로 내면 "원하는 가격에만 산다"가 소리 없이 깨진다.
+  assert.throws(() => buildOrderRequest('353200', 3, 'buy',
+    { ...REAL, ordType: 'limit' }));
+  assert.throws(() => buildOrderRequest('353200', 3, 'buy',
+    { ...REAL, ordType: 'limit', limitPrice: 0 }));
+});
+
+test('매도는 지정가를 요청해도 시장가다 — 손절은 체결 자체가 목적이다', () => {
+  const { body } = buildOrderRequest('353200', 3, 'sell',
+    { ...REAL, ordType: 'limit', limitPrice: 111000 });
+
+  assert.equal(body.ORD_DVSN, '01');
+  assert.equal(body.ORD_UNPR, '0');
+});

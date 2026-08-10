@@ -54,7 +54,7 @@ async function updateFileOnGithub(filePath: string, content: any, sha: string | 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { code, qty, price, side, isVirtual, pin } = body;
+        const { code, qty, price, side, isVirtual, pin, ordType } = body;
 
         // 1. 인증: 자동화 엔진(webhook) 경로는 기존대로, 사람 경로는 세션 + PIN 둘 다 요구.
         //    판정은 lib에 있다(src/lib/trade-auth.ts) — 라우트는 next/server 때문에
@@ -113,8 +113,9 @@ export async function POST(request: Request) {
             await updateFileOnGithub('data/portfolio_virtual.json', portfolio, sha, `[V8.9.9.22] Virtual Trade: ${code} ${side}`);
             result = { status: 'SUCCESS', msg: '가상 주문이 클라우드에 반영되었습니다.' };
         } else {
-            // [REAL] Direct KIS REST API 
-            result = await placeRealOrder(code, Number(qty), Number(price), side);
+            // [REAL] Direct KIS REST API
+            result = await placeRealOrder(code, Number(qty), Number(price), side,
+                                          ordType === 'limit' ? 'limit' : 'market');
             // [V8.9.9.39] 판정 로직 교정: placeRealOrder가 예외 없이 성공하면 rt_cd='0' 상태임
             // KIS 원본 응답에는 status 필드가 없으므로 기존 체크는 버그였음
         }

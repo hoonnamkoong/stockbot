@@ -46,7 +46,7 @@ def _validate_trade_env_strict() -> bool:
 
 import requests
 
-def place_order_via_vercel(side, code, qty, price):
+def place_order_via_vercel(side, code, qty, price, ord_type='market'):
     webhook_secret = os.environ.get("WEBHOOK_SECRET")
     dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
     # [V8.9.9.25 Structural Fix] API 주소 교정 (trade -> trade/order)
@@ -60,7 +60,8 @@ def place_order_via_vercel(side, code, qty, price):
         "side": side,
         "code": code,
         "qty": qty,
-        "price": price
+        "price": price,
+        "ordType": ord_type
     }
     
     print(f"[TradeExecutor] Sending Webhook to Vercel: {url} | payload: {payload}")

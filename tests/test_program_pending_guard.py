@@ -84,3 +84,34 @@ def test_pending_guard_default_backward_compatible():
     result = sim.buy('005930', '삼성전자', 70_000, 10)
     assert result is True, "기본값에서 기존 동작 유지"
     assert len(orders) == 1
+
+
+def test_sell_is_not_blocked_by_pending():
+    """매도는 pending 종목이어도 차단되지 않는다 (청산은 무조건 해야 함)."""
+    from src.pipeline.workers.program_trader import _make_adapter
+
+    sim = FakeSim()
+    # 포트폴리오에 종목이 이미 있는 상태
+    snapshot = make_snapshot(
+        cash=1_000_000,
+        portfolio={
+            '005930': {
+                'name': '삼성전자',
+                'quantity': 10,
+                'avg_price': 70_000,
+                'peak_price': 70_000,
+                'entry_date': '2026-08-10',
+                'is_scaled_out': False,
+            }
+        }
+    )
+    pending_codes = {'005930'}  # 매도하려는 종목이 미체결
+
+    orders = _make_adapter(sim, snapshot, '2026-08-10', real_holdings={}, pending_codes=pending_codes)
+
+    # 미체결 종목이어도 매도는 허용됨
+    result = sim.sell('005930', 75_000, quantity=5)
+    assert result is True, "pending 종목도 매도는 허용되어야 함(청산 우선)"
+    assert len(orders) == 1, "매도 주문이 기록되어야 함"
+    assert orders[0]['side'] == 'sell'
+    assert orders[0]['code'] == '005930'

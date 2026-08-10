@@ -122,6 +122,43 @@ def test_sell_unknown_keeps_everything_frozen():
     assert '353200' in led['pending_orders']
 
 
+def test_sell_unfilled_restore_uses_snapshot_for_entry_date_and_scaled_out():
+    """매도 주문 시 positions[code]는 이미 지워져 있다(Task 6의 정상 경로).
+
+    entry_date·is_scaled_out은 pending 엔트리 자체엔 없어서, register_pending이
+    받아 둔 snapshot(매도 직전 원래 포지션)이 없으면 빈 값/False로 리셋된다.
+    """
+    led = {'positions': {}, 'realized_pnl': realized_pnl_after_fees(1, 111500, 107900)}
+    register_pending(led, '353200', 'OD1', 'sell', 1, 107900, '2026-08-11T09:44:31',
+                     avg_price=111500,
+                     snapshot={'entry_date': '2026-07-01', 'is_scaled_out': True,
+                               'peak_price': 115000, 'name': '심리괴리'})
+
+    reconcile_pending(led, {'OD1': (UNFILLED, None)}, TODAY)
+
+    pos = led['positions']['353200']
+    assert pos['entry_date'] == '2026-07-01'
+    assert pos['is_scaled_out'] is True
+    assert pos['peak_price'] == 115000
+    assert pos['name'] == '심리괴리'
+    assert pos['quantity'] == 1
+    assert pos['avg_price'] == 111500
+
+
+def test_sell_partial_restore_uses_snapshot_when_no_snapshot_defaults_are_empty():
+    """snapshot을 안 넘기면(기존 호출부) 예전과 같이 빈 값/False로 떨어진다 — 회귀 없음."""
+    led = {'positions': {}, 'realized_pnl': realized_pnl_after_fees(10, 111500, 107900)}
+    register_pending(led, '353200', 'OD1', 'sell', 10, 107900, '2026-08-11T09:44:31',
+                     avg_price=111500)
+
+    reconcile_pending(led, {'OD1': (FILLED, _fill(6, 108000))}, TODAY)
+
+    pos = led['positions']['353200']
+    assert pos['quantity'] == 4
+    assert pos['entry_date'] == ''
+    assert pos['is_scaled_out'] is False
+
+
 # ---- 공통 ----
 
 def test_missing_lookup_is_treated_as_unknown():

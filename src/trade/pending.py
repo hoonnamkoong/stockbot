@@ -16,10 +16,16 @@ from src.trade.fees import realized_pnl_after_fees
 
 
 def register_pending(ledger, code, odno, side, qty, price, ordered_at,
-                     avg_price=None, tag=None):
+                     avg_price=None, tag=None, snapshot=None):
     """주문을 pending에 올린다. **종목당 1건** — 이미 있으면 덮어쓰지 않는다.
 
     덮어쓰면 먼저 낸 주문의 주문번호를 잃어 영원히 정산도 취소도 못 한다.
+
+    `snapshot`: 매도 시, 주문을 내기 **직전** `positions[code]`의 사본
+    (`entry_date`·`is_scaled_out`·`peak_price` 등). 매도는 주문과 동시에
+    포지션이 원장에서 지워지므로(Task 6), 미체결·부분체결로 되돌릴 때 원래
+    보유일수·분할매도 여부를 알 방법이 이것뿐이다 — 넘기지 않으면
+    `_correct_sell`이 빈 값/기본값으로 복원한다.
     """
     pend = ledger.setdefault('pending_orders', {})
     if code in pend:
@@ -27,6 +33,7 @@ def register_pending(ledger, code, odno, side, qty, price, ordered_at,
     pend[code] = {
         'odno': odno, 'side': side, 'qty': int(qty), 'price': float(price),
         'ordered_at': ordered_at, 'avg_price': avg_price, 'tag': tag,
+        'snapshot': snapshot or {},
     }
 
 
@@ -112,10 +119,17 @@ def _correct_sell(ledger, positions, code, p, filled_qty, fill_px):
             cur['avg_price'] = ((oq * cur.get('avg_price', avg)) + unfilled * avg) / nq
             cur['quantity'] = nq
         else:
+            # 매도 직후 positions[code]가 이미 지워진 게 정상 경로다(Task 6).
+            # entry_date·is_scaled_out은 pending 엔트리 자체엔 없으므로
+            # register_pending이 받아 둔 snapshot(매도 직전 원래 포지션)에서
+            # 가져온다 — 없으면(snapshot 미전달) 빈 값/기본값으로 떨어진다.
+            snap = p.get('snapshot') or {}
             positions[code] = {
-                'name': p.get('name', code), 'quantity': unfilled, 'avg_price': avg,
-                'peak_price': avg, 'entry_date': p.get('entry_date', ''),
-                'is_scaled_out': False,
+                'name': snap.get('name', p.get('name', code)),
+                'quantity': unfilled, 'avg_price': avg,
+                'peak_price': max(avg, snap.get('peak_price', avg)),
+                'entry_date': snap.get('entry_date', ''),
+                'is_scaled_out': snap.get('is_scaled_out', False),
             }
             if tag:
                 positions[code]['tag'] = tag

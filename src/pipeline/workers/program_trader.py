@@ -151,7 +151,7 @@ def _read_config_fresh(log=print) -> dict | None:
 
 def _default_ledger() -> dict:
     return {'positions': {}, 'last_run': None, 'sim': None, 'realized_pnl': 0,
-            'cooldown_codes': {}, 'turn': {}}
+            'cooldown_codes': {}, 'turn': {}, 'pending_orders': {}}
 
 
 def _read_ledger_fresh(log=print) -> tuple[dict | None, str | None]:
@@ -180,6 +180,7 @@ def _read_ledger_fresh(log=print) -> tuple[dict | None, str | None]:
         d.setdefault('realized_pnl', 0)
         d.setdefault('cooldown_codes', {})
         d.setdefault('turn', {})
+        d.setdefault('pending_orders', {})
         return d, payload.get('sha')
     except Exception as e:
         log(f'[Program] 원장 조회 예외: {e} (fail-closed)')
@@ -340,15 +341,18 @@ def _psych_carry(paper_state) -> dict:
     return {'psych_prev_day': prev_day, 'psych_snapshot': last_run}
 
 
-def _make_adapter(sim, snapshot_state: dict, today: str, real_holdings: dict | None = None):
+def _make_adapter(sim, snapshot_state: dict, today: str, real_holdings: dict | None = None,
+                  pending_codes: set | None = None):
     """심 인스턴스를 실계좌 스냅샷으로 운용하도록 개조하고, 의도 주문을 수집한다.
     - state를 스냅샷으로 교체, save_state/log_trade는 no-op(실제 가상 상태 파일 보호).
     - buy/sell을 오버라이드: 주문 의도를 기록 + 스냅샷을 갱신(같은 run 내 일관성).
-    - 매수 이중 방어: 실계좌에 있는데 스냅샷 포트폴리오(=원장)에 없는 종목은 거부."""
+    - 매수 이중 방어: 실계좌에 있는데 스냅샷 포트폴리오(=원장)에 없는 종목은 거부.
+    - 미체결 필터: pending_codes에 걸린 종목은 거부(같은 종목 중복 주문 방지)."""
     sim.state = snapshot_state
     sim.save_state = lambda *a, **k: None
     sim.log_trade = lambda *a, **k: None
     real_holdings = real_holdings or {}
+    pending_codes = pending_codes or set()
     orders: list[dict] = []
 
     def _buy(code, name, price, quantity, reason=""):
@@ -357,6 +361,9 @@ def _make_adapter(sim, snapshot_state: dict, today: str, real_holdings: dict | N
         except (TypeError, ValueError):
             return False
         if quantity <= 0 or price <= 0:
+            return False
+        if code in pending_codes:
+            # 미체결 주문이 걸린 종목 → 매수하면 안 된다(중복 주문 방지).
             return False
         if code in real_holdings and code not in snapshot_state['portfolio']:
             # 실계좌 보유 중인데 프로그램 원장엔 없음 → 수동 보유 종목이거나 원장 유실.

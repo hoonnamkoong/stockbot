@@ -1,0 +1,86 @@
+"""미체결 주문 필터 테스트 (pending_codes guard)."""
+import pytest
+
+
+class FakeSim:
+    """테스트용 모의 심."""
+    def __init__(self):
+        self.state = None
+        self.save_state = None
+        self.log_trade = None
+        self.buy = None
+        self.sell = None
+
+
+def make_snapshot(cash=3_000_000, portfolio=None):
+    """테스트용 스냅샷 상태."""
+    return {
+        'cash': float(cash),
+        'portfolio': portfolio or {},
+        'invested': 0,
+    }
+
+
+def test_pending_guard_buy_blocked_with_pending_codes():
+    """미체결 주문이 걸린 종목은 매수를 거부한다."""
+    from src.pipeline.workers.program_trader import _make_adapter
+
+    sim = FakeSim()
+    snapshot = make_snapshot(cash=1_000_000)
+    pending_codes = {'005930'}  # 삼성전자 미체결
+
+    orders = _make_adapter(sim, snapshot, '2026-08-10', real_holdings={}, pending_codes=pending_codes)
+
+    # 미체결 종목으로 매수 시도
+    result = sim.buy('005930', '삼성전자', 70_000, 10)
+    assert result is False, "미체결 주문 걸린 종목의 매수를 거부해야 함"
+    assert len(orders) == 0, "주문이 기록되면 안 됨"
+
+
+def test_pending_guard_buy_allowed_without_pending_codes():
+    """미체결이 아닌 종목은 매수를 허용한다."""
+    from src.pipeline.workers.program_trader import _make_adapter
+
+    sim = FakeSim()
+    snapshot = make_snapshot(cash=1_000_000)
+    pending_codes = {'005930'}  # 삼성전자만 미체결
+
+    orders = _make_adapter(sim, snapshot, '2026-08-10', real_holdings={}, pending_codes=pending_codes)
+
+    # 다른 종목으로 매수 시도
+    result = sim.buy('000660', 'SK하이닉스', 100_000, 5)
+    assert result is True, "미체결 아닌 종목의 매수를 허용해야 함"
+    assert len(orders) == 1, "주문이 기록되어야 함"
+    assert orders[0]['code'] == '000660'
+
+
+def test_pending_guard_empty_codes():
+    """pending_codes가 비었으면 기존 동작 유지."""
+    from src.pipeline.workers.program_trader import _make_adapter
+
+    sim = FakeSim()
+    snapshot = make_snapshot(cash=1_000_000)
+    pending_codes = set()
+
+    orders = _make_adapter(sim, snapshot, '2026-08-10', real_holdings={}, pending_codes=pending_codes)
+
+    # 아무 종목이나 매수 가능
+    result = sim.buy('005930', '삼성전자', 70_000, 10)
+    assert result is True, "pending_codes가 비었으면 아무 종목이나 매수 가능"
+    assert len(orders) == 1
+
+
+def test_pending_guard_default_backward_compatible():
+    """기존 호출(pending_codes 없음)도 동작해야 함(기본값)."""
+    from src.pipeline.workers.program_trader import _make_adapter
+
+    sim = FakeSim()
+    snapshot = make_snapshot(cash=1_000_000)
+
+    # pending_codes 인자 없이 호출
+    orders = _make_adapter(sim, snapshot, '2026-08-10', real_holdings={})
+
+    # 정상 작동
+    result = sim.buy('005930', '삼성전자', 70_000, 10)
+    assert result is True, "기본값에서 기존 동작 유지"
+    assert len(orders) == 1

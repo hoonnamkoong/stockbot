@@ -91,3 +91,47 @@ def test_up_to_five_candidates_are_processed():
     a.generate_deep_dive_report(stocks)
 
     assert a.gemini._call_gemini_safe.call_count == 5
+
+
+# ── 엔진 판단 근거(DART/공시 거부 포함) 노출 ────────────────────────────
+
+def test_engine_reason_is_shown_regardless_of_llm_output():
+    """엔진 근거는 LLM 호출 결과와 무관하게 원문 그대로 보여야 한다 —
+    Gemini가 rationale_bullets에 반영 안 해도 사라지면 안 된다."""
+    a = _advisor()
+    a.gemini._call_gemini_safe.return_value = _fake_response({
+        'rank_and_recommendation': '매수', 'business_bullets': [],
+        'rationale_bullets': [], 'outlook_bullets': [], 'risk_bullets': [],
+    })
+
+    report = a.generate_deep_dive_report(
+        [_stock(reason='DART 거부됨: 유상증자 공시')])
+
+    assert 'DART 거부됨: 유상증자 공시' in report
+
+
+def test_engine_reason_is_included_in_the_prompt():
+    a = _advisor()
+    a.gemini._call_gemini_safe.return_value = _fake_response({
+        'rank_and_recommendation': '매수', 'business_bullets': [],
+        'rationale_bullets': [], 'outlook_bullets': [], 'risk_bullets': [],
+    })
+
+    a.generate_deep_dive_report([_stock(reason='어텐션 모멘텀 강력')])
+
+    prompt = a.gemini._call_gemini_safe.call_args[0][0]
+    assert '어텐션 모멘텀 강력' in prompt
+
+
+def test_missing_engine_reason_adds_no_stray_section():
+    """reason이 없는(빈 문자열) 경우 엔진 판단 줄 자체를 안 남긴다 — 빈 줄만
+    남으면 그것도 노이즈다."""
+    a = _advisor()
+    a.gemini._call_gemini_safe.return_value = _fake_response({
+        'rank_and_recommendation': '매수', 'business_bullets': [],
+        'rationale_bullets': [], 'outlook_bullets': [], 'risk_bullets': [],
+    })
+
+    report = a.generate_deep_dive_report([_stock()])  # reason 없음
+
+    assert '엔진 판단' not in report

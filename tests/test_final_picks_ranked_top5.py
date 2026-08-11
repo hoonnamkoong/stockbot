@@ -109,3 +109,19 @@ def test_already_deep_dived_codes_are_excluded_from_top5():
         picks, _, _ = w.run(stocks, sync_state, skip_program_trading=True)
 
     assert [p['code'] for p in picks] == ['B']
+
+
+def test_engine_reason_is_carried_into_final_picks():
+    """엔진 판단 근거(DART/공시 거부 사유 포함)가 final_picks까지 전달돼야
+    딥다이브 리포트에서 보인다. 지금까지는 계산만 되고 버려지고 있었다."""
+    stocks = [_stock('A', 0.9, 100.0)]
+    sim_results = [{'code': 'A', 'name': '종목A', 'signal': 'WATCH',
+                    'reason': 'DART 거부됨: 유상증자 공시'}]
+
+    w = _worker()
+    with mock.patch('src.strategy.engine.StrategyEngine') as MockEngine, \
+         mock.patch.object(w, '_run_simulators'):
+        MockEngine.return_value.execute_simulation.return_value = sim_results
+        picks, _, _ = w.run(stocks, _sync(), skip_program_trading=True)
+
+    assert picks[0]['reason'] == 'DART 거부됨: 유상증자 공시'

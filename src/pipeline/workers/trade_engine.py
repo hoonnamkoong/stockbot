@@ -161,6 +161,9 @@ class TradeEngineWorker(BaseWorker):
                 # candidates에서 풀 데이터 가져오기
                 full = next((c for c in candidates if c['code'] == r['code']), r).copy()
                 full['signal'] = r.get('signal', 'WATCH')
+                # 엔진 판단 근거(DART/공시 거부 등 포함) — 계산은 되는데 지금까지
+                # final_picks에 전달되지 않아 딥다이브 리포트에서 안 보이고 있었다.
+                full['reason'] = r.get('reason', '')
                 eligible.append(full)
 
         from src.strategy.pick_features import rank_top

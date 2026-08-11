@@ -246,6 +246,20 @@ def test_prompt_requests_fact_score(monkeypatch, tmp_path):
     assert 'fact_score' in calls[0]
 
 
+def test_prompt_includes_price_and_foreign_flow_context(monkeypatch, tmp_path):
+    """[2026-08-11, C1] 게시글 제목만으로는 '글은 많은데 가격은 안 움직이는'
+    허위 열기를 못 걸러낸다 — 등락률·외인수급을 프롬프트에 같이 넘긴다."""
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    batch = [{'code': '005930', 'name': '삼성전자', 'change_rate': '+7.32%',
+              'foreign_change': 1.25, 'posts': [{'nid': '1', 'title': '공시 확인'}]}]
+    make_agent(ANSWER, calls).analyze_batch_discovery(batch)
+
+    assert '+7.32%' in calls[0]
+    assert 'change_rate' in calls[0]
+    assert 'foreign_change_pct_point' in calls[0]
+
+
 def test_local_results_carry_fact_score(monkeypatch, tmp_path):
     """사전 판정·분석 실패 경로도 같은 스키마를 내야 Sim1 분기가 안 깨진다."""
     _isolate(monkeypatch, tmp_path)

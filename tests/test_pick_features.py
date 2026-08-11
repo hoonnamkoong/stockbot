@@ -15,6 +15,7 @@ def test_merges_candidate_and_simulation_fields():
     candidates = [{
         'code': '005930', 'name': '삼성전자', 'fact_score': 0.7,
         'sentiment': 'Positive', 'tick_power': 120.5, 'consecutive_days': 3,
+        'change_rate': '+3.50%',
     }]
     simulation_results = [{'code': '005930', 'signal': 'BUY', 'reason': '추세 전환'}]
 
@@ -23,7 +24,8 @@ def test_merges_candidate_and_simulation_fields():
     assert out == [{
         'cycle_id': 123, 'code': '005930', 'name': '삼성전자',
         'fact_score': 0.7, 'sentiment': 'Positive', 'tick_power': 120.5,
-        'consecutive_days': 3, 'engine_signal': 'BUY', 'engine_reason': '추세 전환',
+        'consecutive_days': 3, 'change_rate': 3.5,
+        'engine_signal': 'BUY', 'engine_reason': '추세 전환',
     }]
 
 
@@ -147,8 +149,11 @@ def test_month_path_uses_kst_month():
 
 # ── rank_top — 순위 결합(Borda), 원값 합산 금지 ─────────────────────────
 
-def _cand(code, fact_score=0.0, tick_power=0.0):
-    return {'code': code, 'name': code, 'fact_score': fact_score, 'tick_power': tick_power}
+def _cand(code, fact_score=0.0, tick_power=0.0, change_rate=None):
+    c = {'code': code, 'name': code, 'fact_score': fact_score, 'tick_power': tick_power}
+    if change_rate is not None:
+        c['change_rate'] = change_rate
+    return c
 
 
 def test_rank_top_picks_best_by_combined_rank():
@@ -202,3 +207,38 @@ def test_rank_top_fewer_than_n_returns_all():
     top = rank_top(candidates, n=5)
 
     assert len(top) == 2
+
+
+def test_rank_top_breaks_fact_tick_tie_with_momentum():
+    """fact_score·tick_power가 동률이면 change_rate(모멘텀)가 갈라야 한다."""
+    candidates = [
+        _cand('A', fact_score=0.5, tick_power=100.0, change_rate='+1.0%'),
+        _cand('B', fact_score=0.5, tick_power=100.0, change_rate='+8.0%'),
+    ]
+
+    top = rank_top(candidates, n=1)
+
+    assert top[0]['code'] == 'B'
+
+
+def test_rank_top_ties_do_not_leak_input_order_as_a_phantom_signal():
+    """[실측 버그] 신호가 전혀 없는(0인) 후보들이 리스트 앞쪽에 있다는 이유만으로
+    진짜 신호가 있는 후보를 이기면 안 된다 — 위치 기반 순위(index rank)는
+    동석을 '누가 먼저 나왔나'로 갈라 이 함정에 빠졌었다. 값 기반(dense) 순위여야
+    동석은 정확히 동석으로 남는다."""
+    candidates = (
+        [_cand(f'zero{i}', fact_score=0.0, tick_power=0.0) for i in range(3)]
+        + [_cand('real', fact_score=0.9, tick_power=150.0)]
+    )
+
+    top = rank_top(candidates, n=1)
+
+    assert top[0]['code'] == 'real'
+
+
+def test_parse_change_rate_handles_naver_percent_strings():
+    assert pick_features._parse_change_rate('+3.50%') == 3.5
+    assert pick_features._parse_change_rate('-2.10%') == -2.1
+    assert pick_features._parse_change_rate('') == 0.0
+    assert pick_features._parse_change_rate(None) == 0.0
+    assert pick_features._parse_change_rate('garbage') == 0.0

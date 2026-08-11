@@ -494,25 +494,40 @@ class DataFetcherWorker(BaseWorker):
                         time.sleep(PAGE_RETRY_WAIT * (attempt + 1))
             return [], False, False
 
-        for start_p in range(1, max_pages + 1, chunk_size):
-            chunk = range(start_p, min(start_p + chunk_size, max_pages + 1))
-            with ThreadPoolExecutor(max_workers=chunk_size) as ex:
-                chunk_res = sorted(
-                    [(ex.submit(fetch_page, p), p) for p in chunk],
-                    key=lambda x: x[1]
-                )
-                stop_all = False
-                for future, _ in chunk_res:
-                    posts, stop, ok = future.result()
-                    total_pages += 1
-                    if not ok:
-                        failed_pages += 1
-                    for p in posts:
-                        if p['nid'] not in unique_nids:
-                            unique_nids.add(p['nid'])
-                            new_posts.append(p)
-                    if stop: stop_all = True
-                if stop_all: break
+        # [2026-08-11, D1] 1페이지를 먼저 순차로 본다. 오늘 글이 1페이지 안에서
+        # 끝나면(stop=True) 그게 대부분이다 — 병렬 청크(PAGE_WORKERS=8)로 바로
+        # 가면 stop이 1페이지에서 걸려도 나머지 7개가 이미 동시에 나간 뒤라
+        # 종목당 최소 8요청이 낭비됐다(기존 진단 그대로). 1페이지가 꽉 찼을
+        # 때만(= 오늘 글이 더 있을 수 있을 때만) 병렬 전수 스캔으로 확장한다.
+        # 1페이지 조회 자체가 실패하면(ok=False) "다 봤다"를 모르므로 안전하게
+        # 병렬 전수 스캔으로 폴백한다(모르면 스크래핑하는 쪽으로 fail).
+        first_posts, first_stop, first_ok = fetch_page(1)
+        if first_ok and first_stop:
+            total_pages = 1
+            for p in first_posts:
+                if p['nid'] not in unique_nids:
+                    unique_nids.add(p['nid'])
+                    new_posts.append(p)
+        else:
+            for start_p in range(1, max_pages + 1, chunk_size):
+                chunk = range(start_p, min(start_p + chunk_size, max_pages + 1))
+                with ThreadPoolExecutor(max_workers=chunk_size) as ex:
+                    chunk_res = sorted(
+                        [(ex.submit(fetch_page, p), p) for p in chunk],
+                        key=lambda x: x[1]
+                    )
+                    stop_all = False
+                    for future, _ in chunk_res:
+                        posts, stop, ok = future.result()
+                        total_pages += 1
+                        if not ok:
+                            failed_pages += 1
+                        for p in posts:
+                            if p['nid'] not in unique_nids:
+                                unique_nids.add(p['nid'])
+                                new_posts.append(p)
+                        if stop: stop_all = True
+                    if stop_all: break
 
         # [Sim8] 고유 작성자 수 — 한 사람의 도배와 다수의 관심을 구분하는 축.
         # writer 키는 여기서 떼어낸다. posts는 엑셀·LLM 프롬프트로 흘러가므로

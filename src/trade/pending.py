@@ -33,7 +33,7 @@ def register_pending(ledger, code, odno, side, qty, price, ordered_at,
     pend[code] = {
         'odno': odno, 'side': side, 'qty': int(qty), 'price': float(price),
         'ordered_at': ordered_at, 'avg_price': avg_price, 'tag': tag,
-        'snapshot': snapshot or {},
+        'snapshot': snapshot or {}, 'applied_qty': 0,
     }
 
 
@@ -42,6 +42,14 @@ def reconcile_pending(ledger, lookups, today):
 
     `lookups`에 없는 주문번호는 UNKNOWN으로 본다 — 조회하지 못한 것을
     미체결로 단정하면 팔린 포지션이 되살아난다.
+
+    KIS 체결조회는 **누적** 체결수량을 돌려준다. 취소가 실패해 같은 pending이
+    다음 사이클에도 살아남으면(호출부가 복원), 같은 조회가 같은 누적값을 또
+    돌려줄 수 있다 — 그걸 매번 전량 반영하면 부분체결이 사이클마다 중복으로
+    쌓인다(2주 체결인데 원장엔 4주, 6주...). `applied_qty`(이번까지 이미
+    반영한 누적량)를 pending 항목에 들고 다니며, 이번 조회 - 이미 반영분
+    만큼만 새로 반영한다. 복원하는 쪽(settle_pending_orders)이 반환된
+    `applied_qty`를 pending에 이어 붙여야 이 불변식이 유지된다.
     """
     pend = ledger.setdefault('pending_orders', {})
     positions = ledger.setdefault('positions', {})
@@ -58,11 +66,14 @@ def reconcile_pending(ledger, lookups, today):
         ordered_qty = p['qty']
 
         if p['side'] == 'buy':
-            if filled_qty > 0:
-                _enter_position(positions, code, p, filled_qty, fill_px, today)
+            already_applied = int(p.get('applied_qty', 0))
+            new_fill = filled_qty - already_applied
+            if new_fill > 0:
+                _enter_position(positions, code, p, new_fill, fill_px, today)
             if filled_qty < ordered_qty:
                 cancels.append({'odno': p['odno'], 'code': code,
-                                'qty': ordered_qty - filled_qty})
+                                'qty': ordered_qty - filled_qty,
+                                'applied_qty': filled_qty})
         else:
             _correct_sell(ledger, positions, code, p, filled_qty, fill_px)
 

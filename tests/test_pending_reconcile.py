@@ -55,7 +55,7 @@ def test_buy_unfilled_leaves_ledger_untouched_and_asks_cancel():
     cancels = reconcile_pending(led, {'OD1': (UNFILLED, None)}, TODAY)
 
     assert led['positions'] == {}
-    assert cancels == [{'odno': 'OD1', 'code': '353200', 'qty': 3}]
+    assert cancels == [{'odno': 'OD1', 'code': '353200', 'qty': 3, 'applied_qty': 0}]
 
 
 def test_buy_partial_enters_filled_part_and_cancels_remainder():
@@ -64,7 +64,7 @@ def test_buy_partial_enters_filled_part_and_cancels_remainder():
     cancels = reconcile_pending(led, {'OD1': (FILLED, _fill(2, 111200))}, TODAY)
 
     assert led['positions']['353200']['quantity'] == 2
-    assert cancels == [{'odno': 'OD1', 'code': '353200', 'qty': 1}]
+    assert cancels == [{'odno': 'OD1', 'code': '353200', 'qty': 1, 'applied_qty': 2}]
 
 
 def test_buy_unknown_keeps_pending_and_asks_nothing():
@@ -76,6 +76,49 @@ def test_buy_unknown_keeps_pending_and_asks_nothing():
     assert led['positions'] == {}
     assert cancels == []
     assert '353200' in led['pending_orders'], 'pending이 남아야 중복 주문이 막힌다'
+
+
+def test_buy_partial_fill_across_cycles_is_not_double_applied():
+    """KIS 체결조회는 누적 수량을 준다. 취소 실패로 pending이 복원돼 같은 odno를
+    다음 사이클에 또 조회하면, 같은 누적값이 다시 온다 — applied_qty 없이 그걸
+    또 반영하면 2주 체결이 4주로 불어난다(호출부가 반영분을 이어 붙였다고 가정)."""
+    led = _buy_ledger()  # 주문 3주
+
+    cancels = reconcile_pending(led, {'OD1': (FILLED, _fill(2, 111200))}, TODAY)
+    assert led['positions']['353200']['quantity'] == 2
+    assert cancels == [{'odno': 'OD1', 'code': '353200', 'qty': 1, 'applied_qty': 2}]
+
+    # 호출부(settle_pending_orders)가 취소 실패로 pending을 복원하되, 반환된
+    # applied_qty를 이어 붙인 상태를 재현한다.
+    led['pending_orders']['353200'] = {
+        'odno': 'OD1', 'side': 'buy', 'qty': 3, 'price': 111000,
+        'ordered_at': '2026-08-11T09:20:31', 'avg_price': None, 'tag': None,
+        'snapshot': {}, 'applied_qty': 2,
+    }
+
+    # 다음 사이클: 같은 odno가 여전히 누적 2주(체결 진행 없음)로 조회된다.
+    cancels2 = reconcile_pending(led, {'OD1': (FILLED, _fill(2, 111200))}, TODAY)
+    assert led['positions']['353200']['quantity'] == 2, '체결 진행이 없으면 중복 반영되면 안 된다'
+    assert cancels2 == [{'odno': 'OD1', 'code': '353200', 'qty': 1, 'applied_qty': 2}]
+
+
+def test_buy_partial_fill_completes_on_later_cycle_adds_only_delta():
+    """이어지는 사이클에서 나머지가 마저 체결되면, 이미 반영된 몫을 뺀 차분만 더한다."""
+    led = _buy_ledger()  # 주문 3주
+
+    reconcile_pending(led, {'OD1': (FILLED, _fill(2, 111200))}, TODAY)
+    assert led['positions']['353200']['quantity'] == 2
+
+    led['pending_orders']['353200'] = {
+        'odno': 'OD1', 'side': 'buy', 'qty': 3, 'price': 111000,
+        'ordered_at': '2026-08-11T09:20:31', 'avg_price': None, 'tag': None,
+        'snapshot': {}, 'applied_qty': 2,
+    }
+
+    # 나머지 1주가 마저 체결 — 누적 3/3(전량)으로 조회된다.
+    cancels2 = reconcile_pending(led, {'OD1': (FILLED, _fill(3, 111200))}, TODAY)
+    assert led['positions']['353200']['quantity'] == 3, "누적 체결량(3)을 또 더하면 안 된다(2→5 버그)"
+    assert cancels2 == []  # 전량 체결 → 취소 불필요
 
 
 # ---- 매도 ----

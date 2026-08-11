@@ -40,7 +40,7 @@ from src.pipeline.context import MARKET_CLOSE_HHMM
 from src.trade.fees import realized_pnl_after_fees
 from src.trade.pending import register_pending
 from src.pipeline.workers.program_turn import (
-    REGIME_TAG, new_turn, switch_tag, record_sell, prune_basis,
+    REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
 )
 
 
@@ -470,6 +470,90 @@ def peek_selected_sim(log=print) -> str | None:
     return sim_id
 
 
+def _kis_date(s: str | None) -> str:
+    """'YYYY-MM-DD...'(대시 포함) 또는 ISO 타임스탬프에서 KIS 조회 형식(YYYYMMDD)을 뽑는다."""
+    return (s or '')[:10].replace('-', '')
+
+
+def _lookup_by_pending_date(pending_orders: dict, today: str, lookup_fn=None):
+    """odno별 조회에 그 pending 항목의 ordered_at을 조회 시작일로 넘기는 lookup을 만든다.
+
+    `settle_pending_orders`의 `lookup` 인자(odno 하나만 받는 콜백)와 호환되도록
+    클로저로 감싼다 — `settle_pending_orders` 자체의 시그니처는 바꾸지 않는다
+    (approved 테스트가 1-인자 콜백을 전제한다).
+
+    날짜를 안 넘기면 `lookup_execution`은 오늘 하루로만 조회한다. 장 마감
+    직전에 낸 주문이 다음 거래일까지 안 걸리면, 다음 거래일 조회는 어제 체결을
+    못 찾아 UNFILLED로 오판한다 — 이미 체결된(혹은 이미 취소된) 주문을 또
+    취소하려다 실패하고, 그 pending이 영구히 남아 해당 종목의 신규 매수를
+    막는다(실계좌엔 포지션이 있는데 원장엔 없는 고착 상태).
+    """
+    if lookup_fn is None:
+        from src.trade.executions import lookup_execution as lookup_fn
+
+    today_kis = _kis_date(today)
+
+    def _lookup(odno):
+        from_date = today_kis
+        for p in pending_orders.values():
+            if p.get('odno') == odno:
+                from_date = _kis_date(p.get('ordered_at')) or today_kis
+                break
+        return lookup_fn(odno, from_date=from_date, to_date=today_kis)
+
+    return _lookup
+
+
+def _pending_buy_cost(pending_orders: dict | None) -> float:
+    """미체결 매수 주문이 묶어 둔 예상 현금(수량 × 지정가) 합계.
+
+    매수는 체결 확인 전까지 `positions`에 안 들어가므로(Task 6), 그 값만으로
+    `invested_cost`를 계산하면 이미 낸 지정가 매수의 현금이 아직 안 쓴 것처럼
+    보인다 — 그러면 다음 사이클이 같은 예산으로 다른 종목을 또 산다(이중 지출).
+    확정 전이라도 주문을 낸 순간부터 그 돈은 묶어 둔다.
+    """
+    return sum(
+        p['qty'] * p['price'] for p in (pending_orders or {}).values()
+        if p.get('side') == 'buy'
+    )
+
+
+def _seed_turn_basis_for_settled_buys(turn, pending_buy_codes, pre_settle_positions,
+                                      positions, log_error=print):
+    """정산으로 방금 확정된 매수를 turn.basis에 반영한다(표시 전용).
+
+    settle_pending_orders는 turn을 모른다(시그니처에 없다) — 매수가 이 사이클
+    안에서 곧바로 positions에 들어가던 옛 시장가 시절엔 record_buy가 그 자리에서
+    바로 불렸지만, 지정가+정산 구조에서는 여기서 대신 해줘야 한다. 안 하면
+    이후 매도가 이 종목의 turn PnL을 조용히 못 잡고(program_turn.record_sell은
+    code가 basis에 없으면 no-op), 프론트(computeTurnPnl)는 기준가 없는 종목의
+    미실현 손익을 "모른다"가 아니라 0으로 표시한다 — 확정처럼 보이는 거짓 0이다.
+
+    `pre_settle_positions`: 정산 **전** `positions.get(code)`의 사본(코드별).
+    `positions`: 정산 **후** positions(이 함수 호출 시점의 `ledger['positions']`).
+    두 스냅샷의 avg_price·quantity 차이로 "이번에 새로 들어온 체결분의 가격"을
+    역산한다 — `_enter_position`이 가중평균으로 합친 값이라 별도 조회 없이
+    정확히 복원된다.
+    """
+    if not turn:
+        return
+    for code in pending_buy_codes:
+        prev = pre_settle_positions.get(code) or {}
+        prev_qty = int(prev.get('quantity', 0))
+        cur = positions.get(code)
+        new_qty = int(cur.get('quantity', 0)) if cur else 0
+        delta = new_qty - prev_qty
+        if delta <= 0:
+            continue  # 이번 사이클에 새로 확정된 체결이 없음
+        prev_avg = float(prev.get('avg_price', 0) or 0)
+        new_avg = float(cur.get('avg_price', 0) or 0)
+        fill_price = ((new_avg * new_qty) - (prev_avg * prev_qty)) / delta
+        try:
+            record_buy(turn, code, delta, fill_price, prev_qty)
+        except Exception as e:
+            log_error(f'[Program] 턴 기준가 반영 실패(무시): {e}')
+
+
 def settle_pending_orders(ledger, today, lookup, cancel, log, log_error):
     """pending을 정산하고 미체결 잔량을 취소한다. I/O는 주입받는다(테스트 가능).
 
@@ -489,7 +573,12 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error):
             log(f"[Program] 미체결 취소: {req['code']} {req['qty']}주 (odno={req['odno']})")
         else:
             log_error(f"[Program] 취소 실패 — {req['code']} pending 유지, 재주문 안 함")
-            ledger.setdefault('pending_orders', {})[req['code']] = snapshot[req['code']]
+            # applied_qty를 이번 조회의 누적 체결량으로 갱신해 이어 붙인다 —
+            # 원본 스냅샷을 그대로 복원하면(applied_qty가 옛 값에 머물면) 다음
+            # 사이클에 같은 누적 체결이 또 반영된다(2주 체결이 4주, 6주로 불어남).
+            restored = dict(snapshot[req['code']])
+            restored['applied_qty'] = req['applied_qty']
+            ledger.setdefault('pending_orders', {})[req['code']] = restored
 
 
 def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: datetime,
@@ -610,10 +699,21 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
 
         # 5-b. pending 정산은 심 판단보다 먼저다. 정산 전에 판단하면 심이 낡은
         #      보유 상태를 본다 — 방금 체결된 매수를 못 보고 또 사려 들 수 있다.
-        from src.trade.executions import lookup_execution
+        # 정산 전 미체결 매수 코드/수량을 찍어 둔다 — 정산 후 turn.basis 반영에 쓴다.
+        pending_before = dict(ledger.get('pending_orders') or {})
+        pending_buy_codes = {c for c, p in pending_before.items() if p.get('side') == 'buy'}
+        pre_settle_positions = {c: dict(positions.get(c) or {}) for c in pending_buy_codes}
+
         from src.trade.order_cancel import cancel_order
-        settle_pending_orders(ledger, today, lookup_execution, cancel_order, log, log_error)
+        settle_pending_orders(
+            ledger, today, _lookup_by_pending_date(pending_before, today),
+            cancel_order, log, log_error)
         positions = ledger['positions']
+
+        # [턴 회계] 정산으로 방금 확정된 매수를 기준가(turn.basis)에 반영한다.
+        _seed_turn_basis_for_settled_buys(
+            ledger.get('turn') or {}, pending_buy_codes, pre_settle_positions, positions,
+            log_error)
 
         # 6. 심 인스턴스화(화이트리스트). 사이징을 effective_budget 기준으로 스케일
         #    → 시뮬(initial_cash/N 사이징)의 비례 축소 복제본으로 동작.
@@ -661,7 +761,11 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             turn = ledger.get('turn') or {}  # 기존 턴 레코드를 날리지 않는다(다음 실행이 재시도)
 
         # 8. 실계좌 스냅샷 state 구성 (cash = effective_budget − 프로그램 기투자 원가)
+        # 미체결 매수도 현금을 미리 묶어 둔다 — positions엔 아직 안 들어가 있지만
+        # (Task 6, 체결 확인 전) 이미 낸 주문이라 그 돈은 실제로 못 쓴다. 안 묶으면
+        # 이번 사이클의 미확정 매수와 다음 사이클의 새 매수가 같은 예산을 두 번 쓴다.
         invested_cost = sum(p['avg_price'] * p['quantity'] for p in positions.values())
+        invested_cost += _pending_buy_cost(ledger.get('pending_orders'))
         snapshot_portfolio = {c: dict(p) for c, p in positions.items()}
         for c, p in snapshot_portfolio.items():
             p.setdefault('name', c)

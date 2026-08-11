@@ -123,6 +123,41 @@ def test_buy_partial_fill_completes_on_later_cycle_adds_only_delta():
 
 # ---- 매도 ----
 
+def test_buy_unfilled_after_partial_preserves_applied_qty_for_restore():
+    """부분체결(2주) 후, 다음 조회가 일시적으로 UNFILLED로 와도 복원용
+    applied_qty가 0으로 리셋되면 안 된다 — 0으로 리셋되면 그 다음 FILLED 조회가
+    같은 누적 2주를 또 반영해 포지션이 부풀어 오른다(finding 2)."""
+    led = _buy_ledger()  # 주문 3주
+
+    cancels = reconcile_pending(led, {'OD1': (FILLED, _fill(2, 111200))}, TODAY)
+    assert led['positions']['353200']['quantity'] == 2
+    assert cancels == [{'odno': 'OD1', 'code': '353200', 'qty': 1, 'applied_qty': 2}]
+
+    # 호출부(settle_pending_orders)가 취소 실패로 복원 — applied_qty=2를 이어 붙인다.
+    led['pending_orders']['353200'] = {
+        'odno': 'OD1', 'side': 'buy', 'qty': 3, 'price': 111000,
+        'ordered_at': '2026-08-11T09:20:31', 'avg_price': None, 'tag': None,
+        'snapshot': {}, 'applied_qty': 2,
+    }
+
+    # 다음 사이클: 조회가 일시적으로 UNFILLED로 온다(체결 데이터 없음).
+    cancels2 = reconcile_pending(led, {'OD1': (UNFILLED, None)}, TODAY)
+    assert led['positions']['353200']['quantity'] == 2, 'UNFILLED가 이미 반영된 몫을 되돌리면 안 된다'
+    assert cancels2 == [{'odno': 'OD1', 'code': '353200', 'qty': 3, 'applied_qty': 2}], \
+        'applied_qty가 0으로 리셋되면 다음 FILLED 응답이 이미 반영된 2주를 또 반영한다'
+
+    # 호출부가 다시 복원 — 고쳐진 applied_qty=2를 이어 붙인다.
+    led['pending_orders']['353200'] = {
+        'odno': 'OD1', 'side': 'buy', 'qty': 3, 'price': 111000,
+        'ordered_at': '2026-08-11T09:20:31', 'avg_price': None, 'tag': None,
+        'snapshot': {}, 'applied_qty': cancels2[0]['applied_qty'],
+    }
+
+    # 같은 누적 2주가 다시 FILLED로 온다(체결 진행 없음) — 재적용되면 4주가 된다.
+    reconcile_pending(led, {'OD1': (FILLED, _fill(2, 111200))}, TODAY)
+    assert led['positions']['353200']['quantity'] == 2, '중복 반영되면 안 된다(수량 부풀림 버그 재발)'
+
+
 def test_sell_filled_corrects_to_measured_price():
     led = _sell_ledger()
 
@@ -215,9 +250,13 @@ def test_missing_lookup_is_treated_as_unknown():
 
 
 def test_register_rejects_second_order_for_same_code():
-    """종목당 1건 — 이 제약이 중복 주문 방지의 근거다."""
+    """종목당 1건 — 이 제약이 중복 주문 방지의 근거다. 거부는 침묵하면 안 된다
+    (finding 4 — 침묵하면 그 매도의 실현손익이 추정가로 영구히 고정된다)."""
     led = _buy_ledger()
+    logged = []
 
-    register_pending(led, '353200', 'OD2', 'buy', 5, 112000, '2026-08-11T09:22:31')
+    register_pending(led, '353200', 'OD2', 'buy', 5, 112000, '2026-08-11T09:22:31',
+                     log_error=logged.append)
 
     assert led['pending_orders']['353200']['odno'] == 'OD1', '기존 주문을 덮어쓰면 안 된다'
+    assert logged, '거부됐다는 사실이 사람에게 보여야 한다'

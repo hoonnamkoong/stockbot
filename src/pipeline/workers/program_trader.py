@@ -534,9 +534,12 @@ def _seed_turn_basis_for_settled_buys(turn, pending_buy_codes, pre_settle_positi
     두 스냅샷의 avg_price·quantity 차이로 "이번에 새로 들어온 체결분의 가격"을
     역산한다 — `_enter_position`이 가중평균으로 합친 값이라 별도 조회 없이
     정확히 복원된다.
+
+    반환: 이번 사이클에 수량이 늘어 "체결 확정"으로 잡힌 종목 수. 완료 로그가
+    주문 접수 건수와 실제 체결 건수를 구분해 찍는 데 쓴다(finding 3 — 지정가
+    전환 후 "접수 = 체결"로 세면 체결률이 실제보다 항상 좋아 보인다).
     """
-    if not turn:
-        return
+    settled = 0
     for code in pending_buy_codes:
         prev = pre_settle_positions.get(code) or {}
         prev_qty = int(prev.get('quantity', 0))
@@ -545,6 +548,9 @@ def _seed_turn_basis_for_settled_buys(turn, pending_buy_codes, pre_settle_positi
         delta = new_qty - prev_qty
         if delta <= 0:
             continue  # 이번 사이클에 새로 확정된 체결이 없음
+        settled += 1
+        if not turn:
+            continue  # 체결 확정 집계는 turn 유무와 무관하다 — 기준가 반영만 turn이 필요
         prev_avg = float(prev.get('avg_price', 0) or 0)
         new_avg = float(cur.get('avg_price', 0) or 0)
         fill_price = ((new_avg * new_qty) - (prev_avg * prev_qty)) / delta
@@ -552,15 +558,27 @@ def _seed_turn_basis_for_settled_buys(turn, pending_buy_codes, pre_settle_positi
             record_buy(turn, code, delta, fill_price, prev_qty)
         except Exception as e:
             log_error(f'[Program] 턴 기준가 반영 실패(무시): {e}')
+    return settled
 
 
-def settle_pending_orders(ledger, today, lookup, cancel, log, log_error):
+def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
+                          now_kst=None, alert=None):
     """pending을 정산하고 미체결 잔량을 취소한다. I/O는 주입받는다(테스트 가능).
 
     취소가 실패하면 그 종목의 pending을 되살린다 — 다음 사이클에 새 주문을
     막기 위해서다. 중복 주문보다 한 사이클 기회손실이 싸다.
+
+    **단, 그 pending이 어제(또는 그 전) 낸 주문이면 되살리지 않는다.** KRX
+    정규 주문은 장 마감에 소멸한다 — 날짜 경계를 넘긴 지정가는 KIS가 더는
+    인식하지 못해 취소가 영원히 실패하고, 되살리기를 반복하면 그 종목은
+    영구히 매수가 막히고(`pending_codes`) 예산도 영구히 묶인다
+    (`_pending_buy_cost`). 이런 상태는 스스로 회복되지 않으므로 pending에서
+    제거하고 사람에게 알린다(부분체결분은 이미 positions에 반영돼 있다 —
+    건드리지 않는다).
     """
     from src.trade.pending import reconcile_pending
+    if alert is None:
+        alert = alerts.send_alert_once
 
     pend = ledger.get('pending_orders') or {}
     if not pend:
@@ -569,16 +587,35 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error):
     snapshot = {c: dict(p) for c, p in pend.items()}
 
     for req in reconcile_pending(ledger, lookups, today):
-        if cancel(req['odno'], req['code'], req['qty']):
-            log(f"[Program] 미체결 취소: {req['code']} {req['qty']}주 (odno={req['odno']})")
-        else:
-            log_error(f"[Program] 취소 실패 — {req['code']} pending 유지, 재주문 안 함")
-            # applied_qty를 이번 조회의 누적 체결량으로 갱신해 이어 붙인다 —
-            # 원본 스냅샷을 그대로 복원하면(applied_qty가 옛 값에 머물면) 다음
-            # 사이클에 같은 누적 체결이 또 반영된다(2주 체결이 4주, 6주로 불어남).
-            restored = dict(snapshot[req['code']])
-            restored['applied_qty'] = req['applied_qty']
-            ledger.setdefault('pending_orders', {})[req['code']] = restored
+        code = req['code']
+        if cancel(req['odno'], code, req['qty']):
+            log(f"[Program] 미체결 취소: {code} {req['qty']}주 (odno={req['odno']})")
+            continue
+
+        entry = snapshot[code]
+        ordered_date = (entry.get('ordered_at') or '')[:10]
+        if ordered_date and ordered_date < today:
+            log_error(f"[Program] 취소 실패 — {code}는 어제 이전 주문"
+                      f"(ordered_at={entry.get('ordered_at')})이라 재시도를 멈추고 "
+                      f"pending에서 제거합니다. KIS가 더 이상 인식하지 않는 주문입니다.")
+            alert(
+                f'pending_stale_{code}',
+                f'[Program] 날짜 경계 미체결 종결\n\n{code} — 어제 이전에 낸 지정가 주문'
+                f'(odno={entry.get("odno")})의 취소가 실패했습니다. 주문일이 오늘 이전이라 '
+                f'더 이상 재시도하지 않고 pending에서 제거합니다. KIS 체결 내역을 직접 '
+                f'확인하세요(미체결로 소멸했을 가능성이 큽니다).',
+                now_kst or datetime.strptime(today, '%Y-%m-%d'),
+                log=log_error,
+            )
+            continue  # 복원하지 않음 — 부분체결분은 이미 positions에 반영돼 있다.
+
+        log_error(f"[Program] 취소 실패 — {code} pending 유지, 재주문 안 함")
+        # applied_qty를 이번 조회의 누적 체결량으로 갱신해 이어 붙인다 —
+        # 원본 스냅샷을 그대로 복원하면(applied_qty가 옛 값에 머물면) 다음
+        # 사이클에 같은 누적 체결이 또 반영된다(2주 체결이 4주, 6주로 불어남).
+        restored = dict(entry)
+        restored['applied_qty'] = req['applied_qty']
+        ledger.setdefault('pending_orders', {})[code] = restored
 
 
 def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: datetime,
@@ -707,13 +744,17 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         from src.trade.order_cancel import cancel_order
         settle_pending_orders(
             ledger, today, _lookup_by_pending_date(pending_before, today),
-            cancel_order, log, log_error)
+            cancel_order, log, log_error, now_kst=now_kst)
         positions = ledger['positions']
 
         # [턴 회계] 정산으로 방금 확정된 매수를 기준가(turn.basis)에 반영한다.
-        _seed_turn_basis_for_settled_buys(
+        settled_buy_count = _seed_turn_basis_for_settled_buys(
             ledger.get('turn') or {}, pending_buy_codes, pre_settle_positions, positions,
             log_error)
+        if pending_buy_codes:
+            # "체결"을 주장할 수 있는 유일한 지점 — 주문 접수와 다르다(finding 3).
+            log(f'[Program] 미체결 정산: 매수 체결 확정 {settled_buy_count}/'
+                f'{len(pending_buy_codes)}건')
 
         # 6. 심 인스턴스화(화이트리스트). 사이징을 effective_budget 기준으로 스케일
         #    → 시뮬(initial_cash/N 사이징)의 비례 축소 복제본으로 동작.
@@ -815,6 +856,8 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     # 10. 안전 필터 + 집행
     from src.trade_executor import place_order_via_vercel, append_order_history
     executed = 0
+    sell_filled = 0   # 매도는 시장가라 이 자리에서 즉시 체결로 본다(설계상 진실)
+    buy_placed = 0    # 매수는 지정가라 여기선 접수일 뿐 — 체결은 settle_pending_orders가 확정
     failed_codes: set = set()
 
     # 준비 단계(잔고 조회 → 정합 → 유니버스 보강 → 심 실행)에 쓴 시간. 정상은
@@ -906,14 +949,14 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                     if odno:
                         register_pending(ledger, code, odno, 'sell', qty, price,
                                          now_kst.isoformat(), avg_price=avg, tag=active_tag,
-                                         snapshot=pre_sell_snapshot)
+                                         snapshot=pre_sell_snapshot, log_error=log_error)
                 else:
                     # 매수는 원장에 넣지 않는다 — 체결 확인 후 다음 사이클
                     # (settle_pending_orders)에 들어간다. 여기서 넣으면 "주문 접수 =
                     # 체결"로 간주하던 옛 버그가 지정가에서 재발한다.
                     if odno:
                         register_pending(ledger, code, odno, 'buy', qty, limit_price,
-                                         now_kst.isoformat(), tag=active_tag)
+                                         now_kst.isoformat(), tag=active_tag, log_error=log_error)
                 append_order_history({
                     'executed_at': now_kst.isoformat(), 'side': side, 'code': code,
                     'name': o.get('name', ''), 'qty': qty, 'price': price,
@@ -923,9 +966,11 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 })
                 executed += 1
                 if side == 'sell':
+                    sell_filled += 1
                     log(f"[Program] 체결: SELL {code} {qty}주 @ {price}"
                         f"{f' (odno={odno})' if odno else ''}")
                 else:
+                    buy_placed += 1
                     log(f"[Program] 지정가 주문 접수: BUY {code} {qty}주 @ {price}"
                         f"{f' (odno={odno})' if odno else ''} — 체결 확인 대기")
             else:
@@ -956,7 +1001,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         msg = (f"락을 빼앗겼습니다(내 run_id={run_id}, "
                f"현재={current.get('lock_run_id')}). 이 런의 결과를 덮어쓰지 않습니다 — "
                f"중복 체결 가능성이 있으니 KIS 체결 내역을 확인하세요. "
-               f"체결 {executed}/{len(orders)}건.")
+               f"주문 처리 {executed}/{len(orders)}건(매도체결 {sell_filled}·매수접수 {buy_placed}).")
         log_error(f'[Program] ⚠ {msg}')
         # 실제 돈이 두 번 나갔을 수 있는 유일한 신호다. log_error는 print라
         # Actions 로그에만 남는다 — 사람에게 직접 보낸다. 반복 억제는 걸지
@@ -966,7 +1011,12 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     if current_sha:
         ledger_sha = current_sha
     _write_ledger(_release_payload(ledger), ledger_sha, log)
-    log(f'[Program] 완료: {executed}/{len(orders)}건 체결 (sim={sim_id})')
+    # "체결"이라 부를 수 있는 건 매도(시장가, 이 자리에서 즉시)뿐이다. 매수는
+    # 지정가라 여기선 접수일 뿐 — 체결 확정은 다음 사이클 settle_pending_orders가
+    # 한다. 여기서 buy_placed까지 "체결"로 합쳐 세면(finding 3), 배포 후 관찰
+    # 체크리스트가 보는 체결률이 실제 체결 실패를 가린 채 항상 건강해 보인다.
+    log(f'[Program] 완료: 매도체결 {sell_filled}건, 매수주문접수 {buy_placed}건 '
+        f'(전체 {executed}/{len(orders)}건 처리, sim={sim_id})')
     return sim_candidates
 
 

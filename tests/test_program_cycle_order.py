@@ -91,6 +91,48 @@ def test_settle_partial_fill_across_cycles_does_not_double_apply():
     assert led['pending_orders'] == {}
 
 
+# ---- 날짜 경계 넘는 pending: 취소 실패 시 종결 처리(finding 1) ----
+
+def test_stale_pending_removed_not_restored_when_cancel_fails():
+    """어제 낸 pending의 취소가 실패하면 되살리지 않는다 — KIS가 더는 인식하지
+    않는 주문이라 되살려 봐야 다음 사이클에도 영원히 취소가 실패해, 그 종목의
+    매수를 영구히 막고 예산을 영구히 묶는다(자가 치유 불가)."""
+    led = {'positions': {}, 'realized_pnl': 0, 'pending_orders': {
+        '353200': {'odno': 'OD1', 'side': 'buy', 'qty': 3, 'price': 111000,
+                   'ordered_at': '2026-08-10T15:19:00+09:00', 'avg_price': None, 'tag': None}}}
+    alerts_fired = []
+
+    settle_pending_orders(
+        led, '2026-08-11',
+        lookup=lambda odno: (UNFILLED, None),
+        cancel=lambda odno, code, qty: False,
+        log=lambda *a: None, log_error=lambda *a: None,
+        alert=lambda *a, **k: alerts_fired.append((a, k)) or True,
+    )
+
+    assert '353200' not in led['pending_orders'], '어제 주문은 취소 실패해도 되살리면 안 된다'
+    assert alerts_fired, '스스로 회복되지 않는 상태이므로 사람에게 알려야 한다'
+
+
+def test_same_day_pending_still_restored_when_cancel_fails():
+    """당일 pending은 기존 동작대로 되살아나야 한다 — finding 1 수정의 회귀 방지."""
+    led = {'positions': {}, 'realized_pnl': 0, 'pending_orders': {
+        '353200': {'odno': 'OD1', 'side': 'buy', 'qty': 3, 'price': 111000,
+                   'ordered_at': '2026-08-11T09:20:00+09:00', 'avg_price': None, 'tag': None}}}
+    alerts_fired = []
+
+    settle_pending_orders(
+        led, '2026-08-11',
+        lookup=lambda odno: (UNFILLED, None),
+        cancel=lambda odno, code, qty: False,
+        log=lambda *a: None, log_error=lambda *a: None,
+        alert=lambda *a, **k: alerts_fired.append((a, k)) or True,
+    )
+
+    assert '353200' in led['pending_orders'], '당일 pending은 그대로 복원돼야 한다(회귀 방지)'
+    assert alerts_fired == [], '당일 케이스는 종결 대상이 아니므로 알림도 없어야 한다'
+
+
 # ---- _lookup_by_pending_date: 날짜 경계 넘는 pending 조회 ----
 
 def test_lookup_by_pending_date_uses_ordered_at_as_from_date():

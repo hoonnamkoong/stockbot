@@ -16,10 +16,15 @@ from src.trade.fees import realized_pnl_after_fees
 
 
 def register_pending(ledger, code, odno, side, qty, price, ordered_at,
-                     avg_price=None, tag=None, snapshot=None):
+                     avg_price=None, tag=None, snapshot=None, log_error=None):
     """주문을 pending에 올린다. **종목당 1건** — 이미 있으면 덮어쓰지 않는다.
 
     덮어쓰면 먼저 낸 주문의 주문번호를 잃어 영원히 정산도 취소도 못 한다.
+
+    거부는 조용히 넘어가지 않는다: `log_error`가 주어지면 남긴다. 매도가 이
+    경로로 거부되면(같은 종목에 이미 pending 매수/매도가 있는 경우) 그 매도는
+    정산 대상이 아니게 되어 실현손익이 추정가로 영구히 고정된다 — 사람이 볼
+    수 있어야 한다.
 
     `snapshot`: 매도 시, 주문을 내기 **직전** `positions[code]`의 사본
     (`entry_date`·`is_scaled_out`·`peak_price` 등). 매도는 주문과 동시에
@@ -29,6 +34,10 @@ def register_pending(ledger, code, odno, side, qty, price, ordered_at,
     """
     pend = ledger.setdefault('pending_orders', {})
     if code in pend:
+        if log_error:
+            log_error(f'[Program] pending 등록 거부 — {code}는 이미 pending 중'
+                      f'(odno={pend[code].get("odno")}). 이번 {side} 주문'
+                      f'(odno={odno})은 정산 대상에서 빠집니다.')
         return
     pend[code] = {
         'odno': odno, 'side': side, 'qty': int(qty), 'price': float(price),
@@ -71,9 +80,14 @@ def reconcile_pending(ledger, lookups, today):
             if new_fill > 0:
                 _enter_position(positions, code, p, new_fill, fill_px, today)
             if filled_qty < ordered_qty:
+                # UNFILLED 응답은 filled_qty=0으로 온다 — 이전 사이클에서 이미
+                # 부분체결분을 반영했어도(already_applied) 그대로 0을 넘기면,
+                # 복원된 pending의 applied_qty가 0으로 리셋된다. 다음 사이클에
+                # 같은 누적 체결이 다시 FILLED로 돌아오면 그 몫이 또 반영된다
+                # (예: 2주 체결 → UNFILLED 한 번 낌 → 같은 2주 FILLED → 4주로 오적용).
                 cancels.append({'odno': p['odno'], 'code': code,
                                 'qty': ordered_qty - filled_qty,
-                                'applied_qty': filled_qty})
+                                'applied_qty': max(filled_qty, already_applied)})
         else:
             _correct_sell(ledger, positions, code, p, filled_qty, fill_px)
 

@@ -80,3 +80,60 @@ def test_network_failure_on_retry_reports_failure(tg, monkeypatch):
 
     assert tg.send_message('hi') is False
     assert len(calls) == 2
+
+
+# ── 4096자 상한 — [2026-08-11] 딥다이브가 5종목으로 늘며 실제로 넘을 수 있게 됨 ──
+
+def test_short_message_is_sent_as_a_single_call(tg, monkeypatch):
+    calls = []
+    monkeypatch.setattr(requests, 'post', _fake_post([_FakeResponse(200)], calls))
+
+    assert tg.send_message('짧은 메시지') is True
+    assert len(calls) == 1
+
+
+def test_long_message_is_split_into_multiple_calls(tg, monkeypatch):
+    """상한을 넘는 메시지는 한 번에 안 보내고 문단 경계로 나눠 여러 번 보낸다."""
+    paragraph = '가' * 2000
+    long_text = f"{paragraph}\n\n{paragraph}\n\n{paragraph}"  # 6000+자, 3개 문단
+    calls = []
+    monkeypatch.setattr(requests, 'post',
+                        _fake_post([_FakeResponse(200)] * 10, calls))
+
+    ok = tg.send_message(long_text)
+
+    assert ok is True
+    assert len(calls) >= 2, '4096자 상한을 넘는데 한 번에 보내려 했다'
+    for c in calls:
+        assert len(c['text']) <= tg.TELEGRAM_SAFE_LEN
+
+
+def test_one_failed_chunk_makes_the_whole_send_report_failure(tg, monkeypatch):
+    """나눠 보낸 조각 중 하나라도 실패하면 전체를 성공으로 기록하면 안 된다 —
+    안 그러면 일부 종목 리포트가 조용히 사라진다."""
+    paragraph = '나' * 2000
+    long_text = f"{paragraph}\n\n{paragraph}\n\n{paragraph}"
+    calls = []
+    # 첫 조각 성공, 나머지는 재시도까지 전부 401
+    responses = [_FakeResponse(200)] + [_FakeResponse(401)] * 10
+    monkeypatch.setattr(requests, 'post', _fake_post(responses, calls))
+
+    assert tg.send_message(long_text) is False
+
+
+def test_split_into_chunks_keeps_each_chunk_under_limit():
+    text = '\n\n'.join(['단락' * 100] * 5)  # 각 단락 400자, 5개
+    chunks = TelegramManager._split_into_chunks(text, limit=1000)
+
+    assert all(len(c) <= 1000 for c in chunks)
+    # 원문의 모든 문단이 어딘가에는 남아있어야 한다(유실 없음)
+    assert ''.join(chunks).replace('\n\n', '') == text.replace('\n\n', '')
+
+
+def test_split_into_chunks_force_splits_a_single_oversized_paragraph():
+    """문단 하나가 그 자체로 limit을 넘는 드문 경우도 유실 없이 잘라야 한다."""
+    text = '다' * 5000  # 문단 하나, 구분자 없음
+    chunks = TelegramManager._split_into_chunks(text, limit=2000)
+
+    assert all(len(c) <= 2000 for c in chunks)
+    assert ''.join(chunks) == text

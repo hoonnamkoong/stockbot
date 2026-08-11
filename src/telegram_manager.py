@@ -16,12 +16,55 @@ class TelegramManager:
         if not self.token or not self.chat_id:
             print("[TelegramManager] WARNING: Missing Token or Chat ID.")
             
+    # 텔레그램 sendMessage 실제 상한은 4096자. HTML 태그·이모지 바이트 오차를
+    # 감안해 여유를 둔다. [2026-08-11] 딥다이브가 2→5종목으로 늘면서 한 메시지가
+    # 상한을 넘을 수 있게 됐다 — 넘으면 API가 그냥 거부하는데, 기존 코드는
+    # 그 실패를 아무도 안 보고 "발송 완료"로 기록했다.
+    TELEGRAM_SAFE_LEN = 3900
+
     def send_message(self, text, parse_mode="HTML"):
-        """Sends a raw message to Telegram."""
+        """텔레그램으로 보낸다. 상한을 넘으면 문단(빈 줄) 경계로 나눠 여러
+        메시지로 순차 발송한다. 나눠 보낸 것 중 하나라도 실패하면 False를
+        돌려준다 — 일부만 갔는데 성공으로 기록되면 나머지가 조용히 사라진다."""
         if not self.token or not self.chat_id:
             print("[TelegramManager] Skipped: No credentials.")
             return False
-            
+        if len(text) <= self.TELEGRAM_SAFE_LEN:
+            return self._send_single(text, parse_mode)
+
+        chunks = self._split_into_chunks(text, self.TELEGRAM_SAFE_LEN)
+        print(f"[TelegramManager] 메시지가 {len(text)}자라 {len(chunks)}개로 나눠 보냅니다.")
+        ok = True
+        for chunk in chunks:
+            if not self._send_single(chunk, parse_mode):
+                ok = False
+        return ok
+
+    @staticmethod
+    def _split_into_chunks(text: str, limit: int) -> list:
+        """빈 줄(\\n\\n) 경계로 나눠 각 조각이 limit 이하가 되게 묶는다.
+        문단 하나가 그 자체로 limit을 넘는 드문 경우만 강제로 자른다."""
+        paragraphs = text.split('\n\n')
+        chunks, current = [], ''
+        for p in paragraphs:
+            candidate = f"{current}\n\n{p}" if current else p
+            if len(candidate) <= limit:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current)
+                current = ''
+            if len(p) > limit:
+                for start in range(0, len(p), limit):
+                    chunks.append(p[start:start + limit])
+            else:
+                current = p
+        if current:
+            chunks.append(current)
+        return chunks
+
+    def _send_single(self, text, parse_mode="HTML"):
+        """Sends a raw message to Telegram (4096자 이내라고 가정)."""
         payload = {
             "chat_id": self.chat_id,
             "text": text,

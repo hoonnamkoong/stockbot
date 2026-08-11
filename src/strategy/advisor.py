@@ -403,9 +403,9 @@ class StrategyAdvisor:
 
     def generate_deep_dive_report(self, final_candidates, sell_candidate=None):
         """
-        딥다이브 리포트 — 5개 섹션 번호 포맷.
-        1. 사업 요약  2. 추천 근거  3. 리스크
-        4. 투자 데이터 (목표가: KIS 컨센서스 평균)  5. 관련 기사
+        딥다이브 리포트 — 6개 섹션 번호 포맷.
+        1. 사업 요약  2. 추천 근거  3. 향후 전망(AI 추정)  4. 리스크
+        5. 투자 데이터 (목표가: KIS 컨센서스 평균)  6. 관련 기사
         """
         if not final_candidates and not sell_candidate:
             return "분석 대상 종목이 없습니다."
@@ -424,7 +424,7 @@ class StrategyAdvisor:
         except Exception:
             sector_cache = None
 
-        for stock in final_candidates[:2]:
+        for stock in final_candidates[:5]:
             cur = stock.get('price', stock.get('current_price', 0)) or 0
 
             # 뉴스 아이템 (제목 + URL)
@@ -458,11 +458,18 @@ class StrategyAdvisor:
 {stock.get('posts_summary', '정보 없음')}
 {news_section}
 
+outlook_bullets는 위에 주어진 근거(토론 요약·뉴스·외인변화·52주 위치)가
+유지되거나 꺾일 경우 각각 어떤 흐름이 예상되는지 시나리오로 설명하세요.
+**목표 주가·구체적 수익률(%)·기간을 새로 지어내지 마세요** — 위에 주어지지
+않은 숫자를 만들면 안 됩니다. 판단할 근거가 부족하면 "판단 근거 부족"이라고
+답하세요. 이건 확정 예측이 아니라 근거 기반 시나리오입니다.
+
 다음 JSON 형식으로만 답변하세요. 각 항목은 간결한 명사형 불렛 포인트 배열입니다:
 {{
   "rank_and_recommendation": "강력 매수 또는 매수 등 추천 등급",
   "business_bullets": ["주요 사업 핵심 1문장 (핵심 키워드 중심)"],
   "rationale_bullets": ["근거1", "근거2", "근거3 (최대 5개)"],
+  "outlook_bullets": ["근거 유지 시 시나리오", "근거 약화 시 시나리오 (최대 3개)"],
   "risk_bullets": ["리스크1", "리스크2 (최대 3개)"]
 }}"""
             try:
@@ -490,6 +497,7 @@ class StrategyAdvisor:
 
                 biz = to_bullets(data.get('business_bullets', []))
                 rationale = to_bullets(data.get('rationale_bullets', []))
+                outlook = to_bullets(data.get('outlook_bullets', []))
                 risk = to_bullets(data.get('risk_bullets', []))
 
                 # 섹션 1: 사업 요약
@@ -498,15 +506,19 @@ class StrategyAdvisor:
                 # 섹션 2: 추천 근거
                 sec2 = "2. 추천 근거\n" + ("\n".join(f"- {r}" for r in rationale) if rationale else "- 정보 없음")
 
-                # 섹션 3: 리스크
-                sec3 = "3. 리스크\n" + ("\n".join(f"- {r}" for r in risk) if risk else "- 정보 없음")
+                # 섹션 3: 향후 전망 (AI 추정 — 확정 예측 아님, 프롬프트에서 숫자 지어내기 금지)
+                sec3 = ("3. 향후 전망 (AI 추정)\n"
+                        + ("\n".join(f"- {o}" for o in outlook) if outlook else "- 판단 근거 부족"))
 
-                # 섹션 4: 투자 데이터
-                sec4_lines = ["4. 투자 데이터"]
+                # 섹션 4: 리스크
+                sec4 = "4. 리스크\n" + ("\n".join(f"- {r}" for r in risk) if risk else "- 정보 없음")
+
+                # 섹션 5: 투자 데이터
+                sec5_lines = ["5. 투자 데이터"]
                 avg_tp = stock.get('consensus_avg_target', 0) or 0
                 buy_cnt = stock.get('consensus_buy_count', 0) or 0
                 if avg_tp:
-                    sec4_lines.append(f"- 목표가: {avg_tp:,}원 (증권사 {buy_cnt}개사 매수의견 평균)")
+                    sec5_lines.append(f"- 목표가: {avg_tp:,}원 (증권사 {buy_cnt}개사 매수의견 평균)")
                 per = stock.get('per', 0) or 0
                 pbr = stock.get('pbr', 0) or 0
                 if per or pbr:
@@ -528,24 +540,24 @@ class StrategyAdvisor:
                     pbr_str = f"PBR {pbr}x ({pbr_label})" if pbr else ""
                     line = " | ".join(filter(None, [per_str, pbr_str]))
                     if line:
-                        sec4_lines.append(f"- {line}")
+                        sec5_lines.append(f"- {line}")
                 if w52h and w52l and cur:
                     pos = round((cur - w52l) / (w52h - w52l) * 100) if w52h != w52l else 50
-                    sec4_lines.append(f"- 52주: 고 {w52h:,}원 / 저 {w52l:,}원 (현재 위치 {pos}%)")
-                sec4 = "\n".join(sec4_lines)
+                    sec5_lines.append(f"- 52주: 고 {w52h:,}원 / 저 {w52l:,}원 (현재 위치 {pos}%)")
+                sec5 = "\n".join(sec5_lines)
 
-                # 섹션 5: 관련 기사 (최대 3개)
-                sec5_lines = ["5. 관련 기사"]
+                # 섹션 6: 관련 기사 (최대 3개)
+                sec6_lines = ["6. 관련 기사"]
                 for item in news_items[:3]:
                     title = item.get('title', '')
                     url = item.get('url', '')
                     if url:
-                        sec5_lines.append(f"- [{title}]({url})")
+                        sec6_lines.append(f"- [{title}]({url})")
                     elif title:
-                        sec5_lines.append(f"- {title}")
-                if len(sec5_lines) == 1:
-                    sec5_lines.append("- 관련 기사 없음")
-                sec5 = "\n".join(sec5_lines)
+                        sec6_lines.append(f"- {title}")
+                if len(sec6_lines) == 1:
+                    sec6_lines.append("- 관련 기사 없음")
+                sec6 = "\n".join(sec6_lines)
 
                 formatted = (
                     f"{stock['name']} ({recommendation})\n\n"
@@ -553,7 +565,8 @@ class StrategyAdvisor:
                     f"{sec2}\n\n"
                     f"{sec3}\n\n"
                     f"{sec4}\n\n"
-                    f"{sec5}"
+                    f"{sec5}\n\n"
+                    f"{sec6}"
                 )
                 reports.append(formatted)
             except Exception as e:

@@ -136,6 +136,19 @@ class TradeEngineWorker(BaseWorker):
         for c in candidates:
             c['signal'] = signal_map.get(c['code'], 'WATCH')
 
+        # 2.5. 신호 관측 로깅 (순수 관측 — 선정에는 아직 영향 없음)
+        # 실패해도 Stage 3 나머지(선정·시뮬레이터·프로그램 매매)를 막지 않는다.
+        # Design: ~/.gstack/projects/hoonnamkoong-stockbot/
+        #   Hoon_DT-main-design-20260811-222707.md
+        try:
+            from src.strategy.pick_features import build_features, log_features
+            features = build_features(candidates, simulation_results, self.ctx.cycle_id)
+            n = log_features(features, log=self.log)
+            if n:
+                self.log(f"신호 관측 기록 {n}건")
+        except Exception as e:
+            self.log_error(f"신호 관측 기록 실패(무시하고 계속): {e}")
+
         # 3. 중복 방지: 당일 이미 딥다이브가 나간 종목 제외
         deep_dived = sync_state.daily_deep_dive_codes
         new_picks = []

@@ -210,7 +210,19 @@ jobs:
           git add .
           if ! git diff --cached --quiet; then
             git commit -m "[V8.9.9.17] Automated Data Update: $(date +'%Y-%m-%d %H:%M KST')"
-            git push origin db-data
+            # trading.yml이 60~90초 간격으로 같은 브랜치에 쓰므로 non-fast-forward가
+            # 흔하다. 남의 커밋을 덮어쓰지 않고 그 위에 얹어 재시도한다
+            # (trading.yml Deploy state 스텝과 동일 패턴 — shallow clone이라 unshallow 후 rebase).
+            for i in 1 2 3; do
+              if git push origin db-data; then
+                echo "[Deploy] push 성공 (시도 $i)"
+                break
+              fi
+              echo "[Deploy] push 충돌 — rebase 후 재시도 ($i/3)"
+              git fetch --unshallow origin db-data 2>/dev/null || git fetch origin db-data
+              git pull --rebase origin db-data || { echo "[Deploy] rebase 실패"; exit 1; }
+              if [ "$i" = "3" ]; then echo "[Deploy] push 3회 실패"; exit 1; fi
+            done
           else
             echo "No changes to commit"
           fi

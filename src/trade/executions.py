@@ -15,33 +15,36 @@ from datetime import datetime, timedelta
 from src.trade.auth import get_access_token, get_base_url
 
 
+FILLED = 'filled'
+UNFILLED = 'unfilled'
+UNKNOWN = 'unknown'
+
+
 def _side(code: str) -> str:
     return 'SELL' if code == '01' else 'BUY'
 
 
-def get_daily_executions(from_date: str | None = None, to_date: str | None = None,
-                          odno: str = '') -> list[dict]:
-    """당일(또는 지정 기간) 실제 체결 내역을 KIS에서 직접 조회한다.
+def _request_executions(from_date: str | None = None, to_date: str | None = None,
+                         odno: str = '') -> list[dict] | None:
+    """KIS 일별체결조회 원본. **조회 실패는 None, 성공은 리스트(0건 포함).**
 
-    반환: [{odno, code, name, side, price, qty, amount, time}, ...]
-    조회 실패(토큰·계좌 미설정·HTTP 오류)는 빈 리스트를 반환한다 — fail-quiet.
-    호출부가 "실측이 없다"와 "실측이 0건이다"를 구분할 필요가 있다면 이 함수
-    대신 예외를 잡아 별도로 판정할 것(현재 소비자는 아직 없음).
+    이 구분이 이 함수의 존재 이유다. 호출부가 미체결('조회는 됐는데 없다')과
+    조회 실패('모른다')를 반대로 처리하기 때문이다.
     """
     token = get_access_token()
     if not token:
-        return []
+        return None
 
     app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
     app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
     account_no_full = os.environ.get("KIS_ACCOUNT_NO", "").strip().replace("\n", "")
     is_virtual = os.environ.get("KIS_IS_VIRTUAL", "false").lower() == "true"
     if not account_no_full:
-        return []
+        return None
 
     clean_acc = account_no_full.replace('-', '').replace(' ', '')
     if len(clean_acc) < 10:
-        return []
+        return None
     cano = clean_acc[:8]
     acnt_prdt_cd = clean_acc[8:10]
 
@@ -77,12 +80,12 @@ def get_daily_executions(from_date: str | None = None, to_date: str | None = Non
             headers=headers, params=params, timeout=10,
         )
         if res.status_code != 200:
-            return []
+            return None
         data = res.json()
         if data.get('rt_cd') != '0':
-            return []
+            return None
     except Exception:
-        return []
+        return None
 
     rows = data.get('output1') or []
     fills = []
@@ -107,6 +110,18 @@ def get_daily_executions(from_date: str | None = None, to_date: str | None = Non
     return fills
 
 
+def get_daily_executions(from_date: str | None = None, to_date: str | None = None,
+                          odno: str = '') -> list[dict]:
+    """당일(또는 지정 기간) 실제 체결 내역을 KIS에서 직접 조회한다.
+
+    반환: [{odno, code, name, side, price, qty, amount, time}, ...]
+    조회 실패(토큰·계좌 미설정·HTTP 오류)는 빈 리스트를 반환한다 — fail-quiet.
+    호출부가 "실측이 없다"와 "실측이 0건이다"를 구분할 필요가 있다면 이 함수
+    대신 예외를 잡아 별도로 판정할 것(현재 소비자는 아직 없음).
+    """
+    return _request_executions(from_date, to_date, odno) or []
+
+
 def find_execution_by_odno(odno: str, from_date: str | None = None,
                             to_date: str | None = None) -> dict | None:
     """특정 주문번호의 실제 체결 1건을 찾는다. 못 찾으면(미체결·조회실패) None."""
@@ -117,3 +132,17 @@ def find_execution_by_odno(odno: str, from_date: str | None = None,
         if f['odno'] == odno:
             return f
     return None
+
+
+def lookup_execution(odno: str, from_date: str | None = None,
+                      to_date: str | None = None) -> tuple[str, dict | None]:
+    """주문번호 하나의 체결 상태. ('filled', fill) | ('unfilled', None) | ('unknown', None)"""
+    if not odno or odno == 'UNKNOWN':
+        return UNKNOWN, None
+    rows = _request_executions(from_date, to_date, odno=odno)
+    if rows is None:
+        return UNKNOWN, None
+    for f in rows:
+        if f.get('odno') == odno:
+            return FILLED, f
+    return UNFILLED, None

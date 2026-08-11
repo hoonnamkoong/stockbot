@@ -432,12 +432,20 @@ export function buildOrderRequest(
     code: string,
     qty: number,
     side: 'buy' | 'sell',
-    opts: { accountNo: string; isVirtual: boolean },
+    opts: { accountNo: string; isVirtual: boolean; ordType?: 'market' | 'limit'; limitPrice?: number },
 ): { trId: string; body: Record<string, string> } {
     // KIS 국내주식 주문 API (TTTC0802U: 매수, TTTC0801U: 매도, V접두사는 모의)
     const trId = side === 'buy'
         ? (opts.isVirtual ? 'VTTC0802U' : 'TTTC0802U')
         : (opts.isVirtual ? 'VTTC0801U' : 'TTTC0801U');
+
+    // 매도는 항상 시장가다. 손절·트레일링은 리스크를 줄이려는 행동이라
+    // 체결 자체가 목적이고, 미체결로 남으면 손실이 계속 커진다.
+    const limit = side === 'buy' && opts.ordType === 'limit';
+    if (limit && !(Number(opts.limitPrice) > 0)) {
+        // 조용히 시장가로 떨어뜨리면 "원하는 가격에만 산다"가 소리 없이 깨진다.
+        throw new Error('지정가 주문에 단가가 없습니다');
+    }
 
     return {
         trId,
@@ -445,9 +453,10 @@ export function buildOrderRequest(
             "CANO": opts.accountNo.slice(0, 8),
             "ACNT_PRDT_CD": opts.accountNo.slice(8, 10) || "01",
             "PDNO": code,
-            "ORD_DVSN": "01", // 시장가(01) 또는 지정가(00) - 여기서는 시장가 기본
+            "ORD_DVSN": limit ? "00" : "01",   // 00=지정가, 01=시장가
             "ORD_QTY": qty.toString(),
-            "ORD_UNPR": "0" // 시장가(01) 주문은 매수·매도 모두 단가 0 필수 (KIS 규칙)
+            // 시장가는 매수·매도 모두 단가 0 필수 (KIS 규칙, 683cc55 회귀 방지)
+            "ORD_UNPR": limit ? String(Math.trunc(Number(opts.limitPrice))) : "0",
         },
     };
 }
@@ -458,7 +467,10 @@ export function buildOrderRequest(
  * [지시사항 6] 실거래와 가상 매매의 엄격한 물리적 분리
  * 실거래 주문 API 호출은 4월 V2 알고리즘 하에서 절대 금지됩니다.
  */
-    export async function placeRealOrder(code: string, qty: number, price: number, side: 'buy' | 'sell'): Promise<any> {
+    export async function placeRealOrder(
+        code: string, qty: number, price: number, side: 'buy' | 'sell',
+        ordType: 'market' | 'limit' = 'market',
+    ): Promise<any> {
         // [지시사항] 실거래 차단 정책 전면 삭제 및 수동 주문 허용
         console.log(`[KIS-API] 🚀 Executing REAL order: ${side.toUpperCase()} ${code} ${qty} shares at ${price}`);
 
@@ -469,6 +481,8 @@ export function buildOrderRequest(
             const { trId: tr_id, body } = buildOrderRequest(code, qty, side, {
                 accountNo: config.ACCOUNT_NO,
                 isVirtual: config.IS_VIRTUAL,
+                ordType,
+                limitPrice: price,
             });
 
             const hashKey = await getHashKey(body);

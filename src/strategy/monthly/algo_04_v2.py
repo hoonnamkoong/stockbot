@@ -22,16 +22,22 @@ class Algo04V2(BaseStrategy):
             
         # Pydantic Schema V50 호환 키 적용
         post_count = int(stock_data.get('recent_posts_count', 0))
-        sentiment = stock_data.get('sentiment', 'Neutral')
         foreign_rate_diff = float(stock_data.get('foreign_change', 0.0))
         current_price = float(stock_data.get('price', 0))
 
+        # [2026-08-11] sentiment 게이트(cond2) 제거. 과거 "positive_rate 60.0
+        # 이상 → Positive" 문자열 카테고리를 비교하던 조건이었는데, Gemini
+        # 응답 형식이 -10~10 숫자로 바뀐 뒤 아무도 안 고쳐서 실제 저장값
+        # ('2', '-3' 같은 숫자 문자열)과 절대 안 맞았다 — 이 필터가 사실상
+        # 죽은 채로 있었다(BUY 분기 도달 불가). 검증 없이 숫자 비교로 되살리는
+        # 대신 걷어낸다 — sim1_psych.py가 이미 자체 검증된 심리 신호
+        # (hype_dict)를 쓰고 있어 이 엔진이 sentiment로 다시 게이트를 걸
+        # 이유가 없다.
         cond1 = post_count >= 100
-        cond2 = sentiment == 'Positive'  # 과거 positive_rate 60.0 이상을 Positive로 대체
-        cond3 = foreign_rate_diff > 0.0
-        cond4 = 5.0 < p_change < 20.0
+        cond2 = foreign_rate_diff > 0.0
+        cond3 = 5.0 < p_change < 20.0
 
-        if not (cond1 and cond2 and cond3 and cond4):
+        if not (cond1 and cond2 and cond3):
             return {"action": "WATCH", "reason": "1차 필터(AND) 조건 미충족"}
 
         # 2. 2차 검증 오버레이 (DART & NEWS 결과)

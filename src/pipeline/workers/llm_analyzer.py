@@ -168,7 +168,12 @@ class LLMAnalyzerWorker(BaseWorker):
                 f"[Fallback] {s.get('recent_posts_count', 0)}건 포착 / "
                 f"외인 {direction} {abs(s.get('foreign_change', 0)):.2f}%p"
             )
-            s['sentiment'] = "Positive" if s.get('foreign_change', 0) > 0 else "Negative"
+            # sentiment는 Gemini만 측정할 수 있다. 예전엔 외인수급 부호를
+            # "Positive"/"Negative"로 위장해 채웠는데, 그건 감정이 아니라
+            # 수급 축의 사본이라 측정 실패가 안 보이게 만들었다
+            # (no-fabricated-financial-values 원칙 — 조회 실패를 그럴듯한
+            # 값으로 채우지 않는다).
+            s['sentiment'] = "측정 불가"
 
         self._apply_cached_ai(candidates)
 

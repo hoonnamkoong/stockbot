@@ -246,6 +246,17 @@ def test_prompt_requests_fact_score(monkeypatch, tmp_path):
     assert 'fact_score' in calls[0]
 
 
+def test_prompt_defines_sentiment_independent_of_fact_score(monkeypatch, tmp_path):
+    """[2026-08-11] sentiment가 fact_score의 사본이 되지 않도록 별도 기준을
+    명시해야 한다 — '근거 없어도 논조가 긍정적이면 양수'가 핵심."""
+    _isolate(monkeypatch, tmp_path)
+    calls = []
+    make_agent(ANSWER, calls).analyze_batch_discovery(BATCH)
+
+    assert '근거' in calls[0] and '방향성' in calls[0]
+    assert '감정적 단어' in calls[0]
+
+
 def test_prompt_includes_price_and_foreign_flow_context(monkeypatch, tmp_path):
     """[2026-08-11, C1] 게시글 제목만으로는 '글은 많은데 가격은 안 움직이는'
     허위 열기를 못 걸러낸다 — 등락률·외인수급을 프롬프트에 같이 넘긴다."""

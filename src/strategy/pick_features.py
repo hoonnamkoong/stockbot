@@ -27,9 +27,17 @@ DATA_DIR = 'data'
 
 COLUMNS = [
     'cycle_id', 'ts', 'code', 'name',
-    'fact_score', 'sentiment', 'tick_power', 'consecutive_days',
+    'fact_score', 'sentiment', 'tick_power', 'consecutive_days', 'change_rate',
     'engine_signal', 'engine_reason',
 ]
+
+
+def _parse_change_rate(v) -> float:
+    """'+5.23%' 같은 문자열을 실수로. algo_04_v2.py의 같은 파싱과 동일 규칙."""
+    try:
+        return float(str(v or '0').replace('%', '').replace('+', ''))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def build_features(candidates: list[dict], simulation_results: list[dict], cycle_id: int) -> list[dict]:
@@ -59,6 +67,7 @@ def build_features(candidates: list[dict], simulation_results: list[dict], cycle
             'sentiment': c.get('sentiment', 'Neutral'),
             'tick_power': c.get('tick_power', 0.0),
             'consecutive_days': c.get('consecutive_days', 1),
+            'change_rate': _parse_change_rate(c.get('change_rate')),
             'engine_signal': sim.get('signal', ''),
             'engine_reason': sim.get('reason', ''),
         })
@@ -66,22 +75,42 @@ def build_features(candidates: list[dict], simulation_results: list[dict], cycle
 
 
 def rank_top(candidates: list[dict], n: int = 5) -> list[dict]:
-    """fact_score·tick_power를 순위로 결합해 상위 n개를 고르고 rank(1~n)를 붙인다.
+    """fact_score·tick_power·change_rate를 순위로 결합해 상위 n개를 고르고
+    rank(1~n)를 붙인다.
+
+    ⚠ **이건 수익률 예측이 아니다.** 이 코드베이스 어디에도 검증된 수익률
+    예측 모델이 없다(2026-08-11 확인 — algo_04_v2.py의 BUY/WATCH는 AND
+    필터 통과 여부일 뿐, 통과한 종목 사이의 우열을 매기지 않는다). 여기
+    세 신호는 각각 "근거가 얼마나 탄탄한가"(fact_score), "지금 매수세가
+    얼마나 강한가"(tick_power), "지금 유리한 방향으로 움직이고 있는가"
+    (change_rate)의 대리지표일 뿐이다. 실제로 이 랭킹이 수익률과 상관이
+    있는지는 아직 검증되지 않았다 — build_features()가 남기는 로그가
+    쌓여야 검증할 수 있다.
 
     candidates: code를 가진 dict 목록(이미 BUY/WATCH·중복제거 필터를 거친 것).
-    빈 입력이면 빈 리스트. 동석 순위(둘 다 0)는 원래 순서를 유지한다
-    (Python sort는 안정 정렬이라 추가 처리 불필요).
+    빈 입력이면 빈 리스트. 동석 순위는 원래 순서를 유지한다(Python sort는
+    안정 정렬이라 추가 처리 불필요).
     """
     if not candidates:
         return []
-    by_fact = sorted(candidates, key=lambda c: c.get('fact_score', 0.0) or 0.0, reverse=True)
-    fact_rank = {c['code']: i for i, c in enumerate(by_fact)}
-    by_tick = sorted(candidates, key=lambda c: c.get('tick_power', 0.0) or 0.0, reverse=True)
-    tick_rank = {c['code']: i for i, c in enumerate(by_tick)}
+
+    def _rank_by(key_fn) -> dict:
+        """값이 같으면 같은 순위를 준다(dense rank). 리스트에 들어온 순서로
+        동석을 가르면, 신호가 전혀 없는(0인) 다수 종목이 우연히 앞쪽 순서에
+        있다는 이유만으로 진짜 신호를 이긴다 — 실측으로 확인된 함정이다."""
+        values = sorted({key_fn(c) for c in candidates}, reverse=True)
+        value_rank = {v: i for i, v in enumerate(values)}
+        return {c['code']: value_rank[key_fn(c)] for c in candidates}
+
+    fact_rank = _rank_by(lambda c: c.get('fact_score', 0.0) or 0.0)
+    tick_rank = _rank_by(lambda c: c.get('tick_power', 0.0) or 0.0)
+    momentum_rank = _rank_by(lambda c: _parse_change_rate(c.get('change_rate')))
 
     def combined_rank(c: dict) -> int:
         code = c.get('code')
-        return fact_rank.get(code, len(candidates)) + tick_rank.get(code, len(candidates))
+        worst = len(candidates)
+        return (fact_rank.get(code, worst) + tick_rank.get(code, worst)
+                + momentum_rank.get(code, worst))
 
     top = sorted(candidates, key=combined_rank)[:n]
     for i, c in enumerate(top):

@@ -184,12 +184,17 @@ class GeminiAgent:
                 # '본문이 있는데 비었다'는 잘못된 신호가 됐다.
                 posts_text = "\n".join(
                     GeminiAgent.clean_text(str(p.get('title', ''))) for p in posts)
+                # [2026-08-11, C1] 정량 컨텍스트를 같이 넘긴다 — 지금까지는 게시글
+                # 제목만 보고 판단해서 "글은 많은데 가격은 안 움직이는" 허위 열기를
+                # 걸러낼 재료가 모델에 아예 없었다.
                 cleaned_batch.append({
                     "code": stock.get('code'),
                     "name": stock.get('name'),
-                    "content": posts_text
+                    "content": posts_text,
+                    "change_rate": stock.get('change_rate', ''),
+                    "foreign_change_pct_point": stock.get('foreign_change', 0),
                 })
-            
+
             # 그룹별 프롬프트 생성 및 호출
             prompt = f"""
             당신은 주식 종목 토론방의 대중 심리와 팩트를 분석하는 전문가입니다.
@@ -204,6 +209,9 @@ class GeminiAgent:
                공시·실적·수주·뉴스 인용처럼 확인 가능한 사실이 있으면 높이고,
                기대·전망·소문·감정 표현뿐이면 0에 가깝게 준다.
                감정 점수(sentiment)와 독립이다 — 강한 호재 기대라도 근거가 없으면 낮다.
+            6. change_rate(등락률)·foreign_change_pct_point(외인비중 변화)도 참고하라.
+               게시글은 많은데 change_rate가 미미하거나 음수면 "글만 많고 실제 돈은
+               안 움직이는" 허위 열기일 수 있다 — 그 경우 fact_score를 더 보수적으로.
 
             [분석 대상 데이터]
             {json.dumps(cleaned_batch, ensure_ascii=False)}
@@ -447,13 +455,18 @@ class StrategyAdvisor:
             if news_items:
                 news_section = "\n[최근 뉴스 제목]\n" + "\n".join(f"- {n['title']}" for n in news_items)
 
+            # 엔진 판단 근거(DART/공시 거부 등) — 계산은 됐지만 지금까지
+            # 리포트에 전달되지 않던 값. trade_engine.py가 이제 이 필드를 채운다.
+            engine_reason = stock.get('reason', '')
+            engine_section = f"\n[엔진 판단 근거] {engine_reason}" if engine_reason else ""
+
             prompt = f"""당신은 대한민국 주식시장 전문 애널리스트입니다.
 아래 정보를 바탕으로 이 종목이 왜 지금 시장의 주목을 받고 있는지 분석하세요.
 
 종목: {stock['name']} ({stock['code']})
 현재가: {cur:,}원 | 순위: {stock.get('rank', 'N/A')}위
 외인변화: {stock.get('foreign_change', 0):+.2f}%p
-{w52_text}
+{w52_text}{engine_section}
 [토론 요약]
 {stock.get('posts_summary', '정보 없음')}
 {news_section}
@@ -559,8 +572,13 @@ outlook_bullets는 위에 주어진 근거(토론 요약·뉴스·외인변화·
                     sec6_lines.append("- 관련 기사 없음")
                 sec6 = "\n".join(sec6_lines)
 
+                # LLM 호출과 무관하게 항상 노출한다 — Gemini가 이 근거를
+                # rationale_bullets에 반영하지 않아도 원문 그대로는 보여야 한다.
+                engine_line = f"🔧 엔진 판단: {engine_reason}\n\n" if engine_reason else ""
+
                 formatted = (
                     f"{stock['name']} ({recommendation})\n\n"
+                    f"{engine_line}"
                     f"{sec1}\n\n"
                     f"{sec2}\n\n"
                     f"{sec3}\n\n"

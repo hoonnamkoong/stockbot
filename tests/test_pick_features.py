@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.strategy import pick_features
-from src.strategy.pick_features import build_features
+from src.strategy.pick_features import build_features, rank_top
 
 
 def test_merges_candidate_and_simulation_fields():
@@ -143,3 +143,62 @@ def test_log_features_header_rotates_on_column_change(tmp_path):
 def test_month_path_uses_kst_month():
     assert pick_features.month_path('20260811') == os.path.join(
         'data', 'pick_features_2026-08.csv')
+
+
+# ── rank_top — 순위 결합(Borda), 원값 합산 금지 ─────────────────────────
+
+def _cand(code, fact_score=0.0, tick_power=0.0):
+    return {'code': code, 'name': code, 'fact_score': fact_score, 'tick_power': tick_power}
+
+
+def test_rank_top_picks_best_by_combined_rank():
+    """fact_score 1등 + tick_power 1등인 종목이 최상위여야 한다."""
+    candidates = [
+        _cand('A', fact_score=0.9, tick_power=150.0),  # 둘 다 1등
+        _cand('B', fact_score=0.5, tick_power=100.0),
+        _cand('C', fact_score=0.1, tick_power=80.0),
+    ]
+
+    top = rank_top(candidates, n=2)
+
+    assert [c['code'] for c in top] == ['A', 'B']
+    assert top[0]['rank'] == 1
+    assert top[1]['rank'] == 2
+
+
+def test_rank_top_uses_rank_not_raw_sum():
+    """스케일이 다른 원값을 그대로 더하면 tick_power가 fact_score를 압도한다 —
+    순위 결합은 그 함정에 안 걸려야 한다."""
+    candidates = [
+        # fact_score 최상위, tick_power 최하위
+        _cand('A', fact_score=1.0, tick_power=0.0),
+        # fact_score 최하위, tick_power가 원값으로는 압도적으로 큼
+        _cand('B', fact_score=0.0, tick_power=100000.0),
+    ]
+
+    top = rank_top(candidates, n=1)
+
+    # 순위 결합(Borda)이면 둘 다 (1등+2등=3)으로 동률 — 원래 순서(A 먼저)가
+    # 안정 정렬로 유지되어 A가 뽑힌다. 원값을 더했다면 B가 압도적으로 이겼을 것.
+    assert top[0]['code'] == 'A'
+
+
+def test_rank_top_caps_at_n():
+    candidates = [_cand(str(i), fact_score=float(i)) for i in range(10)]
+
+    top = rank_top(candidates, n=5)
+
+    assert len(top) == 5
+    assert [c['rank'] for c in top] == [1, 2, 3, 4, 5]
+
+
+def test_rank_top_empty_input_returns_empty():
+    assert rank_top([], n=5) == []
+
+
+def test_rank_top_fewer_than_n_returns_all():
+    candidates = [_cand('A', fact_score=0.5), _cand('B', fact_score=0.3)]
+
+    top = rank_top(candidates, n=5)
+
+    assert len(top) == 2

@@ -151,22 +151,20 @@ class TradeEngineWorker(BaseWorker):
 
         # 3. 중복 방지: 당일 이미 딥다이브가 나간 종목 제외
         deep_dived = sync_state.daily_deep_dive_codes
-        new_picks = []
 
-        # BUY/WATCH 시그널 중 오늘 딥다이브 안 나간 것 상위 2개 추출
+        # BUY/WATCH 시그널 중 오늘 딥다이브 안 나간 종목을 전부 모은다 — 순서는
+        # 안 본다. 상위 5개는 "먼저 만난 순"이 아니라 fact_score·tick_power
+        # 순위 결합(rank_top, pick_features.py)으로 뽑는다.
+        eligible = []
         for r in simulation_results:
             if r.get('signal') in ['BUY', 'WATCH'] and r['code'] not in deep_dived:
                 # candidates에서 풀 데이터 가져오기
                 full = next((c for c in candidates if c['code'] == r['code']), r).copy()
                 full['signal'] = r.get('signal', 'WATCH')
-                new_picks.append(full)
-                if len(new_picks) >= 2:
-                    break
+                eligible.append(full)
 
-        final_picks = new_picks[:2]
-        # 해당 배치 내 순위(rank) 추가: 1~2위
-        for i, p in enumerate(final_picks):
-            p['rank'] = i + 1
+        from src.strategy.pick_features import rank_top
+        final_picks = rank_top(eligible, n=5)
 
         # 4. 실전 계좌 매도 후보 선정 (정각 텔레그램 타이밍에만)
         sell_candidate = None

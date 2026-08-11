@@ -209,13 +209,15 @@ def run_pipeline(ctx: PipelineContext) -> None:
     # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
     deep_dive_report = ""
     if ctx.should_notify():
-        # [User V50.8] 상세 리포트 대상: 추천 상위 2개 + 매도 후보 1개
+        # [2026-08-11] 상세 리포트 대상: 추천 상위 5개(fact_score·tick_power
+        # 순위 결합) + 매도 후보 1개. trade_engine.rank_top()이 이미 5개로
+        # 잘라 넘기므로 여기서는 그 값을 그대로 쓴다.
         if final_picks or sell_candidate:
-            ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 (추천:{len(final_picks[:2])}개, 매도:{1 if sell_candidate else 0}개)")
-            deep_dive_report = analyzer_worker.generate_deep_dive(final_picks[:2], candidates, sell_candidate=sell_candidate)
+            ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 (추천:{len(final_picks)}개, 매도:{1 if sell_candidate else 0}개)")
+            deep_dive_report = analyzer_worker.generate_deep_dive(final_picks, candidates, sell_candidate=sell_candidate)
             # 월별 리서치 엑셀에도 기록
             if final_picks:
-                storage.update_monthly_excel(final_picks[:2], ctx.now_kst)
+                storage.update_monthly_excel(final_picks, ctx.now_kst)
         else:
             # 오늘 이미 보고된 종목들만 있는 경우
             daily_info = sync_state.daily_reported_info

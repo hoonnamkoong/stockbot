@@ -11,6 +11,12 @@ Design: ~/.gstack/projects/hoonnamkoong-stockbot/Hoon_DT-main-design-20260811-22
 2단계 범위: Stage 3 후보 전수 관측 로깅까지. `rank_and_recommendation`
 (딥다이브 산출물, Stage 3.5)과의 조인은 별도 증분(Open Question 3의
 as-of 조인 방식 확정 후)이다 — 여기서는 아직 하지 않는다.
+
+[2026-08-11] 사용자가 로그 축적을 기다리지 않고 선정 랭킹 적용을 앞당기기로
+결정 — `rank_top()`이 그 배선이다. 원값을 안 더한다: fact_score(0~1)와
+tick_power(원 단위 % 스케일)를 그대로 합치면 스케일이 큰 쪽이 지배해
+대형주 상수를 만든 것과 같은 함정(횡단면 절대값 z 금지 원칙)이 재현된다.
+대신 신호별 순위를 매기고 순위를 더한다(Borda count).
 """
 
 import csv
@@ -57,6 +63,30 @@ def build_features(candidates: list[dict], simulation_results: list[dict], cycle
             'engine_reason': sim.get('reason', ''),
         })
     return features
+
+
+def rank_top(candidates: list[dict], n: int = 5) -> list[dict]:
+    """fact_score·tick_power를 순위로 결합해 상위 n개를 고르고 rank(1~n)를 붙인다.
+
+    candidates: code를 가진 dict 목록(이미 BUY/WATCH·중복제거 필터를 거친 것).
+    빈 입력이면 빈 리스트. 동석 순위(둘 다 0)는 원래 순서를 유지한다
+    (Python sort는 안정 정렬이라 추가 처리 불필요).
+    """
+    if not candidates:
+        return []
+    by_fact = sorted(candidates, key=lambda c: c.get('fact_score', 0.0) or 0.0, reverse=True)
+    fact_rank = {c['code']: i for i, c in enumerate(by_fact)}
+    by_tick = sorted(candidates, key=lambda c: c.get('tick_power', 0.0) or 0.0, reverse=True)
+    tick_rank = {c['code']: i for i, c in enumerate(by_tick)}
+
+    def combined_rank(c: dict) -> int:
+        code = c.get('code')
+        return fact_rank.get(code, len(candidates)) + tick_rank.get(code, len(candidates))
+
+    top = sorted(candidates, key=combined_rank)[:n]
+    for i, c in enumerate(top):
+        c['rank'] = i + 1
+    return top
 
 
 def _today() -> str:

@@ -38,8 +38,9 @@ from datetime import datetime, timedelta
 from src import alerts
 from src.pipeline.context import MARKET_CLOSE_HHMM
 from src.trade.fees import realized_pnl_after_fees
+from src.trade.pending import register_pending
 from src.pipeline.workers.program_turn import (
-    REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
+    REGIME_TAG, new_turn, switch_tag, record_sell, prune_basis,
 )
 
 
@@ -469,6 +470,28 @@ def peek_selected_sim(log=print) -> str | None:
     return sim_id
 
 
+def settle_pending_orders(ledger, today, lookup, cancel, log, log_error):
+    """pending을 정산하고 미체결 잔량을 취소한다. I/O는 주입받는다(테스트 가능).
+
+    취소가 실패하면 그 종목의 pending을 되살린다 — 다음 사이클에 새 주문을
+    막기 위해서다. 중복 주문보다 한 사이클 기회손실이 싸다.
+    """
+    from src.trade.pending import reconcile_pending
+
+    pend = ledger.get('pending_orders') or {}
+    if not pend:
+        return
+    lookups = {p['odno']: lookup(p['odno']) for p in pend.values()}
+    snapshot = {c: dict(p) for c, p in pend.items()}
+
+    for req in reconcile_pending(ledger, lookups, today):
+        if cancel(req['odno'], req['code'], req['qty']):
+            log(f"[Program] 미체결 취소: {req['code']} {req['qty']}주 (odno={req['odno']})")
+        else:
+            log_error(f"[Program] 취소 실패 — {req['code']} pending 유지, 재주문 안 함")
+            ledger.setdefault('pending_orders', {})[req['code']] = snapshot[req['code']]
+
+
 def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: datetime,
                         log=print, log_error=print, enrich=None) -> list[dict] | None:
     """프로그램 매매 1회 실행. 모든 게이트 통과 시에만 실주문.
@@ -583,6 +606,14 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         #    사라진 포지션은 손익을 알 수 없으므로 지어내지 않되 미정산으로 기록한다.
         today = now_kst.strftime('%Y-%m-%d')
         positions = reconcile_positions(ledger, real_holdings, today, log_error)
+        ledger['positions'] = positions
+
+        # 5-b. pending 정산은 심 판단보다 먼저다. 정산 전에 판단하면 심이 낡은
+        #      보유 상태를 본다 — 방금 체결된 매수를 못 보고 또 사려 들 수 있다.
+        from src.trade.executions import lookup_execution
+        from src.trade.order_cancel import cancel_order
+        settle_pending_orders(ledger, today, lookup_execution, cancel_order, log, log_error)
+        positions = ledger['positions']
 
         # 6. 심 인스턴스화(화이트리스트). 사이징을 effective_budget 기준으로 스케일
         #    → 시뮬(initial_cash/N 사이징)의 비례 축소 복제본으로 동작.
@@ -648,8 +679,9 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         # 이력 승계(현재 Sim1만 해당). 없으면 아무것도 안 넣는다 = 현행 동작.
         snapshot.update(_psych_carry(paper_state))
 
-        # 9. 어댑터(실잔고 이중 방어 포함) + 실행
-        orders = _make_adapter(sim, snapshot, today, real_holdings)
+        # 9. 어댑터(실잔고 이중 방어 + 미체결 필터 포함) + 실행
+        pending_codes = set(ledger.get('pending_orders') or {})
+        orders = _make_adapter(sim, snapshot, today, real_holdings, pending_codes)
         sim.run(sim_candidates, current_prices=current_prices)
     except Exception as e:
         log_error(f'[Program] 주문 준비/심 실행 실패(무시하고 락 해제): {e}')
@@ -727,54 +759,71 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             continue
 
         # 판단가와 체결 시점 가격이 벌어졌으면 그 진입은 포기한다(매수 한정).
-        # 후보 가격은 스크래퍼 스냅샷이라 주문 시점엔 10분 이상 묵어 있을 수 있고,
-        # 주문은 시장가라 체결가를 호가에 맡긴다. 둘이 겹치면 심이 보지도 않은
-        # 가격에 사게 된다.
+        # 후보 가격은 스크래퍼 스냅샷이라 주문 시점엔 10분 이상 묵어 있을 수 있다.
+        # 지정가는 심 판단가로 건다 — 여기서 조회하는 live_px는 괴리 판정에만 쓰고
+        # 주문가를 덮어쓰지 않는다. 덮어쓰면 "원하는 가격에만 산다"는 지정가의
+        # 취지가 시장가와 다를 바 없어진다. 그래도 괴리가 너무 크면 체결 가능성이
+        # 낮은 pending만 쌓여 그 종목의 다음 매수 기회를 막으므로 미리 포기한다.
+        limit_price = price
         if side == 'buy':
             allowed, live_px, why = check_buy_drift(code, price, _price_quote)
             if not allowed:
                 log(f'[Program] SKIP buy {code} — {why}')
                 failed_codes.add(code)
                 continue
-            if live_px:
-                price = int(live_px)   # 기록·턴 회계는 더 신선한 값으로
         try:
-            res = place_order_via_vercel(side, code, qty, price)
+            res = place_order_via_vercel(
+                side, code, qty, limit_price if side == 'buy' else price,
+                ord_type='limit' if side == 'buy' else 'market')
             if res.get('success'):
-                # [복리] 매도 체결분의 실현손익을 원장에 누적(다음 실행의 effective_budget에 반영).
-                # _apply_order_to_positions가 positions[code]를 지우거나 수량을 줄이기 전에 계산해야 함.
-                # price는 KIS 확정 체결가가 아닌 주문가 추정치 — 원장의 avg_price/peak_price와 동일한
-                # 근사 정밀도(기존 설계와 일관).
-                if side == 'sell':
-                    accrue_realized_pnl(ledger, positions, code, qty, price)
-                # [턴 회계] 표시 전용 별도 트랙(기준가 대비). 실패해도 매매·원장은 계속한다.
-                try:
-                    if turn:
-                        prev_qty = positions.get(code, {}).get('quantity', 0)
-                        if side == 'sell':
-                            record_sell(turn, positions, code, qty, price)
-                        else:
-                            record_buy(turn, code, qty, price, prev_qty)
-                except Exception as e:
-                    log_error(f'[Program] 턴 체결 기록 실패(무시): {e}')
-                _apply_order_to_positions(positions, o, today)
-                if turn and side == 'buy' and code in positions:
-                    positions[code]['tag'] = active_tag
-                # [E10] KIS 주문번호를 기록만 한다 — 아직 원장 값(avg_price 등)을
-                # 이걸로 정정하지는 않는다. 며칠 관찰 후 추정치와 실측의 차이를
-                # 보고 다음 단계에서 자동 대사를 붙인다(설계 문서 Rollback Plan).
                 odno = _extract_odno(res)
-                if odno and code in positions:
-                    positions[code]['last_odno'] = odno
+                if not odno:
+                    # 추적 불가 = 정산도 취소도 못 한다. 사람 경로로 올린다.
+                    # 반복될 수 있는 조건이라 쿨다운 있는 쪽을 쓴다.
+                    alerts.send_alert_once(
+                        f'odno_missing_{code}',
+                        f'[Program] 주문번호 없음 — {side} {code} {qty}주 추적 불가',
+                        now_kst,
+                    )
+                    log_error(f'[Program] odno 없음: {side} {code} — pending 등록 불가')
+                if side == 'sell':
+                    # 시장가라 즉시 반영한다. 반영하지 않으면 다음 사이클에 또 판다.
+                    # price는 KIS 확정 체결가가 아닌 주문가 추정치 — 다음 사이클
+                    # settle_pending_orders가 실측가로 차액을 정정한다.
+                    pre_sell_snapshot = dict(positions[code]) if code in positions else {}
+                    avg = pre_sell_snapshot.get('avg_price')
+                    accrue_realized_pnl(ledger, positions, code, qty, price)
+                    try:
+                        if turn:
+                            record_sell(turn, positions, code, qty, price)
+                    except Exception as e:
+                        log_error(f'[Program] 턴 체결 기록 실패(무시): {e}')
+                    _apply_order_to_positions(positions, o, today)
+                    if odno:
+                        register_pending(ledger, code, odno, 'sell', qty, price,
+                                         now_kst.isoformat(), avg_price=avg, tag=active_tag,
+                                         snapshot=pre_sell_snapshot)
+                else:
+                    # 매수는 원장에 넣지 않는다 — 체결 확인 후 다음 사이클
+                    # (settle_pending_orders)에 들어간다. 여기서 넣으면 "주문 접수 =
+                    # 체결"로 간주하던 옛 버그가 지정가에서 재발한다.
+                    if odno:
+                        register_pending(ledger, code, odno, 'buy', qty, limit_price,
+                                         now_kst.isoformat(), tag=active_tag)
                 append_order_history({
                     'executed_at': now_kst.isoformat(), 'side': side, 'code': code,
                     'name': o.get('name', ''), 'qty': qty, 'price': price,
-                    'status': 'executed', 'reason': f"[프로그램:{sim_id}] {o.get('reason', '')}",
+                    'status': 'executed' if side == 'sell' else 'pending',
+                    'reason': f"[프로그램:{sim_id}] {o.get('reason', '')}",
                     'odno': odno,
                 })
                 executed += 1
-                log(f"[Program] 체결: {side.upper()} {code} {qty}주 @ {price}"
-                    f"{f' (odno={odno})' if odno else ''}")
+                if side == 'sell':
+                    log(f"[Program] 체결: SELL {code} {qty}주 @ {price}"
+                        f"{f' (odno={odno})' if odno else ''}")
+                else:
+                    log(f"[Program] 지정가 주문 접수: BUY {code} {qty}주 @ {price}"
+                        f"{f' (odno={odno})' if odno else ''} — 체결 확인 대기")
             else:
                 failed_codes.add(code)
                 log(f"[Program] 주문 거부 {code}: {res.get('error')}")

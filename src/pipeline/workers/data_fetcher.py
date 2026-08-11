@@ -349,16 +349,6 @@ class DataFetcherWorker(BaseWorker):
                 r = requests.get(url, headers=headers, params=params, timeout=3)
                 if r.status_code == 200:
                     out = r.json().get('output', {})
-                    # 체결강도
-                    probe = tick_power_probe(out)
-                    if probe is None:
-                        details['tick_power'] = float(out[TICK_POWER_FIELD])
-                    elif not self._tick_probe_logged:
-                        # 런당 한 번만. 이 한 줄이 "필드명이 틀렸다"와 "응답이
-                        # 비었다"를 가른다 — 지금은 그 둘을 구분할 수 없어
-                        # 어느 쪽을 고쳐야 하는지 모른다.
-                        self._tick_probe_logged = True
-                        self.log_error(probe)
                     # 기존 Naver 데이터 KIS로 보강 (더 정확)
                     if out.get('stck_prpr'):
                         details['price'] = int(out['stck_prpr'])
@@ -405,6 +395,40 @@ class DataFetcherWorker(BaseWorker):
             except Exception as e:
                 # 조용히 삼키면 시가 없는 하루가 '신호 없는 하루'로 위장된다.
                 print(f"   [DataFetcher] KIS 시세 보강 실패 {code}: {e}")
+
+        # [2026-08-11] 체결강도(tday_rltv)는 inquire-price(FHKST01010100) 응답에
+        # 없다 — 실측(오늘 전 런에서 100% 결손)으로 확인됐다. KIS 공식 예제
+        # (examples_llm/domestic_stock/inquire_ccnl)를 보면 그 필드는 별도 엔드포인트
+        # inquire-ccnl(FHKST01010300, "주식현재가 체결")의 응답이다. 위 inquire-price
+        # 블록과 같은 try에 묶지 않는다 — 이유는 바로 위 [V60.0] 주석과 같다:
+        # 한쪽이 타임아웃 나도 다른 쪽 보강은 살아야 한다.
+        if getattr(self, 'kis_token', None) and getattr(self, 'kis_app_key', None):
+            try:
+                url = f"{self.kis_base_url}/uapi/domestic-stock/v1/quotations/inquire-ccnl"
+                headers = {
+                    "Content-Type": "application/json; charset=utf-8",
+                    "authorization": f"Bearer {self.kis_token}",
+                    "appkey": self.kis_app_key,
+                    "appsecret": self.kis_app_secret,
+                    "tr_id": "FHKST01010300"
+                }
+                params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code}
+                r = requests.get(url, headers=headers, params=params, timeout=3)
+                if r.status_code == 200:
+                    out = r.json().get('output', {})
+                    probe = tick_power_probe(out)
+                    if probe is None:
+                        details['tick_power'] = float(out[TICK_POWER_FIELD])
+                    elif not self._tick_probe_logged:
+                        # 런당 한 번만. 이 한 줄이 "필드명이 틀렸다"와 "응답이
+                        # 비었다"를 가른다 — 지금은 그 둘을 구분할 수 없어
+                        # 어느 쪽을 고쳐야 하는지 모른다.
+                        self._tick_probe_logged = True
+                        self.log_error(probe)
+                else:
+                    print(f"   [DataFetcher] KIS 체결강도 조회 실패 {code}: HTTP {r.status_code}")
+            except Exception as e:
+                print(f"   [DataFetcher] KIS 체결강도 조회 실패 {code}: {e}")
 
         # 2. 호가 잔량 추출 (매도잔량 / 매수잔량)
         # 메인 페이지의 호가 정보 테이블 탐색

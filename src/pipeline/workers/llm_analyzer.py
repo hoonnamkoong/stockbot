@@ -64,6 +64,13 @@ class LLMAnalyzerWorker(BaseWorker):
                 s.posts_summary = code_map[s.code].get('posts_summary', s.posts_summary)
                 s.sentiment = str(code_map[s.code].get('sentiment', s.sentiment))
                 s.top_keywords = code_map[s.code].get('keywords', s.top_keywords)
+                # fact_score는 Stage 2에서 계산되지만 이 동기화가 없으면 StockData에
+                # 반영되지 않는다 — Stage 3가 s.to_dict()로 다시 만드는 candidates에는
+                # 항상 기본값(0.0)만 남아, 계산된 값이 있어도 선정·로깅 어디서도 못 본다.
+                try:
+                    s.fact_score = float(code_map[s.code].get('fact_score', s.fact_score))
+                except (TypeError, ValueError):
+                    pass
 
         return stocks, candidates
 

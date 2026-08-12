@@ -561,6 +561,45 @@ def _seed_turn_basis_for_settled_buys(turn, pending_buy_codes, pre_settle_positi
     return settled
 
 
+# 같은 가격으로 이만큼 안 체결되면 사람에게 올린다(분).
+# 2026-08-04 설계의 Success Criteria 2번은 "연속 3런"이었는데, 그때는 트리거가
+# 10분 주기라 3런이 30분이었다. 지금은 2분 주기라 런 수로 재면 6분이 되고,
+# 지정가가 6분 안 체결되지 않는 건 정상이라 경보가 무의미해진다. 의도였던
+# 시간으로 직접 잰다.
+STUCK_ORDER_MIN = 30
+
+
+def _warn_if_stuck(entry: dict, code: str, now_kst, alert, log) -> None:
+    """판단가가 얼어붙은 채 오래 남은 미체결 주문을 드러낸다.
+
+    설계 아홉 항목 중 이것만 구현이 빠졌고, 8일 뒤 001210이 판단가 5,300원으로
+    수백 런 고착된 채 돌았는데 아무 경보도 없었다. PR #28이 피해(대기열 리셋)는
+    막았지만 감지는 없었다 — 오히려 주문이 대기열에 남게 되면서, 심이 더는
+    원하지 않는 주문이 조용히 예산을 묶을 수 있다.
+
+    시각을 못 읽으면 조용히 넘어간다. 모르는 것을 장애로 부르지 않는다.
+    """
+    if not now_kst or not alert:
+        return
+    try:
+        waited = (now_kst - datetime.fromisoformat(entry['ordered_at'])).total_seconds() / 60
+    except Exception:
+        return
+    if waited < STUCK_ORDER_MIN:
+        return
+    price = int(float(entry.get('price') or 0))
+    alert(
+        f'stuck_order_{code}',
+        f'<b>미체결 주문 고착</b>\n\n'
+        f'{code} {entry.get("qty")}주 @ {price:,} — {int(waited)}분째 같은 가격으로 '
+        f'체결되지 않고 있습니다(odno={entry.get("odno")}).\n'
+        f'상한가처럼 대기열이 두꺼운 자리이거나, 판단가가 시세를 따라가지 못하고 '
+        f'있을 수 있습니다. 그동안 이 종목의 예산은 묶여 있습니다.',
+        now_kst,
+        log=log,
+    )
+
+
 def _keep_resting(entry: dict, code: str, quote, log) -> bool:
     """판단가가 그대로면 미체결 매수를 거두지 않는다.
 
@@ -613,6 +652,7 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
     for req in reconcile_pending(ledger, lookups, today):
         code = req['code']
         if _keep_resting(snapshot[code], code, quote, log):
+            _warn_if_stuck(snapshot[code], code, now_kst, alert, log_error)
             # 취소 실패 복원과 같은 방식으로 되돌린다 — applied_qty를 이어 붙이지
             # 않으면 다음 사이클에 같은 누적 체결이 또 반영된다.
             restored = dict(snapshot[code])

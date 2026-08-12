@@ -407,7 +407,7 @@ class LiberoSimulator(BaseSimulator):
     # 실측은 채점 전용 — 예측에 정답을 섞지 않는다(룩어헤드 금지).
     # ──────────────────────────────────────────────────
     MARKET_CLOSE = '15:30'
-    SCORE_LOG_MAX = 400   # ≈ 8건/일 × 50일
+    SCORE_LOG_MAX = 800   # ≈ 16건/일 × 50일 (velocity·naive 두 모델 × 8시간대)
     EOD_DAMPING = 0.5     # 속도 외삽 감쇠(모멘텀은 마감까지 절반만 이어진다고 가정)
 
     @staticmethod
@@ -466,23 +466,33 @@ class LiberoSimulator(BaseSimulator):
                 continue  # 다음 런에서 재시도 (EOD finalize에서 정리)
             self._append_score({
                 'date': today_str, 'type': 'h1', 'made_at': p['made_at'],
+                'model': p.get('model', 'velocity'),
                 'target': p['target'], 'pred': p['value'], 'actual': actual,
                 'gap': round(p['value'] - actual, 1),
             })
             p['scored'] = True
 
         # ③ 예측 생성 (시간대당 1회)
+        # 나이브 기준선(naive = 직전 실측값 그대로)을 나란히 적는다. 예측을 채점만
+        # 하고 기준선이 없으면 그 오차가 좋은지 나쁜지 알 수 없다 — "아무것도 하지
+        # 않기"보다 나은지가 속도 외삽의 최소 합격선이다. 채점은 아래 ②·finalize_eod의
+        # 기존 경로를 그대로 타고, 로그의 model 필드로만 갈린다.
         if not any(p['made_at'] == label for p in preds):
             velocity = meas[-1]['breadth'] - meas[-2]['breadth'] if len(meas) >= 2 else 0.0
             last = meas[-1]['breadth']
             next_label = f"{now.hour + 1:02d}:00"
-            if next_label <= '15:00':
-                preds.append({'made_at': label, 'target': next_label, 'type': 'h1',
-                              'value': round(self._clamp(last + velocity), 1), 'scored': False})
             hours_left = max(0.0, 15.5 - (now.hour + now.minute / 60.0))
-            preds.append({'made_at': label, 'target': 'EOD', 'type': 'eod',
-                          'value': round(self._clamp(last + velocity * hours_left * self.EOD_DAMPING), 1),
-                          'scored': False})
+            for model, h1_value, eod_value in (
+                ('velocity', last + velocity, last + velocity * hours_left * self.EOD_DAMPING),
+                ('naive', last, last),
+            ):
+                if next_label <= '15:00':
+                    preds.append({'made_at': label, 'target': next_label, 'type': 'h1',
+                                  'model': model, 'value': round(self._clamp(h1_value), 1),
+                                  'scored': False})
+                preds.append({'made_at': label, 'target': 'EOD', 'type': 'eod',
+                              'model': model, 'value': round(self._clamp(eod_value), 1),
+                              'scored': False})
 
         self.save_state()
 
@@ -504,13 +514,17 @@ class LiberoSimulator(BaseSimulator):
 
         first_eod_pred = None
         for p in intr['predictions']:
-            if p['type'] == 'eod' and first_eod_pred is None:
+            model = p.get('model', 'velocity')
+            # calibration_log(프론트 갭 차트)는 **예측 모델**의 갭이어야 한다.
+            # 기준선이 그 자리를 차지하면 차트의 의미가 조용히 바뀐다.
+            if p['type'] == 'eod' and model == 'velocity' and first_eod_pred is None:
                 first_eod_pred = p['value']
             if p.get('scored'):
                 continue
             if p['type'] == 'eod':
                 self._append_score({
                     'date': today_str, 'type': 'eod', 'made_at': p['made_at'],
+                    'model': model,
                     'target': 'EOD', 'pred': p['value'], 'actual': actual_eod,
                     'gap': round(p['value'] - actual_eod, 1),
                 })

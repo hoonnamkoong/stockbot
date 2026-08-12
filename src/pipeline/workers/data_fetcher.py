@@ -9,7 +9,6 @@
 
 import re
 import requests
-import os
 import time
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -124,6 +123,11 @@ class DataFetcherWorker(BaseWorker):
         except Exception as e:
             self.kis = None
             self.log_error(f"KIS 클라이언트 초기화 실패: {e} — 시세·체결강도 조회 불가")
+        # KISDataProvider는 토큰이 비어도 예외 없이 생성된다(_init_auth가 자체
+        # 예외를 삼킨다). 그러면 self.kis는 참이지만 모든 필드가 조용히 0으로
+        # 나온다 — 예전 코드가 토큰 공백을 잡던 자리를 여기서 대신 잡는다.
+        if self.kis and not getattr(self.kis, '_token', None):
+            self.log_error("KIS 토큰이 비었습니다 — 시세·체결강도 조회 불가")
 
         # 4. 병렬 수집 및 1차 필터링
         results_raw = []

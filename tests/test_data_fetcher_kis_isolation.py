@@ -35,14 +35,19 @@ class FakeResponse:
 
 
 class _FakeProvider:
-    def __init__(self, quote=None, tick=0.0):
+    def __init__(self, quote=None, tick=0.0, raises=False):
         self._quote = quote or {}
         self._tick = tick
+        self._raises = raises
 
     def get_price_quote(self, code):
+        if self._raises:
+            raise RuntimeError('provider get_price_quote 실패(주입된 장애)')
         return self._quote
 
     def get_tick_power(self, code):
+        if self._raises:
+            raise RuntimeError('provider get_tick_power 실패(주입된 장애)')
         return self._tick
 
 
@@ -139,3 +144,32 @@ def test_zero_quote_does_not_overwrite_naver_values(monkeypatch):
     d = w._get_stock_details('002990')
 
     assert d['prev_close'] == 17310, '네이버가 준 전일종가가 0으로 덮이면 안 된다'
+    assert d['current_price'] == 17940, '네이버가 준 현재가가 0으로 덮이면 안 된다'
+    assert d.get('price', 0) == 0, 'KIS가 0이면 price 키를 만들지 않는다'
+
+
+def test_kis_exception_survives_and_leaves_naver_values_intact(monkeypatch):
+    """provider가 예외를 던져도 죽지 않고 네이버 값은 살아 있어야 한다.
+
+    2026-08-03 격리 원칙(코드 대신)의 반대편: 그때는 '한쪽이 죽으면 다른 쪽도
+    실행 안 됨'이었다. 여기서는 'KIS가 예외를 던져도 그 예외가 전체를 죽이면
+    안 된다'는 같은 원칙의 다른 실패 모드를 확인한다. get_price_quote/
+    get_tick_power를 감싼 try/except를 지워도 이 테스트 전에는 초록으로
+    남았다 — provider가 주입되지 않은 시나리오만 있었기 때문이다.
+    """
+    def fake_get(url, **kw):
+        if 'frgn.naver' in url:
+            return FakeResponse(frgn_html())
+        if 'main.naver' in url:
+            return FakeResponse('<table class="type2 type_stock2"></table>')
+        raise AssertionError(f'KIS를 직접 부르면 안 된다: {url}')
+
+    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+    w = _worker()
+    w.kis = _FakeProvider(raises=True)
+
+    d = w._get_stock_details('002990')  # 예외 없이 끝나야 한다
+
+    assert d['prev_close'] == 17310
+    assert d['current_price'] == 17940
+    assert d['tick_power'] == 0.0

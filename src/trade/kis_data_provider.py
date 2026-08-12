@@ -499,7 +499,9 @@ class KISDataProvider:
         if not out:
             result = {"price": 0, "change_rate_pct": 0.0, "per": 0.0, "pbr": 0.0,
                       "sector_name": "", "w52_hgpr": 0, "w52_lwpr": 0,
-                      "open_price": 0, "day_high": 0, "day_low": 0, "prev_close": 0}
+                      "open_price": 0, "day_high": 0, "day_low": 0, "prev_close": 0,
+                      "foreign_rate": 0.0, "eps": 0, "bps": 0,
+                      "mkt_cap": 0, "amount": 0, "volume": 0}
             self._set_cache(key, result)
             return result
 
@@ -515,6 +517,12 @@ class KISDataProvider:
             "day_high": self._to_int(out.get("stck_hgpr", 0)),
             "day_low": self._to_int(out.get("stck_lwpr", 0)),
             "prev_close": self._to_int(out.get("stck_sdpr", 0)),
+            "foreign_rate": self._to_float(out.get("hts_frgn_ehrt", 0)),
+            "eps": self._to_int(float(self._to_float(out.get("eps", 0)))),
+            "bps": self._to_int(float(self._to_float(out.get("bps", 0)))),
+            "mkt_cap": self._to_int(out.get("hts_avls", 0)),
+            "amount": self._to_int(out.get("acml_tr_pbmn", 0)),
+            "volume": self._to_int(out.get("acml_vol", 0)),
         }
         self._set_cache(key, result)
         return result
@@ -788,6 +796,9 @@ class KISDataProvider:
     @staticmethod
     def _to_int(v) -> int:
         try:
+            # float 값이 들어오면 직접 변환 (문자열 변환 시 "1500.0" 형태가 되어 int() 실패)
+            if isinstance(v, float):
+                return int(v)
             return int(str(v).replace(",", "").strip())
         except Exception:
             return 0

@@ -561,8 +561,32 @@ def _seed_turn_basis_for_settled_buys(turn, pending_buy_codes, pre_settle_positi
     return settled
 
 
+def _keep_resting(entry: dict, code: str, quote, log) -> bool:
+    """판단가가 그대로면 미체결 매수를 거두지 않는다.
+
+    취소·재주문은 같은 가격대 대기열의 **맨 뒤**로 보낸다(가격-시간 우선).
+    2026-08-12: 001210이 상한가(5,300)에 고정돼 판단가가 하루 종일 같았는데,
+    봇이 매 사이클 취소→동일가 재주문을 반복해 순번을 스스로 리셋했다 — 체결
+    0건. 같은 날 002990은 재주문을 겪지 않은 첫 주문이 그대로 체결됐다.
+
+    시세를 모르면 기존 동작(취소)으로 떨어진다 — 모르는 상태에서 주문을
+    시장에 남겨두지 않는다.
+    """
+    if entry.get('side') != 'buy' or quote is None:
+        return False
+    try:
+        live = float((quote(code) or {}).get('price') or 0)
+    except Exception:
+        return False
+    if live <= 0 or int(live) != int(float(entry.get('price') or 0)):
+        return False
+    log(f"[Program] 미체결 유지: {code} @ {int(live)} — 판단가 그대로라 "
+        f"재주문하지 않습니다(취소하면 대기열 순번을 잃습니다)")
+    return True
+
+
 def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
-                          now_kst=None, alert=None):
+                          now_kst=None, alert=None, quote=None):
     """pending을 정산하고 미체결 잔량을 취소한다. I/O는 주입받는다(테스트 가능).
 
     취소가 실패하면 그 종목의 pending을 되살린다 — 다음 사이클에 새 주문을
@@ -588,6 +612,13 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
 
     for req in reconcile_pending(ledger, lookups, today):
         code = req['code']
+        if _keep_resting(snapshot[code], code, quote, log):
+            # 취소 실패 복원과 같은 방식으로 되돌린다 — applied_qty를 이어 붙이지
+            # 않으면 다음 사이클에 같은 누적 체결이 또 반영된다.
+            restored = dict(snapshot[code])
+            restored['applied_qty'] = req['applied_qty']
+            ledger.setdefault('pending_orders', {})[code] = restored
+            continue
         if cancel(req['odno'], code, req['qty']):
             log(f"[Program] 미체결 취소: {code} {req['qty']}주 (odno={req['odno']})")
             continue
@@ -744,7 +775,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         from src.trade.order_cancel import cancel_order
         settle_pending_orders(
             ledger, today, _lookup_by_pending_date(pending_before, today),
-            cancel_order, log, log_error, now_kst=now_kst)
+            cancel_order, log, log_error, now_kst=now_kst, quote=_price_quote)
         positions = ledger['positions']
 
         # [턴 회계] 정산으로 방금 확정된 매수를 기준가(turn.basis)에 반영한다.

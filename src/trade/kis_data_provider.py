@@ -520,6 +520,34 @@ class KISDataProvider:
         return result
 
     # ──────────────────────────────────────────────────
+    # 7-b. 체결강도 (FHKST01010300 — 주식현재가 체결)
+    # ──────────────────────────────────────────────────
+    def get_tick_power(self, code: str) -> float:
+        """당일 체결강도(tday_rltv). 얻지 못하면 0.0.
+
+        이 응답의 output은 dict가 아니라 **체결 내역 리스트**다(실호출 확인: 30행,
+        최신순). tday_rltv는 당일 누적값이라 모든 행이 같으므로 최신 행만 본다.
+        inquire-price(FHKST01010100)에는 이 필드가 없다 — 2026-08-11에 그걸 몰라
+        전 종목 결손이 났다.
+        """
+        key = f"tick_power_{code}"
+        cached = self._get_cached(key, self.TTL_REALTIME)
+        if cached is not None:
+            return cached['value']
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/inquire-ccnl",
+            "FHKST01010300",
+            {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+        )
+        rows = body.get("output") or []
+        if isinstance(rows, dict):
+            rows = [rows]
+        value = self._to_float(rows[0].get("tday_rltv", 0)) if rows else 0.0
+        self._set_cache(key, {'value': value})
+        return value
+
+    # ──────────────────────────────────────────────────
     # 8. 등락률 순위 (FHPST01700000)
     # ──────────────────────────────────────────────────
     def get_fluctuation_rank(self, market: str = '0001', sort: str = '0', limit: int = 30) -> list[dict]:

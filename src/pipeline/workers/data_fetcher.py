@@ -415,7 +415,18 @@ class DataFetcherWorker(BaseWorker):
                 params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code}
                 r = requests.get(url, headers=headers, params=params, timeout=3)
                 if r.status_code == 200:
-                    out = r.json().get('output', {})
+                    # [2026-08-12] 이 응답의 output은 dict가 아니라 **체결 내역
+                    # 리스트**다(실호출로 확정: 30행, 최신순). tday_rltv는 당일
+                    # 누적 체결강도라 모든 행이 같은 값이므로 최신 행만 본다.
+                    # 형태 판정을 probe보다 **앞에** 둔다: 08-11에 이 엔드포인트로
+                    # 옮기면서 dict로 가정했고, 그래서 매 종목 probe가 실행되기
+                    # 전에 AttributeError가 났다 — 원인을 가리려고 만든 진단이
+                    # 정작 원인이 생긴 순간에만 침묵했다(tick_power 100% 결손).
+                    out = r.json().get('output')
+                    if isinstance(out, list):
+                        out = out[0] if out else {}
+                    if not isinstance(out, dict):
+                        out = {}
                     probe = tick_power_probe(out)
                     if probe is None:
                         details['tick_power'] = float(out[TICK_POWER_FIELD])

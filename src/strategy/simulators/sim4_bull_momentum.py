@@ -91,6 +91,8 @@ class BullMomentumSimulator(BaseSimulator):
 
         # 3. 진입 (고유동성 + 강한 기간 모멘텀 + 당일 상승 + ADX + 체결강도)
         target_amount = self.calc_nav(current_prices) * self.POSITION_WEIGHT
+        # 런당 한 번만 판정한다(종목마다 재계산하면 같은 답을 후보 수만큼 다시 낸다).
+        tick_outage = self.tick_power_outage(candidates)
         for stock in candidates:
             if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
             code = stock['code']
@@ -114,7 +116,7 @@ class BullMomentumSimulator(BaseSimulator):
             has_inst = (orgn > 0 or frgn > 0)
             if (5.0 <= period_change <= 40.0 and daily_change > 0
                     and 20.0 <= adx < self.ADX_MAX
-                    and self.validate_tick_power(stock, threshold=120.0)
+                    and self.validate_tick_power(stock, threshold=120.0, outage=tick_outage)
                     and has_inst):
                 qty = int(target_amount / price)
                 if qty > 0:

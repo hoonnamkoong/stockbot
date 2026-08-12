@@ -93,6 +93,24 @@ def test_weak_tick_power_is_rejected():
     assert _buys(orders) == [] and _reason(diags, 'T001') == 'weak_demand'
 
 
+def test_zero_tick_power_is_exempt_when_others_have_values():
+    """개별 종목의 0은 종목 사정일 수 있다 — 계속 면제한다(회귀 방지)."""
+    orders, _, _ = decide_psych(_view(), [_target(tick_power=0.0)] + _filler(),
+                                {'T001': 1000})
+    assert [o['code'] for o in _buys(orders)] == ['T001']
+
+
+def test_run_wide_tick_power_outage_blocks_entry():
+    """후보 전체가 0이면 '수급이 약한 날'이 아니라 '못 잰 날'이다 — 진입 금지.
+
+    2026-08-12: inquire-ccnl 응답을 dict로 잘못 읽어 tick_power가 100% 0이었고,
+    0을 무조건 면제하던 게이트가 이 조건을 통째로 없앴다.
+    """
+    cands = [_target(tick_power=0.0)] + [dict(f, tick_power=0.0) for f in _filler()]
+    orders, diags, _ = decide_psych(_view(), cands, {'T001': 1000})
+    assert _buys(orders) == [] and _reason(diags, 'T001') == 'weak_demand'
+
+
 # ── 진단 로그 ────────────────────────────────────────────
 def test_every_candidate_is_logged():
     """통과한 것만 보면 '왜 이건 걸렀나'를 영영 못 본다."""

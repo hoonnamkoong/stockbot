@@ -189,6 +189,8 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
     sold = set()
     cand_by_code = {s.get('code'): s for s in candidates if s.get('code')}
     feat = _features(candidates)
+    # 런당 한 번만 판정한다(종목마다 재계산하면 같은 답을 후보 수만큼 다시 낸다).
+    tick_outage = BaseSimulator.tick_power_outage(candidates)
 
     # 1. 청산 — ATR 기반 동적 익절/손절 + 트레일링 (기존 유지)
     for code in list(portfolio.keys()):
@@ -268,7 +270,8 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
         }
 
         skip = _skip_reason(stock, view, code, price, amount, change_rate,
-                            sparkline, adx, buzz_ratio, f, portfolio, sold, held)
+                            sparkline, adx, buzz_ratio, f, portfolio, sold, held,
+                            tick_outage)
         if skip:
             d['decision'], d['reason'] = 'skip', skip
             diags.append(d)
@@ -296,7 +299,8 @@ def _fmt(v):
 
 
 def _skip_reason(stock, view, code, price, amount, change_rate,
-                 sparkline, adx, buzz_ratio, f, portfolio, sold, held):
+                 sparkline, adx, buzz_ratio, f, portfolio, sold, held,
+                 tick_outage=False):
     """첫 번째로 걸린 게이트 이름. 통과하면 None.
 
     순서가 곧 로그의 의미다 — 앞쪽 게이트가 뒤쪽을 가린다.
@@ -324,7 +328,8 @@ def _skip_reason(stock, view, code, price, amount, change_rate,
         return 'buzz'
     if not (CHANGE_MIN <= change_rate <= CHANGE_MAX):
         return 'price_moved'
-    if not BaseSimulator.validate_tick_power(stock, threshold=TICK_POWER_MIN):
+    if not BaseSimulator.validate_tick_power(stock, threshold=TICK_POWER_MIN,
+                                             outage=tick_outage):
         return 'weak_demand'
     if adx < ADX_MIN:
         return 'no_trend'

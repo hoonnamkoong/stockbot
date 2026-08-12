@@ -82,6 +82,8 @@ def decide_bull_daytrade(view, candidates, current_prices):
     # 2. 진입
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len(portfolio) - len(sold)
+    # 런당 한 번만 판정한다(종목마다 재계산하면 같은 답을 후보 수만큼 다시 낸다).
+    tick_outage = BaseSimulator.tick_power_outage(candidates)
     for stock in candidates:
         if held >= MAX_HOLDINGS:
             break
@@ -100,7 +102,7 @@ def decide_bull_daytrade(view, candidates, current_prices):
         daily_change = _parse_change_rate(stock)
         has_inst = (stock.get('orgn_fake_ntby_qty', 0) > 0 or stock.get('frgn_fake_ntby_qty', 0) > 0)
         if (5.0 <= period_change <= 40.0 and daily_change > 0 and 20.0 <= adx < ADX_MAX
-                and _validate_tick(stock, 120.0) and has_inst):
+                and _validate_tick(stock, 120.0, outage=tick_outage) and has_inst):
             qty = int(target_amount / price)
             if qty > 0:
                 orders.append({'action': 'BUY', 'code': code, 'name': stock['name'], 'price': price,

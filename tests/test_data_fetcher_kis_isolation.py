@@ -47,7 +47,17 @@ KIS_OUT = {
 }
 
 # tday_rltv(체결강도)는 inquire-price가 아니라 inquire-ccnl 응답이다(2026-08-11 정정).
-CCNL_OUT = {'tday_rltv': '120.5'}
+# **output은 dict가 아니라 체결 30행짜리 리스트다**(2026-08-12 실호출로 확정).
+# 08-11에 엔드포인트만 옮기고 이 형태를 확인하지 않아, 실제로는 매 종목
+# 'list' object has no attribute 'get'으로 죽고 tick_power가 100% 0이었다.
+# 여기 mock이 코드와 같은 오해(dict)를 복제하고 있어서 테스트는 초록이었다.
+# 최신 행이 [0]이고, tday_rltv는 당일 누적값이라 모든 행이 같은 값을 갖는다.
+CCNL_OUT = [
+    {'stck_cntg_hour': '155954', 'stck_prpr': '255500', 'cntg_vol': '19',
+     'tday_rltv': '120.5', 'prdy_ctrt': '6.68'},
+    {'stck_cntg_hour': '155747', 'stck_prpr': '255500', 'cntg_vol': '1',
+     'tday_rltv': '120.5', 'prdy_ctrt': '6.68'},
+]
 
 
 def _worker():
@@ -56,6 +66,10 @@ def _worker():
     w.kis_app_key = 'key'
     w.kis_app_secret = 'secret'
     w.kis_base_url = 'https://openapi.koreainvestment.com:9443'
+    # __init__을 건너뛰므로 여기서 채운다. 빠져 있으면 진단(probe) 경로가
+    # AttributeError로 죽는데 그게 except에 삼켜져, 테스트는 통과하면서
+    # 진단은 한 줄도 안 남는 상태를 못 잡는다.
+    w._tick_probe_logged = False
     return w
 
 
@@ -127,3 +141,58 @@ def test_tick_power_survives_inquire_price_failure(monkeypatch):
 
     assert d['tick_power'] == 120.5
     assert d.get('open_price', 0) == 0
+
+
+def test_empty_ccnl_list_leaves_tick_power_zero_with_diagnosis(monkeypatch, capsys):
+    """체결이 아직 없으면(장 시작 전 등) output은 빈 리스트로 온다.
+
+    0으로 남는 것만으로는 부족하다 — 예외로 죽어도 결과는 똑같이 0이라서
+    둘이 구분되지 않는다. 진단이 남는지까지 봐야 '측정 못 함'의 이유가 남는다.
+    """
+    def fake_get(url, **kw):
+        if 'frgn.naver' in url:
+            return FakeResponse(frgn_html())
+        if 'main.naver' in url:
+            return FakeResponse('<table class="type2 type_stock2"></table>')
+        if 'inquire-ccnl' in url:
+            return FakeKisResponse([])
+        if 'inquire-price' in url:
+            return FakeKisResponse(KIS_OUT)
+        raise AssertionError(f'예상치 못한 요청: {url}')
+
+    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+
+    d = _worker()._get_stock_details('002990')
+
+    assert d['tick_power'] == 0.0
+    out = capsys.readouterr().out
+    assert '[진단]' in out
+    assert 'has no attribute' not in out
+
+
+def test_unexpected_ccnl_shape_logs_diagnosis_instead_of_crashing(monkeypatch, capsys):
+    """형태가 또 바뀌어도 예외가 아니라 진단 한 줄이 남아야 한다.
+
+    08-12 사고의 핵심이 이거였다. probe는 "필드명이 틀렸나 / 응답이 비었나"를
+    가르려고 만든 계기판인데, 자기가 진단해야 할 형태 가정 **뒤에** 있어서
+    리스트가 오는 순간 자기보다 먼저 예외가 났다. 계기판이 사고 때만 꺼졌다.
+    """
+    def fake_get(url, **kw):
+        if 'frgn.naver' in url:
+            return FakeResponse(frgn_html())
+        if 'main.naver' in url:
+            return FakeResponse('<table class="type2 type_stock2"></table>')
+        if 'inquire-ccnl' in url:
+            return FakeKisResponse('예상 못 한 형태')
+        if 'inquire-price' in url:
+            return FakeKisResponse(KIS_OUT)
+        raise AssertionError(f'예상치 못한 요청: {url}')
+
+    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+
+    d = _worker()._get_stock_details('002990')
+
+    assert d['tick_power'] == 0.0
+    out = capsys.readouterr().out
+    assert '[진단]' in out
+    assert 'has no attribute' not in out

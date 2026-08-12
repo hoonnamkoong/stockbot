@@ -335,13 +335,29 @@ class BaseSimulator:
         return max(atr, 1.0) # ATR이 0이 되지 않도록 보장
 
     @staticmethod
-    def validate_tick_power(stock_data: dict, threshold: float = 120.0) -> bool:
+    def tick_power_outage(candidates: list) -> bool:
+        """이번 런에서 체결강도 측정이 통째로 죽었는가.
+
+        후보가 없으면 장애가 아니다 — 0/0을 장애로 부르면 조용한 날마다 운다.
+        """
+        return bool(candidates) and all(not c.get('tick_power') for c in candidates)
+
+    @staticmethod
+    def validate_tick_power(stock_data: dict, threshold: float = 120.0,
+                            outage: bool = False) -> bool:
         """[V60.0] 수급의 힘(체결강도)이 임계치를 넘는지 확인합니다.
         KIS API 실패로 0.0인 경우, 데이터 없음 ≠ 수급 나쁨이므로 조건 스킵(통과).
+
+        [2026-08-12] 단, **전량 결손(outage)이면 면제하지 않는다.** 개별 종목의 0은
+        종목 사정(신규상장·거래정지)일 수 있지만, 런 전체가 0인 건 측정이 죽었다는
+        뜻이고 그때 면제는 게이트를 통째로 없앤다. 실제로 inquire-ccnl 응답을
+        dict로 잘못 읽던 동안 이 조건이 한 달 넘게 존재하지 않았는데, 그 사실이
+        로그에는 '정상 통과'로 보였다. 면제의 방향이 매수를 더 내보내는 쪽이라
+        더 나빴다.
         """
-        tp = float(stock_data.get('tick_power', 0.0))
+        tp = float(stock_data.get('tick_power', 0.0) or 0.0)
         if tp == 0.0:
-            return True  # KIS 실패 시 데이터 없음으로 간주, 조건 면제
+            return not outage
         return tp >= threshold
 
     @staticmethod

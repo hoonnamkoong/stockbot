@@ -120,7 +120,16 @@ def get_balance():
                     holdings.append(_parse_holding(item))
             
             return {
-                "deposit": int(output2.get('dnca_tot_amt', 0)), # 예수금
+                "deposit": int(output2.get('dnca_tot_amt', 0)), # 예수금(D+0)
+                # D+1/D+2 예수금. 매도대금은 D+2에 편입되므로, 매일 파는 단타
+                # 심에서는 판 돈이 이틀간 dnca_tot_amt에 안 잡힌다 — 프로그램
+                # 매매 예산 클램프가 그만큼 계속 깎인다(2026-08-13: 설정 200만이
+                # 123만으로 클램프됐다). 대시보드(src/lib/kis-api.ts)는 이미
+                # prvs_rcdl_excc_amt를 읽고 있어 같은 계좌를 둘이 다르게 봤다.
+                # 지금은 **드러내기만** 한다 — 클램프 상한을 올리는 건 "없는 돈으로
+                # 주문한다"는 방향의 실패라, 실계좌 raw로 관계를 확인한 뒤에 한다.
+                "deposit_d1": int(output2.get('nxdy_excc_amt', 0) or 0),
+                "deposit_d2": int(output2.get('prvs_rcdl_excc_amt', 0) or 0),
                 "total_asset": int(output2.get('tot_evlu_amt', 0)), # 총 평가 자산
                 "total_profit": int(output2.get('evlu_pfls_smtl_amt', 0)), # 총 평가 손익
                 "holdings": holdings,

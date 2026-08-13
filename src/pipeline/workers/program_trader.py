@@ -429,7 +429,15 @@ def _resolve_candidates(sim, candidates: list[dict], enrich, log=print, log_erro
         try:
             enriched = enrich(own_universe)
             if enriched:
-                log(f'[Program] 심 전용 유니버스 적용: {len(enriched)}종목')
+                # 체결강도 충족률을 함께 찍는다. 0/N이면 게이트가 전 종목을 막는데,
+                # 그 상태가 로그에는 "주문 없음"으로만 보인다 — 2026-08-13에
+                # 실전 계좌가 하루 종일 매수 0건이던 걸 아무도 모른 이유다.
+                tp = sum(1 for s in enriched if s.get('tick_power'))
+                log(f'[Program] 심 전용 유니버스 적용: {len(enriched)}종목'
+                    f' (체결강도 확보 {tp}/{len(enriched)})')
+                if not tp:
+                    log_error('[Program] 체결강도 전량 결손 — validate_tick_power '
+                              '게이트가 신규 매수를 전부 막습니다.')
                 return enriched
         except Exception as e:
             log_error(f'[Program] 유니버스 보강 실패: {e} — 원본 유니버스 사용')
@@ -688,6 +696,57 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
         restored['applied_qty'] = req['applied_qty']
         ledger.setdefault('pending_orders', {})[code] = restored
 
+    _sweep_stale_pending(ledger, today, now_kst, alert, log_error)
+
+
+def _sweep_stale_pending(ledger, today, now_kst, alert, log_error) -> None:
+    """조회가 안 되는 채로 날짜 경계를 넘긴 pending을 걷어낸다.
+
+    위 루프의 날짜 경계 탈출구는 **취소 실패 경로에만** 있다. 그런데
+    `reconcile_pending`은 조회 결과가 UNKNOWN이면 `continue`로 빠지므로 취소
+    목록에 오르지 않고, 따라서 그 탈출구에 닿지 못한다 — UNKNOWN이 한 번
+    굳으면 그 pending은 불멸이 된다. 2026-08-13에 001210(34주 @ 5,300,
+    08-12T15:29 주문)이 정확히 그렇게 다음 거래일까지 남아 180,200원을 묶었고,
+    그동안 그 종목은 `pending_codes`에 걸려 신규 매수도 막혔다.
+
+    KRX 정규 주문은 장 마감에 소멸한다. 어제 낸 지정가가 오늘도 pending인 건
+    조회가 되든 안 되든 원장이 현실과 어긋났다는 뜻이다.
+
+    positions는 건드리지 않는다 — 부분체결분은 이미 거기 반영돼 있다. 그리고
+    지우면서 사람에게 알린다: 못 본 체결이 있었다면 실계좌엔 포지션이 있는데
+    원장엔 없는 상태이고, 그건 사람만 풀 수 있다.
+    """
+    pend = ledger.get('pending_orders') or {}
+    for code in list(pend):
+        entry = pend[code]
+        # 시각을 못 읽는 것과 '어제 주문이다'는 다르다. 모르는 것을 근거로
+        # 원장을 지우지 않는다. 문자열 비교로 때우면 안 된다 — '(없음)' 같은
+        # 값은 어떤 날짜보다도 작아서 조용히 '어제 주문'이 된다.
+        try:
+            ordered_date = datetime.strptime(
+                (entry.get('ordered_at') or '')[:10], '%Y-%m-%d').date()
+            today_date = datetime.strptime(today, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            continue
+        if ordered_date >= today_date:
+            continue
+        del pend[code]
+        log_error(f"[Program] 날짜 경계 pending 정리 — {code}"
+                  f"(odno={entry.get('odno')}, ordered_at={entry.get('ordered_at')}) "
+                  f"제거. 조회로 상태를 확정하지 못한 채 거래일이 바뀌었습니다.")
+        if alert:
+            alert(
+                f'pending_stale_{code}',
+                f'[Program] 날짜 경계 미체결 정리\n\n{code} — 어제 이전에 낸 주문'
+                f'(odno={entry.get("odno")}, {entry.get("qty")}주 @ '
+                f'{int(float(entry.get("price") or 0)):,})의 상태를 조회로 확정하지 '
+                f'못한 채 거래일이 바뀌었습니다. pending에서 제거해 묶여 있던 예산을 '
+                f'풉니다.\nKIS 체결 내역을 직접 확인하세요 — 실제로 체결됐다면 '
+                f'실계좌에는 포지션이 있는데 원장에는 없는 상태입니다.',
+                now_kst or datetime.strptime(today, '%Y-%m-%d'),
+                log=log_error,
+            )
+
 
 def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: datetime,
                         log=print, log_error=print, enrich=None) -> list[dict] | None:
@@ -786,6 +845,15 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     if effective_budget > real_account_value:
         log(f"[Program] effective_budget({effective_budget:,.0f})이 실제 계좌가치"
             f"({real_account_value:,.0f})를 초과 — 클램프")
+        # 클램프가 걸릴 때만 현금 내역을 편다. 상한이 어디서 오는지 이 한 줄이
+        # 없으면 알 수 없다 — deposit은 D+0라, 매도대금이 D+2에 묶여 있으면
+        # 계좌에 돈이 있어도 예산이 깎인다(2026-08-13: 설정 200만 → 123만).
+        # KIS가 준 총평가금액(total_asset)과 나란히 찍어 차이를 드러낸다.
+        log(f"[Program] 현금 내역: D+0={real_deposit:,} / "
+            f"D+1={int(bal.get('deposit_d1') or 0):,} / "
+            f"D+2={int(bal.get('deposit_d2') or 0):,} / "
+            f"보유원가={real_invested:,.0f} / "
+            f"KIS총평가={int(bal.get('total_asset') or 0):,}")
         effective_budget = real_account_value
     if effective_budget <= 0:
         log('[Program] 클램프 후 effective_budget<=0 — skip')

@@ -144,22 +144,48 @@ class KISDataProvider:
         요청했는데 앞서 돈 심의 30행 캐시를 받아 코스닥 순위가 170만큼 밀렸다)."""
         KISDataProvider._rank_cache[key] = (time.time(), data)
 
-    def _get(self, url: str, tr_id: str, params: dict, timeout: int = 5) -> dict:
+    # 연결과 응답을 따로 잰다. 하나의 숫자로 묶으면 "연결은 빨리 포기하고
+    # 응답은 기다린다"를 동시에 할 수 없다.
+    CONNECT_TIMEOUT = 3
+    READ_TIMEOUT = 5
+
+    # 연결 계열 실패에 한해 이만큼 던진다(재시도 2회 포함). 2026-08-13에 러너
+    # 하나의 egress가 4분간 죽어 KIS 호출 60건이 전부 connect timeout이 났는데,
+    # 단발 호출이라 그 런의 per·tick_power가 통째로 사라졌다.
+    GET_ATTEMPTS = 3
+    RETRY_BACKOFF_SEC = 0.3
+
+    def _get(self, url: str, tr_id: str, params: dict, timeout: int = READ_TIMEOUT) -> dict:
+        """실패하면 {}를 돌려준다 — 없는 값을 0으로 지어내지 않는다.
+
+        재시도는 **연결 계열 실패에만** 한다. rt_cd != 0이나 HTTP 500은 서버가
+        대답한 것이고, 그걸 다시 던지면 유량제한만 키운다.
+        """
         if not self._token or not self._base_url:
             return {}
-        try:
-            r = requests.get(
-                f"{self._base_url}{url}",
-                headers=self._headers(tr_id),
-                params=params,
-                timeout=timeout,
-            )
+        for attempt in range(self.GET_ATTEMPTS):
+            try:
+                r = requests.get(
+                    f"{self._base_url}{url}",
+                    headers=self._headers(tr_id),
+                    params=params,
+                    timeout=(self.CONNECT_TIMEOUT, timeout),
+                )
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                if attempt + 1 < self.GET_ATTEMPTS:
+                    time.sleep(self.RETRY_BACKOFF_SEC * (attempt + 1))
+                    continue
+                return {}
+            except Exception:
+                return {}
             if r.status_code == 200:
-                body = r.json()
+                try:
+                    body = r.json()
+                except Exception:
+                    return {}
                 if body.get("rt_cd") == "0":
                     return body
-        except Exception:
-            pass
+            return {}
         return {}
 
     # ──────────────────────────────────────────────────
@@ -499,7 +525,9 @@ class KISDataProvider:
         if not out:
             result = {"price": 0, "change_rate_pct": 0.0, "per": 0.0, "pbr": 0.0,
                       "sector_name": "", "w52_hgpr": 0, "w52_lwpr": 0,
-                      "open_price": 0, "day_high": 0, "day_low": 0, "prev_close": 0}
+                      "open_price": 0, "day_high": 0, "day_low": 0, "prev_close": 0,
+                      "foreign_rate": 0.0, "eps": 0, "bps": 0,
+                      "mkt_cap": 0, "amount": 0, "volume": 0}
             self._set_cache(key, result)
             return result
 
@@ -515,9 +543,43 @@ class KISDataProvider:
             "day_high": self._to_int(out.get("stck_hgpr", 0)),
             "day_low": self._to_int(out.get("stck_lwpr", 0)),
             "prev_close": self._to_int(out.get("stck_sdpr", 0)),
+            "foreign_rate": self._to_float(out.get("hts_frgn_ehrt", 0)),
+            "eps": self._to_int(float(self._to_float(out.get("eps", 0)))),
+            "bps": self._to_int(float(self._to_float(out.get("bps", 0)))),
+            "mkt_cap": self._to_int(out.get("hts_avls", 0)),
+            "amount": self._to_int(out.get("acml_tr_pbmn", 0)),
+            "volume": self._to_int(out.get("acml_vol", 0)),
         }
         self._set_cache(key, result)
         return result
+
+    # ──────────────────────────────────────────────────
+    # 7-b. 체결강도 (FHKST01010300 — 주식현재가 체결)
+    # ──────────────────────────────────────────────────
+    def get_tick_power(self, code: str) -> float:
+        """당일 체결강도(tday_rltv). 얻지 못하면 0.0.
+
+        이 응답의 output은 dict가 아니라 **체결 내역 리스트**다(실호출 확인: 30행,
+        최신순). tday_rltv는 당일 누적값이라 모든 행이 같으므로 최신 행만 본다.
+        inquire-price(FHKST01010100)에는 이 필드가 없다 — 2026-08-11에 그걸 몰라
+        전 종목 결손이 났다.
+        """
+        key = f"tick_power_{code}"
+        cached = self._get_cached(key, self.TTL_REALTIME)
+        if cached is not None:
+            return cached['value']
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/quotations/inquire-ccnl",
+            "FHKST01010300",
+            {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+        )
+        rows = body.get("output") or []
+        if isinstance(rows, dict):
+            rows = [rows]
+        value = self._to_float(rows[0].get("tday_rltv", 0)) if rows else 0.0
+        self._set_cache(key, {'value': value})
+        return value
 
     # ──────────────────────────────────────────────────
     # 8. 등락률 순위 (FHPST01700000)
@@ -760,6 +822,9 @@ class KISDataProvider:
     @staticmethod
     def _to_int(v) -> int:
         try:
+            # float 값이 들어오면 직접 변환 (문자열 변환 시 "1500.0" 형태가 되어 int() 실패)
+            if isinstance(v, float):
+                return int(v)
             return int(str(v).replace(",", "").strip())
         except Exception:
             return 0

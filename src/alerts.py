@@ -107,6 +107,47 @@ def notify_holiday_check_failed(today_display: str, now: datetime, log=print) ->
     )
 
 
+# 전량 결손이 몇 런 연속인지 세는 자리. **쿨다운 기록과 같은 파일**에 둔다.
+# 이 파일만 trading·scraper 양쪽 배포 경로에 이미 실려 있어서, 새 파일을 만들면
+# 동기화 목록에 또 한 자리가 생긴다 — 2026-07-30 통합에서 빠진 일곱 번째 자리가
+# 정확히 그렇게 만들어졌고, 그 결과 심9-1이 8월 5일까지 db-data에 안 올라갔다.
+# 키를 '_'로 시작시켜 알림 키와 섞이지 않게 한다.
+OUTAGE_STREAK_KEY = '_outage_streak'
+
+
+def bump_outage_streak(key: str, outage: bool, data_dir: str | None = None,
+                       log=print) -> int:
+    """전량 결손이 연속 몇 런째인지 돌려준다. 정상 런이면 0으로 되돌린다.
+
+    왜 세야 하나: 2026-08-13에 KIS 연결이 **한 런 동안만** 전부 connect timeout이
+    나서 per·tick_power가 30/30 결손이 됐고 알림 두 건이 나갔다. 그런데 이
+    알림이 원래 잡으려던 건 "tick_power가 7~8월 내내 0"이라는 지속성 문제다.
+    한 런의 blip과 몇 주짜리 고장을 같은 신호로 다루면, 잦은 쪽이 드문 쪽을
+    묻어버린다 — 사람이 둔감해지는 순간 알림은 없는 것과 같다.
+
+    카운터가 db-data 왕복에서 밀릴 수 있다(state_was_written의 ⚠️ 참고). 밀리면
+    **덜 울리는 쪽으로** 틀린다. 지속 장애는 다음 런이 다시 세므로 늦어질 뿐
+    사라지지 않고, 반대 방향(없는 장애를 알림)으로는 틀리지 않는다.
+    """
+    path = os.path.join(data_dir or DEFAULT_DATA_DIR, STATE_FILENAME)
+    state = _load_state(path)
+    streaks = state.get(OUTAGE_STREAK_KEY)
+    if not isinstance(streaks, dict):
+        streaks = {}
+
+    current = streaks.get(key) if isinstance(streaks.get(key), int) else 0
+    updated = current + 1 if outage else 0
+    if updated == current:
+        # 정상 런이 이어지는 동안 파일을 매번 건드리면, 그 배포가 다른 워크플로의
+        # 쿨다운 기록을 런 시작 사본으로 되돌린다(lost update). 바뀔 게 없으면 쓰지 않는다.
+        return updated
+
+    streaks[key] = updated
+    state[OUTAGE_STREAK_KEY] = streaks
+    _save_state(path, state, log)
+    return updated
+
+
 def _load_state(path: str) -> dict:
     try:
         with open(path, 'r', encoding='utf-8') as f:

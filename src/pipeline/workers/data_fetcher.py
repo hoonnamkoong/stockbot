@@ -9,7 +9,6 @@
 
 import re
 import requests
-import os
 import time
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -30,41 +29,30 @@ PAGE_RETRY_WAIT = 0.5
 POST_LIMIT = 30       # 종목당 LLM에 넘길 게시글 수 (공감 상위). 2026-07-28: 5 → 30
 
 
-# KIS inquire-price(FHKST01010100)에서 체결강도를 담는 필드.
-# 상수로 뺀 이유: diag 4,576행이 전부 0인데 원인이 "필드명이 틀렸다"인지
-# "토큰이 없어 블록을 건너뛴다"인지 가릴 수 없었다. 이름을 한 곳에 두면
-# 진단 메시지와 실제 조회가 같은 값을 가리킨다.
-TICK_POWER_FIELD = 'tday_rltv'
+# 전량 결손이 이만큼 연속돼야 사람에게 올린다. 스크래퍼는 10분 격자라 3런이면
+# 약 30분이다. 1런으로 재면 2026-08-13처럼 러너 하나의 4분짜리 네트워크 사고가
+# 사람을 깨우고, 그런 알림이 몇 번 반복되면 정작 몇 주짜리 고장 때 아무도 안 본다.
+OUTAGE_ALERT_RUNS = 3
 
 
-def tick_power_probe(out: dict) -> str | None:
-    """체결강도 필드가 응답에 없을 때 무엇이 왔는지 한 줄로 돌려준다.
-
-    0을 결손으로 읽는다 — KIS가 미집계를 '0'으로 주면 유효값으로 착각하게 되고,
-    그게 정확히 지금 상태(전부 0인데 정상처럼 보임)를 재생산한다.
-
-    정상일 때 None을 돌려준다. 종목마다 찍으면 로그가 20배가 된다.
-    """
-    try:
-        if float(out.get(TICK_POWER_FIELD) or 0) > 0:
-            return None
-    except (TypeError, ValueError):
-        pass
-    return (f"[진단] KIS inquire-price 응답에 '{TICK_POWER_FIELD}'가 없거나 0 — "
-            f"받은 키: {sorted(out)[:40] or '(빈 응답)'}")
-
-
-def missing_field_alert(field: str, missing: int, total: int) -> str | None:
-    """전량 결손일 때만 사람에게 보낼 문구를 돌려준다.
+def outage_alert(down: list[tuple[str, str]], streak: int, total: int) -> str | None:
+    """전량 결손이 연속으로 이어질 때만, 죽은 필드를 **한 건으로 묶어** 돌려준다.
 
     일부 결손은 종목 사정(신규상장·거래정지)일 수 있어 로그로 충분하다.
-    **전량 결손은 측정이 죽었다는 뜻이고, 그건 '신호가 없는 날'과 구분되지 않은
-    채 몇 주가 간다** — tick_power가 실제로 그렇게 7~8월 내내 0이었다.
+    전량 결손은 측정이 죽었다는 뜻이고, 그건 '신호가 없는 날'과 구분되지 않은 채
+    몇 주가 간다 — tick_power가 실제로 그렇게 7~8월 내내 0이었다.
+
+    한 건으로 묶는 이유: per(inquire-price)와 tick_power(inquire-ccnl)는
+    엔드포인트가 다르지만 호스트가 같아 **항상 같이** 죽는다. 필드별로 쪼개면
+    사고 하나에 사람이 두 번 깨어난다(2026-08-13에 그랬다).
     """
-    if total <= 0 or missing < total:
+    if total <= 0 or not down or streak < OUTAGE_ALERT_RUNS:
         return None
-    return (f"<b>{field} 전량 결손</b>\n\n"
-            f"후보 {total}종목 전부에서 {field}를 얻지 못했습니다.\n"
+    names = ', '.join(f for f, _ in down)
+    detail = '\n'.join(f"· {f}: {note}" for f, note in down)
+    return (f"<b>KIS 지표 전량 결손</b>\n\n"
+            f"{names} — 후보 {total}종목 전부에서 값을 얻지 못했습니다"
+            f"(연속 {streak}런).\n{detail}\n"
             f"이 값을 쓰는 심은 판단 자체가 불가능하고, 로그에는 '신호 없음'으로 보입니다.")
 
 
@@ -98,8 +86,6 @@ class DataFetcherWorker(BaseWorker):
         super().__init__(ctx)
         self.storage = storage
         self._reset_body_stats()
-        # 체결강도 진단은 런당 한 번만 남긴다(종목마다 찍으면 20배).
-        self._tick_probe_logged = False
 
     def run(self) -> list[StockData]:
         """
@@ -141,21 +127,20 @@ class DataFetcherWorker(BaseWorker):
 
         self.log(f"후보 종목 {len(candidates)}개 분석 시작")
 
-        # [V61.0] KIS API 토큰 사전 발급 (체결강도 조회용)
+        # KIS 호출은 KISDataProvider 하나로 한다. 예전엔 여기서 토큰을 직접 받아
+        # requests로 굴리는 사본이 있었는데, 그 사본에는 rt_cd 검사도 응답 형태
+        # 대응도 캐시도 없었다 — 2026-08-12에 그 차이로 두 번 사고가 났다.
         try:
-            from src.trade.auth import get_access_token, get_base_url
-            import os
-            self.kis_token = get_access_token()
-            self.kis_base_url = get_base_url()
-            self.kis_app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
-            self.kis_app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
-            # 토큰이 비면 체결강도 블록이 통째로 건너뛰어지고 tick_power가 전부
-            # 0이 된다. 그게 diag 4,576행이 전부 0인 원인의 후보 두 개 중 하나다.
-            if not self.kis_token:
-                self.log_error("KIS 토큰이 비었습니다 — 체결강도 조회를 건너뜁니다")
+            from src.trade.kis_data_provider import KISDataProvider
+            self.kis = KISDataProvider()
         except Exception as e:
-            self.log_error(f"KIS API 초기화 실패: {e} — 체결강도 조회 불가")
-            self.kis_token = None
+            self.kis = None
+            self.log_error(f"KIS 클라이언트 초기화 실패: {e} — 시세·체결강도 조회 불가")
+        # KISDataProvider는 토큰이 비어도 예외 없이 생성된다(_init_auth가 자체
+        # 예외를 삼킨다). 그러면 self.kis는 참이지만 모든 필드가 조용히 0으로
+        # 나온다 — 예전 코드가 토큰 공백을 잡던 자리를 여기서 대신 잡는다.
+        if self.kis and not getattr(self.kis, '_token', None):
+            self.log_error("KIS 토큰이 비었습니다 — 시세·체결강도 조회 불가")
 
         # 4. 병렬 수집 및 1차 필터링
         results_raw = []
@@ -256,6 +241,8 @@ class DataFetcherWorker(BaseWorker):
         # [2026-08-04, E9] 상세조회 순서를 임계값 판정 뒤로 옮겼다(위 process_one).
         # 통과 종목의 상세조회 자체는 안 바뀌었어야 한다 — 결손률이 오르면 순서
         # 변경이 아니라 다른 문제(토큰 만료·유량제한 등)를 의심할 근거가 된다.
+        total = len(results_raw)
+        down: list[tuple[str, str]] = []
         for field, note in (
             ('per', 'Sim3 가치페어 밸류에이션 판정 불가'),
             ('tick_power', '체결강도 판정 불가'),
@@ -263,14 +250,19 @@ class DataFetcherWorker(BaseWorker):
         ):
             missing = sum(1 for s in results_raw if not s.get(field))
             if missing:
-                self.log_error(f"{field} 결손 {missing}/{len(results_raw)}종목 — {note}")
-            # 전량 결손은 로그로 끝내면 안 된다. tick_power가 정확히 그렇게
-            # 7~8월 내내 0이었고, 아무도 몰랐다.
-            outage = missing_field_alert(field, missing, len(results_raw))
-            if outage:
-                alerts.send_alert_once(f'field_outage_{field}', f"{outage}\n{note}",
-                                       now=self.ctx.now_kst, cooldown_min=180,
-                                       log=self.log)
+                self.log_error(f"{field} 결손 {missing}/{total}종목 — {note}")
+            if total > 0 and missing == total:
+                down.append((field, note))
+
+        # 전량 결손은 로그로 끝내면 안 된다. tick_power가 정확히 그렇게 7~8월
+        # 내내 0이었고, 아무도 몰랐다. 다만 **한 런의 결손은 아직 고장이 아니다** —
+        # 연속으로 이어질 때만 올린다(OUTAGE_ALERT_RUNS 주석 참고).
+        streak = alerts.bump_outage_streak('field_outage', bool(down), log=self.log)
+        outage = outage_alert(down, streak, total)
+        if outage:
+            alerts.send_alert_once('field_outage', outage,
+                                   now=self.ctx.now_kst, cooldown_min=180,
+                                   log=self.log)
 
         # 7. Pydantic 변환 (타입 안전성 확보)
         results: list[StockData] = []
@@ -329,115 +321,36 @@ class DataFetcherWorker(BaseWorker):
         except Exception as e:
             print(f"   [DataFetcher] 외인비중 수집 실패 {code}: {e}")
 
-        # [V60.0] 1. 체결강도·시세 보강 (KIS API 활용, 네이버 제공 중단에 따른 대응)
-        # 네이버 메인 페이지 파싱과 같은 try에 묶지 않는다: 2026-08-03에 둘이 한 블록이라
-        # 러너에서 main.naver가 타임아웃 나자 KIS 호출이 실행조차 되지 않았고, 시가가 빈
-        # 심9는 하루 종일 진입 후보를 한 건도 만들지 못했다. 두 소스는 독립이어야 한다.
+        # KIS 보강. 네이버 파싱과 같은 try에 묶지 않는다 — 2026-08-03에 둘이 한
+        # 블록이라 main.naver가 타임아웃 나자 KIS 호출이 실행조차 되지 않았다.
         details['tick_power'] = 0.0
-        if getattr(self, 'kis_token', None) and getattr(self, 'kis_app_key', None):
+        if getattr(self, 'kis', None):
             try:
-                url = f"{self.kis_base_url}/uapi/domestic-stock/v1/quotations/inquire-price"
-                headers = {
-                    "Content-Type": "application/json; charset=utf-8",
-                    "authorization": f"Bearer {self.kis_token}",
-                    "appkey": self.kis_app_key,
-                    "appsecret": self.kis_app_secret,
-                    "tr_id": "FHKST01010100"
-                }
-                params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code}
-                # 잦은 호출 방지를 위해 timeout 짧게 설정
-                r = requests.get(url, headers=headers, params=params, timeout=3)
-                if r.status_code == 200:
-                    out = r.json().get('output', {})
-                    # 기존 Naver 데이터 KIS로 보강 (더 정확)
-                    if out.get('stck_prpr'):
-                        details['price'] = int(out['stck_prpr'])
-                        details['current_price'] = int(out['stck_prpr'])
-                    if out.get('prdy_ctrt'):
-                        rate = float(out['prdy_ctrt'])
-                        details['change_rate'] = f"+{rate:.2f}%" if rate >= 0 else f"{rate:.2f}%"
-                    if out.get('hts_frgn_ehrt'):
-                        details['foreign_rate'] = float(out['hts_frgn_ehrt'])
-                    if out.get('stck_sdpr'):
-                        details['prev_close'] = int(out['stck_sdpr'])
-                    # [Sim9] 시가: 갭(=시가/전일종가) 산출용. 전일종가와 같은 응답 블록이라 추가 콜 0.
-                    if out.get('stck_oprc'):
-                        details['open_price'] = int(out['stck_oprc'])
-                    # [Sim9] 당일 고가/저가: 진입가가 그날 변동폭의 어디인지(일중 위치) 산출용.
-                    # 저가 근처에서 마감한 되밀림만 다음날 되돌아온다(실측).
-                    for _src, _dst in (('stck_hgpr', 'day_high'), ('stck_lwpr', 'day_low')):
-                        if out.get(_src):
-                            try: details[_dst] = int(out[_src])
-                            except (ValueError, TypeError): pass
-                    # 신규 밸류에이션/52주 필드 (추가 API 호출 없이 동일 응답에서 파싱)
-                    for _f in ('per', 'pbr'):
-                        if out.get(_f):
-                            try: details[_f] = float(out[_f])
-                            except (ValueError, TypeError): pass
-                    for _f in ('eps', 'bps', 'w52_hgpr', 'w52_lwpr'):
-                        if out.get(_f):
-                            try: details[_f] = int(float(out[_f]))
-                            except (ValueError, TypeError): pass
-                    if out.get('hts_avls'):
-                        try: details['mkt_cap'] = int(out['hts_avls'])
-                        except (ValueError, TypeError): pass
-                    # 거래대금/거래량: KIS가 네이버보다 정확 (원 단위)
-                    if out.get('acml_tr_pbmn'):
-                        try: details['amount'] = int(out['acml_tr_pbmn'])
-                        except (ValueError, TypeError): pass
-                    if out.get('acml_vol'):
-                        try: details['volume'] = int(out['acml_vol'])
-                        except (ValueError, TypeError): pass
-                    if out.get('bstp_kor_isnm'):
-                        details['sector_name'] = out['bstp_kor_isnm'].strip()
-                else:
-                    print(f"   [DataFetcher] KIS 시세 보강 실패 {code}: HTTP {r.status_code}")
+                q = self.kis.get_price_quote(code)
+                # 0으로 덮어쓰지 않는다. 조회 실패도 0으로 오므로, 덮으면 네이버가
+                # 얻어둔 값을 잃는다(2026-08-04 실전 0체결의 형태).
+                if q.get('price'):
+                    details['price'] = q['price']
+                    details['current_price'] = q['price']
+                if q.get('change_rate_pct'):
+                    r = q['change_rate_pct']
+                    details['change_rate'] = f"+{r:.2f}%" if r >= 0 else f"{r:.2f}%"
+                for src, dst in (
+                    ('foreign_rate', 'foreign_rate'), ('prev_close', 'prev_close'),
+                    ('open_price', 'open_price'), ('day_high', 'day_high'),
+                    ('day_low', 'day_low'), ('per', 'per'), ('pbr', 'pbr'),
+                    ('eps', 'eps'), ('bps', 'bps'), ('w52_hgpr', 'w52_hgpr'),
+                    ('w52_lwpr', 'w52_lwpr'), ('mkt_cap', 'mkt_cap'),
+                    ('amount', 'amount'), ('volume', 'volume'),
+                ):
+                    if q.get(src):
+                        details[dst] = q[src]
+                if q.get('sector_name'):
+                    details['sector_name'] = q['sector_name']
             except Exception as e:
-                # 조용히 삼키면 시가 없는 하루가 '신호 없는 하루'로 위장된다.
                 print(f"   [DataFetcher] KIS 시세 보강 실패 {code}: {e}")
-
-        # [2026-08-11] 체결강도(tday_rltv)는 inquire-price(FHKST01010100) 응답에
-        # 없다 — 실측(오늘 전 런에서 100% 결손)으로 확인됐다. KIS 공식 예제
-        # (examples_llm/domestic_stock/inquire_ccnl)를 보면 그 필드는 별도 엔드포인트
-        # inquire-ccnl(FHKST01010300, "주식현재가 체결")의 응답이다. 위 inquire-price
-        # 블록과 같은 try에 묶지 않는다 — 이유는 바로 위 [V60.0] 주석과 같다:
-        # 한쪽이 타임아웃 나도 다른 쪽 보강은 살아야 한다.
-        if getattr(self, 'kis_token', None) and getattr(self, 'kis_app_key', None):
             try:
-                url = f"{self.kis_base_url}/uapi/domestic-stock/v1/quotations/inquire-ccnl"
-                headers = {
-                    "Content-Type": "application/json; charset=utf-8",
-                    "authorization": f"Bearer {self.kis_token}",
-                    "appkey": self.kis_app_key,
-                    "appsecret": self.kis_app_secret,
-                    "tr_id": "FHKST01010300"
-                }
-                params = {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code}
-                r = requests.get(url, headers=headers, params=params, timeout=3)
-                if r.status_code == 200:
-                    # [2026-08-12] 이 응답의 output은 dict가 아니라 **체결 내역
-                    # 리스트**다(실호출로 확정: 30행, 최신순). tday_rltv는 당일
-                    # 누적 체결강도라 모든 행이 같은 값이므로 최신 행만 본다.
-                    # 형태 판정을 probe보다 **앞에** 둔다: 08-11에 이 엔드포인트로
-                    # 옮기면서 dict로 가정했고, 그래서 매 종목 probe가 실행되기
-                    # 전에 AttributeError가 났다 — 원인을 가리려고 만든 진단이
-                    # 정작 원인이 생긴 순간에만 침묵했다(tick_power 100% 결손).
-                    out = r.json().get('output')
-                    if isinstance(out, list):
-                        out = out[0] if out else {}
-                    if not isinstance(out, dict):
-                        out = {}
-                    probe = tick_power_probe(out)
-                    if probe is None:
-                        details['tick_power'] = float(out[TICK_POWER_FIELD])
-                    elif not self._tick_probe_logged:
-                        # 런당 한 번만. 이 한 줄이 "필드명이 틀렸다"와 "응답이
-                        # 비었다"를 가른다 — 지금은 그 둘을 구분할 수 없어
-                        # 어느 쪽을 고쳐야 하는지 모른다.
-                        self._tick_probe_logged = True
-                        self.log_error(probe)
-                else:
-                    print(f"   [DataFetcher] KIS 체결강도 조회 실패 {code}: HTTP {r.status_code}")
+                details['tick_power'] = self.kis.get_tick_power(code)
             except Exception as e:
                 print(f"   [DataFetcher] KIS 체결강도 조회 실패 {code}: {e}")
 

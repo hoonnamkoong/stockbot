@@ -15,6 +15,12 @@ from src.data.storage_manager import StorageManager
 from src.strategy.registry import get_active_simulators
 
 
+# 체결강도 조회의 read 타임아웃(초). 이 경로는 2분 매매 루프 안에서 종목당
+# 1콜씩 돈다 — 기본 5초에 재시도까지 겹치면 30종목에 30초가 붙어 1분 매매가
+# 2분으로 되돌아간다(trade_loop의 LOOP_BUDGET_SEC=85, 첫 바퀴 25초 조건).
+_TICK_TIMEOUT_SEC = 2
+
+
 def _median(xs):
     if not xs:
         return 0.0
@@ -559,6 +565,21 @@ class TradeEngineWorker(BaseWorker):
                         for _f in ('open_price', 'day_high', 'day_low', 'prev_close'):
                             if _f not in stock and quote.get(_f):
                                 stock[_f] = quote[_f]
+                    except Exception:
+                        pass
+                # 체결강도 — Sim4/4-1 진입 게이트(validate_tick_power)의 재료다.
+                # 이게 없으면 유니버스 전체가 tick_power 0으로 보이고, 게이트는
+                # 그걸 '전량 결손 = 측정이 죽었다'로 읽어 **전 종목을 막는다**.
+                # 2026-08-13에 실전 계좌가 하루 종일 매수 0건이던 직접 원인이다.
+                # 이 함수는 프로그램 경로와 페이퍼 경로가 **같이** 쓰므로 파리티가
+                # 깨진 건 아니었다 — 양쪽이 똑같이 멎어 있었다.
+                # 실패는 0.0으로 오므로 값이 있을 때만 붙인다 — 0을 적으면
+                # '측정 불가'와 '체결강도 0'이 합쳐진다.
+                if 'tick_power' not in stock:
+                    try:
+                        tp = kis.get_tick_power(code, timeout=_TICK_TIMEOUT_SEC)
+                        if tp:
+                            stock['tick_power'] = tp
                     except Exception:
                         pass
                 # 수급 — 유니버스 자체에 이미 값이 있으면 덮어쓰지 않음

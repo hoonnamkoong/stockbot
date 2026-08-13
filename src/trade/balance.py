@@ -9,6 +9,16 @@ from src.trade.auth import get_access_token, load_env
 # [Rule 4.3] KIS API를 통한 계좌 잔고 및 보유 종목 조회를 담당하는 모듈입니다.
 # 실전 및 모의 투자 계좌를 지원하며, 에러 7(조회이후 자료변경) 발생 시의 자동 재시도 로직을 포함합니다.
 
+def _opt_int(v):
+    """값이 없으면 None. '측정 못 했다'를 0으로 적지 않는다."""
+    if v in (None, ''):
+        return None
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
 def _parse_holding(item: dict) -> dict:
     """KIS inquire-balance output1 한 행을 내부 holdings 형식으로 변환."""
     return {
@@ -120,7 +130,19 @@ def get_balance():
                     holdings.append(_parse_holding(item))
             
             return {
-                "deposit": int(output2.get('dnca_tot_amt', 0)), # 예수금
+                "deposit": int(output2.get('dnca_tot_amt', 0)), # 예수금(D+0)
+                # D+1/D+2 예수금. 매도대금은 D+2에 편입되므로, 매일 파는 단타
+                # 심에서는 판 돈이 이틀간 dnca_tot_amt에 안 잡힌다 — 프로그램
+                # 매매 예산 클램프가 그만큼 계속 깎인다(2026-08-13: 설정 200만이
+                # 123만으로 클램프됐다). 대시보드(src/lib/kis-api.ts)는 이미
+                # prvs_rcdl_excc_amt를 읽고 있어 같은 계좌를 둘이 다르게 봤다.
+                # 지금은 **드러내기만** 한다 — 클램프 상한을 올리는 건 "없는 돈으로
+                # 주문한다"는 방향의 실패라, 실계좌 raw로 관계를 확인한 뒤에 한다.
+                # 없으면 None이다. 0으로 채우면 '이 응답에 필드가 없다'와
+                # '예수금이 0이다'가 합쳐지는데, 이 값들의 용도가 "예산 상한을
+                # 올려도 되나"를 사람이 판단하는 것이라 그 혼동이 곧 오판이 된다.
+                "deposit_d1": _opt_int(output2.get('nxdy_excc_amt')),
+                "deposit_d2": _opt_int(output2.get('prvs_rcdl_excc_amt')),
                 "total_asset": int(output2.get('tot_evlu_amt', 0)), # 총 평가 자산
                 "total_profit": int(output2.get('evlu_pfls_smtl_amt', 0)), # 총 평가 손익
                 "holdings": holdings,

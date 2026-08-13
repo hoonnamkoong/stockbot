@@ -55,15 +55,32 @@ def test_unchanged_price_keeps_the_order_resting():
     assert '001210' in led['pending_orders'], 'pending이 유지돼야 재주문도 막힌다'
 
 
-def test_moved_price_still_cancels():
-    """가격이 움직였으면 기존대로 거두고, 다음 사이클에 새 값으로 다시 낸다."""
+def test_price_above_the_limit_still_cancels():
+    """시장이 내 지정가 위로 갔다 = 이 가격엔 안 붙는다. 거두고 다시 낸다."""
+    led = _ledger(price=5300)
+    cancel = _Spy()
+
+    _settle(led, lambda code: {'price': 5390}, cancel)
+
+    assert cancel.cancelled == [('OD1', '001210', 31)]
+    assert '001210' not in led['pending_orders']
+
+
+def test_price_below_the_limit_keeps_resting():
+    """[2026-08-13 추가] 매수 지정가 5,300에 현재가 5,210은 **체결 직전**이다.
+    그걸 취소하고 5,210에 다시 내면 앞줄을 버리고 맨 뒤로 간다.
+
+    원래 조건은 `int(live) != int(지정가)` 하나뿐이라 유리하게 움직인 경우도
+    취소했다 — 사용자가 한투 앱에서 본 대량 취소의 주된 몫이 이것이다.
+    `check_buy_drift`는 "상승 괴리만 막는다. 판단가보다 싸진 것은 불리하지
+    않다"고 명시하는데, 이쪽엔 그 대칭이 없었다."""
     led = _ledger(price=5300)
     cancel = _Spy()
 
     _settle(led, lambda code: {'price': 5210}, cancel)
 
-    assert cancel.cancelled == [('OD1', '001210', 31)]
-    assert '001210' not in led['pending_orders']
+    assert cancel.cancelled == [], '체결 임박한 주문을 취소하면 안 된다'
+    assert '001210' in led['pending_orders']
 
 
 def test_quote_failure_falls_back_to_cancelling():

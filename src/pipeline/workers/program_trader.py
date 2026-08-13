@@ -623,32 +623,85 @@ def _warn_if_stuck(entry: dict, code: str, now_kst, alert, log) -> None:
     )
 
 
-def _keep_resting(entry: dict, code: str, quote, log) -> bool:
-    """판단가가 그대로면 미체결 매수를 거두지 않는다.
+# 주문 직후 이 시간 동안은 가격이 올라가도 유지한다(분).
+# 태스커가 2분 주기라 매 사이클 재평가하면 어떤 주문도 대기열에서 살아남지
+# 못한다 — 재주문은 가격-시간 우선에서 그 가격대 맨 뒤로 간다.
+RESTING_MIN_MIN = 6
+
+# 이만큼 못 붙으면 시장가로 올린다(분). 지정가 이하인데도 안 붙는 자리는
+# 대기열이 두꺼운 것이고, 계속 재주문해봐야 예산만 묶인다(001210이 그랬다).
+MARKET_ESCALATE_MIN = 15
+
+
+def _rested_min(entry: dict, now_kst) -> float | None:
+    """주문 후 경과 분. 못 읽으면 None — 모르는 것을 0분으로 적지 않는다."""
+    if not now_kst:
+        return None
+    try:
+        return (now_kst - datetime.fromisoformat(entry['ordered_at'])).total_seconds() / 60
+    except Exception:
+        return None
+
+
+def resting_action(entry: dict, live, now_kst) -> str:
+    """미체결 매수를 어떻게 할지: 'keep' | 'escalate' | 'reorder'.
 
     취소·재주문은 같은 가격대 대기열의 **맨 뒤**로 보낸다(가격-시간 우선).
     2026-08-12: 001210이 상한가(5,300)에 고정돼 판단가가 하루 종일 같았는데,
     봇이 매 사이클 취소→동일가 재주문을 반복해 순번을 스스로 리셋했다 — 체결
     0건. 같은 날 002990은 재주문을 겪지 않은 첫 주문이 그대로 체결됐다.
 
-    시세를 모르면 기존 동작(취소)으로 떨어진다 — 모르는 상태에서 주문을
-    시장에 남겨두지 않는다.
+    그 수정(PR #28)은 "현재가 == 지정가"만 살렸다. 상한가 전용이었던 셈이라,
+    주가가 1원만 움직여도 2분마다 취소가 나갔다 — 한투 앱 이력이 취소로 덮인
+    이유다. 특히 **유리하게 움직인 경우를 구분하지 않았다**: 매수 지정가
+    5,300에 현재가 5,250은 체결 직전인데 그걸 취소하고 맨 뒤로 갔다.
+    `check_buy_drift`는 "상승 괴리만 막는다. 판단가보다 싸진 것은 불리하지
+    않다"고 명시하는데 이쪽엔 그 대칭이 없었다.
+
+    시세를 모르면 'reorder'(=기존 동작인 취소)로 떨어진다 — 모르는 상태에서
+    주문을 시장에 남겨두지 않는다.
     """
-    if entry.get('side') != 'buy' or quote is None:
-        return False
+    if entry.get('side') != 'buy':
+        return 'reorder'          # 매도는 시장가라 여기 오지 않는다
+    try:
+        live_px = float(live or 0)
+    except (TypeError, ValueError):
+        return 'reorder'
+    if live_px <= 0:
+        return 'reorder'
+    limit = float(entry.get('price') or 0)
+    if limit <= 0:
+        return 'reorder'
+
+    waited = _rested_min(entry, now_kst)
+    if waited is not None:
+        if waited >= MARKET_ESCALATE_MIN:
+            return 'escalate'
+        if waited < RESTING_MIN_MIN:
+            return 'keep'
+    return 'keep' if live_px <= limit else 'reorder'
+
+
+def _resting_decision(entry: dict, code: str, quote, now_kst, log) -> str:
+    """resting_action에 시세 조회를 붙인 얇은 껍데기."""
+    if quote is None:
+        return 'reorder'
     try:
         live = float((quote(code) or {}).get('price') or 0)
     except Exception:
-        return False
-    if live <= 0 or int(live) != int(float(entry.get('price') or 0)):
-        return False
-    log(f"[Program] 미체결 유지: {code} @ {int(live)} — 판단가 그대로라 "
-        f"재주문하지 않습니다(취소하면 대기열 순번을 잃습니다)")
-    return True
+        return 'reorder'
+    action = resting_action(entry, live, now_kst)
+    if action == 'keep':
+        log(f"[Program] 미체결 유지: {code} 지정가 {int(float(entry.get('price') or 0)):,} "
+            f"/ 현재가 {int(live):,} — 취소하면 대기열 순번을 잃습니다")
+    elif action == 'escalate':
+        log(f"[Program] 미체결 {MARKET_ESCALATE_MIN}분 초과: {code} — 시장가로 올립니다")
+    return action
 
 
 def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
-                          now_kst=None, alert=None, quote=None, realized=None):
+                          now_kst=None, alert=None, quote=None, realized=None,
+                          escalate=None):
     """pending을 정산하고 미체결 잔량을 취소한다. I/O는 주입받는다(테스트 가능).
 
     취소가 실패하면 그 종목의 pending을 되살린다 — 다음 사이클에 새 주문을
@@ -674,7 +727,39 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
 
     for req in reconcile_pending(ledger, lookups, today):
         code = req['code']
-        if _keep_resting(snapshot[code], code, quote, log):
+        action = _resting_decision(snapshot[code], code, quote, now_kst, log)
+        if action == 'escalate':
+            # 취소가 먼저다. 취소 없이 시장가를 얹으면 둘 다 체결될 수 있다
+            # (이중 매수). 취소에 실패하면 아무것도 하지 않고 유지한다.
+            if not cancel(req['odno'], code, req['qty']):
+                log_error(f'[Program] {code} 시장가 전환 보류 — 기존 주문 취소 실패')
+                # 전환이 반복 실패하면 그 주문은 계속 예산을 묶는다. 그 상태는
+                # 30분 고착 경보가 잡는다(이 경로가 그 경보의 유일한 도달점이다 —
+                # 정상 경로는 15분에 전환되므로 30분까지 남지 않는다).
+                _warn_if_stuck(snapshot[code], code, now_kst, alert, log_error)
+                restored = dict(snapshot[code])
+                restored['applied_qty'] = req['applied_qty']
+                ledger.setdefault('pending_orders', {})[code] = restored
+                continue
+            if escalate and escalate(code, req['qty'], snapshot[code]):
+                # 시장가 전환은 돈이 움직이는 사건이다(슬리피지를 산다).
+                # 조용히 하면 안 된다.
+                if alert:
+                    alert(f'escalated_{code}',
+                          f'[Program] 미체결 {MARKET_ESCALATE_MIN}분 초과 — '
+                          f'시장가 전환\n\n'
+                          f'{code} {req["qty"]}주 지정가 '
+                          f'{int(float(snapshot[code].get("price") or 0)):,}원이 '
+                          f'{MARKET_ESCALATE_MIN}분 동안 체결되지 않아 시장가로 다시 '
+                          f'냈습니다. 슬리피지가 발생할 수 있습니다.',
+                          now_kst or datetime.strptime(today, '%Y-%m-%d'),
+                          log=log_error)
+                continue          # escalate가 새 pending을 등록했다
+            # 전환에 실패해도 기존 주문은 이미 취소됐다. 되살리지 않는다 —
+            # 없는 주문을 원장에 남기면 그 종목의 다음 매수가 영구히 막힌다.
+            log_error(f'[Program] {code} 시장가 전환 실패 — 이번 사이클은 주문 없음')
+            continue
+        if action == 'keep':
             _warn_if_stuck(snapshot[code], code, now_kst, alert, log_error)
             # 취소 실패 복원과 같은 방식으로 되돌린다 — applied_qty를 이어 붙이지
             # 않으면 다음 사이클에 같은 누적 체결이 또 반영된다.
@@ -963,9 +1048,54 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         pre_settle_positions = {c: dict(positions.get(c) or {}) for c in pending_buy_codes}
 
         from src.trade.order_cancel import cancel_order
+
+        def _escalate_to_market(code, qty, entry) -> bool:
+            """지정가로 오래 못 붙은 매수를 시장가로 다시 낸다.
+
+            호출부가 기존 주문을 **이미 취소한 뒤에만** 부른다. 여기서 실패하면
+            그 종목은 이번 사이클에 주문이 없는 상태로 끝난다(원장에도 안 남는다).
+
+            가드는 신규 매수와 같은 것을 쓴다 — 시장가라고 느슨해지면 안 된다:
+              - 정규장 종료 후에는 신규 매수를 내지 않는다.
+              - 판단가 대비 +2%를 넘게 뛰었으면 포기한다(check_buy_drift).
+                시장가는 호가를 그대로 받으므로 이 가드가 더 중요하다.
+            """
+            if not _buy_allowed(now_kst):
+                log(f'[Program] {code} 시장가 전환 취소 — 정규장 종료 후 신규 매수 금지')
+                return False
+            decided = float(entry.get('price') or 0)
+            allowed, live_px, why = check_buy_drift(code, decided, _price_quote)
+            if not allowed:
+                log(f'[Program] {code} 시장가 전환 취소 — {why}')
+                return False
+            try:
+                res = place_order_via_vercel('buy', code, qty, live_px or decided,
+                                             ord_type='market')
+            except Exception as e:
+                log_error(f'[Program] {code} 시장가 전환 주문 실패: {e}')
+                return False
+            if not res.get('success'):
+                log_error(f'[Program] {code} 시장가 전환 거부: {res.get("message")}')
+                return False
+            odno = _extract_odno(res)
+            if not odno:
+                # 주문은 나갔는데 번호가 없다 = 추적 불가. 원장에 못 넣으므로
+                # 사람 경로로 올린다(신규 매수 경로와 같은 처리).
+                alerts.send_alert_once(
+                    f'odno_missing_{code}',
+                    f'[Program] 주문번호 없음 — 시장가 전환 {code} {qty}주 추적 불가',
+                    now_kst)
+                log_error(f'[Program] odno 없음: 시장가 전환 {code} — pending 등록 불가')
+                return True       # 주문 자체는 나갔다. 되살리면 이중 매수가 된다.
+            register_pending(ledger, code, odno, 'buy', qty, live_px or decided,
+                             now_kst.isoformat(), tag=(ledger.get('turn') or {}).get('active_tag'),
+                             log_error=log_error)
+            return True
+
         settle_pending_orders(
             ledger, today, _lookup_by_pending_date(pending_before, today),
-            cancel_order, log, log_error, now_kst=now_kst, quote=_price_quote)
+            cancel_order, log, log_error, now_kst=now_kst, quote=_price_quote,
+            escalate=_escalate_to_market)
         positions = ledger['positions']
 
         # [턴 회계] 정산으로 방금 확정된 매수를 기준가(turn.basis)에 반영한다.

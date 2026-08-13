@@ -45,9 +45,9 @@ class _AlertSpy:
         return True
 
 
-def _settle(ledger, now_kst, alert, live=5300):
+def _settle(ledger, now_kst, alert, live=5300, cancel_ok=True):
     settle_pending_orders(ledger, TODAY, lambda odno: (UNFILLED, None),
-                          lambda *a: True, lambda m: None, lambda m: None,
+                          lambda *a: cancel_ok, lambda m: None, lambda m: None,
                           now_kst=now_kst, alert=alert,
                           quote=lambda code: {'price': live})
 
@@ -59,11 +59,16 @@ def test_no_alert_before_the_threshold():
     assert alert.calls == []
 
 
-def test_alert_when_the_order_sits_at_the_same_price_too_long():
+def test_alert_when_escalation_cannot_proceed_and_the_order_sits():
+    """[2026-08-13 갱신] 정상 경로는 이제 15분에 시장가로 전환하므로
+    (MARKET_ESCALATE_MIN) 주문이 30분까지 남지 않는다. 이 경보의 유일한
+    도달점은 **전환이 반복 실패하는 경우**다 — 기존 주문 취소가 안 되면
+    시장가를 얹을 수 없고(이중 매수), 그동안 예산은 계속 묶인다."""
     alert = _AlertSpy()
-    _settle(_ledger(), datetime(2026, 8, 12, 11, 0), alert)   # 97분 경과
-    assert len(alert.calls) == 1
-    key, text = alert.calls[0]
+    _settle(_ledger(), datetime(2026, 8, 12, 11, 0), alert, cancel_ok=False)  # 97분 경과
+    stuck = [c for c in alert.calls if c[0].startswith('stuck_order_')]
+    assert len(stuck) == 1
+    key, text = stuck[0]
     assert '001210' in key
     assert '001210' in text and '5,300' in text
 

@@ -144,22 +144,48 @@ class KISDataProvider:
         요청했는데 앞서 돈 심의 30행 캐시를 받아 코스닥 순위가 170만큼 밀렸다)."""
         KISDataProvider._rank_cache[key] = (time.time(), data)
 
-    def _get(self, url: str, tr_id: str, params: dict, timeout: int = 5) -> dict:
+    # 연결과 응답을 따로 잰다. 하나의 숫자로 묶으면 "연결은 빨리 포기하고
+    # 응답은 기다린다"를 동시에 할 수 없다.
+    CONNECT_TIMEOUT = 3
+    READ_TIMEOUT = 5
+
+    # 연결 계열 실패에 한해 이만큼 던진다(재시도 2회 포함). 2026-08-13에 러너
+    # 하나의 egress가 4분간 죽어 KIS 호출 60건이 전부 connect timeout이 났는데,
+    # 단발 호출이라 그 런의 per·tick_power가 통째로 사라졌다.
+    GET_ATTEMPTS = 3
+    RETRY_BACKOFF_SEC = 0.3
+
+    def _get(self, url: str, tr_id: str, params: dict, timeout: int = READ_TIMEOUT) -> dict:
+        """실패하면 {}를 돌려준다 — 없는 값을 0으로 지어내지 않는다.
+
+        재시도는 **연결 계열 실패에만** 한다. rt_cd != 0이나 HTTP 500은 서버가
+        대답한 것이고, 그걸 다시 던지면 유량제한만 키운다.
+        """
         if not self._token or not self._base_url:
             return {}
-        try:
-            r = requests.get(
-                f"{self._base_url}{url}",
-                headers=self._headers(tr_id),
-                params=params,
-                timeout=timeout,
-            )
+        for attempt in range(self.GET_ATTEMPTS):
+            try:
+                r = requests.get(
+                    f"{self._base_url}{url}",
+                    headers=self._headers(tr_id),
+                    params=params,
+                    timeout=(self.CONNECT_TIMEOUT, timeout),
+                )
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                if attempt + 1 < self.GET_ATTEMPTS:
+                    time.sleep(self.RETRY_BACKOFF_SEC * (attempt + 1))
+                    continue
+                return {}
+            except Exception:
+                return {}
             if r.status_code == 200:
-                body = r.json()
+                try:
+                    body = r.json()
+                except Exception:
+                    return {}
                 if body.get("rt_cd") == "0":
                     return body
-        except Exception:
-            pass
+            return {}
         return {}
 
     # ──────────────────────────────────────────────────

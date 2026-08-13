@@ -29,17 +29,30 @@ PAGE_RETRY_WAIT = 0.5
 POST_LIMIT = 30       # 종목당 LLM에 넘길 게시글 수 (공감 상위). 2026-07-28: 5 → 30
 
 
-def missing_field_alert(field: str, missing: int, total: int) -> str | None:
-    """전량 결손일 때만 사람에게 보낼 문구를 돌려준다.
+# 전량 결손이 이만큼 연속돼야 사람에게 올린다. 스크래퍼는 10분 격자라 3런이면
+# 약 30분이다. 1런으로 재면 2026-08-13처럼 러너 하나의 4분짜리 네트워크 사고가
+# 사람을 깨우고, 그런 알림이 몇 번 반복되면 정작 몇 주짜리 고장 때 아무도 안 본다.
+OUTAGE_ALERT_RUNS = 3
+
+
+def outage_alert(down: list[tuple[str, str]], streak: int, total: int) -> str | None:
+    """전량 결손이 연속으로 이어질 때만, 죽은 필드를 **한 건으로 묶어** 돌려준다.
 
     일부 결손은 종목 사정(신규상장·거래정지)일 수 있어 로그로 충분하다.
-    **전량 결손은 측정이 죽었다는 뜻이고, 그건 '신호가 없는 날'과 구분되지 않은
-    채 몇 주가 간다** — tick_power가 실제로 그렇게 7~8월 내내 0이었다.
+    전량 결손은 측정이 죽었다는 뜻이고, 그건 '신호가 없는 날'과 구분되지 않은 채
+    몇 주가 간다 — tick_power가 실제로 그렇게 7~8월 내내 0이었다.
+
+    한 건으로 묶는 이유: per(inquire-price)와 tick_power(inquire-ccnl)는
+    엔드포인트가 다르지만 호스트가 같아 **항상 같이** 죽는다. 필드별로 쪼개면
+    사고 하나에 사람이 두 번 깨어난다(2026-08-13에 그랬다).
     """
-    if total <= 0 or missing < total:
+    if total <= 0 or not down or streak < OUTAGE_ALERT_RUNS:
         return None
-    return (f"<b>{field} 전량 결손</b>\n\n"
-            f"후보 {total}종목 전부에서 {field}를 얻지 못했습니다.\n"
+    names = ', '.join(f for f, _ in down)
+    detail = '\n'.join(f"· {f}: {note}" for f, note in down)
+    return (f"<b>KIS 지표 전량 결손</b>\n\n"
+            f"{names} — 후보 {total}종목 전부에서 값을 얻지 못했습니다"
+            f"(연속 {streak}런).\n{detail}\n"
             f"이 값을 쓰는 심은 판단 자체가 불가능하고, 로그에는 '신호 없음'으로 보입니다.")
 
 
@@ -228,6 +241,8 @@ class DataFetcherWorker(BaseWorker):
         # [2026-08-04, E9] 상세조회 순서를 임계값 판정 뒤로 옮겼다(위 process_one).
         # 통과 종목의 상세조회 자체는 안 바뀌었어야 한다 — 결손률이 오르면 순서
         # 변경이 아니라 다른 문제(토큰 만료·유량제한 등)를 의심할 근거가 된다.
+        total = len(results_raw)
+        down: list[tuple[str, str]] = []
         for field, note in (
             ('per', 'Sim3 가치페어 밸류에이션 판정 불가'),
             ('tick_power', '체결강도 판정 불가'),
@@ -235,14 +250,19 @@ class DataFetcherWorker(BaseWorker):
         ):
             missing = sum(1 for s in results_raw if not s.get(field))
             if missing:
-                self.log_error(f"{field} 결손 {missing}/{len(results_raw)}종목 — {note}")
-            # 전량 결손은 로그로 끝내면 안 된다. tick_power가 정확히 그렇게
-            # 7~8월 내내 0이었고, 아무도 몰랐다.
-            outage = missing_field_alert(field, missing, len(results_raw))
-            if outage:
-                alerts.send_alert_once(f'field_outage_{field}', f"{outage}\n{note}",
-                                       now=self.ctx.now_kst, cooldown_min=180,
-                                       log=self.log)
+                self.log_error(f"{field} 결손 {missing}/{total}종목 — {note}")
+            if total > 0 and missing == total:
+                down.append((field, note))
+
+        # 전량 결손은 로그로 끝내면 안 된다. tick_power가 정확히 그렇게 7~8월
+        # 내내 0이었고, 아무도 몰랐다. 다만 **한 런의 결손은 아직 고장이 아니다** —
+        # 연속으로 이어질 때만 올린다(OUTAGE_ALERT_RUNS 주석 참고).
+        streak = alerts.bump_outage_streak('field_outage', bool(down), log=self.log)
+        outage = outage_alert(down, streak, total)
+        if outage:
+            alerts.send_alert_once('field_outage', outage,
+                                   now=self.ctx.now_kst, cooldown_min=180,
+                                   log=self.log)
 
         # 7. Pydantic 변환 (타입 안전성 확보)
         results: list[StockData] = []

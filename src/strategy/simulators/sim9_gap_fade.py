@@ -22,6 +22,20 @@ STOP_PCT = -3.0          # 익일 손절
 MIN_AMOUNT = 1_000_000_000
 
 
+
+def _skip(funnel, code, reason, **vals):
+    """왜 안 샀는지를 한 줄 남긴다.
+
+    2026-08-13 감사: 이 심은 배포 이래 매수가 **0건**인데, 로그에는 아무것도
+    남지 않아 "신호가 없는 날"과 "구조적으로 못 사는 심"이 구분되지 않았다.
+    유니버스(상승률 상위 50)와 진입 조건(갭 +7% 후 되밀림 -6% → 당일 등락률
+    +0.6% 이하)이 서로 밀어내는 관계라는 의심이 있는데, 확정하려면 게이트별
+    탈락 분포가 필요하다. 추측 대신 세어 본다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
+
 def _minutes(now):
     return now.hour * 60 + now.minute
 
@@ -36,7 +50,7 @@ def _held_days(entry_str, today):
         return None
 
 
-def decide_gap_fade(view, candidates, current_prices, now=None):
+def decide_gap_fade(view, candidates, current_prices, now=None, funnel=None):
     """[Sim9] 갭소진 반등 결정. 순수 함수. Order 리스트 반환.
 
     now를 주입받는 이유: 진입/청산이 모두 시각 게이트에 걸려 있어 테스트가
@@ -99,17 +113,26 @@ def decide_gap_fade(view, candidates, current_prices, now=None):
             break
         code = stock.get('code')
         if not code or code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _skip(funnel, code, 'held_or_cooldown')
             continue
         price = float(stock.get('price', 0))
         open_px = float(stock.get('open_price', 0))
         prev_cl = float(stock.get('prev_close', 0))
         amount = float(stock.get('amount', 0))
-        if price <= 0 or open_px <= 0 or prev_cl <= 0 or amount < MIN_AMOUNT:
+        if price <= 0 or open_px <= 0 or prev_cl <= 0:
+            _skip(funnel, code, 'no_ohlc')
+            continue
+        if amount < MIN_AMOUNT:
+            _skip(funnel, code, 'amount')
             continue
 
         gap = (open_px / prev_cl - 1) * 100
         intra = (price / open_px - 1) * 100
-        if not (gap >= GAP_MIN and intra <= INTRA_MAX):
+        if gap < GAP_MIN:
+            _skip(funnel, code, 'gap', gap=gap, intra=intra)
+            continue
+        if intra > INTRA_MAX:
+            _skip(funnel, code, 'intra', gap=gap, intra=intra)
             continue
 
         # 일중 위치: 되밀림이 '끝난' 종목과 '중간에 걸친' 종목을 가른다.
@@ -119,8 +142,12 @@ def decide_gap_fade(view, candidates, current_prices, now=None):
         hi = float(stock.get('day_high', 0) or 0)
         lo = float(stock.get('day_low', 0) or 0)
         if hi <= 0 or lo <= 0 or hi <= lo:
+            _skip(funnel, code, 'no_hilo', gap=gap, intra=intra)
             continue
-        if (price - lo) / (hi - lo) <= RANGE_POS_MAX:
+        pos = (price - lo) / (hi - lo)
+        if pos > RANGE_POS_MAX:
+            _skip(funnel, code, 'range_pos', gap=gap, intra=intra, pos=pos)
+        if pos <= RANGE_POS_MAX:
             qty = int(target_amount / price)
             if qty > 0:
                 orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
@@ -182,7 +209,40 @@ class GapFadeSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_gap_fade(self._view(current_prices), candidates, current_prices)
+        funnel = []
+        orders = decide_gap_fade(self._view(current_prices), candidates, current_prices,
+                                 funnel=funnel)
+        self._log_funnel(candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, orders) -> None:
+        """게이트별 탈락 분포를 한 줄로 남긴다.
+
+        이 심은 배포 이래 매수가 0건인데 로그에 아무것도 없어서, "신호가 없는
+        날"과 "구조적으로 못 사는 심"이 구분되지 않았다. 의심은 유니버스
+        (KOSPI 상승률 상위 50)와 진입 조건이 서로 밀어낸다는 것이다 — 갭 +7%
+        후 되밀림 -6%면 당일 등락률이 +0.6% 이하라 상승률 상위에 남기 어렵다.
+        추측으로 유니버스를 바꾸지 않고 먼저 센다.
+
+        `gap` 탈락이 후보 전량이면 유니버스 문제가 확정된다. gap을 통과하는
+        종목이 매일 몇 개씩 나오는데 뒤 게이트에서 죽으면 원인은 다른 데 있다.
+
+        진단이 심을 죽이면 안 된다 — 통째로 삼킨다.
+        """
+        try:
+            from collections import Counter
+            if not funnel and not orders:
+                return
+            c = Counter(f['reason'] for f in funnel)
+            passed_gap = [f for f in funnel if f['reason'] not in ('held_or_cooldown',
+                                                                  'no_ohlc', 'amount', 'gap')]
+            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
+            print(f"[Sim9 깔때기] 후보 {len(candidates)} → 매수 {len(orders)} | 탈락: {parts}")
+            for f in passed_gap[:5]:
+                print(f"   갭통과 {f['code']}: gap={f.get('gap', 0):+.1f}% "
+                      f"intra={f.get('intra', 0):+.1f}% 탈락={f['reason']}")
+        except Exception as e:
+            print(f'[Sim9 깔때기] 기록 실패(무시): {e}')

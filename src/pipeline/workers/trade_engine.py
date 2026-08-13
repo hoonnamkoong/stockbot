@@ -20,6 +20,13 @@ from src.strategy.registry import get_active_simulators
 # 2분으로 되돌아간다(trade_loop의 LOOP_BUDGET_SEC=85, 첫 바퀴 25초 조건).
 _TICK_TIMEOUT_SEC = 2
 
+# 표본 중 이 비율도 안 움직였으면 아직 거래가 시작되지 않은 것으로 본다.
+# 정규장 중 KOSPI 시총 상위 100종목의 80% 이상이 **정확히** 0.00%인 상황은
+# 실질적으로 개장 직후뿐이다(08-13 09:00: 97종목이 0.00%, 10분 뒤 breadth 95.0).
+# 개수가 아니라 비율인 이유: 이 함수는 표본 크기를 가정하지 않는다(호출부의
+# 80종목 하한은 _fetch_top100_breadth 쪽 가드다).
+MIN_MOVED_RATIO = 0.2
+
 
 def _median(xs):
     if not xs:
@@ -601,8 +608,27 @@ class TradeEngineWorker(BaseWorker):
 
     @staticmethod
     def _breadth_momentum(rates):
-        """top100 등락률 리스트 → (breadth%, momentum median). 빈 리스트면 None."""
+        """top100 등락률 리스트 → (breadth%, momentum median). 측정 불가면 None.
+
+        측정 불가는 둘이다:
+          - 빈 리스트
+          - **아직 안 움직인 장** — 등락률이 0이 아닌 종목이 표본의
+            MIN_MOVED_RATIO 미만이면 개장 전/직후라 값이 없는 것이다.
+
+        두 번째가 2026-08-06부터 리베로 예측을 통째로 망가뜨렸다. 그날부터 첫
+        관측이 09:00 정각으로 앞당겨졌는데, 네이버 시총 페이지는 그 시각에
+        아직 전일 종가라 100종목이 전부 0.00%로 보인다. `r > 0`이 하나도 없으니
+        breadth 0으로 기록됐고, `finalize_eod`가 그날 **첫** EOD 예측을
+        calibration에 쓰므로 예측값이 통째로 0이 됐다(08-13: 09:00에 3.0,
+        10분 뒤 95.0). 표본 수 가드(80 미만이면 None)는 "표본은 100개인데 전부
+        안 움직였다"를 잡지 못한다.
+
+        **0.00과 음수는 다르다.** 전 종목이 하락한 날은 측정 가능한 날이고
+        breadth 0이 정답이다 — 그걸 '측정 불가'로 버리면 진짜 폭락일을 잃는다.
+        """
         if not rates:
+            return None
+        if sum(1 for r in rates if r != 0) < len(rates) * MIN_MOVED_RATIO:
             return None
         ups = sum(1 for r in rates if r > 0)
         return round(ups / len(rates) * 100, 1), round(_median(rates), 2)
@@ -678,8 +704,12 @@ class TradeEngineWorker(BaseWorker):
                 break
         if len(codes) < 80:
             return None
-        breadth, momentum = self._breadth_momentum(rates)
-        return breadth, momentum, len(codes), codes
+        bm = self._breadth_momentum(rates)
+        if bm is None:
+            # 표본은 찼는데 아직 안 움직였다(개장 직후). 여기서 언팩하면 터지고,
+            # 0으로 적으면 08-06~08-13처럼 리베로 예측이 통째로 0이 된다.
+            return None
+        return bm[0], bm[1], len(codes), codes
 
     def _append_regime_observation(self, now_kst, live_breadth) -> None:
         """국면 관측 이력에 한 건 남긴다 — 10분 해상도, 분 단위 시각.

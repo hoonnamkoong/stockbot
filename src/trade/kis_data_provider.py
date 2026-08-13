@@ -556,8 +556,15 @@ class KISDataProvider:
     # ──────────────────────────────────────────────────
     # 7-b. 체결강도 (FHKST01010300 — 주식현재가 체결)
     # ──────────────────────────────────────────────────
-    def get_tick_power(self, code: str) -> float:
+    def get_tick_power(self, code: str, timeout: int | None = None) -> float:
         """당일 체결강도(tday_rltv). 얻지 못하면 0.0.
+
+        `timeout`: 이 조회는 2분 매매 루프 안에서 종목당 1콜씩 돈다. 기본
+        read 타임아웃(5초)에 재시도 2회까지 겹치면 종목당 최악 10초라, 30종목
+        3배치면 30초가 더 붙어 `LOOP_BUDGET_SEC=85`의 "두 바퀴" 조건(첫 바퀴
+        25초)을 깬다. 호출부가 더 짧게 줄 수 있게 열어 둔다 — 체결강도는
+        게이트 재료라 못 얻으면 매수를 막을 뿐, 늦어서 사이클을 통째로
+        날리는 것보다 낫다.
 
         이 응답의 output은 dict가 아니라 **체결 내역 리스트**다(실호출 확인: 30행,
         최신순). tday_rltv는 당일 누적값이라 모든 행이 같으므로 최신 행만 본다.
@@ -569,10 +576,12 @@ class KISDataProvider:
         if cached is not None:
             return cached['value']
 
+        kw = {'timeout': timeout} if timeout else {}
         body = self._get(
             "/uapi/domestic-stock/v1/quotations/inquire-ccnl",
             "FHKST01010300",
             {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code},
+            **kw,
         )
         rows = body.get("output") or []
         if isinstance(rows, dict):

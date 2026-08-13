@@ -28,7 +28,9 @@ class _Sim:
         self.state = {'portfolio': {}}
 
     def get_universe(self):
-        return [{'code': '005930', 'price': 70000}]
+        # tick_power를 채워 둔다 — 비면 '체결강도 전량 결손' 경보가 함께 울려
+        # 이 파일이 재려는 준비-예산 경보와 섞인다(2026-08-13에 그 경보가 생겼다).
+        return [{'code': '005930', 'price': 70000, 'tick_power': 130.0}]
 
     def run(self, candidates, current_prices=None):
         pass

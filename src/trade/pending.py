@@ -114,15 +114,37 @@ def _enter_position(positions, code, p, qty, price, today):
         positions[code]['tag'] = p['tag']
 
 
-def _correct_sell(ledger, positions, code, p, filled_qty, fill_px):
+def apply_confirmed_sell(ledger, positions, code, entry, filled_qty, realized):
+    """조회로 **확정된** 매도를 원장에 반영한다 — 추정치를 갈아끼운다.
+
+    `_correct_sell`과 같은 일을 하되, 실현손익을 체결가로 다시 계산하지 않고
+    KIS가 확정한 금액(TTTC8715R)을 그대로 쓴다. 체결가 재계산은 수수료·세금
+    처리가 증권사와 미세하게 어긋날 수 있고, 그 차이가 `effective_budget`을
+    통해 다음 주문 크기에 들어간다.
+
+    `filled_qty=0, realized=0.0`이면 "그 매도는 체결되지 않았다"가 되어
+    추정치를 통째로 되돌리고 포지션을 복원한다.
+    """
+    _correct_sell(ledger, positions, code, entry, filled_qty, 0.0,
+                  realized_override=realized)
+
+
+def _correct_sell(ledger, positions, code, p, filled_qty, fill_px,
+                  realized_override=None):
     """주문 시 추정으로 더한 값을 실측으로 갈아끼우고, 안 팔린 수량을 되돌린다.
 
     주문 시 `E = est(ordered_qty, 주문가)`를 더해 뒀으므로, 진실
     `A = actual(filled_qty, 체결가)`에 대해 보정은 `A - E` 하나로 떨어진다.
+
+    `realized_override`: 체결가로 재계산하는 대신 쓸 확정 실현손익(원).
+    KIS 기간별매매손익이 확정한 값을 그대로 반영할 때 쓴다.
     """
     avg = float(p.get('avg_price') or 0)
     estimated = realized_pnl_after_fees(p['qty'], avg, p['price']) if avg else 0.0
-    actual = realized_pnl_after_fees(filled_qty, avg, fill_px) if (avg and filled_qty) else 0.0
+    if realized_override is not None:
+        actual = float(realized_override)
+    else:
+        actual = realized_pnl_after_fees(filled_qty, avg, fill_px) if (avg and filled_qty) else 0.0
     correction = actual - estimated
     # 반올림하지 않는다 — 여기서 반올림하면 realized_pnl(before) + correction이
     # actual과 정확히 상쇄되지 않는다. 주문 시 더한 estimated와 지금 빼는

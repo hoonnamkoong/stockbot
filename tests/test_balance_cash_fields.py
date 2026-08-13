@@ -72,12 +72,12 @@ def test_total_asset_still_comes_from_kis():
     assert _balance()['total_asset'] == 2000396
 
 
-def test_missing_fields_are_zero_not_crashes():
-    """모의계좌·구버전 응답에 필드가 없을 수 있다. 없으면 0이고, 그 0은
-    '조회했더니 0'이 아니라 '이 응답엔 없다'는 뜻이다 — 클램프는 여전히
-    dnca_tot_amt만 쓰므로 동작에 영향이 없다."""
+def test_missing_fields_are_none_not_zero():
+    """모의계좌·구버전 응답에 필드가 없을 수 있다. 그때 0으로 채우면
+    '이 응답엔 없다'와 '예수금이 0이다'가 합쳐진다 — 이 값들의 용도가
+    "예산 상한을 올려도 되나"를 사람이 판단하는 것이라 그 혼동이 곧 오판이다."""
     out = _balance({'dnca_tot_amt': '500000', 'tot_evlu_amt': '500000'})
 
-    assert out['deposit_d2'] == 0
-    assert out['deposit_d1'] == 0
+    assert out['deposit_d2'] is None
+    assert out['deposit_d1'] is None
     assert out['deposit'] == 500000

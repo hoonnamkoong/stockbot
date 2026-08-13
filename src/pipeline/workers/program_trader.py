@@ -38,7 +38,9 @@ from datetime import datetime, timedelta
 from src import alerts
 from src.pipeline.context import MARKET_CLOSE_HHMM
 from src.trade.fees import realized_pnl_after_fees
+from src.trade.executions import UNKNOWN
 from src.trade.pending import register_pending
+from src.trade.realized_pnl import lookup_realized_pnl as _lookup_realized_pnl
 from src.pipeline.workers.program_turn import (
     REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
 )
@@ -412,7 +414,8 @@ def _make_adapter(sim, snapshot_state: dict, today: str, real_holdings: dict | N
     return orders
 
 
-def _resolve_candidates(sim, candidates: list[dict], enrich, log=print, log_error=print) -> list[dict]:
+def _resolve_candidates(sim, candidates: list[dict], enrich, log=print, log_error=print,
+                        now_kst=None) -> list[dict]:
     """심 전용 유니버스를 적용한 최종 후보를 반환.
 
     페이퍼 경로(trade_engine._run_simulators)와 동일 의미론:
@@ -436,8 +439,20 @@ def _resolve_candidates(sim, candidates: list[dict], enrich, log=print, log_erro
                 log(f'[Program] 심 전용 유니버스 적용: {len(enriched)}종목'
                     f' (체결강도 확보 {tp}/{len(enriched)})')
                 if not tp:
+                    # log_error는 print다. 08-13에 하루치 매수가 통째로 사라진 걸
+                    # 아무도 모른 이유가 정확히 그것이므로, 그 감지기를 다시
+                    # Actions 로그 줄로 두지 않는다. 스크래퍼 쪽 전량 결손과 같은
+                    # 사람 경로를 쓴다(data_fetcher의 field_outage와 같은 계열).
                     log_error('[Program] 체결강도 전량 결손 — validate_tick_power '
                               '게이트가 신규 매수를 전부 막습니다.')
+                    alerts.send_alert_once(
+                        'program_tick_power_outage',
+                        f'<b>프로그램 매매 정지 — 체결강도 전량 결손</b>\n\n'
+                        f'유니버스 {len(enriched)}종목 전부에서 체결강도를 얻지 '
+                        f'못했습니다. validate_tick_power 게이트가 신규 매수를 '
+                        f'전부 막으므로 이 상태로는 한 주도 사지 않습니다.\n'
+                        f'로그에는 "주문 없음"으로만 보입니다.',
+                        now=now_kst, cooldown_min=180, log=log)
                 return enriched
         except Exception as e:
             log_error(f'[Program] 유니버스 보강 실패: {e} — 원본 유니버스 사용')
@@ -633,7 +648,7 @@ def _keep_resting(entry: dict, code: str, quote, log) -> bool:
 
 
 def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
-                          now_kst=None, alert=None, quote=None):
+                          now_kst=None, alert=None, quote=None, realized=None):
     """pending을 정산하고 미체결 잔량을 취소한다. I/O는 주입받는다(테스트 가능).
 
     취소가 실패하면 그 종목의 pending을 되살린다 — 다음 사이클에 새 주문을
@@ -696,11 +711,27 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
         restored['applied_qty'] = req['applied_qty']
         ledger.setdefault('pending_orders', {})[code] = restored
 
-    _sweep_stale_pending(ledger, today, now_kst, alert, log_error)
+    _sweep_stale_pending(ledger, today, lookups, now_kst, alert, log_error,
+                         realized=realized)
 
 
-def _sweep_stale_pending(ledger, today, now_kst, alert, log_error) -> None:
-    """조회가 안 되는 채로 날짜 경계를 넘긴 pending을 걷어낸다.
+# 조회가 UNKNOWN인 채로 이만큼 연속돼야 pending을 걷어낸다.
+#
+# 1런으로 판정하면 안 된다. `lookup_execution`이 UNKNOWN을 돌려주는 경우는
+# 사실상 **요청 실패 하나뿐**이다 — 미체결은 rows==[] → UNFILLED로 온다. 즉
+# UNKNOWN은 일시적일 수 있고(2026-08-13에 러너 egress가 4분간 죽어 KIS 호출
+# 60건이 전부 connect timeout이었다), 그때 지우면 다음 사이클이면 정상 반영됐을
+# 체결을 원장에서 영구히 잃는다. `reconcile_positions`는 실보유를 원장으로
+# 들여오지 않고 빼기만 하므로 스스로 회복되지 않는다.
+#
+# 같은 논리를 알림에는 이미 적용했다(data_fetcher의 OUTAGE_ALERT_RUNS=3).
+# 돈이 걸린 이쪽이 더 느슨할 이유가 없다.
+UNKNOWN_SWEEP_RUNS = 3
+
+
+def _sweep_stale_pending(ledger, today, lookups, now_kst, alert, log_error,
+                         realized=None) -> None:
+    """조회가 계속 안 되는 채로 날짜 경계를 넘긴 pending을 걷어낸다.
 
     위 루프의 날짜 경계 탈출구는 **취소 실패 경로에만** 있다. 그런데
     `reconcile_pending`은 조회 결과가 UNKNOWN이면 `continue`로 빠지므로 취소
@@ -710,15 +741,31 @@ def _sweep_stale_pending(ledger, today, now_kst, alert, log_error) -> None:
     그동안 그 종목은 `pending_codes`에 걸려 신규 매수도 막혔다.
 
     KRX 정규 주문은 장 마감에 소멸한다. 어제 낸 지정가가 오늘도 pending인 건
-    조회가 되든 안 되든 원장이 현실과 어긋났다는 뜻이다.
+    원장이 현실과 어긋났다는 뜻이다. 다만 **연속 UNKNOWN**일 때만 그렇게 본다
+    (UNKNOWN_SWEEP_RUNS 주석 참고).
 
-    positions는 건드리지 않는다 — 부분체결분은 이미 거기 반영돼 있다. 그리고
-    지우면서 사람에게 알린다: 못 본 체결이 있었다면 실계좌엔 포지션이 있는데
-    원장엔 없는 상태이고, 그건 사람만 풀 수 있다.
+    매수는 지우기만 한다 — 부분체결분은 이미 positions에 있다.
+
+    매도는 다르다. 매도는 주문 시점에 **추정 실현손익을 원장에 이미 더했고**
+    (`accrue_realized_pnl`), 그 값은 표시용이 아니라 effective_budget을 통해
+    다음 실주문 크기에 들어간다. 그냥 지우면 추정치가 영구히 굳는다. 그래서
+    KIS 확정 실현손익(TTTC8715R)으로 갈아끼운 뒤에만 지운다. **못 가져오면
+    지우지 않는다** — 모르는 채로 돈 숫자를 확정하지 않는다.
     """
+    from src.trade.pending import apply_confirmed_sell
     pend = ledger.get('pending_orders') or {}
     for code in list(pend):
         entry = pend[code]
+        status = (lookups.get(entry.get('odno')) or (UNKNOWN, None))[0]
+        if status != UNKNOWN:
+            # 조회가 됐다 = 위 루프가 정상 경로로 처리한다. 연속 카운터를 되돌린다.
+            if entry.get('unknown_streak'):
+                entry['unknown_streak'] = 0
+            continue
+
+        streak = int(entry.get('unknown_streak') or 0) + 1
+        entry['unknown_streak'] = streak
+
         # 시각을 못 읽는 것과 '어제 주문이다'는 다르다. 모르는 것을 근거로
         # 원장을 지우지 않는다. 문자열 비교로 때우면 안 된다 — '(없음)' 같은
         # 값은 어떤 날짜보다도 작아서 조용히 '어제 주문'이 된다.
@@ -730,22 +777,53 @@ def _sweep_stale_pending(ledger, today, now_kst, alert, log_error) -> None:
             continue
         if ordered_date >= today_date:
             continue
+        if streak < UNKNOWN_SWEEP_RUNS:
+            log_error(f"[Program] {code} 조회 불가 {streak}/{UNKNOWN_SWEEP_RUNS}런 "
+                      f"— 날짜 경계를 넘겼지만 아직 정리하지 않습니다.")
+            continue
+
+        if entry.get('side') == 'sell':
+            lookup_fn = realized or _lookup_realized_pnl
+            ok, got = lookup_fn(code, entry.get('ordered_at') or '')
+            if not ok:
+                log_error(f"[Program] {code} 매도 확정 실현손익을 조회하지 못해 "
+                          f"pending을 유지합니다 — 추정치를 확정으로 굳히지 않습니다.")
+                continue
+            apply_confirmed_sell(ledger, ledger.setdefault('positions', {}), code,
+                                 entry, got['qty'] if got else 0,
+                                 got['amount'] if got else 0.0)
+
         del pend[code]
         log_error(f"[Program] 날짜 경계 pending 정리 — {code}"
                   f"(odno={entry.get('odno')}, ordered_at={entry.get('ordered_at')}) "
-                  f"제거. 조회로 상태를 확정하지 못한 채 거래일이 바뀌었습니다.")
+                  f"제거. 조회 불가가 {streak}런 이어진 채 거래일이 바뀌었습니다.")
         if alert:
-            alert(
-                f'pending_stale_{code}',
-                f'[Program] 날짜 경계 미체결 정리\n\n{code} — 어제 이전에 낸 주문'
-                f'(odno={entry.get("odno")}, {entry.get("qty")}주 @ '
-                f'{int(float(entry.get("price") or 0)):,})의 상태를 조회로 확정하지 '
-                f'못한 채 거래일이 바뀌었습니다. pending에서 제거해 묶여 있던 예산을 '
-                f'풉니다.\nKIS 체결 내역을 직접 확인하세요 — 실제로 체결됐다면 '
-                f'실계좌에는 포지션이 있는데 원장에는 없는 상태입니다.',
-                now_kst or datetime.strptime(today, '%Y-%m-%d'),
-                log=log_error,
-            )
+            alert(f'pending_stale_{code}',
+                  _stale_pending_alert_text(code, entry, streak),
+                  now_kst or datetime.strptime(today, '%Y-%m-%d'),
+                  log=log_error)
+
+
+def _stale_pending_alert_text(code: str, entry: dict, streak: int) -> str:
+    """매수와 매도는 사람이 확인할 것이 정반대다.
+
+    매수: 체결됐는데 못 봤다면 실계좌에 포지션이 있고 원장엔 없다.
+    매도: **안** 팔렸는데 못 봤다면 실계좌에 포지션이 있고 원장엔 없다 —
+    다만 이쪽은 실현손익을 KIS 확정값으로 이미 갈아끼운 뒤라 회계는 맞다.
+    """
+    head = (f'[Program] 날짜 경계 미체결 정리\n\n{code} — 어제 이전에 낸 '
+            f'{"매도" if entry.get("side") == "sell" else "매수"} 주문'
+            f'(odno={entry.get("odno")}, {entry.get("qty")}주 @ '
+            f'{int(float(entry.get("price") or 0)):,})의 체결 상태를 {streak}런 연속 '
+            f'조회하지 못한 채 거래일이 바뀌었습니다. pending에서 제거해 묶여 있던 '
+            f'예산을 풉니다.\n\n')
+    if entry.get('side') == 'sell':
+        return head + ('실현손익은 KIS 확정값(기간별매매손익)으로 갈아끼운 뒤 '
+                       '정리했으므로 원장 회계는 맞습니다.\n'
+                       '다만 그 매도가 실제로는 체결되지 않았다면 실계좌에 포지션이 '
+                       '남아 있습니다 — KIS 잔고를 확인하세요.')
+    return ('' + head + 'KIS 체결 내역을 직접 확인하세요 — 실제로 체결됐다면 '
+            '실계좌에는 포지션이 있는데 원장에는 없는 상태입니다.')
 
 
 def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: datetime,
@@ -849,11 +927,15 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         # 없으면 알 수 없다 — deposit은 D+0라, 매도대금이 D+2에 묶여 있으면
         # 계좌에 돈이 있어도 예산이 깎인다(2026-08-13: 설정 200만 → 123만).
         # KIS가 준 총평가금액(total_asset)과 나란히 찍어 차이를 드러낸다.
-        log(f"[Program] 현금 내역: D+0={real_deposit:,} / "
-            f"D+1={int(bal.get('deposit_d1') or 0):,} / "
-            f"D+2={int(bal.get('deposit_d2') or 0):,} / "
+        def _cash(v):
+            # 필드가 없으면 '—'다. 0으로 찍으면 '이 응답엔 없다'와 '예수금 0'이
+            # 합쳐지는데, 이 줄의 용도가 예산 상한 판단이라 그 혼동이 곧 오판이다.
+            return f'{v:,}' if isinstance(v, int) else '—'
+        log(f"[Program] 현금 내역: D+0={_cash(real_deposit)} / "
+            f"D+1={_cash(bal.get('deposit_d1'))} / "
+            f"D+2={_cash(bal.get('deposit_d2'))} / "
             f"보유원가={real_invested:,.0f} / "
-            f"KIS총평가={int(bal.get('total_asset') or 0):,}")
+            f"KIS총평가={_cash(bal.get('total_asset'))}")
         effective_budget = real_account_value
     if effective_budget <= 0:
         log('[Program] 클램프 후 effective_budget<=0 — skip')
@@ -907,7 +989,8 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         paper_state = getattr(sim, 'state', None)
 
         # 7. 심 전용 유니버스 적용 (페이퍼 경로 _run_simulators와 동일 의미론)
-        sim_candidates = _resolve_candidates(sim, candidates, enrich, log, log_error)
+        sim_candidates = _resolve_candidates(sim, candidates, enrich, log, log_error,
+                                            now_kst=now_kst)
 
         # 현재가 맵: 최종 후보 + 프로그램 보유 종목
         current_prices = {}

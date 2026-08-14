@@ -41,6 +41,16 @@ def sell_cost(qty: int, price: float) -> float:
     return qty * price * (SELL_FEE_RATE + SELL_TAX_RATE)
 
 
+def roundtrip_cost(qty: int, buy_price: float, sell_price: float) -> float:
+    """`realized_pnl_after_fees`가 빼는 비용과 **정확히 같은 값**.
+
+    손익에서 뺀 금액을 화면이 "수수료 N원 차감"으로 보여주려면 그 값을 따로
+    낼 수 있어야 한다. 두 함수가 갈리면 화면의 검산(gross - 수수료 = net)이
+    깨지므로, 항이 바뀌면 반드시 함께 바꾼다.
+    """
+    return buy_cost(qty, buy_price) + sell_cost(qty, sell_price)
+
+
 def realized_pnl_after_fees(qty: int, buy_price: float, sell_price: float) -> float:
     """매도 체결분의 실현손익 — 왕복 비용을 뺀 값.
 

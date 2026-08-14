@@ -3,6 +3,7 @@ import { getToken } from 'next-auth/jwt';
 import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
 import { computeTurnPnl, basisFromPositions, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
+import { pushTurnHistory } from '@/lib/turn-history';
 import { validateArmRequest } from '@/lib/trade-auth';
 import { getRealizedProfitBuckets, summarizeRealizedBuckets } from '@/lib/kis-api';
 import { kstTimestamp } from '@/lib/kst';
@@ -138,16 +139,19 @@ async function getLivePrices(): Promise<{ ok: boolean; prices: Record<string, nu
  * OFF 시점의 턴 손익 동결값을 만든다. 실패는 pnl:null + degraded로 정직하게 남긴다.
  * throw하지 않는다(getPositions/getLivePrices가 total). 호출부가 데드라인으로 감싼다.
  */
-async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string): Promise<LastTurnResult> {
-    const base = { id: cfgTurn.id as string, ended_at: endedAt, sim, capital: Number(cfgTurn.capital) || 0 };
+async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string, startedAt: string | undefined): Promise<LastTurnResult> {
+    const base = { id: cfgTurn.id as string, ended_at: endedAt, started_at: startedAt, sim, capital: Number(cfgTurn.capital) || 0 };
 
     const { ok: ledgerOk, positions, turn } = await getPositions();
-    if (!ledgerOk) return { ...base, pnl: null, by_tag: {}, degraded: 'ledger_unavailable' };
+    if (!ledgerOk) return { ...base, pnl: null, by_tag: {}, fees: null, degraded: 'ledger_unavailable' };
 
     // 원장의 턴 id가 config와 다르면 이번 턴에 파이썬이 한 번도 안 돌았다(장 외 ON→OFF 등).
     // 이건 실패가 아니라 '거래가 없었다'는 뜻 — pnl:0이 정답이며 degraded를 붙이면 안 된다.
     const matched = turn && turn.id === cfgTurn.id ? turn : null;
-    if (!matched) return { ...base, pnl: 0, by_tag: {} };
+    // `|| 0`이 아니라 이 순서다 — 원장을 못 읽은 것(null)과 거래가 없어 0원인 것을
+    // 합치면 안 된다. 0원은 값이고 null은 '모른다'다.
+    const fees = matched ? Number(matched.fees_realized ?? 0) : 0;
+    if (!matched) return { ...base, pnl: 0, by_tag: {}, fees };
 
     const capital = Number(matched.capital) || base.capital;
     const held = Object.keys(positions).length > 0;
@@ -156,10 +160,10 @@ async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string): Pr
     // (getLivePrices는 성공 응답에 빈 holdings/0가만 와도 ok:true를 주므로 별도로 걸러야 한다).
     const noUsablePrice = held && !Object.keys(positions).some((c) => Number(prices[c]) > 0);
     // 보유 종목이 없으면 시세가 없어도 확정분(by_tag)만으로 손익이 정확하다.
-    if (held && (!pricesOk || noUsablePrice)) return { ...base, capital, pnl: null, by_tag: {}, degraded: 'prices_unavailable' };
+    if (held && (!pricesOk || noUsablePrice)) return { ...base, capital, pnl: null, by_tag: {}, fees, degraded: 'prices_unavailable' };
 
     const { pnl, byTag } = computeTurnPnl(matched, positions, prices);
-    return { ...base, capital, pnl, by_tag: byTag };
+    return { ...base, capital, pnl, by_tag: byTag, fees };
 }
 
 // ── PIN 무차별 대입 방어 (파일 기반 카운터, secret repo) ─────────────────
@@ -283,6 +287,7 @@ export async function GET(request: Request) {
             realized_pnl, // 프로그램 누적 실현손익(원)
             turn: liveTurn, // 진행 중인 턴(config와 원장이 같은 턴을 가리킬 때만) — 프론트가 실시간 손익 계산
             last_turn_result: content.last_turn_result ?? null, // OFF 시 동결된 직전 턴
+            turn_history: Array.isArray(content.turn_history) ? content.turn_history : [],
             unreconciled_exits: unreconciledExits, // 손익 미계상 청산분 — 있으면 수익률이 실제와 어긋난다
             pnl_since: pnlSince,                   // 누적 집계 시작일(yyyymmdd)
             // KIS 확정 실현손익(계좌 전체). null이면 조회 못 함 → 화면은 '측정 불가'
@@ -320,16 +325,19 @@ export async function POST(request: Request) {
             if (cfgTurn?.id) {
                 const sim: string | null = content.selected_sim ?? null;
                 const capital = Number(cfgTurn.capital) || 0;
-                const frozen = await withDeadline(freezeTurn(cfgTurn, sim, now), DISPLAY_DEADLINE_MS, null);
+                const frozen = await withDeadline(freezeTurn(cfgTurn, sim, now, cfgTurn.started_at), DISPLAY_DEADLINE_MS, null);
                 lastTurnResult = frozen ?? {
                     // 데드라인 초과 = 원장이 멀쩡한데 조회가 느렸을 수도 있다 → ledger_unavailable과 구분
-                    id: cfgTurn.id, ended_at: now, sim, capital,
-                    pnl: null, by_tag: {}, degraded: 'timeout',
+                    id: cfgTurn.id, ended_at: now, started_at: cfgTurn.started_at, sim, capital,
+                    pnl: null, by_tag: {}, fees: null, degraded: 'timeout',
                 };
             }
             const next = { ...content, enabled: false, updated_at: now,
                 updated_by: (token as any).email || (token as any).name || 'user',
-                turn: null, last_turn_result: lastTurnResult };
+                turn: null, last_turn_result: lastTurnResult,
+                turn_history: lastTurnResult
+                    ? pushTurnHistory(content.turn_history, lastTurnResult)
+                    : (content.turn_history ?? []) };
             await putConfig(next, sha, 'program-trading: OFF (kill-switch)');
             return NextResponse.json({ success: true, enabled: false, selected_sim: next.selected_sim, budget: next.budget });
         }

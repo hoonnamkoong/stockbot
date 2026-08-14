@@ -11,6 +11,8 @@ export type ProgramTurn = {
     basis: Record<string, number>;
     by_tag: Record<string, number>;
     active_tag: string | null;
+    /** 파이썬이 매도 확정 시점에 누적하는, 이 턴에서 실제로 낸 매매 비용. */
+    fees_realized?: number;
 };
 
 export type ProgramPosition = { name: string; quantity: number; avg_price: number; tag?: string };
@@ -42,9 +44,13 @@ export type UnreconciledExit = {
 export type LastTurnResult = {
     id: string;
     ended_at: string;
+    /** 턴이 열린 시각. 없으면 '언제부터'를 그릴 수 없다(구 기록은 없을 수 있다). */
+    started_at?: string;
     sim: string | null;
     capital: number;
     pnl: number | null;
+    /** 이 턴에 실제로 낸 매매 비용. 계산 불가였으면 null. */
+    fees?: number | null;
     by_tag: Record<string, number>;
     degraded?: 'ledger_unavailable' | 'prices_unavailable' | 'timeout';
 };

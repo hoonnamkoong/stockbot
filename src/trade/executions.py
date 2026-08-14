@@ -24,6 +24,19 @@ def _side(code: str) -> str:
     return 'SELL' if code == '01' else 'BUY'
 
 
+def _fail(odno: str, from_date: str, to_date: str, reason: str) -> None:
+    """조회 실패 사유를 남긴다. **성공 경로는 조용하다**(2분 루프다).
+
+    [2026-08-14] 001210(odno=0022794600, 08-12 주문)이 3런 연속 UNKNOWN인 채
+    날짜 경계 스윕에 걸려 원장에서 제거됐다. UNKNOWN이 나오는 경로는 사실상
+    요청 실패뿐인데(미체결은 rows==[] → UNFILLED), 이 함수가 status_code도
+    rt_cd도 예외도 전부 버려서 "왜 실패했는지"를 사후에 알 방법이 없었다.
+    돈이 걸린 경로에서 실패 사유가 안 남으면 다음에도 추측만 하게 된다.
+    """
+    where = f"odno={odno or '(없음)'} {from_date or '?'}~{to_date or '?'}"
+    print(f"[Executions] ❌ 체결조회 실패 — {where}: {reason}")
+
+
 def _request_executions(from_date: str | None = None, to_date: str | None = None,
                          odno: str = '') -> list[dict] | None:
     """KIS 일별체결조회 원본. **조회 실패는 None, 성공은 리스트(0건 포함).**
@@ -33,6 +46,7 @@ def _request_executions(from_date: str | None = None, to_date: str | None = None
     """
     token = get_access_token()
     if not token:
+        _fail(odno, from_date, to_date, '토큰 없음')
         return None
 
     app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
@@ -40,10 +54,12 @@ def _request_executions(from_date: str | None = None, to_date: str | None = None
     account_no_full = os.environ.get("KIS_ACCOUNT_NO", "").strip().replace("\n", "")
     is_virtual = os.environ.get("KIS_IS_VIRTUAL", "false").lower() == "true"
     if not account_no_full:
+        _fail(odno, from_date, to_date, 'KIS_ACCOUNT_NO 미설정')
         return None
 
     clean_acc = account_no_full.replace('-', '').replace(' ', '')
     if len(clean_acc) < 10:
+        _fail(odno, from_date, to_date, f'계좌번호 형식 이상(길이 {len(clean_acc)})')
         return None
     cano = clean_acc[:8]
     acnt_prdt_cd = clean_acc[8:10]
@@ -80,11 +96,16 @@ def _request_executions(from_date: str | None = None, to_date: str | None = None
             headers=headers, params=params, timeout=10,
         )
         if res.status_code != 200:
+            _fail(odno, from_date, to_date, f'HTTP {res.status_code}')
             return None
         data = res.json()
         if data.get('rt_cd') != '0':
+            _fail(odno, from_date, to_date,
+                  f"rt_cd={data.get('rt_cd')} {data.get('msg_cd', '')} "
+                  f"{data.get('msg1', '')}".strip())
             return None
-    except Exception:
+    except Exception as e:
+        _fail(odno, from_date, to_date, repr(e))
         return None
 
     rows = data.get('output1') or []

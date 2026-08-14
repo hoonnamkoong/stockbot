@@ -121,6 +121,44 @@ def test_one_failed_chunk_makes_the_whole_send_report_failure(tg, monkeypatch):
     assert tg.send_message(long_text) is False
 
 
+# ── 서식 없는 본문은 처음부터 평문으로 ──────────────────────────
+# [2026-08-14] 11:00·14:00 딥다이브가 조각마다 400을 받고 평문으로 재시도했다.
+# 본문에 HTML 태그가 하나도 없는데 parse_mode=HTML로 보내서, 뉴스 제목의
+# 'M&A' 같은 문자가 파서를 깨뜨린 것이다. 재시도로 전달은 됐지만 매 발송마다
+# 실패 로그가 쌓이고 API 호출이 두 배가 되며, 진짜 실패가 이 소음에 묻힌다.
+
+def test_plain_text_mode_omits_parse_mode_entirely(tg, monkeypatch):
+    calls = []
+    monkeypatch.setattr(requests, 'post', _fake_post([_FakeResponse(200)], calls))
+
+    assert tg.send_message('외국계 PEF, 국내 M&A 싹쓸이', parse_mode=None) is True
+    assert len(calls) == 1
+    assert 'parse_mode' not in calls[0]
+
+
+def test_plain_text_mode_does_not_retry_on_failure(tg, monkeypatch):
+    """평문으로 보냈는데 거부됐다면 서식 문제가 아니다 — 같은 걸 또 보낼 이유가 없다."""
+    calls = []
+    monkeypatch.setattr(requests, 'post',
+                        _fake_post([_FakeResponse(400)] * 3, calls))
+
+    assert tg.send_message('hi', parse_mode=None) is False
+    assert len(calls) == 1
+
+
+def test_plain_text_mode_applies_to_every_chunk(tg, monkeypatch):
+    """나눠 보낼 때 조각 하나만 평문이면 나머지가 그대로 400을 맞는다."""
+    paragraph = '가' * 2000
+    calls = []
+    monkeypatch.setattr(requests, 'post', _fake_post([_FakeResponse(200)] * 10, calls))
+
+    tg.send_message(f"{paragraph}\n\n{paragraph}\n\n{paragraph}", parse_mode=None)
+
+    assert len(calls) >= 2
+    for c in calls:
+        assert 'parse_mode' not in c
+
+
 def test_split_into_chunks_keeps_each_chunk_under_limit():
     text = '\n\n'.join(['단락' * 100] * 5)  # 각 단락 400자, 5개
     chunks = TelegramManager._split_into_chunks(text, limit=1000)

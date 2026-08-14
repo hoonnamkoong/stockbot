@@ -65,12 +65,12 @@ class TelegramManager:
 
     def _send_single(self, text, parse_mode="HTML"):
         """Sends a raw message to Telegram (4096자 이내라고 가정)."""
-        payload = {
-            "chat_id": self.chat_id,
-            "text": text,
-            "parse_mode": parse_mode
-        }
-        
+        # parse_mode=None은 "서식 없이 보낸다"는 뜻이다. 키를 None으로 넣어
+        # 보내면 텔레그램이 그걸 서식 지정으로 받아 거부한다 — 아예 뺀다.
+        payload = {"chat_id": self.chat_id, "text": text}
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+
         try:
             response = requests.post(self.api_base, json=payload, timeout=10)
             response.raise_for_status()

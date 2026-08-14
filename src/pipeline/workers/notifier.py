@@ -113,7 +113,10 @@ class NotifierWorker(BaseWorker):
             self.tg.send_market_report("KOSDAQ 실시간 어텐션", kosdaq)
 
         if report:
-            self.tg.send_message(report)
+            # 딥다이브 본문(advisor.generate_deep_dive_report)에는 HTML 태그가
+            # 하나도 없다. 내용은 Gemini 응답·뉴스 제목·토론 요약을 그대로 담아
+            # 'M&A' 같은 문자가 섞이므로, HTML로 보내면 파서가 거부한다.
+            self.tg.send_message(report, parse_mode=None)
             self.log(f"딥다이브 리포트 발송 완료 ({len(final_picks)}개 종목)")
         else:
             self.log("시뮬레이션 결과만 발송 완료")

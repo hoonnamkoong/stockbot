@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { computeTurnPnl, type ProgramTurn, type ProgramPosition } from './program-turn.ts';
+import { computeTurnPnl, basisFromPositions, type ProgramTurn, type ProgramPosition } from './program-turn.ts';
 
 // 실전 프로그램 매매의 턴 손익을 그리는 계산이다. 화면에만 쓰이지만 사용자가 이 숫자를
 // 보고 프로그램을 끄고 켠다. 파이썬 짝(program_turn.py)에는 tests/test_program_turn.py가
@@ -130,4 +130,23 @@ test('원장의 by_tag를 변조하지 않는다 — 폴링으로 반복 호출�
 
   assert.deepEqual(first, second);
   assert.deepEqual(t.by_tag, { sim6_bear: 500 }, '원본 by_tag가 변했다');
+});
+
+test('턴 기준가는 매입 평단이다 — ON 시점 시세로 리셋하지 않는다', () => {
+  // 파이썬 new_turn과 같은 규칙. 갈리면 파이썬 첫 런 전후로 턴 손익이 점프한다.
+  const positions = {
+    A: { name: '가', quantity: 10, avg_price: 1000 },
+    B: { name: '나', quantity: 5, avg_price: 2000 },
+  };
+  assert.deepEqual(basisFromPositions(positions), { A: 1000, B: 2000 });
+});
+
+test('평단이 없거나 0인 종목은 기준가를 만들지 않는다', () => {
+  // 0을 넣으면 (현재가 - 0) * 수량 = 시가총액 전체가 턴 수익이 된다.
+  const positions = { A: { name: '가', quantity: 10, avg_price: 0 } } as any;
+  assert.deepEqual(basisFromPositions(positions), {});
+});
+
+test('보유가 없으면 빈 기준가다', () => {
+  assert.deepEqual(basisFromPositions({}), {});
 });

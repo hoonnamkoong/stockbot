@@ -76,3 +76,24 @@ export function computeTurnPnl(
     const pnl = Object.values(byTag).reduce((s, v) => s + v, 0);
     return { pnl, byTag };
 }
+
+/**
+ * 턴 기준가 = 보유 종목의 **매입 평단**. 파이썬 new_turn과 같은 규칙이다.
+ *
+ * ON 시점 시세로 리셋(MTM)하지 않는다 — ON 전부터 보유한 종목도 원래 매입가부터
+ * 재야 KIS 종목별 ROI와 턴 손익이 정합한다. 예전에는 route가 현재가로,
+ * 파이썬이 평단으로 잡아 파이썬 첫 런 전후로 같은 턴의 손익이 점프했다.
+ *
+ * avg_price가 0/누락이면 항목을 만들지 않는다. 0을 기준가로 넣으면
+ * (현재가 - 0) * 수량, 즉 시가총액 전체가 턴 수익으로 계상된다.
+ */
+export function basisFromPositions(
+    positions: Record<string, ProgramPosition>,
+): Record<string, number> {
+    const basis: Record<string, number> = {};
+    for (const [code, pos] of Object.entries(positions || {})) {
+        const avg = Number(pos?.avg_price) || 0;
+        if (avg > 0) basis[code] = avg;
+    }
+    return basis;
+}

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
-import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
+import { computeTurnPnl, basisFromPositions, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
 import { validateArmRequest } from '@/lib/trade-auth';
 import { getRealizedProfitBuckets, summarizeRealizedBuckets } from '@/lib/kis-api';
 import { kstTimestamp } from '@/lib/kst';
@@ -256,6 +256,7 @@ export async function GET(request: Request) {
         // 아직 파이썬이 한 번도 안 돈 턴(ON 직후 ~ 다음 파이프라인 런, 또는 장 외 시간에 ON)은
         // 원장에 turn이 없다. 이때 null을 주면 사용자가 방금 켠 턴이 화면에서 사라진다 —
         // config의 opening_basis·capital만으로도 손익은 계산 가능하므로 그것으로 턴을 구성한다.
+        // 기준가는 매입 평단이다(파이썬 new_turn과 동일 규칙) — 여기서도 그 값을 그대로 쓴다.
         // active_tag: null이 '아직 파이썬 미실행'의 신호다(원장에 저장된 턴은 항상 태그가 있다).
         const cfgTurn = content.turn;
         let liveTurn: ProgramTurn | null = null;
@@ -360,8 +361,8 @@ export async function POST(request: Request) {
 
         const now = kstTimestamp();
 
-        // [턴 열기] ON 시점의 시세로 물려받은 보유 종목의 기준가를 스냅샷한다(MTM 리셋).
-        // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 현재가로 채워진다.
+        // [턴 열기] 기준가는 매입 평단이다(basisFromPositions 주석 참고) — 시세 조회가 필요 없어졌다.
+        // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 채워진다.
         // ON은 fail-open이지만 OFF와 같은 hang 노출이 있으므로 동일 데드라인을 건다.
         // (진행된 만큼만 turn에 반영되고, 나머지는 기본값 그대로 ON 진행)
         // IIFE는 turn을 in-place mutate하지 않고 값을 반환한다 — 이 await 완료 전에는
@@ -372,13 +373,8 @@ export async function POST(request: Request) {
             // 조회 실패/데드라인 초과 시 capital은 falsy(0)로 남긴다 — 그럴듯한 값을 지어내는 대신
             // 파이썬의 `cfg_turn.get('capital') or effective_budget` 폴백이 채우게 한다.
             const capital = ledgerOk ? budgetNum + realized_pnl : 0;   // 턴 시작 유효자본 = 이 턴에 실제로 굴릴 돈
-            const { prices } = await getLivePrices();
-            const basis: Record<string, number> = {};
-            for (const code of Object.keys(positions)) {
-                const px = Number(prices[code]) || 0;
-                if (px > 0) basis[code] = px;
-            }
-            return { capital, opening_basis: basis };
+            // 기준가는 매입 평단이다(basisFromPositions 주석 참고). 시세 조회가 필요 없어졌다.
+            return { capital, opening_basis: basisFromPositions(positions) };
         })(), DISPLAY_DEADLINE_MS, { capital: 0, opening_basis: {} });
 
         const turn: any = { id: new Date().toISOString(), started_at: now, capital: opened.capital, opening_basis: opened.opening_basis };

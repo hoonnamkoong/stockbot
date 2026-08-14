@@ -5,7 +5,6 @@ import { getRealPortfolio } from '@/lib/kis-api';
 import { computeTurnPnl, basisFromPositions, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
 import { pushTurnHistory } from '@/lib/turn-history';
 import { validateArmRequest } from '@/lib/trade-auth';
-import { getRealizedProfitBuckets, summarizeRealizedBuckets } from '@/lib/kis-api';
 import { kstTimestamp } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
@@ -91,8 +90,9 @@ async function getPositions(): Promise<{
     turn: ProgramTurn | null;
     unreconciled_exits: UnreconciledExit[];
     pnl_since: string | null;
+    fee_rates: { buy: number; sell: number; tax: number } | null;
 }> {
-    const empty = { positions: {}, realized_pnl: 0, turn: null, unreconciled_exits: [], pnl_since: null };
+    const empty = { positions: {}, realized_pnl: 0, turn: null, unreconciled_exits: [], pnl_since: null, fee_rates: null };
     try {
         const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${POSITIONS_PATH}?ref=${SECRET_BRANCH}`;
         const res = await fetch(url, {
@@ -114,6 +114,8 @@ async function getPositions(): Promise<{
             unreconciled_exits: Array.isArray(content.unreconciled_exits) ? content.unreconciled_exits : [],
             // 누적 집계 시작일(yyyymmdd). 리셋 시점 이후만 KIS 실측과 비교해야 의미가 있다.
             pnl_since: typeof content.pnl_since === 'string' ? content.pnl_since : null,
+            fee_rates: content.fee_rates && typeof content.fee_rates === 'object'
+                ? content.fee_rates : null,   // 원장에 아직 없으면 null → 화면은 '측정 불가'
         };
     } catch {
         return { ok: false, ...empty }; // 네트워크/파싱 실패 — non-blocking이되 '실패'로 신호
@@ -241,19 +243,8 @@ export async function GET(request: Request) {
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
         const { ok: ledgerOk, positions, realized_pnl, turn, unreconciled_exits: unreconciledExits,
-                pnl_since: pnlSince } = await getPositions();
+                pnl_since: pnlSince, fee_rates: feeRates } = await getPositions();
 
-        // [실측 대조] 원장의 realized_pnl은 주문가 추정치로 쌓은 값이라 실제 체결가와 어긋나고,
-        // 수동 청산은 아예 빠진다. KIS가 확정한 실현손익(TTTC8715R)을 나란히 가져와 비교한다.
-        // 계좌 전체 기준이므로 프로그램 외 매매가 있으면 그만큼 다르다 — 화면에서 그렇게 라벨한다.
-        const kisRealized = await withDeadline((async (): Promise<{ ok: boolean; total: number } | null> => {
-            if (!pnlSince) return null;                       // 집계 시작일이 없으면 비교 구간을 정할 수 없다
-            const today = kstTimestamp().slice(0, 10).replace(/-/g, '');
-            const { ok, buckets } = await getRealizedProfitBuckets(pnlSince, today);
-            // 조회 실패면 '측정 불가'. 조회는 됐는데 매도가 없으면 0원이다 —
-            // 둘을 합치면 진짜 조회 실패를 알아챌 방법이 사라진다.
-            return summarizeRealizedBuckets(ok, buckets);
-        })(), DISPLAY_DEADLINE_MS, null);
         // 진행 중인 턴은 config가 정의한다(ON 시 route가 연다). 원장 turn은 파이썬만 쓰고
         // OFF 시 지워지지 않으므로, id가 config와 같을 때만 채택한다(stale 방지).
         //
@@ -290,8 +281,7 @@ export async function GET(request: Request) {
             turn_history: Array.isArray(content.turn_history) ? content.turn_history : [],
             unreconciled_exits: unreconciledExits, // 손익 미계상 청산분 — 있으면 수익률이 실제와 어긋난다
             pnl_since: pnlSince,                   // 누적 집계 시작일(yyyymmdd)
-            // KIS 확정 실현손익(계좌 전체). null이면 조회 못 함 → 화면은 '측정 불가'
-            kis_realized_pnl: kisRealized && kisRealized.ok ? kisRealized.total : null,
+            fee_rates: feeRates,                   // 수수료율(원장). 없으면 null → 화면은 '측정 불가'
         });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

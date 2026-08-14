@@ -174,3 +174,86 @@ def test_lookup_ignores_rows_for_other_orders(monkeypatch):
                         lambda *a, **k: [{'odno': '9999999999', 'qty': 5, 'price': 100.0}])
 
     assert lookup_execution('0007441100') == (UNFILLED, None)
+
+
+# ── 실패 사유 진단 ────────────────────────────────────────────────
+# 2026-08-14: 001210(odno=0022794600, 08-12 주문)이 3런 연속 UNKNOWN인 채
+# 날짜 경계 스윕에 걸려 원장에서 제거됐다. UNKNOWN이 나오는 경로는 사실상
+# 요청 실패뿐인데, 이 함수가 status_code·rt_cd·예외를 전부 버려서 "왜
+# 실패했는지"를 로그로 판정할 수 없었다. 돈이 걸린 경로에서 실패 사유가
+# 안 남으면 다음에도 똑같이 추측만 하게 된다.
+
+def test_http_error_logs_status_code(capsys):
+    res = mock.MagicMock()
+    res.status_code = 500
+    with mock.patch.object(executions, 'get_access_token', return_value='tok'), \
+         mock.patch.object(executions, 'get_base_url', return_value='https://x'), \
+         mock.patch.dict(os.environ, _env(), clear=False), \
+         mock.patch('src.trade.executions.requests.get', return_value=res):
+        executions.lookup_execution('0022794600')
+
+    out = capsys.readouterr().out
+    assert '0022794600' in out
+    assert '500' in out
+
+
+def test_non_zero_rt_cd_logs_kis_message(capsys):
+    res = mock.MagicMock()
+    res.status_code = 200
+    res.json.return_value = {'rt_cd': '1', 'msg_cd': 'EGW00123',
+                             'msg1': '기간이 유효하지 않습니다', 'output1': []}
+    with mock.patch.object(executions, 'get_access_token', return_value='tok'), \
+         mock.patch.object(executions, 'get_base_url', return_value='https://x'), \
+         mock.patch.dict(os.environ, _env(), clear=False), \
+         mock.patch('src.trade.executions.requests.get', return_value=res):
+        executions.lookup_execution('0022794600')
+
+    out = capsys.readouterr().out
+    assert '0022794600' in out
+    assert 'EGW00123' in out
+    assert '기간이 유효하지 않습니다' in out
+
+
+def test_network_exception_logs_the_exception(capsys):
+    with mock.patch.object(executions, 'get_access_token', return_value='tok'), \
+         mock.patch.object(executions, 'get_base_url', return_value='https://x'), \
+         mock.patch.dict(os.environ, _env(), clear=False), \
+         mock.patch('src.trade.executions.requests.get', side_effect=OSError('net down')):
+        executions.lookup_execution('0022794600')
+
+    out = capsys.readouterr().out
+    assert '0022794600' in out
+    assert 'net down' in out
+
+
+def test_no_token_logs_reason(capsys):
+    with mock.patch.object(executions, 'get_access_token', return_value=None):
+        executions.lookup_execution('0022794600')
+
+    assert '토큰' in capsys.readouterr().out
+
+
+def test_failure_log_carries_the_query_period(capsys):
+    """어느 기간으로 조회하다 실패했는지가 없으면 날짜 범위 문제를 가려낼 수 없다."""
+    res = mock.MagicMock()
+    res.status_code = 500
+    with mock.patch.object(executions, 'get_access_token', return_value='tok'), \
+         mock.patch.object(executions, 'get_base_url', return_value='https://x'), \
+         mock.patch.dict(os.environ, _env(), clear=False), \
+         mock.patch('src.trade.executions.requests.get', return_value=res):
+        executions.lookup_execution('0022794600', from_date='20260812', to_date='20260814')
+
+    out = capsys.readouterr().out
+    assert '20260812' in out
+    assert '20260814' in out
+
+
+def test_success_does_not_log_failure(capsys):
+    """성공 경로는 조용해야 한다 — 2분마다 도는 루프다."""
+    with mock.patch.object(executions, 'get_access_token', return_value='tok'), \
+         mock.patch.object(executions, 'get_base_url', return_value='https://x'), \
+         mock.patch.dict(os.environ, _env(), clear=False), \
+         mock.patch('src.trade.executions.requests.get', return_value=_fake_response([])):
+        executions.lookup_execution('0022794600')
+
+    assert capsys.readouterr().out == ''

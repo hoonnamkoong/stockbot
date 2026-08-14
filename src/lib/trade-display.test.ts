@@ -6,7 +6,21 @@ import { derivePosition, pnlColor, roiCells, signed, splitTimestamp } from './tr
 
 test('잔고 API 필드(qty/avg_price)로 한 줄을 만든다', () => {
   const p = derivePosition({ qty: 10, avg_price: 1000, current_price: 1100, pl_rate: 10, pl_amount: 1000 });
-  assert.deepEqual(p, { qty: 10, avgPrice: 1000, currentPrice: 1100, amount: 10_000, plAmount: 1000, plRate: 10, priceKnown: true });
+  assert.deepEqual(p, { qty: 10, avgPrice: 1000, currentPrice: 1100, amount: 10_000, evalAmount: 11_000, plAmount: 1000, plRate: 10, priceKnown: true });
+});
+
+test('현재금액은 현재가 기준이다 — 체결금액과의 차이가 곧 평가손익이다', () => {
+  const p = derivePosition({ qty: 6, avg_price: 45_050, current_price: 45_350 });
+  assert.equal(p.amount, 270_300);        // 투입 원금
+  assert.equal(p.evalAmount, 272_100);    // 지금 팔면 받는 값(수수료·세금 전)
+  assert.equal(p.evalAmount - p.amount, p.plAmount);
+});
+
+test('시세를 모르면 현재금액도 모른다 — 체결금액으로 메우지 않는다', () => {
+  // 평단으로 폴백하면 '안 움직였다'는 거짓이 되고, 손익 0원과 구분이 사라진다.
+  const p = derivePosition({ qty: 10, avg_price: 1000, current_price: 0 });
+  assert.equal(p.priceKnown, false);
+  assert.equal(p.evalAmount, null);
 });
 
 test('심 상태 필드(quantity/price)도 같은 줄이 된다', () => {

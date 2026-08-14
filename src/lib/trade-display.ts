@@ -18,7 +18,7 @@
  */
 export function derivePosition(h: any): {
   qty: number; avgPrice: number; currentPrice: number; amount: number;
-  plRate: number; plAmount: number; priceKnown: boolean;
+  evalAmount: number | null; plRate: number; plAmount: number; priceKnown: boolean;
 } {
   const qty = h.qty || h.quantity || 0;
   const avgPrice = h.avg_price || h.price || 0;
@@ -28,7 +28,10 @@ export function derivePosition(h: any): {
   const amount = qty * avgPrice;
   const plAmount = h.pl_amount ?? Math.round((currentPrice - avgPrice) * qty);
   const priceKnown = h.price_known !== false && currentPrice > 0;
-  return { qty, avgPrice, currentPrice, amount, plAmount, plRate, priceKnown };
+  // 현재금액(평가금액). 시세를 모르면 평단으로 메우지 않고 null로 올린다 —
+  // 그러면 '체결금액과 같다 = 안 움직였다'는 거짓이 화면에 찍힌다.
+  const evalAmount = priceKnown ? qty * currentPrice : null;
+  return { qty, avgPrice, currentPrice, amount, evalAmount, plAmount, plRate, priceKnown };
 }
 
 /** 국내 관례: 이익은 빨강, 손실은 파랑. */

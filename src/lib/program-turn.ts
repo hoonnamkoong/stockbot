@@ -17,7 +17,15 @@ export type ProgramTurn = {
 
 export type ProgramPosition = { name: string; quantity: number; avg_price: number; tag?: string };
 
-export type TurnResult = { pnl: number; byTag: Record<string, number> };
+/** 원장이 실어 보내는 수수료 요율 사본. 정의는 src/trade/fees.py 하나뿐이다. */
+export type FeeRates = { buy: number; sell: number; tax: number };
+
+export type TurnResult = {
+    pnl: number;
+    byTag: Record<string, number>;
+    /** 이 턴에 실제로 낸 비용. 요율을 못 받았으면 null(= 측정 불가). */
+    fees: number | null;
+};
 
 /**
  * OFF 시점에 config에 동결되는 직전 턴 결과(표시 전용).
@@ -56,18 +64,24 @@ export type LastTurnResult = {
 };
 
 /**
- * 턴 손익 = 확정분(by_tag) + 보유분 미실현(각 종목의 tag에 귀속).
+ * 턴 손익 = 확정분(by_tag) + 보유분 미실현(각 종목의 tag에 귀속) − 보유분 매수 수수료.
  * 시세를 못 구한 종목은 기여분 0으로 처리한다(기존 프로그램 평가손익 계산과 동일한 폴백).
+ *
+ * 확정분(by_tag)은 파이썬이 매도 정산 시점에 이미 수수료·세금을 뺀 net이다. 미실현은
+ * 아직 안 판 포지션이라 gross인데, 여기서 눈금을 맞추려고 '이미 낸 매수 수수료'만
+ * 뺀다. 아직 안 낸 매도 수수료·거래세는 빼지 않는다 — 안 낸 돈이다.
  */
 export function computeTurnPnl(
     turn: ProgramTurn | null | undefined,
     positions: Record<string, ProgramPosition>,
     prices: Record<string, number>,
+    feeRates?: FeeRates,
 ): TurnResult {
-    if (!turn || !turn.id) return { pnl: 0, byTag: {} };
+    if (!turn || !turn.id) return { pnl: 0, byTag: {}, fees: feeRates ? 0 : null };
 
     const byTag: Record<string, number> = { ...(turn.by_tag || {}) };
     const basis = turn.basis || {};
+    let holdingFee = 0;
 
     for (const [code, pos] of Object.entries(positions || {})) {
         const px = Number(prices[code]) || 0;
@@ -76,11 +90,15 @@ export function computeTurnPnl(
         // ??는 0을 통과시켜 (px-0)*qty = 시가총액 전체가 턴 수익으로 계상된다.
         const b = Number(basis[code] || px);
         const tag = pos.tag || turn.active_tag || 'unknown';
-        byTag[tag] = (byTag[tag] || 0) + (px - b) * pos.quantity;
+        const fee = feeRates ? pos.quantity * Number(pos.avg_price || 0) * feeRates.buy : 0;
+        holdingFee += fee;
+        byTag[tag] = (byTag[tag] || 0) + (px - b) * pos.quantity - fee;
     }
 
     const pnl = Object.values(byTag).reduce((s, v) => s + v, 0);
-    return { pnl, byTag };
+    // 실현 비용(turn.fees_realized)은 파이썬이 원장에 누적해 둔 값이다.
+    const fees = feeRates ? (Number(turn.fees_realized) || 0) + holdingFee : null;
+    return { pnl, byTag, fees };
 }
 
 /**

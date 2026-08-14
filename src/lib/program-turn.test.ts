@@ -15,15 +15,15 @@ const pos = (over: Partial<ProgramPosition> = {}): ProgramPosition => ({
 });
 
 test('턴이 없으면 0원이 아니라 빈 결과', () => {
-  assert.deepEqual(computeTurnPnl(null, {}, {}), { pnl: 0, byTag: {} });
-  assert.deepEqual(computeTurnPnl(undefined, {}, {}), { pnl: 0, byTag: {} });
+  assert.deepEqual(computeTurnPnl(null, {}, {}), { pnl: 0, byTag: {}, fees: null });
+  assert.deepEqual(computeTurnPnl(undefined, {}, {}), { pnl: 0, byTag: {}, fees: null });
   // id가 빈 문자열인 턴은 열린 적 없는 턴이다(파이썬 new_turn이 항상 id를 넣는다).
-  assert.deepEqual(computeTurnPnl(turn({ id: '' }), {}, {}), { pnl: 0, byTag: {} });
+  assert.deepEqual(computeTurnPnl(turn({ id: '' }), {}, {}), { pnl: 0, byTag: {}, fees: null });
 });
 
 test('보유가 없으면 확정분(by_tag)이 그대로 턴 손익', () => {
   const r = computeTurnPnl(turn({ by_tag: { sim4_bull_daytrading: 500 } }), {}, {});
-  assert.deepEqual(r, { pnl: 500, byTag: { sim4_bull_daytrading: 500 } });
+  assert.deepEqual(r, { pnl: 500, byTag: { sim4_bull_daytrading: 500 }, fees: null });
 });
 
 test('미실현은 종목의 tag에 귀속된다 — active_tag보다 우선', () => {
@@ -149,4 +149,63 @@ test('평단이 없거나 0인 종목은 기준가를 만들지 않는다', () =
 
 test('보유가 없으면 빈 기준가다', () => {
   assert.deepEqual(basisFromPositions({}), {});
+});
+
+const RATES = { buy: 0.00015, sell: 0.00015, tax: 0.0018 };
+
+test('보유분의 매수 수수료를 미실현에서 뺀다 — 이미 낸 돈이다', () => {
+  const turn = { id: 't1', capital: 1_000_000, basis: { A: 1000 }, by_tag: {}, active_tag: 'sim4',
+                 fees_realized: 0 } as any;
+  const positions = { A: { name: '가', quantity: 100, avg_price: 1000, tag: 'sim4' } };
+
+  const { pnl, byTag, fees } = computeTurnPnl(turn, positions, { A: 1100 }, RATES);
+
+  const buyFee = 100 * 1000 * RATES.buy;          // 15원
+  assert.equal(fees, buyFee);
+  assert.equal(pnl, 100 * (1100 - 1000) - buyFee); // gross 10,000 - 15
+  assert.equal(byTag.sim4, pnl, '기여도 합계는 전체 손익과 같아야 한다');
+});
+
+test('아직 안 낸 매도 비용은 미리 빼지 않는다', () => {
+  const turn = { id: 't1', capital: 1_000_000, basis: { A: 1000 }, by_tag: {}, active_tag: 'sim4',
+                 fees_realized: 0 } as any;
+  const positions = { A: { name: '가', quantity: 100, avg_price: 1000, tag: 'sim4' } };
+
+  const { fees } = computeTurnPnl(turn, positions, { A: 1100 }, RATES);
+
+  // 매도 수수료(0.00015) + 거래세(0.0018)를 미리 뺐다면 값이 훨씬 커진다.
+  assert.equal(fees, 100 * 1000 * RATES.buy);
+});
+
+test('실현 비용과 보유분 매수 수수료를 합쳐 낸다', () => {
+  const turn = { id: 't1', capital: 1_000_000, basis: { A: 1000 }, by_tag: { sim4: 5_000 },
+                 active_tag: 'sim4', fees_realized: 300 } as any;
+  const positions = { A: { name: '가', quantity: 100, avg_price: 1000, tag: 'sim4' } };
+
+  const { fees } = computeTurnPnl(turn, positions, { A: 1100 }, RATES);
+
+  assert.equal(fees, 300 + 100 * 1000 * RATES.buy);
+});
+
+test('요율이 없으면 수수료는 0이 아니라 측정 불가다', () => {
+  // 원장에 fee_rates가 아직 안 찍힌 첫 배포 직후. 0으로 그리면 '수수료를 안 냈다'는 거짓이 된다.
+  const turn = { id: 't1', capital: 1_000_000, basis: { A: 1000 }, by_tag: {}, active_tag: 'sim4',
+                 fees_realized: 0 } as any;
+  const positions = { A: { name: '가', quantity: 100, avg_price: 1000, tag: 'sim4' } };
+
+  const { fees, pnl } = computeTurnPnl(turn, positions, { A: 1100 }, undefined);
+
+  assert.equal(fees, null);
+  assert.equal(pnl, 100 * (1100 - 1000), '차감할 수 없으면 gross 그대로 둔다');
+});
+
+test('시세를 못 구한 종목은 수수료도 안 뺀다 — 손익을 안 세는 종목이다', () => {
+  const turn = { id: 't1', capital: 1_000_000, basis: { A: 1000 }, by_tag: {}, active_tag: 'sim4',
+                 fees_realized: 0 } as any;
+  const positions = { A: { name: '가', quantity: 100, avg_price: 1000, tag: 'sim4' } };
+
+  const { pnl, fees } = computeTurnPnl(turn, positions, {}, RATES);
+
+  assert.equal(pnl, 0);
+  assert.equal(fees, 0);
 });

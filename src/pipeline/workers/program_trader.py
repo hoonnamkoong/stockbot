@@ -37,7 +37,7 @@ from datetime import datetime, timedelta
 
 from src import alerts
 from src.pipeline.context import MARKET_CLOSE_HHMM
-from src.trade.fees import realized_pnl_after_fees
+from src.trade.fees import realized_pnl_after_fees, roundtrip_cost
 from src.trade.executions import UNKNOWN
 from src.trade.pending import register_pending
 from src.trade.realized_pnl import lookup_realized_pnl as _lookup_realized_pnl
@@ -65,7 +65,16 @@ def accrue_realized_pnl(ledger: dict, positions: dict, code: str,
         return 0.0
     delta = realized_pnl_after_fees(qty, pos['avg_price'], price)
     ledger['realized_pnl'] = round(ledger.get('realized_pnl', 0) + delta, 2)
+    _accrue_turn_fees(ledger, roundtrip_cost(qty, pos['avg_price'], price))
     return delta
+
+
+def _accrue_turn_fees(ledger: dict, delta: float) -> None:
+    """턴의 실현 비용 누적. 턴이 없으면 아무것도 하지 않는다(OFF 중 잔여 정산)."""
+    turn = ledger.get('turn')
+    if turn is None:
+        return
+    turn['fees_realized'] = turn.get('fees_realized', 0.0) + delta
 
 
 def _buy_allowed(now_kst) -> bool:

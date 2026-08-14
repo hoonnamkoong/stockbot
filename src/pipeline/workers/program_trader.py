@@ -77,6 +77,19 @@ def _accrue_turn_fees(ledger: dict, delta: float) -> None:
     turn['fees_realized'] = turn.get('fees_realized', 0.0) + delta
 
 
+def stamp_fee_rates(ledger: dict) -> None:
+    """요율 사본을 원장에 찍는다. **정의는 fees.py 하나뿐이다.**
+
+    화면(TS)이 보유분 매수 수수료를 유도해야 하는데, 상수를 TS에 복사하면
+    2026-08-10에 심과 실전의 비용 모델이 갈렸던 버그를 그대로 재현한다.
+    복사 대신 매 사이클 원장에 실어 보낸다.
+    """
+    from src.trade import fees
+    ledger['fee_rates'] = {'buy': fees.BUY_FEE_RATE,
+                           'sell': fees.SELL_FEE_RATE,
+                           'tax': fees.SELL_TAX_RATE}
+
+
 def _buy_allowed(now_kst) -> bool:
     """신규 매수 허용 시각인가. 정규장 종료(15:30)부터 막는다.
 
@@ -1209,6 +1222,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         ledger['positions'] = positions
         ledger['cooldown_codes'] = snapshot.get('cooldown_codes', {})
         ledger['last_run'] = now_kst.isoformat()
+        stamp_fee_rates(ledger)
         ledger['sim'] = sim_id
         ledger['turn'] = turn
         _write_ledger(_release_payload(ledger), ledger_sha, log)
@@ -1346,6 +1360,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     ledger['positions'] = positions
     ledger['cooldown_codes'] = snapshot.get('cooldown_codes', {})
     ledger['last_run'] = now_kst.isoformat()
+    stamp_fee_rates(ledger)
     ledger['sim'] = sim_id
     try:
         if turn:

@@ -55,36 +55,22 @@ test('code 없는 행과 빈 잔고를 견딘다', () => {
 
 const POS = { A: { name: 'A', quantity: 10, avg_price: 1_000 } };
 
-test('미실현은 자체 원장 평단 기준이다 — 브로커 계좌 전체와 섞지 않는다', () => {
-  const p = summarizeProgram({ positions: POS, prices: { A: 1_200 }, realizedPnl: 5_000, budget: 1_000_000 });
-  assert.equal(p.unrealizedPnl, 2_000);
-  assert.equal(p.totalPnl, 7_000);
+test('보유 평가금액은 시세 기준이다', () => {
+  const p = summarizeProgram({ positions: POS, prices: { A: 1_200 } });
   assert.equal(p.holdingsValue, 12_000);
-  assert.equal(p.ratePct!.toFixed(2), '0.70');
 });
 
-test('시세를 못 붙인 종목은 기여분 0이다 — 0원으로 평가하면 원금 전액 손실로 보인다', () => {
-  // 예전 버그: 미실현은 ??를 써서 price 0이 통과해 (0-1000)*10 = -10,000이 됐고,
-  // 보유 총액은 ||를 써서 평단으로 떨어졌다. 같은 결측에 두 계산이 다르게 반응했다.
+test('시세를 못 붙인 종목은 평단으로 평가한다 — 없는 시세를 지어내지 않는다', () => {
   for (const prices of [{ A: 0 }, {}, { A: -1 }]) {
-    const p = summarizeProgram({ positions: POS, prices, realizedPnl: 0, budget: 1_000_000 });
-    assert.equal(p.unrealizedPnl, 0, JSON.stringify(prices));
+    const p = summarizeProgram({ positions: POS, prices });
     assert.equal(p.holdingsValue, 10_000, JSON.stringify(prices));
   }
 });
 
-test('예산이 없으면 수익률은 측정 불가다 — 0%로 그리면 손익 0과 구분이 사라진다', () => {
-  const p = summarizeProgram({ positions: POS, prices: { A: 1_200 }, realizedPnl: 0, budget: 0 });
-  assert.equal(p.ratePct, null);
-  assert.equal(p.totalPnl, 2_000, '수익률은 못 만들어도 손익 금액은 값이 있다');
-});
-
-test('예산·포지션·실현손익 중 하나라도 있으면 프로그램 지표를 띄운다', () => {
-  const none = summarizeProgram({ positions: {}, prices: {}, realizedPnl: 0, budget: 0 });
+test('포지션이 있으면 프로그램 지표를 띄운다', () => {
+  const none = summarizeProgram({ positions: {}, prices: {} });
   assert.equal(none.hasData, false);
-  assert.equal(summarizeProgram({ positions: POS, prices: {}, realizedPnl: 0, budget: 0 }).hasData, true);
-  assert.equal(summarizeProgram({ positions: {}, prices: {}, realizedPnl: -1, budget: 0 }).hasData, true);
-  assert.equal(summarizeProgram({ positions: {}, prices: {}, realizedPnl: 0, budget: 1 }).hasData, true);
+  assert.equal(summarizeProgram({ positions: POS, prices: {} }).hasData, true);
 });
 
 // ── 턴 ─────────────────────────────────────────────────────────────
@@ -143,4 +129,44 @@ test('손익 0인 태그는 목록에서 빼고 큰 순서로 세운다', () => 
   const turn = { ...TURN, basis: {}, by_tag: { a: 100, b: 0, c: -50, d: 900 }, active_tag: 'a' };
   const t = summarizeTurn({ turn, lastTurn: null, positions: {}, prices: {}, programEnabled: true });
   assert.deepEqual(t.tagRows, [['d', 900], ['a', 100], ['c', -50]]);
+});
+
+const RATES = { buy: 0.00015, sell: 0.00015, tax: 0.0018 };
+
+test('프로그램 요약은 이제 보유 평가금액만 낸다 — 수익률은 턴이 낸다', () => {
+  const p = summarizeProgram({ positions: POS, prices: { A: 1_200 } });
+  assert.equal(p.holdingsValue > 0, true);
+  assert.equal('ratePct' in p, false, '누적 수익률은 화면에서 사라졌다');
+});
+
+test('턴 요약이 수수료와 시작 시각을 낸다', () => {
+  const turn = { id: 't1', capital: 1_000_000, basis: { A: 1000 }, by_tag: {},
+                 active_tag: 'sim4', fees_realized: 300, started_at: '2026-08-12T14:20:00' } as any;
+  const t = summarizeTurn({
+    turn, lastTurn: null, positions: { A: { name: '가', quantity: 100, avg_price: 1000, tag: 'sim4' } },
+    prices: { A: 1100 }, programEnabled: true, feeRates: RATES,
+  });
+
+  assert.equal(t.fees, 300 + 100 * 1000 * RATES.buy);
+  assert.equal(t.startedAt, '2026-08-12T14:20:00');
+  assert.equal(t.measurable, true);
+});
+
+test('요율을 못 받으면 수수료는 측정 불가다', () => {
+  const turn = { id: 't1', capital: 1_000_000, basis: {}, by_tag: { sim4: 1000 },
+                 active_tag: 'sim4' } as any;
+  const t = summarizeTurn({ turn, lastTurn: null, positions: {}, prices: {},
+                            programEnabled: true, feeRates: undefined });
+  assert.equal(t.fees, null);
+});
+
+test('OFF로 동결된 직전 턴도 수수료와 시작 시각을 그대로 쓴다', () => {
+  const lastTurn = { id: 't0', ended_at: '2026-08-12T14:20:00', started_at: '2026-08-03T10:00:00',
+                     sim: 'sim4', capital: 2_000_000, pnl: 12_340, fees: 2_100, by_tag: {} };
+  const t = summarizeTurn({ turn: null, lastTurn, positions: {}, prices: {},
+                            programEnabled: false, feeRates: RATES });
+
+  assert.equal(t.fees, 2_100);
+  assert.equal(t.startedAt, '2026-08-03T10:00:00');
+  assert.equal(t.isLive, false);
 });

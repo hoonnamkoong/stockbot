@@ -13,6 +13,8 @@ export type ProgramTurn = {
     active_tag: string | null;
     /** 파이썬이 매도 확정 시점에 누적하는, 이 턴에서 실제로 낸 매매 비용. */
     fees_realized?: number;
+    /** 턴이 열린 시각. 구 기록에는 없을 수 있다. */
+    started_at?: string;
 };
 
 export type ProgramPosition = { name: string; quantity: number; avg_price: number; tag?: string };

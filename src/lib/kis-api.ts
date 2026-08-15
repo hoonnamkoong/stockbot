@@ -579,31 +579,6 @@ export function matchRealizedRoi(
  * `종목코드_매매일자(yyyymmdd)` 키의 버킷 Map으로 반환한다.
  * 모의투자 미지원/조회 실패 시 빈 Map(→ 전체 "측정 불가").
  */
-/**
- * 조회 결과를 화면이 쓸 형태로 접는다.
- *
- * 이 함수의 존재 이유는 **'측정 불가'와 '0원'을 가르는 것**이다:
- *   - ok=false → 조회 실패. 화면은 '측정 불가'.
- *   - ok=true, 버킷 없음 → 그 기간에 매도가 없었다. **0원이 정답이다.**
- *   - ok=true, 버킷 있음 → 합산값.
- *
- * 예전에는 빈 Map 하나로 앞 두 경우를 표현해서, 판 게 없는 날에도 화면이
- * '측정 불가'를 띄웠다. 그러면 진짜 조회 실패를 알아챌 방법이 사라진다 —
- * 없는 것과 못 잰 것은 다르다.
- */
-export function summarizeRealizedBuckets(
-    ok: boolean,
-    buckets: Map<string, ProfitEntry[]>,
-): { ok: boolean; total: number } {
-    if (!ok) return { ok: false, total: 0 };
-    let total = 0;
-    // Map 순회는 tsconfig target 때문에 for..of가 막힌다 — forEach로 합산.
-    buckets.forEach((entries) => {
-        entries.forEach((e) => { total += e.roiAmount; });
-    });
-    return { ok: true, total };
-}
-
 export async function getRealizedProfitBuckets(
     fromDateStr: string,
     toDateStr: string,

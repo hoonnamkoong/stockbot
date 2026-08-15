@@ -4,7 +4,7 @@ import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
 import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
 import { validateArmRequest } from '@/lib/trade-auth';
-import { getRealizedProfitBuckets } from '@/lib/kis-api';
+import { getRealizedProfitBuckets, summarizeRealizedBuckets } from '@/lib/kis-api';
 import { kstTimestamp } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
@@ -245,14 +245,10 @@ export async function GET(request: Request) {
         const kisRealized = await withDeadline((async (): Promise<{ ok: boolean; total: number } | null> => {
             if (!pnlSince) return null;                       // 집계 시작일이 없으면 비교 구간을 정할 수 없다
             const today = kstTimestamp().slice(0, 10).replace(/-/g, '');
-            const buckets = await getRealizedProfitBuckets(pnlSince, today);
-            if (buckets.size === 0) return { ok: false, total: 0 };   // 조회 실패/무거래 구분 불가 → '측정 불가'
-            // Map 순회는 tsconfig target 때문에 for..of가 막힌다 — forEach로 합산.
-            let total = 0;
-            buckets.forEach((entries) => {
-                entries.forEach((e) => { total += e.roiAmount; });
-            });
-            return { ok: true, total };
+            const { ok, buckets } = await getRealizedProfitBuckets(pnlSince, today);
+            // 조회 실패면 '측정 불가'. 조회는 됐는데 매도가 없으면 0원이다 —
+            // 둘을 합치면 진짜 조회 실패를 알아챌 방법이 사라진다.
+            return summarizeRealizedBuckets(ok, buckets);
         })(), DISPLAY_DEADLINE_MS, null);
         // 진행 중인 턴은 config가 정의한다(ON 시 route가 연다). 원장 turn은 파이썬만 쓰고
         // OFF 시 지워지지 않으므로, id가 config와 같을 때만 채택한다(stale 방지).

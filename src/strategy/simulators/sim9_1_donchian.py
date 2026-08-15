@@ -2,8 +2,8 @@ from .base_simulator import BaseSimulator
 
 _cooldown_active = BaseSimulator.cooldown_active
 
-MAX_HOLDINGS = 6
-POSITION_WEIGHT = 0.15   # 종목당 NAV 대비 비중 (전 심 통일)
+MAX_HOLDINGS = 5
+POSITION_WEIGHT = 0.19   # 종목당 NAV 대비 비중 (전 심 통일)
 
 CHANNEL_DAYS = 20        # 진입 채널 (원 터틀 System 1)
 EXIT_DAYS = 10           # 청산 채널

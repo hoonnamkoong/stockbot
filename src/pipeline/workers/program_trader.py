@@ -1041,7 +1041,22 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     # [보안/안전 교정] effective_budget이 잘못 커지거나(계산 drift) 사용자가 계좌에서
     # 다른 용도로 현금을 소진한 경우 실제 살 수 없는 주문을 낼 위험이 있다.
     # 증권사 거부에만 기대지 않고, 여기서 실제 예수금으로 상한을 강제한다.
-    real_deposit = int(bal.get('deposit') or 0)
+    # 예수금은 **D+2를 쓴다**. dnca_tot_amt(D+0)는 매도대금이 아직 안 들어온
+    # 금액이라, 파는 심일수록 계좌가치가 실제보다 작게 잡히고 그만큼 사이징이
+    # 깎인다 — 2026-08-12에 계좌가치가 1,235,198로 잡혀 종목당 목표가 185,280
+    # (의도한 300,000의 62%)이 됐다. 매도대금은 이미 내 돈이고 D+2에 예수금으로
+    # 확정 편입된다.
+    #
+    # 근거: 2026-08-14 실측 로그에서 보유가 없을 때
+    #   D+2(2,020,888) == KIS총평가(tot_evlu_amt) 였다.
+    # 즉 D+2 예수금 + 유가증권 평가액이 계좌가치이고, 여기서는 보유분을
+    # 취득원가로 더한다(평가액이 아니라 원가 — 미실현이익까지 사이징 근거로
+    # 삼으면 오르는 날 과투입된다).
+    #
+    # 필드가 없으면(모의계좌·구버전 응답) D+0으로 떨어진다. 보수적인 쪽이다.
+    real_deposit_d0 = int(bal.get('deposit') or 0)
+    _d2 = bal.get('deposit_d2')
+    real_deposit = int(_d2) if isinstance(_d2, int) and _d2 > 0 else real_deposit_d0
     real_invested = sum(h['avg_price'] * h['qty'] for h in real_holdings.values())
     real_account_value = real_deposit + real_invested
     if effective_budget > real_account_value:
@@ -1055,11 +1070,14 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             # 필드가 없으면 '—'다. 0으로 찍으면 '이 응답엔 없다'와 '예수금 0'이
             # 합쳐지는데, 이 줄의 용도가 예산 상한 판단이라 그 혼동이 곧 오판이다.
             return f'{v:,}' if isinstance(v, int) else '—'
-        log(f"[Program] 현금 내역: D+0={_cash(real_deposit)} / "
+        # 어느 값을 실제로 썼는지 함께 찍는다 — 라벨과 사용값이 어긋나면
+        # 로그를 보고도 사이징 근거를 잘못 짚는다.
+        log(f"[Program] 현금 내역: D+0={_cash(real_deposit_d0)} / "
             f"D+1={_cash(bal.get('deposit_d1'))} / "
             f"D+2={_cash(bal.get('deposit_d2'))} / "
             f"보유원가={real_invested:,.0f} / "
-            f"KIS총평가={_cash(bal.get('total_asset'))}")
+            f"KIS총평가={_cash(bal.get('total_asset'))} "
+            f"→ 사용 예수금={real_deposit:,}")
         effective_budget = real_account_value
     if effective_budget <= 0:
         log('[Program] 클램프 후 effective_budget<=0 — skip')

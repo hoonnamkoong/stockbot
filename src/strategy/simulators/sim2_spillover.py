@@ -4,8 +4,8 @@ from datetime import datetime
 # 사이징은 전 매매심 공통 규격이다(NAV×15% × 최대 6종목 = 90% 투입).
 # 2026-08-03 이전의 심2는 상한 없이 NAV/10씩 담아 10종목까지 갔고, 현금이 36,234원
 # (NAV의 1.2%)까지 마르자 신호가 와도 매수가 조용히 실패했다.
-MAX_HOLDINGS = 6
-POSITION_WEIGHT = 0.15
+MAX_HOLDINGS = 5
+POSITION_WEIGHT = 0.19
 
 class SectorSpilloverSimulator(BaseSimulator):
     """

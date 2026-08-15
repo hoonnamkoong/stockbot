@@ -4,8 +4,8 @@ from .base_simulator import BaseSimulator, get_kst_now
 
 _cooldown_active = BaseSimulator.cooldown_active
 
-MAX_HOLDINGS = 6
-POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% 투입, 전 심 통일)
+MAX_HOLDINGS = 5
+POSITION_WEIGHT = 0.19  # 종목당 NAV 대비 비중 (0.19 × 5 = 최대 95% 투입, 전 심 통일)
 
 # 갭소진 파라미터 (2026-06~07 42거래일, 체결 가능한 정보만으로 재측정해 확정)
 # 최초 스펙(갭 3 / 되밀림 -3 / 필터 없음)은 거래당 +1.50%·승률 45.7%였고,

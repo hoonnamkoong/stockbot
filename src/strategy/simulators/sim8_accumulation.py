@@ -4,8 +4,8 @@ from .base_simulator import BaseSimulator
 
 _cooldown_active = BaseSimulator.cooldown_active
 
-MAX_HOLDINGS = 6
-POSITION_WEIGHT = 0.15   # 종목당 NAV 대비 최종 비중 (전 심 통일). 2단으로 나눠 채운다.
+MAX_HOLDINGS = 5
+POSITION_WEIGHT = 0.19   # 종목당 NAV 대비 최종 비중 (전 심 통일). 2단으로 나눠 채운다.
 
 # 앵커링 좌표
 NEAR_FLOOR = 0.85        # 52주 고점의 85% 미만이면 앵커 구간 밖

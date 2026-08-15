@@ -6,8 +6,8 @@ from .base_simulator import BaseSimulator, get_kst_now
 _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
 
-MAX_HOLDINGS = 6
-POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% 투입)
+MAX_HOLDINGS = 5
+POSITION_WEIGHT = 0.19  # 종목당 NAV 대비 비중 (0.19 × 5 = 최대 95% 투입)
 
 # 레인지 채널 파라미터 (백테스트로 확정)
 MIN_HISTORY = 10          # 채널 산출 최소 일수

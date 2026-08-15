@@ -1,6 +1,6 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from src.strategy.simulators.sim9_1_donchian import decide_donchian, MIN_SAMPLE
+from src.strategy.simulators.sim9_1_donchian import POSITION_WEIGHT, decide_donchian, MIN_SAMPLE
 
 # 20일 채널: 저점 900, 상단 1000
 CHANNEL = [900 + (i % 5) * 25 for i in range(19)] + [1000]
@@ -73,7 +73,7 @@ def test_no_signal_when_sample_too_thin():
 def test_entry_takes_full_weight():
     orders = decide_donchian(_view({}), [_target()] + _filler(), {'T001': 1050})
     b = [o for o in _buys(orders) if o['code'] == 'T001'][0]
-    assert b['quantity'] == int(3_000_000 * 0.15 / 1050)
+    assert b['quantity'] == int(3_000_000 * POSITION_WEIGHT / 1050)
 
 
 # ── 청산 ────────────────────────────────────────────────

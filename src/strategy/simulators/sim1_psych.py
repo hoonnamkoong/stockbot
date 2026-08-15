@@ -6,8 +6,8 @@ _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
 
 MIN_AMOUNT = 1_000_000_000
-MAX_HOLDINGS = 6             # 전 심 통일 (0.15 × 6 = 최대 90% 투입)
-POSITION_WEIGHT = 0.15
+MAX_HOLDINGS = 5             # 전 심 통일 (0.19 × 5 = 최대 95% 투입)
+POSITION_WEIGHT = 0.19
 MIN_SAMPLE = 10              # 횡단면 z 최소 표본. 미달이면 z를 만들지 않는다.
 
 # 점화 임계값 — 잠정값이다.

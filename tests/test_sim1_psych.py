@@ -8,7 +8,9 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.strategy.simulators.sim1_psych import decide_psych, MIN_SAMPLE
+from src.strategy.simulators.sim1_psych import (
+    decide_psych, MAX_HOLDINGS, MIN_SAMPLE, POSITION_WEIGHT,
+)
 
 
 def _view(portfolio=None, nav=3_000_000):
@@ -150,16 +152,18 @@ def test_thin_sample_fails_closed():
 
 
 # ── 사이징 (전 심 통일) ──────────────────────────────────
-def test_position_size_is_fifteen_percent():
+def test_position_size_follows_the_weight_constant():
     orders, _, _ = decide_psych(_view(), [_target()] + _filler(), {'T001': 1000})
-    assert _buys(orders)[0]['quantity'] == int(3_000_000 * 0.15 / 1000)
+    # 상수를 참조한다 — 하드코딩하면 사이징을 조정할 때마다 이 테스트가
+    # '무엇이 깨졌는지'가 아니라 '숫자가 바뀌었다'만 알려준다.
+    assert _buys(orders)[0]['quantity'] == int(3_000_000 * POSITION_WEIGHT / 1000)
 
 
-def test_max_six_holdings():
+def test_max_holdings_is_capped():
     """이전에는 보유 상한이 없어 Sim1만 통일에서 빠져 있었다."""
     cands = [_target(code=f'T{i:03d}', name=f'심리{i}') for i in range(9)] + _filler()
     orders, diags, _ = decide_psych(_view(), cands, {})
-    assert len(_buys(orders)) == 6
+    assert len(_buys(orders)) == MAX_HOLDINGS
     assert any(d['reason'] == 'full' for d in diags)
 
 

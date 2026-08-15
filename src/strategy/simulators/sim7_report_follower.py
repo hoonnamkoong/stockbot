@@ -9,9 +9,9 @@ class ReportFollowerSimulator(BaseSimulator):
     Stage 3: run()으로 포트폴리오 청산 조건 체크.
     Stage 3.6: buy_from_report()로 신규 매수 신호 처리.
     """
-    MAX_HOLDINGS = 6
+    MAX_HOLDINGS = 5
     WEIGHT_MIN   = 0.10
-    WEIGHT_MAX   = 0.15  # 0.15 × 6 = 최대 90% 투입
+    WEIGHT_MAX   = 0.19  # 0.19 × 5 = 최대 95% 투입
     GATE         = 45.0
 
     def __init__(self, initial_cash=3_000_000):

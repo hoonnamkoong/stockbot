@@ -505,14 +505,23 @@ class TradeEngineWorker(BaseWorker):
                         if price_text.isdigit():
                             stock['price'] = int(price_text)
                             stock['current_price'] = stock['price']
-                    sparkline = []
-                    for row in data_rows[:5]:
+                    # 이 표는 20행(20영업일)을 준다. 종가를 전부 뽑아 두고
+                    # sparkline은 그 앞 5개만 쓴다 — 추가 호출 0.
+                    closes = []
+                    for row in data_rows:
                         try:
-                            sparkline.append(int(row[1].get_text().replace(',', '').strip()))
+                            closes.append(int(row[1].get_text().replace(',', '').strip()))
                         except Exception:
                             pass
-                    if sparkline:
-                        stock['sparkline_price'] = sparkline[::-1]  # 오래된→최신 순
+                    if closes:
+                        stock['sparkline_price'] = closes[:5][::-1]   # 오래된→최신 순
+                        # [Sim5] 채널 산출용 20일 종가. 이걸 안 채우면 자체
+                        # 유니버스를 쓰는 심은 `_channel()`이 None을 돌려받아
+                        # **진입이 구조적으로 불가능해진다.** 지금까지 이 필드는
+                        # 스크래퍼 경로(data_fetcher._get_stock_details)에만
+                        # 있었고, 그래서 심5에 자체 유니버스를 달면 조용히
+                        # 매수 0건이 되는 함정이 있었다.
+                        stock.setdefault('range_history', closes[::-1])
                     if len(data_rows) >= 2:
                         stock['foreign_rate'] = float(
                             data_rows[0][8].get_text().replace('%', '').replace(',', '').strip() or 0

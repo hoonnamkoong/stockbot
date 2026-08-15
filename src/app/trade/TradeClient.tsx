@@ -107,9 +107,9 @@ function TradeContent() {
         programBudget, setProgramBudget, programConfirmedBudget,
         programSims, programValid, programBusy,
         programPinOpen, setProgramPinOpen, programPin, setProgramPin,
-        programPositions, programRealizedPnl, programLedgerOk,
+        programPositions, programLedgerOk,
         programTurn, programLastTurn, programUnreconciled,
-        programKisRealized, programPnlSince,
+        programFeeRates, programTurnHistory,
         submitProgram, onToggleProgram,
     } = useProgramTrading(showNotify);
 
@@ -351,18 +351,14 @@ function TradeContent() {
         // 숫자는 전부 lib이 만든다(테스트 있음). 여기는 배치만 한다.
         const { deposit, holdings, totalEval, totalPL, roiPct } = summarizeAccount(balance);
         const priceMap = buildPriceMap(balance?.holdings);
-        const program = summarizeProgram({
-            positions: programPositions,
-            prices: priceMap,
-            realizedPnl: programRealizedPnl,
-            budget: programConfirmedBudget,
-        });
+        const program = summarizeProgram({ positions: programPositions, prices: priceMap });
         const turn = summarizeTurn({
             turn: programTurn,
             lastTurn: programLastTurn,
             positions: programPositions,
             prices: priceMap,
             programEnabled,
+            feeRates: programFeeRates,
         });
 
         // 태그 → 표시명. 하위 전략도 매매 가능 심이라 programSims에 이름이 들어있다.
@@ -449,9 +445,13 @@ function TradeContent() {
                             <Text fw={700} size="lg">{Math.round(totalEval).toLocaleString()} 원</Text>
                         </Stack>
                     </SimpleGrid>
-                    {program.hasData && (
+                    {(program.hasData || turn.has) && (
                         <>
-                            <Divider mb="sm" label="프로그램 매매" labelPosition="left" />
+                            <Divider mb="sm" labelPosition="left" label={
+                                turn.startedAt
+                                    ? `프로그램 매매 · 현재 턴 ${turn.startedAt.slice(5, 16).replace('T', ' ')} ~ ${turn.isLive ? '진행 중' : '종료'}`
+                                    : '프로그램 매매'
+                            } />
                             {programUnreconciled.length > 0 && (
                                 <Alert color="orange" variant="light" mb="md" title="누적 수익률이 실제와 어긋납니다">
                                     <Text size="sm">
@@ -470,21 +470,30 @@ function TradeContent() {
                             )}
                             <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md" mb="md">
                                 <Stack gap={2}>
-                                    <Text size="xs" c="dimmed">수익률 (누적)</Text>
-                                    {programLedgerOk && program.ratePct !== null ? (
-                                        <Text fw={800} size="lg" c={program.totalPnl >= 0 ? 'red' : 'blue'}>
-                                            {program.totalPnl >= 0 ? '+' : ''}{program.ratePct.toFixed(2)}%
-                                        </Text>
-                                    ) : (
+                                    <Text size="xs" c="dimmed">수익률</Text>
+                                    {!turn.has ? (
+                                        <Text size="sm" c="dimmed" mt={4}>턴 없음 — 껐다 켜면 시작</Text>
+                                    ) : !turn.measurable ? (
                                         <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
+                                    ) : (
+                                        <Text fw={800} size="lg" c={turn.pnl >= 0 ? 'red' : 'blue'}>
+                                            {turn.pnl >= 0 ? '+' : ''}{turn.ratePct.toFixed(2)}%
+                                        </Text>
                                     )}
                                 </Stack>
                                 <Stack gap={2}>
-                                    <Text size="xs" c="dimmed">평가손익 (누적)</Text>
-                                    {programLedgerOk ? (
-                                        <Text fw={700} size="lg" c={program.totalPnl >= 0 ? 'red' : 'blue'}>
-                                            {program.totalPnl >= 0 ? '+' : ''}{Math.round(program.totalPnl).toLocaleString()} 원
-                                        </Text>
+                                    <Text size="xs" c="dimmed">평가손익 (net)</Text>
+                                    {turn.has && turn.measurable ? (
+                                        <>
+                                            <Text fw={700} size="lg" c={turn.pnl >= 0 ? 'red' : 'blue'}>
+                                                {turn.pnl >= 0 ? '+' : ''}{Math.round(turn.pnl).toLocaleString()} 원
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {turn.fees === null
+                                                    ? '수수료 측정 불가'
+                                                    : `수수료 ${Math.round(turn.fees).toLocaleString()}원 차감`}
+                                            </Text>
+                                        </>
                                     ) : (
                                         <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
                                     )}
@@ -498,37 +507,11 @@ function TradeContent() {
                                     )}
                                 </Stack>
                                 <Stack gap={2}>
-                                    <Text size="xs" c="dimmed">
-                                        KIS 실측 실현손익{programPnlSince ? ` (${programPnlSince.slice(4, 6)}/${programPnlSince.slice(6, 8)}~)` : ''}
-                                    </Text>
-                                    {programKisRealized == null ? (
+                                    <Text size="xs" c="dimmed">원금</Text>
+                                    {turn.capital > 0 ? (
+                                        <Text fw={700} size="lg">{Math.round(turn.capital).toLocaleString()} 원</Text>
+                                    ) : (
                                         <Text fw={700} size="lg" c="dimmed">측정 불가</Text>
-                                    ) : (
-                                        <>
-                                            <Text fw={700} size="lg" c={programKisRealized >= 0 ? 'red' : 'blue'}>
-                                                {programKisRealized >= 0 ? '+' : ''}{Math.round(programKisRealized).toLocaleString()} 원
-                                            </Text>
-                                            <Text size="xs" c="dimmed">계좌 전체 · 증권사 확정치</Text>
-                                        </>
-                                    )}
-                                </Stack>
-                                <Stack gap={2}>
-                                    <Text size="xs" c="dimmed">
-                                        턴당 수익률{turn.has && !turn.isLive ? ' (직전 턴)' : ''}
-                                    </Text>
-                                    {!turn.has ? (
-                                        <Text size="sm" c="dimmed" mt={4}>턴 없음 — 껐다 켜면 시작</Text>
-                                    ) : !turn.measurable ? (
-                                        <Text fw={800} size="lg" c="dimmed">측정 불가</Text>
-                                    ) : (
-                                        <>
-                                            <Text fw={800} size="lg" c={turn.pnl >= 0 ? 'red' : 'blue'}>
-                                                {turn.pnl >= 0 ? '+' : ''}{turn.ratePct.toFixed(2)}%
-                                            </Text>
-                                            <Text size="xs" c="dimmed">
-                                                {turn.pnl >= 0 ? '+' : ''}{Math.round(turn.pnl).toLocaleString()} 원 / 원금 {Math.round(turn.capital).toLocaleString()} 원
-                                            </Text>
-                                        </>
                                     )}
                                 </Stack>
                             </SimpleGrid>
@@ -536,7 +519,7 @@ function TradeContent() {
                     )}
                     {turn.has && (
                         <Stack gap={6} mb="md">
-                            <Text size="xs" c="dimmed">턴당 SIM별 수익률 (기여도 — 합계 = 턴 수익률)</Text>
+                            <Text size="xs" c="dimmed">전략별 기여도 (합계 = 수익률)</Text>
                             {turn.pendingFirstRun ? (
                                 <Text size="sm" c="dimmed">전략별 집계 대기 — 다음 파이프라인 런부터</Text>
                             ) : !turn.measurable ? (
@@ -556,6 +539,22 @@ function TradeContent() {
                                     ))}
                                 </Group>
                             )}
+                        </Stack>
+                    )}
+                    {programTurnHistory.length > 0 && (
+                        <Stack gap={4} mb="md">
+                            <Text size="xs" c="dimmed">지난 턴</Text>
+                            {programTurnHistory.map((t) => (
+                                <Text key={t.id} size="xs" c="dimmed">
+                                    {(t.started_at ?? '?').slice(5, 16).replace('T', ' ')} ~ {t.ended_at.slice(5, 16).replace('T', ' ')}
+                                    {' · 원금 '}{Math.round(t.capital).toLocaleString()}원
+                                    {' · '}
+                                    {t.pnl === null
+                                        ? '측정 불가'
+                                        : `${t.pnl >= 0 ? '+' : ''}${Math.round(t.pnl).toLocaleString()}원 (${t.capital > 0 ? ((t.pnl / t.capital) * 100).toFixed(2) : '-'}%)`}
+                                    {t.fees != null && ` · 수수료 ${Math.round(t.fees).toLocaleString()}원`}
+                                </Text>
+                            ))}
                         </Stack>
                     )}
                     <Divider mb="xs" label="보유 포트폴리오 (일괄 매도 가능)" labelPosition="center" />

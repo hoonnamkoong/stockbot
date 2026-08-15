@@ -86,3 +86,24 @@ def test_flat_trade_loses_exactly_the_cost():
     assert net < 0
     # 매수수수료 15 + 매도수수료 15 + 거래세 180 = 210원
     assert abs(net - (-210)) < 0.01
+
+
+from src.trade.fees import roundtrip_cost, buy_cost, sell_cost
+
+
+def test_roundtrip_cost_is_buy_plus_sell():
+    """왕복 비용 = 매수 수수료 + (매도 수수료 + 거래세)."""
+    got = roundtrip_cost(10, 1000.0, 1100.0)
+    assert got == buy_cost(10, 1000.0) + sell_cost(10, 1100.0)
+
+
+def test_roundtrip_cost_is_what_realized_pnl_subtracted():
+    """손익에서 뺀 비용과 정확히 같은 값이어야 한다 — 다르면 화면 검산이 깨진다."""
+    from src.trade.fees import realized_pnl_after_fees
+    gross = 10 * (1100.0 - 1000.0)
+    net = realized_pnl_after_fees(10, 1000.0, 1100.0)
+    assert abs((gross - net) - roundtrip_cost(10, 1000.0, 1100.0)) < 1e-9
+
+
+def test_roundtrip_cost_zero_qty_is_zero():
+    assert roundtrip_cost(0, 1000.0, 1100.0) == 0.0

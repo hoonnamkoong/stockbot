@@ -10,7 +10,7 @@
  */
 
 // `.ts` 확장자를 붙여야 node --test가 읽는다(sim-reset-targets.ts와 같은 이유).
-import { computeTurnPnl, type LastTurnResult, type ProgramPosition, type ProgramTurn } from './program-turn.ts';
+import { computeTurnPnl, type FeeRates, type LastTurnResult, type ProgramPosition, type ProgramTurn } from './program-turn.ts';
 
 /** 종목코드 → 현재가. 잔고 응답에서 뽑는다(프로그램 원장에는 시세가 없다). */
 export function buildPriceMap(holdings: any[] | null | undefined): Record<string, number> {
@@ -43,38 +43,24 @@ export function summarizeAccount(balance: { deposit?: number; holdings?: any[] }
 }
 
 /**
- * 프로그램 매매 누적 요약.
+ * 프로그램 보유 평가금액.
  *
- * 미실현은 **자체 원장의 avg_price**를 기준가로 쓴다 — 브로커 계좌 전체 손익과
- * 섞이면 프로그램의 성과가 아니게 된다. 시세를 못 붙인 종목은 기여분 0이다
- * (기준가를 현재가로 쓰는 것과 같다 — 없는 시세를 지어내지 않는다).
+ * [2026-08-14] 누적 수익률·누적 평가손익은 화면에서 사라졌다 — 모든 지표가 턴
+ * 기준이 됐기 때문이다(summarizeTurn). 원장의 realized_pnl은 그대로 살아 있고
+ * effective_budget(다음 주문 크기) 계산에 계속 쓰인다.
+ *
+ * 시세를 못 붙인 종목은 avg_price로 평가한다 — 없는 시세를 지어내지 않는다.
  */
 export function summarizeProgram(args: {
     positions: Record<string, ProgramPosition>;
     prices: Record<string, number>;
-    realizedPnl: number;
-    budget: number;
-}): { unrealizedPnl: number; totalPnl: number; ratePct: number | null; holdingsValue: number; hasData: boolean } {
+}): { holdingsValue: number; hasData: boolean } {
     const entries = Object.entries(args.positions || {});
-    const unrealizedPnl = entries.reduce((sum, [code, pos]) => {
-        const px = args.prices[code];
-        const currentPrice = px != null && px > 0 ? px : pos.avg_price;
-        return sum + (currentPrice - pos.avg_price) * pos.quantity;
-    }, 0);
     const holdingsValue = entries.reduce((sum, [code, pos]) => {
         const px = args.prices[code];
         return sum + ((px != null && px > 0 ? px : pos.avg_price) * pos.quantity);
     }, 0);
-
-    const totalPnl = args.realizedPnl + unrealizedPnl;
-    return {
-        unrealizedPnl,
-        totalPnl,
-        // 예산(분모)이 없으면 수익률을 만들 수 없다.
-        ratePct: args.budget > 0 ? (totalPnl / args.budget) * 100 : null,
-        holdingsValue,
-        hasData: args.budget > 0 || entries.length > 0 || args.realizedPnl !== 0,
-    };
+    return { holdingsValue, hasData: entries.length > 0 };
 }
 
 export type TurnSummary = {
@@ -90,6 +76,10 @@ export type TurnSummary = {
     pnl: number;
     ratePct: number;
     byTag: Record<string, number>;
+    /** 이 턴에 실제로 낸 매매 비용. 요율을 못 받았으면 null(측정 불가). */
+    fees: number | null;
+    /** 턴이 열린 시각. 구 기록에는 없을 수 있다. */
+    startedAt: string | null;
     /** 손익 0인 태그는 빼고 큰 순서. 합계가 턴 수익률이다. */
     tagRows: [string, number][];
 };
@@ -105,12 +95,14 @@ export function summarizeTurn(args: {
     positions: Record<string, ProgramPosition>;
     prices: Record<string, number>;
     programEnabled: boolean;
+    feeRates?: FeeRates;
 }): TurnSummary {
-    const live = args.turn ? computeTurnPnl(args.turn, args.positions, args.prices) : null;
+    const live = args.turn ? computeTurnPnl(args.turn, args.positions, args.prices, args.feeRates) : null;
     const isLive = args.programEnabled && !!args.turn;
     const capital = args.turn?.capital ?? args.lastTurn?.capital ?? 0;
     const pnl = live ? live.pnl : (args.lastTurn?.pnl ?? 0);
     const byTag = live ? live.byTag : (args.lastTurn?.by_tag ?? {});
+    const fees = live ? live.fees : (args.lastTurn?.fees ?? null);
 
     return {
         has: !!args.turn || !!args.lastTurn,
@@ -121,6 +113,8 @@ export function summarizeTurn(args: {
         pnl,
         ratePct: capital > 0 ? (pnl / capital) * 100 : 0,
         byTag,
+        fees,
+        startedAt: (args.turn as any)?.started_at ?? args.lastTurn?.started_at ?? null,
         tagRows: Object.entries(byTag).filter(([, v]) => v !== 0).sort((a, b) => b[1] - a[1]),
     };
 }

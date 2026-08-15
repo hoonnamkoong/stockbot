@@ -12,7 +12,7 @@ I/O를 하지 않는다. 조회 결과를 받아 원장 dict을 제자리에서 
 필요한 목록을 돌려줄 뿐이다.
 """
 from src.trade.executions import FILLED, UNFILLED, UNKNOWN
-from src.trade.fees import realized_pnl_after_fees
+from src.trade.fees import realized_pnl_after_fees, roundtrip_cost
 
 
 def register_pending(ledger, code, odno, side, qty, price, ordered_at,
@@ -150,6 +150,15 @@ def _correct_sell(ledger, positions, code, p, filled_qty, fill_px,
     # actual과 정확히 상쇄되지 않는다. 주문 시 더한 estimated와 지금 빼는
     # estimated가 부동소수점으로 정확히 같은 값이어야 텔레스코핑이 성립한다.
     ledger['realized_pnl'] = ledger.get('realized_pnl', 0) + correction
+
+    # 손익과 같은 텔레스코핑. 주문 시 더한 추정 비용을 실측으로 갈아끼운다.
+    # realized_override(KIS 확정) 경로는 KIS가 비용을 분해해 주지 않으므로
+    # 우리 모델 값으로 남는다 — 그 괴리는 체결 대사가 잡는다.
+    est_fee = roundtrip_cost(p['qty'], avg, p['price']) if avg else 0.0
+    act_fee = roundtrip_cost(filled_qty, avg, fill_px or p['price']) if (avg and filled_qty) else 0.0
+    turn = ledger.get('turn')
+    if turn is not None:
+        turn['fees_realized'] = turn.get('fees_realized', 0.0) + (act_fee - est_fee)
 
     tag = p.get('tag')
     if tag:

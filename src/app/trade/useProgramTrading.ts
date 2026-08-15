@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import type { LastTurnResult, ProgramTurn, UnreconciledExit } from '@/lib/program-turn';
+import type { FeeRates, LastTurnResult, ProgramTurn, UnreconciledExit } from '@/lib/program-turn';
 
 export type ProgramPositions = Record<string, { name: string; quantity: number; avg_price: number; tag?: string }>;
 
@@ -33,9 +33,10 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
     const [programTurn, setProgramTurn] = useState<ProgramTurn | null>(null);
     const [programLastTurn, setProgramLastTurn] = useState<LastTurnResult | null>(null);
     const [programUnreconciled, setProgramUnreconciled] = useState<UnreconciledExit[]>([]);
-    // KIS 확정 실현손익(계좌 전체). null = 조회 못 함 → 화면은 '측정 불가'
-    const [programKisRealized, setProgramKisRealized] = useState<number | null>(null);
     const [programPnlSince, setProgramPnlSince] = useState<string | null>(null);
+    // 수수료율(원장). 없으면 undefined → summarizeTurn이 '측정 불가'로 그린다
+    const [programFeeRates, setProgramFeeRates] = useState<FeeRates | undefined>(undefined);
+    const [programTurnHistory, setProgramTurnHistory] = useState<LastTurnResult[]>([]);
 
     const fetchProgram = useCallback(async () => {
         try {
@@ -53,8 +54,9 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
             setProgramTurn(d.turn && d.turn.id ? d.turn : null);
             setProgramLastTurn(d.last_turn_result ?? null);
             setProgramUnreconciled(Array.isArray(d.unreconciled_exits) ? d.unreconciled_exits : []);
-            setProgramKisRealized(typeof d.kis_realized_pnl === 'number' ? d.kis_realized_pnl : null);
             setProgramPnlSince(d.pnl_since ?? null);
+            setProgramFeeRates(d.fee_rates ?? undefined);
+            setProgramTurnHistory(Array.isArray(d.turn_history) ? d.turn_history : []);
         } catch { /* 미로그인/네트워크 실패 시 조용히 무시 */ }
     }, []);
 
@@ -104,7 +106,7 @@ export function useProgramTrading(showNotify: (title: string, msg: string, color
         programPinOpen, setProgramPinOpen, programPin, setProgramPin,
         programPositions, programRealizedPnl, programLedgerOk,
         programTurn, programLastTurn, programUnreconciled,
-        programKisRealized, programPnlSince,
+        programPnlSince, programFeeRates, programTurnHistory,
         submitProgram, onToggleProgram,
     };
 }

@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
-import { computeTurnPnl, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
+import { computeTurnPnl, basisFromPositions, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
+import { pushTurnHistory } from '@/lib/turn-history';
 import { validateArmRequest } from '@/lib/trade-auth';
-import { getRealizedProfitBuckets, summarizeRealizedBuckets } from '@/lib/kis-api';
 import { kstTimestamp } from '@/lib/kst';
 
 export const dynamic = 'force-dynamic';
@@ -90,8 +90,9 @@ async function getPositions(): Promise<{
     turn: ProgramTurn | null;
     unreconciled_exits: UnreconciledExit[];
     pnl_since: string | null;
+    fee_rates: { buy: number; sell: number; tax: number } | null;
 }> {
-    const empty = { positions: {}, realized_pnl: 0, turn: null, unreconciled_exits: [], pnl_since: null };
+    const empty = { positions: {}, realized_pnl: 0, turn: null, unreconciled_exits: [], pnl_since: null, fee_rates: null };
     try {
         const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${POSITIONS_PATH}?ref=${SECRET_BRANCH}`;
         const res = await fetch(url, {
@@ -113,6 +114,8 @@ async function getPositions(): Promise<{
             unreconciled_exits: Array.isArray(content.unreconciled_exits) ? content.unreconciled_exits : [],
             // 누적 집계 시작일(yyyymmdd). 리셋 시점 이후만 KIS 실측과 비교해야 의미가 있다.
             pnl_since: typeof content.pnl_since === 'string' ? content.pnl_since : null,
+            fee_rates: content.fee_rates && typeof content.fee_rates === 'object'
+                ? content.fee_rates : null,   // 원장에 아직 없으면 null → 화면은 '측정 불가'
         };
     } catch {
         return { ok: false, ...empty }; // 네트워크/파싱 실패 — non-blocking이되 '실패'로 신호
@@ -138,16 +141,19 @@ async function getLivePrices(): Promise<{ ok: boolean; prices: Record<string, nu
  * OFF 시점의 턴 손익 동결값을 만든다. 실패는 pnl:null + degraded로 정직하게 남긴다.
  * throw하지 않는다(getPositions/getLivePrices가 total). 호출부가 데드라인으로 감싼다.
  */
-async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string): Promise<LastTurnResult> {
-    const base = { id: cfgTurn.id as string, ended_at: endedAt, sim, capital: Number(cfgTurn.capital) || 0 };
+async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string, startedAt: string | undefined): Promise<LastTurnResult> {
+    const base = { id: cfgTurn.id as string, ended_at: endedAt, started_at: startedAt, sim, capital: Number(cfgTurn.capital) || 0 };
 
     const { ok: ledgerOk, positions, turn } = await getPositions();
-    if (!ledgerOk) return { ...base, pnl: null, by_tag: {}, degraded: 'ledger_unavailable' };
+    if (!ledgerOk) return { ...base, pnl: null, by_tag: {}, fees: null, degraded: 'ledger_unavailable' };
 
     // 원장의 턴 id가 config와 다르면 이번 턴에 파이썬이 한 번도 안 돌았다(장 외 ON→OFF 등).
     // 이건 실패가 아니라 '거래가 없었다'는 뜻 — pnl:0이 정답이며 degraded를 붙이면 안 된다.
     const matched = turn && turn.id === cfgTurn.id ? turn : null;
-    if (!matched) return { ...base, pnl: 0, by_tag: {} };
+    // `|| 0`이 아니라 이 순서다 — 원장을 못 읽은 것(null)과 거래가 없어 0원인 것을
+    // 합치면 안 된다. 0원은 값이고 null은 '모른다'다.
+    const fees = matched ? Number(matched.fees_realized ?? 0) : 0;
+    if (!matched) return { ...base, pnl: 0, by_tag: {}, fees };
 
     const capital = Number(matched.capital) || base.capital;
     const held = Object.keys(positions).length > 0;
@@ -156,10 +162,10 @@ async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string): Pr
     // (getLivePrices는 성공 응답에 빈 holdings/0가만 와도 ok:true를 주므로 별도로 걸러야 한다).
     const noUsablePrice = held && !Object.keys(positions).some((c) => Number(prices[c]) > 0);
     // 보유 종목이 없으면 시세가 없어도 확정분(by_tag)만으로 손익이 정확하다.
-    if (held && (!pricesOk || noUsablePrice)) return { ...base, capital, pnl: null, by_tag: {}, degraded: 'prices_unavailable' };
+    if (held && (!pricesOk || noUsablePrice)) return { ...base, capital, pnl: null, by_tag: {}, fees, degraded: 'prices_unavailable' };
 
     const { pnl, byTag } = computeTurnPnl(matched, positions, prices);
-    return { ...base, capital, pnl, by_tag: byTag };
+    return { ...base, capital, pnl, by_tag: byTag, fees };
 }
 
 // ── PIN 무차별 대입 방어 (파일 기반 카운터, secret repo) ─────────────────
@@ -237,25 +243,15 @@ export async function GET(request: Request) {
         // selected_sim이 현재 매매 가능 목록에 없으면 무효(파이프라인도 OFF 취급)
         const selectedValid = !!content.selected_sim && validIds.has(content.selected_sim);
         const { ok: ledgerOk, positions, realized_pnl, turn, unreconciled_exits: unreconciledExits,
-                pnl_since: pnlSince } = await getPositions();
+                pnl_since: pnlSince, fee_rates: feeRates } = await getPositions();
 
-        // [실측 대조] 원장의 realized_pnl은 주문가 추정치로 쌓은 값이라 실제 체결가와 어긋나고,
-        // 수동 청산은 아예 빠진다. KIS가 확정한 실현손익(TTTC8715R)을 나란히 가져와 비교한다.
-        // 계좌 전체 기준이므로 프로그램 외 매매가 있으면 그만큼 다르다 — 화면에서 그렇게 라벨한다.
-        const kisRealized = await withDeadline((async (): Promise<{ ok: boolean; total: number } | null> => {
-            if (!pnlSince) return null;                       // 집계 시작일이 없으면 비교 구간을 정할 수 없다
-            const today = kstTimestamp().slice(0, 10).replace(/-/g, '');
-            const { ok, buckets } = await getRealizedProfitBuckets(pnlSince, today);
-            // 조회 실패면 '측정 불가'. 조회는 됐는데 매도가 없으면 0원이다 —
-            // 둘을 합치면 진짜 조회 실패를 알아챌 방법이 사라진다.
-            return summarizeRealizedBuckets(ok, buckets);
-        })(), DISPLAY_DEADLINE_MS, null);
         // 진행 중인 턴은 config가 정의한다(ON 시 route가 연다). 원장 turn은 파이썬만 쓰고
         // OFF 시 지워지지 않으므로, id가 config와 같을 때만 채택한다(stale 방지).
         //
         // 아직 파이썬이 한 번도 안 돈 턴(ON 직후 ~ 다음 파이프라인 런, 또는 장 외 시간에 ON)은
         // 원장에 turn이 없다. 이때 null을 주면 사용자가 방금 켠 턴이 화면에서 사라진다 —
         // config의 opening_basis·capital만으로도 손익은 계산 가능하므로 그것으로 턴을 구성한다.
+        // 기준가는 매입 평단이다(파이썬 new_turn과 동일 규칙) — 여기서도 그 값을 그대로 쓴다.
         // active_tag: null이 '아직 파이썬 미실행'의 신호다(원장에 저장된 턴은 항상 태그가 있다).
         const cfgTurn = content.turn;
         let liveTurn: ProgramTurn | null = null;
@@ -282,10 +278,10 @@ export async function GET(request: Request) {
             realized_pnl, // 프로그램 누적 실현손익(원)
             turn: liveTurn, // 진행 중인 턴(config와 원장이 같은 턴을 가리킬 때만) — 프론트가 실시간 손익 계산
             last_turn_result: content.last_turn_result ?? null, // OFF 시 동결된 직전 턴
+            turn_history: Array.isArray(content.turn_history) ? content.turn_history : [],
             unreconciled_exits: unreconciledExits, // 손익 미계상 청산분 — 있으면 수익률이 실제와 어긋난다
             pnl_since: pnlSince,                   // 누적 집계 시작일(yyyymmdd)
-            // KIS 확정 실현손익(계좌 전체). null이면 조회 못 함 → 화면은 '측정 불가'
-            kis_realized_pnl: kisRealized && kisRealized.ok ? kisRealized.total : null,
+            fee_rates: feeRates,                   // 수수료율(원장). 없으면 null → 화면은 '측정 불가'
         });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -319,16 +315,19 @@ export async function POST(request: Request) {
             if (cfgTurn?.id) {
                 const sim: string | null = content.selected_sim ?? null;
                 const capital = Number(cfgTurn.capital) || 0;
-                const frozen = await withDeadline(freezeTurn(cfgTurn, sim, now), DISPLAY_DEADLINE_MS, null);
+                const frozen = await withDeadline(freezeTurn(cfgTurn, sim, now, cfgTurn.started_at), DISPLAY_DEADLINE_MS, null);
                 lastTurnResult = frozen ?? {
                     // 데드라인 초과 = 원장이 멀쩡한데 조회가 느렸을 수도 있다 → ledger_unavailable과 구분
-                    id: cfgTurn.id, ended_at: now, sim, capital,
-                    pnl: null, by_tag: {}, degraded: 'timeout',
+                    id: cfgTurn.id, ended_at: now, started_at: cfgTurn.started_at, sim, capital,
+                    pnl: null, by_tag: {}, fees: null, degraded: 'timeout',
                 };
             }
             const next = { ...content, enabled: false, updated_at: now,
                 updated_by: (token as any).email || (token as any).name || 'user',
-                turn: null, last_turn_result: lastTurnResult };
+                turn: null, last_turn_result: lastTurnResult,
+                turn_history: lastTurnResult
+                    ? pushTurnHistory(content.turn_history, lastTurnResult)
+                    : (content.turn_history ?? []) };
             await putConfig(next, sha, 'program-trading: OFF (kill-switch)');
             return NextResponse.json({ success: true, enabled: false, selected_sim: next.selected_sim, budget: next.budget });
         }
@@ -360,8 +359,8 @@ export async function POST(request: Request) {
 
         const now = kstTimestamp();
 
-        // [턴 열기] ON 시점의 시세로 물려받은 보유 종목의 기준가를 스냅샷한다(MTM 리셋).
-        // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 현재가로 채워진다.
+        // [턴 열기] 기준가는 매입 평단이다(basisFromPositions 주석 참고) — 시세 조회가 필요 없어졌다.
+        // 잔고 조회가 실패해도 ON은 정상 진행 — 기준가는 파이썬 첫 실행 때 채워진다.
         // ON은 fail-open이지만 OFF와 같은 hang 노출이 있으므로 동일 데드라인을 건다.
         // (진행된 만큼만 turn에 반영되고, 나머지는 기본값 그대로 ON 진행)
         // IIFE는 turn을 in-place mutate하지 않고 값을 반환한다 — 이 await 완료 전에는
@@ -372,13 +371,8 @@ export async function POST(request: Request) {
             // 조회 실패/데드라인 초과 시 capital은 falsy(0)로 남긴다 — 그럴듯한 값을 지어내는 대신
             // 파이썬의 `cfg_turn.get('capital') or effective_budget` 폴백이 채우게 한다.
             const capital = ledgerOk ? budgetNum + realized_pnl : 0;   // 턴 시작 유효자본 = 이 턴에 실제로 굴릴 돈
-            const { prices } = await getLivePrices();
-            const basis: Record<string, number> = {};
-            for (const code of Object.keys(positions)) {
-                const px = Number(prices[code]) || 0;
-                if (px > 0) basis[code] = px;
-            }
-            return { capital, opening_basis: basis };
+            // 기준가는 매입 평단이다(basisFromPositions 주석 참고). 시세 조회가 필요 없어졌다.
+            return { capital, opening_basis: basisFromPositions(positions) };
         })(), DISPLAY_DEADLINE_MS, { capital: 0, opening_basis: {} });
 
         const turn: any = { id: new Date().toISOString(), started_at: now, capital: opened.capital, opening_basis: opened.opening_basis };

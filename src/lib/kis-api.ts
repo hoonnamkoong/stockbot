@@ -579,15 +579,47 @@ export function matchRealizedRoi(
  * `종목코드_매매일자(yyyymmdd)` 키의 버킷 Map으로 반환한다.
  * 모의투자 미지원/조회 실패 시 빈 Map(→ 전체 "측정 불가").
  */
+/**
+ * 조회 결과를 화면이 쓸 형태로 접는다.
+ *
+ * 이 함수의 존재 이유는 **'측정 불가'와 '0원'을 가르는 것**이다:
+ *   - ok=false → 조회 실패. 화면은 '측정 불가'.
+ *   - ok=true, 버킷 없음 → 그 기간에 매도가 없었다. **0원이 정답이다.**
+ *   - ok=true, 버킷 있음 → 합산값.
+ *
+ * 예전에는 빈 Map 하나로 앞 두 경우를 표현해서, 판 게 없는 날에도 화면이
+ * '측정 불가'를 띄웠다. 그러면 진짜 조회 실패를 알아챌 방법이 사라진다 —
+ * 없는 것과 못 잰 것은 다르다.
+ */
+export function summarizeRealizedBuckets(
+    ok: boolean,
+    buckets: Map<string, ProfitEntry[]>,
+): { ok: boolean; total: number } {
+    if (!ok) return { ok: false, total: 0 };
+    let total = 0;
+    // Map 순회는 tsconfig target 때문에 for..of가 막힌다 — forEach로 합산.
+    buckets.forEach((entries) => {
+        entries.forEach((e) => { total += e.roiAmount; });
+    });
+    return { ok: true, total };
+}
+
 export async function getRealizedProfitBuckets(
     fromDateStr: string,
     toDateStr: string,
-): Promise<Map<string, ProfitEntry[]>> {
+): Promise<{ ok: boolean; buckets: Map<string, ProfitEntry[]> }> {
+    // **조회 실패와 '그 기간에 매도가 없음'을 반드시 가른다.**
+    // 예전에는 둘 다 빈 Map이라 호출부가 구분할 수 없었고, 화면은 매도가 정말
+    // 없는 날에도 '측정 불가'를 띄웠다 — 그러면 진짜 조회 실패를 알아챌 방법이
+    // 사라진다. Python 쪽(src/trade/realized_pnl.py)은 같은 구분을 이미 한다.
     const buckets = new Map<string, ProfitEntry[]>();
     try {
         const config = getKISConfig();
         if (config.IS_VIRTUAL) {
-            console.warn('[KIS-API] 모의투자: 기간별매매손익(TTTC8715R) 미지원 가능 → 실현손익 생략');
+            // 모의투자는 이 TR을 지원하지 않는다. 실패로 떨어뜨린다 — 0건으로
+            // 읽으면 '매도가 없었다'가 되어 없는 사실을 만든다.
+            console.warn('[KIS-API] 모의투자: 기간별매매손익(TTTC8715R) 미지원 → 측정 불가');
+            return { ok: false, buckets };
         }
         const token = await getAccessToken();
         const fullAccount = (config.ACCOUNT_NO || '').replace(/[-\s]/g, '').trim();
@@ -622,7 +654,7 @@ export async function getRealizedProfitBuckets(
 
         if (res.data.rt_cd !== '0') {
             console.error(`[KIS-API] 매매손익 조회 실패: ${res.data.msg1}`);
-            return buckets;
+            return { ok: false, buckets };
         }
 
         const output1: any[] = res.data.output1 || [];
@@ -645,11 +677,13 @@ export async function getRealizedProfitBuckets(
             const arr = buckets.get(key);
             if (arr) arr.push(entry); else buckets.set(key, [entry]);
         }
-        return buckets;
+        // 여기까지 왔으면 조회는 성공했다. buckets가 비어 있어도 그건
+        // '그 기간에 매도가 없었다'는 **확정된 사실**이지 측정 실패가 아니다.
+        return { ok: true, buckets };
     } catch (e: any) {
         const msg = e.response?.data?.msg1 || e.message;
         console.error('[KIS-API] getRealizedProfitBuckets Error:', msg);
-        return buckets; // 빈 Map → 측정 불가
+        return { ok: false, buckets };
     }
 }
 
@@ -729,7 +763,9 @@ export async function getRealTradeHistory(startDate?: string, endDate?: string):
         }));
 
         // 매도 건에 실현손익(roi %, roiAmount 원) 조인
-        const buckets = await getRealizedProfitBuckets(fromDateStr, toDateStr);
+        // 여기서는 ok를 따로 쓰지 않는다 — 조회가 실패하면 buckets가 비어
+        // matchRealizedRoi가 해당 매도 행에 roi를 안 붙인다(=값 없음).
+        const { buckets } = await getRealizedProfitBuckets(fromDateStr, toDateStr);
         return matchRealizedRoi(fills, buckets);
     } catch (e: any) {
         const msg = e.response?.data?.msg1 || e.message;

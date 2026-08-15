@@ -44,7 +44,17 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         return regime, 50.0 if bull_score is None else bull_score
 
     def get_universe(self):
-        """국면 연동 유니버스. BULL=KIS 등락률 상위 30, BEAR=인버스 ETF 고정, SIDEWAYS=공통 버즈."""
+        """국면 연동 유니버스. BULL=등락률 상위 30, BEAR=인버스 ETF 고정,
+        SIDEWAYS=시총 상위 100(중립).
+
+        SIDEWAYS는 `decide_sideways`(심5의 판단 함수)를 그대로 쓴다. 그래서
+        심5와 **같은 유니버스 문제를 그대로 물려받았다** — 버즈 후보로는
+        "박스권 저점"이 한 종목도 들어오지 않는다(2026-08-14 실측: 저점에 가장
+        가까운 종목조차 저점 대비 +24%, 기준은 +3%).
+
+        심5와 같은 중립 풀을 쓴다. 조회 실패는 None이다 — 빈 리스트면 '후보
+        없음'이 되어 그 국면 동안 아무것도 안 한다.
+        """
         regime, _ = self._read_regime()
         if regime == "BULL":
             try:
@@ -54,7 +64,11 @@ class Sim10OrchestratorSimulator(BaseSimulator):
                 return None
         if regime == "BEAR":
             return [dict(e) for e in INVERSE_UNIVERSE]
-        return None
+        try:
+            from src.data.market_cap_universe import fetch_top100
+            return fetch_top100(limit=100)
+        except Exception:
+            return None
 
     def _log_regime(self, regime, bull_score):
         today_str = get_kst_now().strftime("%Y-%m-%d")

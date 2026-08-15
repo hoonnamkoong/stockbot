@@ -134,6 +134,36 @@ class SidewaysSwingSimulator(BaseSimulator):
     def __init__(self, initial_cash=3000000):
         super().__init__("Sideways", initial_cash)
 
+    def get_universe(self):
+        """KOSPI 시총 상위 100 — **중립** 유니버스.
+
+        2026-08-14 실측으로 확정: 버즈 후보를 받는 동안 이 심은 매수가 0건이었다.
+
+            [레인지] 진입 없음 — 채널폭 통과 19개 중
+            저점에 가장 가까운 000660 저점 대비 +24.4% (기준 +3% 이내)
+
+        채널폭은 18~19개가 통과하는데 저점에 가장 가까운 종목조차 +24%다.
+        버즈 후보(인기·급등 종목)는 정의상 채널 저점 근처에 있을 수 없다 —
+        "박스권 저점 매수"에 "지금 뜨는 종목" 풀을 물린 셈이었다.
+
+        상승률/하락률 상위도 답이 아니다. 이 심은 "박스권 바닥에 **조용히**
+        앉아 있는 종목"을 원하는데, 그건 오늘 오른 쪽에도 내린 쪽에도 없다.
+        (하락률 상위는 `daily_change > -2.0` 게이트와도 정면 충돌한다.)
+
+        조회 실패는 None이다 — 빈 리스트로 돌려주면 '후보가 없다'가 되어
+        그날 이 심이 조용히 아무것도 안 한다. None이면 호출부가 파이프라인
+        후보를 그대로 쓴다.
+
+        채널(`range_history` 20일)은 `_enrich_universe`가 채운다 — 그 보강이
+        없던 동안에는 자체 유니버스를 달면 오히려 진입이 **구조적으로
+        불가능**해졌다(같은 날 고쳤다).
+        """
+        try:
+            from src.data.market_cap_universe import fetch_top100
+            return fetch_top100(limit=100)
+        except Exception:
+            return None
+
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)

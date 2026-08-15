@@ -36,7 +36,23 @@ POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% �
 ADX_MAX = 60.0
 
 
-def decide_bull_daytrade(view, candidates, current_prices):
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심3·심5·심9와 같은 방식).
+
+    2026-08-14: 체결강도 게이트를 고쳐 유니버스 30종목 중 25~27개가 통과하는데도
+    실전 계좌는 하루 종일 `sim4_bull_daytrading: 주문 없음`이었다. 어제 고친 건
+    필요조건이었지 충분조건이 아니었고, 뒤 게이트 중 무엇이 막는지는 로그에
+    아무것도 남지 않았다.
+
+    이 심은 **실전 계좌가 실제로 돌리는 심**이라 여기서 못 사면 그날 매매가
+    통째로 없다. 추측으로 임계값을 만지지 말고 먼저 센다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
+
+
+def decide_bull_daytrade(view, candidates, current_prices, funnel=None):
     """[Sim4-1] 단타 결정. 순수 함수 — 매매·상태 없음. Order 리스트 반환."""
     orders = []
     portfolio = view['portfolio']
@@ -89,26 +105,44 @@ def decide_bull_daytrade(view, candidates, current_prices):
             break
         code = stock['code']
         if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
-            continue
+            _fn(funnel, code, 'held_or_cooldown'); continue
         price = float(stock.get('price', 0))
         amount = float(stock.get('amount', 0))
-        if price <= 0 or amount < 3_000_000_000:
-            continue
+        if price <= 0:
+            _fn(funnel, code, 'no_price'); continue
+        if amount < 3_000_000_000:
+            _fn(funnel, code, 'amount', amount=amount); continue
         sparkline = stock.get('sparkline_price', [])
-        adx = _adx(sparkline) if sparkline else 0.0
-        if adx < 20.0 or adx >= ADX_MAX:
-            continue
+        if not sparkline:
+            _fn(funnel, code, 'no_sparkline'); continue
+        adx = _adx(sparkline)
+        if adx < 20.0:
+            _fn(funnel, code, 'adx_low', adx=adx); continue
+        if adx >= ADX_MAX:
+            _fn(funnel, code, 'adx_high', adx=adx); continue
         period_change = _period_change(sparkline)
         daily_change = _parse_change_rate(stock)
         has_inst = (stock.get('orgn_fake_ntby_qty', 0) > 0 or stock.get('frgn_fake_ntby_qty', 0) > 0)
-        if (5.0 <= period_change <= 40.0 and daily_change > 0 and 20.0 <= adx < ADX_MAX
-                and _validate_tick(stock, 120.0, outage=tick_outage) and has_inst):
-            qty = int(target_amount / price)
-            if qty > 0:
-                orders.append({'action': 'BUY', 'code': code, 'name': stock['name'], 'price': price,
-                               'quantity': qty, 'cooldown': None,
-                               'reason': f"[단타] 탑승 (기간 {period_change:.1f}%, ADX {adx:.1f}, 기관{stock.get('orgn_fake_ntby_qty',0):+,}/외인{stock.get('frgn_fake_ntby_qty',0):+,})"})
-                held += 1
+        # 예전엔 아래 다섯을 한 `if`로 묶어 두어, 통과 못 하면 **무엇 때문인지
+        # 알 수 없었다.** 2026-08-14: 체결강도 게이트를 고쳐 25~27/30이 통과하는데도
+        # 하루 종일 `주문 없음`이었는데, 어느 조건에서 죽는지 로그에 아무것도
+        # 남지 않았다. 조건을 쪼개서 센다.
+        if not (5.0 <= period_change <= 40.0):
+            _fn(funnel, code, 'period', period=period_change, adx=adx); continue
+        if daily_change <= 0:
+            _fn(funnel, code, 'daily_down', daily=daily_change, adx=adx); continue
+        if not _validate_tick(stock, 120.0, outage=tick_outage):
+            _fn(funnel, code, 'tick', tick=stock.get('tick_power', 0), adx=adx); continue
+        if not has_inst:
+            _fn(funnel, code, 'no_inst', adx=adx, period=period_change); continue
+        qty = int(target_amount / price)
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+        else:
+            orders.append({'action': 'BUY', 'code': code, 'name': stock['name'], 'price': price,
+                           'quantity': qty, 'cooldown': None,
+                           'reason': f"[단타] 탑승 (기간 {period_change:.1f}%, ADX {adx:.1f}, 기관{stock.get('orgn_fake_ntby_qty',0):+,}/외인{stock.get('frgn_fake_ntby_qty',0):+,})"})
+            held += 1
     return orders
 
 
@@ -133,7 +167,38 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_bull_daytrade(self._view(current_prices), candidates, current_prices)
+        funnel = []
+        orders = decide_bull_daytrade(self._view(current_prices), candidates,
+                                      current_prices, funnel=funnel)
+        self._log_funnel(candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, orders) -> None:
+        """게이트별 탈락 분포. 이 심은 실전 계좌가 실제로 돌리는 심이라,
+        여기서 못 사면 그날 매매가 통째로 없다.
+
+        2026-08-14: 체결강도 게이트를 고쳐 30종목 중 25~27개가 통과하는데도
+        하루 종일 `주문 없음`이었다. 뒤 게이트 다섯이 한 `if`로 묶여 있어
+        무엇이 막는지 알 수 없었다.
+
+        진단이 심을 죽이면 안 되니 통째로 삼킨다.
+        """
+        try:
+            from collections import Counter
+            if not funnel and not orders:
+                return
+            c = Counter(f['reason'] for f in funnel)
+            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
+            print(f"[Sim4-1 깔때기] 후보 {len(candidates)} → 매수 {len(orders)} | 탈락: {parts}")
+            # ADX까지 통과한(=셋업이 살아 있는) 종목이 어디서 죽는지 본다.
+            deep = [f for f in funnel
+                    if f['reason'] in ('period', 'daily_down', 'tick', 'no_inst', 'qty_zero')]
+            for f in deep[:5]:
+                print(f"   {f['code']} 탈락={f['reason']} "
+                      f"ADX={f.get('adx', 0):.1f} 기간={f.get('period', 0):.1f}% "
+                      f"당일={f.get('daily', 0):.1f}% 체결강도={f.get('tick', 0)}")
+        except Exception as e:
+            print(f'[Sim4-1 깔때기] 기록 실패(무시): {e}')

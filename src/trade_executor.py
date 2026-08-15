@@ -126,8 +126,14 @@ def save_reservations(reservations: list) -> None:
 import csv
 import io
 
+# `status`는 마지막 컬럼이다 — 기존 파일의 8칸 행이 그대로 유효하게 읽히도록.
+# pending(주문 접수) / filled(체결 확인) 두 값을 쓴다. 예전에는 이 구분이 없어
+# 미체결 주문이 체결과 똑같이 한 줄로 남았다(2026-08-12: 001210이 7번 주문
+# 0체결인데 CSV엔 매수 7건). 지우지 않고 filled 행을 덧붙인다 — 이 파일은
+# writer가 둘(trading.yml·scraper.yml)이라 read-modify-write를 하면 lost update가
+# 난다(alert_dedup.json에서 이미 겪었다).
 TRADE_HISTORY_HEADER = ["timestamp", "symbol", "action", "price", "quantity",
-                        "total_amount", "roi", "reason"]
+                        "total_amount", "roi", "reason", "status"]
 
 
 def _csv_line(values: list) -> str:
@@ -136,7 +142,7 @@ def _csv_line(values: list) -> str:
     return buf.getvalue()
 
 
-def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[실전] KIS 체정 후 수동 기록", roi=None):
+def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[실전] KIS 체정 후 수동 기록", roi=None, status="filled"):
     filepath = os.path.join(_REPO_ROOT, 'data', 'trade_history_real.csv')
     file_exists = os.path.exists(filepath)
     now_kst = datetime.now() # KST 기준 (로컬 실행 시)
@@ -152,6 +158,7 @@ def append_trade_history_csv(side, code, qty, price, name="Unknown", reason="[�
         f"{total_amount:,.0f}",
         roi_str,
         reason,
+        status,
     ]
 
     with open(filepath, 'a', encoding='utf-8-sig', newline='') as f:
@@ -258,6 +265,8 @@ def append_order_history(record: dict) -> None:
             f"chore: order {record.get('side', '')} {record.get('code', '')}"),
         'order_history.json')
     # CSV에도 동시 기록 (ROI 포함)
+    # status를 그대로 넘긴다. 매수는 주문 접수 시 pending으로 들어오고,
+    # 체결이 확인되면 settle_pending_orders가 filled 행을 따로 덧붙인다.
     append_trade_history_csv(
         side=side,
         code=record.get('code', ''),
@@ -265,7 +274,8 @@ def append_order_history(record: dict) -> None:
         price=record.get('price', 0),
         name=record.get('name', 'Unknown'),
         roi=roi,
-        reason=record.get('reason', '[실전] KIS 체결 기록')
+        reason=record.get('reason', '[실전] KIS 체결 기록'),
+        status=record.get('status', 'filled'),
     )
 
 

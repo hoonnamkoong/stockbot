@@ -46,7 +46,7 @@ def register_pending(ledger, code, odno, side, qty, price, ordered_at,
     }
 
 
-def reconcile_pending(ledger, lookups, today):
+def reconcile_pending(ledger, lookups, today, on_fill=None):
     """조회 결과로 pending을 정산한다. 반환은 취소해야 할 주문 목록.
 
     `lookups`에 없는 주문번호는 UNKNOWN으로 본다 — 조회하지 못한 것을
@@ -59,6 +59,11 @@ def reconcile_pending(ledger, lookups, today):
     반영한 누적량)를 pending 항목에 들고 다니며, 이번 조회 - 이미 반영분
     만큼만 새로 반영한다. 복원하는 쪽(settle_pending_orders)이 반환된
     `applied_qty`를 pending에 이어 붙여야 이 불변식이 유지된다.
+
+    `on_fill(code, qty, price, entry)`: 매수 체결이 **새로** 반영될 때 부른다.
+    이 모듈은 I/O를 하지 않으므로, 실거래 이력에 남기는 일은 호출부가 맡는다.
+    주문 접수와 체결을 같은 줄로 적으면 미체결이 체결처럼 보인다(2026-08-12:
+    001210이 7번 주문 0체결인데 이력엔 매수 7건).
     """
     pend = ledger.setdefault('pending_orders', {})
     positions = ledger.setdefault('positions', {})
@@ -79,6 +84,9 @@ def reconcile_pending(ledger, lookups, today):
             new_fill = filled_qty - already_applied
             if new_fill > 0:
                 _enter_position(positions, code, p, new_fill, fill_px, today)
+                if on_fill:
+                    # 실측 체결가·수량으로 남긴다. 주문가가 아니다.
+                    on_fill(code, new_fill, fill_px, p)
             if filled_qty < ordered_qty:
                 # UNFILLED 응답은 filled_qty=0으로 온다 — 이전 사이클에서 이미
                 # 부분체결분을 반영했어도(already_applied) 그대로 0을 넘기면,

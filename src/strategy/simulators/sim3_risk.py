@@ -28,8 +28,8 @@ class SmartRiskSimulator(BaseSimulator):
     - Sim4(모멘텀)와 음의 상관 목표: 모멘텀 장에서 기회 적음, 조정/가치 장에서 기회 증가
     - 청산: +8% 익절 / -5% 손절 / 7일 타임스탑
     """
-    MAX_HOLDINGS = 6
-    POSITION_WEIGHT = 0.15  # 종목당 NAV 대비 비중 (0.15 × 6 = 최대 90% 투입)
+    MAX_HOLDINGS = 5
+    POSITION_WEIGHT = 0.19  # 종목당 NAV 대비 비중 (0.19 × 5 = 최대 95% 투입)
 
     def __init__(self, initial_cash=3000000):
         super().__init__("Risk", initial_cash)

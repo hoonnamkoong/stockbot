@@ -9,7 +9,9 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.strategy.simulators.sim2_spillover import SectorSpilloverSimulator
+from src.strategy.simulators.sim2_spillover import (
+    MAX_HOLDINGS, POSITION_WEIGHT, SectorSpilloverSimulator,
+)
 
 
 def _sim(tmp_path, portfolio=None, cash=3_000_000):
@@ -36,9 +38,9 @@ def _holding(code, qty=10, price=1000):
             'entry_date': '2026-08-03', 'peak_price': price, 'is_scaled_out': False}
 
 
-def test_stops_buying_at_six_holdings(tmp_path):
-    """보유 6종목이면 신호가 있어도 더 사지 않는다."""
-    held = {f'00000{i}': _holding(f'00000{i}') for i in range(1, 7)}
+def test_stops_buying_at_max_holdings(tmp_path):
+    """슬롯이 다 찼으면 신호가 있어도 더 사지 않는다."""
+    held = {f'00000{i}': _holding(f'00000{i}') for i in range(1, MAX_HOLDINGS + 1)}
     s = _sim(tmp_path, portfolio=held)
     prices = {c: 1000 for c in held}
 
@@ -46,25 +48,27 @@ def test_stops_buying_at_six_holdings(tmp_path):
 
     assert '111111' not in s.state['portfolio']
     assert '222222' not in s.state['portfolio']
-    assert len(s.state['portfolio']) == 6
+    assert len(s.state['portfolio']) == MAX_HOLDINGS
 
 
-def test_position_size_is_fifteen_percent_of_nav(tmp_path):
+def test_position_size_follows_the_weight_constant(tmp_path):
     """종목당 투입은 NAV의 15% — 10%씩 무제한이 아니다."""
     s = _sim(tmp_path)
 
     s.run([_candidate('111111', '신규A', price=1000)], {})
 
     pos = s.state['portfolio']['111111']
-    assert pos['quantity'] == 450  # 3,000,000 × 0.15 / 1,000
+    assert pos['quantity'] == int(3_000_000 * POSITION_WEIGHT / 1000)
 
 
-def test_six_positions_leave_cash_headroom(tmp_path):
-    """6종목을 다 채워도 현금이 남아야 한다(90% 투입)."""
+def test_full_slots_leave_cash_headroom(tmp_path):
+    """슬롯을 다 채워도 현금이 남아야 한다(버퍼)."""
     s = _sim(tmp_path)
-    cands = [_candidate(f'11111{i}', f'신규{i}', price=1000) for i in range(6)]
+    cands = [_candidate(f'11111{i}', f'신규{i}', price=1000) for i in range(MAX_HOLDINGS + 1)]
 
     s.run(cands, {})
 
-    assert len(s.state['portfolio']) == 6
-    assert s.state['cash'] > 3_000_000 * 0.08
+    assert len(s.state['portfolio']) == MAX_HOLDINGS
+    # 버퍼 = 1 - MAX_HOLDINGS × POSITION_WEIGHT. 상수에서 끌어온다.
+    buffer_ratio = 1 - MAX_HOLDINGS * POSITION_WEIGHT
+    assert s.state['cash'] > 3_000_000 * buffer_ratio * 0.9

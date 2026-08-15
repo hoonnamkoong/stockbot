@@ -1,6 +1,6 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from src.strategy.simulators.sim8_accumulation import decide_accumulation, MIN_SAMPLE
+from src.strategy.simulators.sim8_accumulation import POSITION_WEIGHT, decide_accumulation, MIN_SAMPLE
 
 
 def _view(portfolio, nav=3_000_000):
@@ -50,7 +50,8 @@ def test_accumulation_entry_takes_half_weight():
     cands = [_target()] + _filler()
     orders = decide_accumulation(_view({}), cands, {'T001': 900})
     b = [o for o in _buys(orders) if o['code'] == 'T001'][0]
-    assert b['quantity'] == int(3_000_000 * 0.075 / 900)
+    # 1단은 최종 비중의 절반이다(2단으로 나눠 채운다).
+    assert b['quantity'] == int(3_000_000 * POSITION_WEIGHT / 2 / 900)
 
 
 def test_no_entry_when_crowd_already_arrived():
@@ -101,7 +102,7 @@ def test_pyramiding_fills_remaining_weight():
     orders = decide_accumulation(_view(held), cands, {'T001': 1000})
     b = [o for o in _buys(orders) if o['code'] == 'T001']
     assert len(b) == 1 and '추가매수' in b[0]['reason']
-    assert b[0]['quantity'] == int((3_000_000 * 0.15 - 250 * 900) / 1000)
+    assert b[0]['quantity'] == int((3_000_000 * POSITION_WEIGHT - 250 * 900) / 1000)
 
 
 def test_no_pyramiding_when_weight_already_full():

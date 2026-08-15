@@ -3,6 +3,10 @@
 배경(2026-07-23): 라이브 실측에서 Sim3 5.7% / Sim5 5.0% / Sim4 63.3% / Sim7 47.9%로
 투입률이 낮았고, 원인은 전략 신호가 아니라 사이징 구조였다.
   A. MAX_HOLDINGS × 종목당 비중이 100%에 한참 못 미침 (Sim3 30%, Sim4 62.5%, Sim5 40%)
+[2026-08-15] 6종목 × 15% = 90% → **5종목 × 19% = 95%**로 조정. 버퍼를 10%에서
+5%로 줄이고 종목 수를 하나 줄여 건당 비중을 키웠다. 정수 절사 손실이 비싼
+주식에서 커지는데(45,050원 주식은 목표의 93.5%만 사용) 종목당 금액이 크면
+그 손실 비율이 줄어든다.
   B. Sim7만 분모가 '잔여 현금'이라 매수마다 복리로 감쇠 (5번째 픽 = 첫 픽의 60%)
   C. 분모가 initial_cash 고정이라 수익금이 영구 유휴 현금으로 남음
 여기서 A/B/C의 재발을 각각 잠근다.
@@ -61,9 +65,9 @@ CAPS = [
 
 
 @pytest.mark.parametrize("label,weight,max_holdings", CAPS)
-def test_max_deployment_reaches_90pct(label, weight, max_holdings):
+def test_max_deployment_reaches_95pct(label, weight, max_holdings):
     """상한이 90% 미만이면 그만큼 예수금이 구조적으로 잠긴다."""
-    assert weight * max_holdings == pytest.approx(0.90, abs=0.01), \
+    assert weight * max_holdings == pytest.approx(0.95, abs=0.01), \
         f"{label}: 최대 투입률 {weight * max_holdings:.0%} (목표 90%)"
 
 
@@ -120,22 +124,22 @@ def _range_candidates(n):
             for i in range(n)]
 
 
-def test_sim4_1_fills_to_90pct():
+def test_sim4_1_fills_to_95pct():
     cands = _momentum_candidates(10)
     orders = decide_bull_daytrade(_view(), cands, {c['code']: 1_000 for c in cands})
     buys = [o for o in orders if o['action'] == 'BUY']
     spent = sum(o['quantity'] * o['price'] for o in buys)
     assert len(buys) == sim4_bull_daytrading.MAX_HOLDINGS
-    assert spent / NAV == pytest.approx(0.90, abs=0.01)
+    assert spent / NAV == pytest.approx(0.95, abs=0.01)
 
 
-def test_sim5_fills_to_90pct():
+def test_sim5_fills_to_95pct():
     cands = _range_candidates(10)
     orders = decide_sideways(_view(), cands, {c['code']: 1_020 for c in cands})
     buys = [o for o in orders if o['action'] == 'BUY']
     spent = sum(o['quantity'] * o['price'] for o in buys)
     assert len(buys) == sim5_sideways_swing.MAX_HOLDINGS
-    assert spent / NAV == pytest.approx(0.90, abs=0.01)
+    assert spent / NAV == pytest.approx(0.95, abs=0.01)
 
 
 # ---------------------------------------------------------------- 원인 B: Sim7 복리 감쇠
@@ -148,4 +152,4 @@ def test_sim7_position_sizes_do_not_decay(tmp_path):
     costs = [p['quantity'] * p['avg_price'] for p in s.state['portfolio'].values()]
     assert len(costs) == sim7_report_follower.ReportFollowerSimulator.MAX_HOLDINGS
     assert max(costs) - min(costs) <= 1_000, f"매수액 감쇠 발생: {costs}"
-    assert sum(costs) / NAV == pytest.approx(0.90, abs=0.01)
+    assert sum(costs) / NAV == pytest.approx(0.95, abs=0.01)

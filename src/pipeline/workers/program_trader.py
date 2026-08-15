@@ -747,7 +747,24 @@ def settle_pending_orders(ledger, today, lookup, cancel, log, log_error,
     lookups = {p['odno']: lookup(p['odno']) for p in pend.values()}
     snapshot = {c: dict(p) for c, p in pend.items()}
 
-    for req in reconcile_pending(ledger, lookups, today):
+    def _record_fill(code, qty, price, entry):
+        """체결이 확정된 순간에만 실거래 이력에 filled 행을 남긴다.
+
+        주문 접수 시점에는 pending 행이 이미 들어가 있다(append_order_history).
+        지우지 않고 덧붙인다 — 이 파일은 writer가 둘이라 read-modify-write를
+        하면 lost update가 난다.
+        """
+        try:
+            from src.trade_executor import append_trade_history_csv
+            append_trade_history_csv(
+                side='buy', code=code, qty=qty, price=price,
+                name=(entry or {}).get('name', '') or code,
+                reason=f"[프로그램:{(entry or {}).get('tag') or ''}] 체결 확인",
+                status='filled')
+        except Exception as e:
+            log_error(f'[Program] 체결 이력 기록 실패(무시): {code} {e}')
+
+    for req in reconcile_pending(ledger, lookups, today, on_fill=_record_fill):
         code = req['code']
         action = _resting_decision(snapshot[code], code, quote, now_kst, log)
         if action == 'escalate':

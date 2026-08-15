@@ -135,11 +135,22 @@ def append_json_list(path: str, record: dict, message: str, log=print,
 
 
 def append_csv_row(path: str, row_line: str, header_line: str, message: str, log=print) -> bool:
-    """CSV 파일 끝에 한 줄을 덧붙인다. 파일이 없으면 헤더부터 만든다."""
+    """CSV 파일 끝에 한 줄을 덧붙인다. 파일이 없으면 헤더부터 만든다.
+
+    **헤더가 달라졌으면 헤더 줄을 갱신한다.** 예전에는 파일이 비었을 때만
+    헤더를 썼다 — 컬럼을 늘리면 기존 파일이 옛 헤더를 유지한 채 새 행만
+    길어져서, 읽는 쪽이 컬럼 이름을 잘못 짚는다. 컬럼은 **뒤에만** 추가한다는
+    규약이라(기존 행은 짧은 채로 유효) 헤더만 바꿔 끼우면 정합이 맞는다.
+    """
     def _t(current: str) -> str:
         if not current.strip():
             return f'﻿{header_line}\n{row_line}\n'
         base = current if current.endswith('\n') else current + '\n'
+        lines = base.split('\n')
+        if lines[0].lstrip('﻿') != header_line:
+            # 기존 행은 건드리지 않는다 — 짧은 행은 뒤 컬럼이 빈 것으로 읽힌다.
+            lines[0] = f'﻿{header_line}'
+            base = '\n'.join(lines)
         return base + row_line + '\n'
 
     return update_text(path, _t, message, log)

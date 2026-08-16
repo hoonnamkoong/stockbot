@@ -17,10 +17,25 @@ class SectorSpilloverSimulator(BaseSimulator):
         super().__init__("Spillover", initial_cash)
 
     def get_universe(self):
-        """코스피 외국인+기관 순매수 상위 30개 종목 (FHPTJ04400000)."""
+        """코스피 **외국인** 순매수 상위 30개 종목 (FHPTJ04400000, etc_cls='1').
+
+        2026-08-17까지 `etc_cls='0'`(외국인+기관 합산)을 썼다. 확정 일별 순매수
+        30거래일(7/3~8/14, 11,403 종목-일)로 재니 **기관이 역신호**였다 —
+        익일 시가→종가(수수료 후):
+
+            외국인 단독 상위   +0.20% (승률 53%)
+            기관 단독 상위     −0.82% (승률 40%)
+            합산 상위(구 방식)  −0.01% (승률 48%)   ← 기관이 외국인 신호를 상쇄
+
+            외인 매수 & 기관 매도  +0.08%
+            외인 매도 & 기관 매수  −0.84%   ← 최악
+
+        합산 순위는 두 신호를 평균 내 서로를 죽인다. 외국인만 본다.
+        ⚠ 표본이 30거래일뿐이고 8월(반등장)이 끌어올린 값이다 — 이력이 쌓이면 재측정할 것.
+        """
         try:
             from src.trade.kis_data_provider import KISDataProvider
-            return KISDataProvider().get_foreign_institution_rank(market='0001', etc_cls='0', limit=30)
+            return KISDataProvider().get_foreign_institution_rank(market='0001', etc_cls='1', limit=30)
         except Exception:
             return None
 
@@ -122,11 +137,13 @@ class SectorSpilloverSimulator(BaseSimulator):
         frgn_kis = stock_data.get('frgn_fake_ntby_qty', 0)
         orgn_kis = stock_data.get('orgn_fake_ntby_qty', 0)
         if frgn_kis != 0 or orgn_kis != 0:
-            # KIS 데이터 있음: 외인 OR 기관 순매수 양수면 각각 20점
+            # KIS 데이터 있음: **외인 순매수만** 본다(40점).
+            # 2026-08-17까지 외인 20점 + 기관 20점이었다. 확정 수급 30거래일 실측에서
+            # 기관 순매수 상위가 −0.82%(승률 40%)로 **역신호**였다 — 기관이 사는 것에
+            # 점수를 주면 지는 쪽에 가중치를 얹는 셈이다. 배점(40)은 아래 폴백 경로
+            # (foreign_change>0 → 40점)와 이미 같은 구조라 그쪽에 맞춘다.
             if frgn_kis > 0:
-                score += 20
-            if orgn_kis > 0:
-                score += 20
+                score += 40
         else:
             # KIS 데이터 없음: 네이버 foreign_change 폴백
             f_change = stock_data.get('foreign_change', 0)

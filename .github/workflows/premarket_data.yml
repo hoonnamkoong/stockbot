@@ -1,0 +1,122 @@
+name: Premarket Data Collection
+
+# 개장 전 데이터 적재 전용. **과거가 없는 데이터를 오늘부터 쌓는 것이 목적이다.**
+#
+# 왜 필요한가 (2026-08-16 실측):
+#   급등의 수익은 전부 '갭'에 있다. 개장 전 호재 뉴스가 뜨면 갭이 벌어지고
+#   시가→종가는 음수다. 즉 시가에 사면 이미 늦다. 갭이 만들어지는 과정을 볼 수
+#   있는 유일한 창이 NXT 프리마켓(08:00~08:50)인데, NXT는 REST 과거 조회가 없다
+#   (FID_COND_MRKT_DIV_CODE=NX는 0을 반환). 웹소켓 실시간만 존재한다.
+#   => 지금부터 적재하지 않으면 영원히 검증할 수 없다.
+#
+# 역할 분리 (기존 규칙 유지):
+#   - trading.yml / scraper.yml : 태스커 트리거
+#   - eod_data.yml              : 장 마감 후 cron
+#   - premarket_data.yml (이것) : 개장 전 cron. 매매하지 않는다. 수집만 한다.
+#
+# cron 지연 대응: GitHub cron은 발화가 수십 분 밀릴 수 있다. 마감 후 작업은
+# 무해했지만 프리마켓은 시각이 곧 데이터다. 그래서 **일찍 깨워 --start로 대기**한다.
+
+on:
+  schedule:
+    - cron: '20 22 * * 0-4'   # 22:20 UTC = KST 07:20 (밀려도 08:00 전에 붙도록 여유)
+  workflow_dispatch:
+    inputs:
+      until:
+        description: '수신 종료 시각 (HHMM, KST)'
+        required: false
+        default: '0850'
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+      KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+      KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests websockets beautifulsoup4
+
+      - name: Restore previous data (db-data)
+        run: |
+          git fetch origin db-data --depth=1 || true
+          git checkout origin/db-data -- data/ 2>/dev/null || echo "db-data 없음 — 첫 실행"
+
+      - name: 휴장일 게이트
+        id: gate
+        run: |
+          # 개장 여부는 KIS chk-holiday만 신뢰한다(holidays 패키지 금지, 판정불가≠개장).
+          python - <<'PY'
+          import datetime as dt, os, sys
+          sys.path.insert(0, os.getcwd())
+          from src.market_calendar import load_calendar, lookup
+          today = dt.date.today().strftime('%Y%m%d')
+          # lookup은 3값이다: True=개장 / False=휴장 / None=판정 불가.
+          # 매매였다면 None에서 멈춰야 하지만, 이건 **수집 전용**이라 휴장일에
+          # 돌아도 빈 파일이 남을 뿐 손해가 없다. 그래서 None은 진행으로 처리하고
+          # False(확정 휴장)에서만 건너뛴다.
+          state = lookup(load_calendar(), today)
+          print(f'{today} 개장 판정: {state}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'open={"false" if state is False else "true"}\n')
+          PY
+
+      - name: 유니버스 — 전일 거래대금 급증배수 상위 30
+        if: steps.gate.outputs.open == 'true'
+        run: |
+          # 급증배수 상위 30은 신호의 92%를 덮는다(2026-08-16 리콜 실측).
+          # 등락률 순위(현행 스크래퍼 방식)는 같은 30에서 83%에 그친다.
+          python scripts/fetch_kis_history.py universe --pages 4 -o data/premarket_universe_raw.csv
+          python scripts/fetch_kis_history.py daily \
+            --universe data/premarket_universe_raw.csv \
+            --from $(date -d '40 days ago' +%Y%m%d) --to $(date +%Y%m%d) \
+            -o data/premarket_daily.csv
+
+      - name: 개장 전 뉴스 적재 (급증배수 상위 30)
+        if: steps.gate.outputs.open == 'true'
+        run: |
+          # 뉴스는 건수가 아니라 내용이 가른다(2026-08-16). 분류는 나중에 바꿀 수
+          # 있으니 제목을 시각과 함께 원본으로 남긴다.
+          python - <<'PY'
+          import csv, statistics as st, sys
+          sys.path.insert(0, '.')
+          from scripts.collect_nxt_premarket import top_by_surge
+          rows = top_by_surge('data/premarket_daily.csv', 30)
+          with open('data/premarket_universe.csv', 'w', encoding='utf-8-sig', newline='') as f:
+              w = csv.writer(f); w.writerow(['code', 'name']); w.writerows(rows)
+          print(f'유니버스 {len(rows)}종목')
+          PY
+          python scripts/fetch_naver_news.py data/premarket_universe.csv \
+            $(date -d '7 days ago' +%Y.%m.%d) data/premarket_news_$(date +%Y%m%d).csv
+
+      - name: NXT 프리마켓 체결 적재 (08:00~08:50)
+        if: steps.gate.outputs.open == 'true'
+        run: |
+          python scripts/collect_nxt_premarket.py \
+            --daily data/premarket_daily.csv --top 30 \
+            --tr H0NXCNT0 --start 0800 --until "${{ github.event.inputs.until || '0850' }}"
+
+      - name: 커밋 (db-data)
+        if: steps.gate.outputs.open == 'true'
+        run: |
+          git config user.name  "StockBot"
+          git config user.email "bot@stockbot.com"
+          git fetch origin db-data --depth=1 || true
+          git checkout -B db-data origin/db-data 2>/dev/null || git checkout -B db-data
+          # 여러 경로를 한 줄로 add 하면 하나만 없어도 전체가 실패한다(2026-08-05 사고).
+          for f in data/nxt_*.csv data/premarket_daily.csv data/premarket_universe.csv data/premarket_news_*.csv; do
+            [ -e "$f" ] && git add "$f" || echo "없음: $f"
+          done
+          git diff --cached --quiet || git commit -m "data(premarket): $(date +%Y-%m-%d) NXT 프리마켓 적재"
+          git push origin db-data

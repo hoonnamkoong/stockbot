@@ -84,3 +84,6 @@ data/.lite_deploy_manifest
 data/.scraper_deploy_exclude
 # 알림 반복 억제 상태 — 원본은 db-data. main의 사본은 의미가 없다.
 data/alert_dedup.json
+
+# 백테스트 연구용 원시 시세(수십 MB). scripts/fetch_kis_history.py로 언제든 다시 받는다.
+output/research/

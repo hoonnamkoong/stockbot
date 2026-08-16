@@ -107,6 +107,13 @@ jobs:
           python scripts/fetch_naver_news.py data/premarket_universe.csv \
             $(date -d '7 days ago' +%Y.%m.%d) data/premarket_news_$(date +%Y%m%d).csv
 
+      - name: 투자자 수급 적재 (누적 — 30거래일 창이 계속 밀려난다)
+        if: steps.gate.outputs.open == 'true'
+        run: |
+          # FHKST01010900은 최근 30거래일만 준다. 오늘 안 받으면 오늘 것은 영원히 못 받는다
+          # (6월분을 그렇게 놓쳤다). 유니버스 400 전체로 받아 기존 파일에 누적한다.
+          python scripts/fetch_investor_flows.py             --universe data/premarket_universe_raw.csv -o data/investor_flows.csv
+
       - name: NXT 프리마켓 체결 적재 (08:00~08:50)
         if: steps.gate.outputs.open == 'true'
         run: |
@@ -123,7 +130,7 @@ jobs:
           git fetch origin db-data --depth=1 || true
           git checkout -B db-data origin/db-data 2>/dev/null || git checkout -B db-data
           # 여러 경로를 한 줄로 add 하면 하나만 없어도 전체가 실패한다(2026-08-05 사고).
-          for f in data/us_daily.csv data/nxt_*.csv data/premarket_daily.csv data/premarket_universe.csv data/premarket_news_*.csv; do
+          for f in data/us_daily.csv data/investor_flows.csv data/nxt_*.csv data/premarket_daily.csv data/premarket_universe.csv data/premarket_news_*.csv; do
             [ -e "$f" ] && git add "$f" || echo "없음: $f"
           done
           git diff --cached --quiet || git commit -m "data(premarket): $(date +%Y-%m-%d) 프리마켓·미국지수 적재"

@@ -236,6 +236,17 @@ class GapFadeSimulator(BaseSimulator):
             from collections import Counter
             if not funnel and not orders:
                 return
+            # 파일로도 남긴다. print는 Actions 로그에만 남아 며칠 뒤엔 못 찾는다 —
+            # 심1이 `sim1_diag_*.csv`로 남기는 것과 같은 이유다(2026-08-17).
+            # 이 심은 진입 창이 14:30~15:20뿐이라 "그 창에 후보가 조건에 닿았는가"를
+            # 사후에 확인할 방법이 이것밖에 없다.
+            try:
+                from src.data import sim_diag
+                sim_diag.append('sim9', [dict(f, decision='skip') for f in funnel]
+                                + [dict(code=o.get('code'), reason='entry', decision='entry')
+                                   for o in orders], log=lambda *_: None)
+            except Exception:
+                pass
             c = Counter(f['reason'] for f in funnel)
             passed_gap = [f for f in funnel if f['reason'] not in ('held_or_cooldown',
                                                                   'no_ohlc', 'amount', 'gap')]

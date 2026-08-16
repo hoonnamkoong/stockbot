@@ -42,6 +42,14 @@ class SmartRiskSimulator(BaseSimulator):
         except Exception:
             return None
 
+    def _ttm_valuation(self, code, price):
+        """TTM PER/PBR. 조회가 실패하면 빈 dict — 0으로 채워 '싸다'로 오판하지 않는다."""
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_ttm_valuation(code, price)
+        except Exception:
+            return {}
+
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         candidate_map = {s['code']: s for s in candidates}
@@ -111,10 +119,23 @@ class SmartRiskSimulator(BaseSimulator):
             if price <= 0: _fn(funnel, code, 'no_price'); continue
             if amount < 5_000_000_000: _fn(funnel, code, 'amount', amount=amount); continue  # 50억 유동성
 
-            # PER/PBR 데이터 없으면 진입 제외 (안전 우선)
-            stock_per = float(stock.get('per', 0))
-            stock_pbr = float(stock.get('pbr', 0))
-            if stock_per <= 0 and stock_pbr <= 0: _fn(funnel, code, 'no_per_pbr'); continue
+            # PER/PBR은 **TTM 기준**으로 다시 계산한다.
+            # KIS `inquire-price`의 per/pbr은 직전 **연간 결산** EPS·BPS 기준이라
+            # 실적이 개선된 종목을 비싸게 보이게 한다(2026-08-17 실측: 삼성전자
+            # 41.82 vs TTM 22.19, SK하이닉스 27.90 vs 15.89). 섹터 평균(sector_cache)은
+            # 외부 통계라 TTM 기준인데 종목만 연간 기준이면, **실적 개선주는 비싸 보여
+            # 걸러지고 정체주가 싸 보여 뽑힌다** — 저평가 필터가 정확히 반대로 작동한다.
+            # 계산 실패는 0으로 남긴다(그 축은 판정에서 빠진다). 폴백으로 연간 값을
+            # 쓰면 편향이 그대로 돌아온다.
+            # 후보에 이미 TTM 값이 실려 있으면 그걸 쓴다(조회 절약·테스트 주입).
+            if stock.get('per_ttm') or stock.get('pbr_ttm'):
+                stock_per = float(stock.get('per_ttm') or 0)
+                stock_pbr = float(stock.get('pbr_ttm') or 0)
+            else:
+                val = self._ttm_valuation(code, price)
+                stock_per = val.get('per_ttm', 0.0)
+                stock_pbr = val.get('pbr_ttm', 0.0)
+            if stock_per <= 0 and stock_pbr <= 0: _fn(funnel, code, 'no_ttm_val'); continue
 
             # 업종 평균 조회
             sector_name = stock.get('sector_name', '')
@@ -143,7 +164,7 @@ class SmartRiskSimulator(BaseSimulator):
             qty = int(target_amount / price)
             if qty > 0:
                 reason = (
-                    f"[가치페어] 업종 저평가 진입 "
+                    f"[가치페어] 업종 저평가 진입(TTM) "
                     f"(PER {stock_per:.1f}x / 섹터 {avg_per:.1f}x, "
                     f"PBR {stock_pbr:.2f}x / 섹터 {avg_pbr:.2f}x, "
                     f"ADX {adx:.1f}, 섹터: {sector_name})"

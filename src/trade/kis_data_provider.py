@@ -310,6 +310,75 @@ class KISDataProvider:
         return result
 
     # ──────────────────────────────────────────────────
+    # 2-b. TTM 밸류에이션 (최근 4분기 EPS 기준 PER/PBR)
+    # ──────────────────────────────────────────────────
+    def get_ttm_valuation(self, code: str, price: float) -> dict:
+        """최근 4분기(TTM) EPS와 **최근 분기** BPS로 PER/PBR을 계산한다.
+
+        왜 필요한가 (2026-08-17 실측): `inquire-price`가 주는 `per`/`pbr`은
+        **직전 연간 결산** EPS·BPS 기준이라, 실적이 개선된 종목을 비싸게 보이게 한다.
+
+            삼성전자   KIS per 41.82 (EPS 6,564=연간)  vs  TTM 22.19 (EPS 12,372)
+            SK하이닉스 KIS per 27.90                   vs  TTM 15.89
+            현대차     KIS per 12.82                   vs  TTM 13.97  ← 반대로 낮게
+
+        심3은 "PER이 섹터 평균의 80% 이하 = 저평가"로 진입하는데, 섹터 평균
+        (`sector_cache`)은 외부 통계라 TTM 기준이다. 종목만 연간 기준이면
+        **실적 개선주는 비싸 보여 걸러지고 정체주가 싸 보여 뽑힌다.**
+
+        분기 재무비율(FHKST66430300, FID_DIV_CLS_CODE='1')은 **연내 누적**으로 온다.
+        그래서 TTM = 최근분기누적 + (직전연간 − 직전년도 같은분기 누적).
+        삼성전자 검증: 6,993 + (6,564 − 1,186) = 12,371 (네이버 TTM 12,372과 일치).
+
+        실패하면 빈 dict를 준다 — 0으로 채우면 "싸다"로 오판된다.
+        """
+        key = f"ttm_val_{code}"
+        cached = self._get_disk_cached(key, self.TTL_FINANCIAL)
+        if cached is None:
+            body = self._get(
+                "/uapi/domestic-stock/v1/finance/financial-ratio",
+                "FHKST66430300",
+                {"FID_INPUT_ISCD": code, "FID_DIV_CLS_CODE": "1",
+                 "FID_COND_MRKT_DIV_CODE": "J"},
+            )
+            rows = body.get("output") or body.get("output1") or []
+            cached = self._ttm_from_quarters(rows if isinstance(rows, list) else [rows])
+            self._set_disk_cache(key, cached)
+
+        eps, bps = cached.get("eps_ttm", 0.0), cached.get("bps", 0.0)
+        out = dict(cached)
+        out["per_ttm"] = round(price / eps, 2) if eps > 0 and price > 0 else 0.0
+        out["pbr_ttm"] = round(price / bps, 2) if bps > 0 and price > 0 else 0.0
+        return out
+
+    @staticmethod
+    def _ttm_from_quarters(rows: list) -> dict:
+        """분기 누적 EPS 목록 → TTM EPS + 최근 BPS. 계산 불가면 0."""
+        periods = {}
+        for r in rows:
+            ym = str(r.get("stac_yymm") or "").strip()
+            if len(ym) == 6:
+                periods[ym] = r
+        if not periods:
+            return {"eps_ttm": 0.0, "bps": 0.0}
+        latest = max(periods)
+        cur = periods[latest]
+        eps_cur = KISDataProvider._to_float(cur.get("eps", 0))
+        bps = KISDataProvider._to_float(cur.get("bps", 0))
+
+        year, month = int(latest[:4]), latest[4:]
+        if month == "12":
+            return {"eps_ttm": eps_cur, "bps": bps}      # 이미 연간 누적이다
+        prev_fy = periods.get(f"{year - 1}12")
+        prev_same = periods.get(f"{year - 1}{month}")
+        if not prev_fy or not prev_same:
+            return {"eps_ttm": 0.0, "bps": bps}          # 조각이 없으면 만들지 않는다
+        eps_ttm = (eps_cur
+                   + KISDataProvider._to_float(prev_fy.get("eps", 0))
+                   - KISDataProvider._to_float(prev_same.get("eps", 0)))
+        return {"eps_ttm": round(eps_ttm, 2), "bps": bps}
+
+    # ──────────────────────────────────────────────────
     # 3. 재무 안정성비율 (부채비율 등)
     # ──────────────────────────────────────────────────
     def get_finance_stability_ratio(self, code: str) -> dict:

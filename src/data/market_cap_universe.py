@@ -36,7 +36,16 @@ _PER_PAGE = 50
 
 
 def parse_rows(html: bytes) -> list[dict]:
-    """시총 페이지 1장 → [{code, name, price}]. 파싱 실패 행은 버린다."""
+    """시총 페이지 1장 → [{code, name, price, amount, change_rate}]. 파싱 실패 행은 버린다.
+
+    ⚠ `amount`(거래대금)와 `change_rate`는 2026-08-17에 추가했다. 그전까지
+    `{code, name, price}`만 돌려줬는데, **심5는 `amount < 10억`이면 `continue`**라
+    키가 없으면 `get('amount', 0)` → 0 → **후보 99종목이 전부 첫 게이트에서 탈락**했다.
+    실제로 심5는 배포 이래 거래 0건, 현금 200만원 그대로였다.
+
+    이 페이지는 거래**대금**이 아니라 거래**량**을 준다(td[9]). 거래대금은
+    현재가 × 거래량으로 만든다 — `get_fluctuation_rank`가 쓰는 방식과 같다.
+    """
     soup = BeautifulSoup(html.decode('euc-kr', 'replace'), 'html.parser')
     table = soup.select_one('table.type_2')
     if not table:
@@ -58,7 +67,21 @@ def parse_rows(html: bytes) -> list[dict]:
             continue
         if price <= 0:
             continue
-        out.append({'code': code, 'name': tag.get_text(strip=True), 'price': price})
+        row_out = {'code': code, 'name': tag.get_text(strip=True), 'price': price}
+        # 거래량(td[9]) → 거래대금. 못 읽으면 키를 넣지 않는다 — 0을 넣으면
+        # "유동성 0"으로 오판되어 유동성 게이트를 쓰는 심이 전량 탈락한다.
+        if len(cols) > 9:
+            try:
+                vol = int(cols[9].get_text(strip=True).replace(',', ''))
+                if vol > 0:
+                    row_out['amount'] = price * vol
+            except ValueError:
+                pass
+        if len(cols) > 4:
+            rate = cols[4].get_text(strip=True)
+            if rate:
+                row_out['change_rate'] = rate
+        out.append(row_out)
     return out
 
 

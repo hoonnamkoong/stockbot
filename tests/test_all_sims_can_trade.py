@@ -161,8 +161,12 @@ def test_sim2_spillover_can_buy(tmp_path):
 def test_sim3_value_can_buy(tmp_path):
     from src.strategy.simulators.sim3_risk import SmartRiskSimulator
     s = _sim(SmartRiskSimulator, tmp_path)
+    # per/pbr이 아니라 **per_ttm/pbr_ttm**을 준다. 2026-08-17에 심3의 밸류에이션
+    # 기준을 연간 결산 → TTM으로 바꿨다(연간 기준은 실적 개선주를 비싸게 보이게 해
+    # 저평가 필터가 반대로 작동했다). 후보에 TTM이 없으면 심3이 KIS를 조회하는데,
+    # 테스트에서 네트워크를 타면 안 되므로 여기서 주입한다.
     cands = [{'code': f'{i:06d}', 'name': f'가치{i}', 'price': 1000,
-              'amount': 50_000_000_000, 'per': 5.0, 'pbr': 0.5,
+              'amount': 50_000_000_000, 'per_ttm': 5.0, 'pbr_ttm': 0.5,
               'sector_name': '반도체', 'sparkline_price': list(ZIGZAG)}
              for i in range(s.MAX_HOLDINGS + 3)]
 

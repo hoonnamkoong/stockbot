@@ -119,8 +119,26 @@ def crowd_reference(data_dir):
 
     읽지 못하면 (빈 dict, None)이다. 중앙값이 None이면 '군중 미도달'을 판정할
     수 없다는 뜻이고, 호출부는 매집을 하지 않는다(없는 근거로 사지 않는다).
+
+    ⚠ **신선도를 반드시 검사한다.** 파일이 낡아도 값은 멀쩡히 들어 있어서
+    fail-closed가 걸리지 않고 **옛 기준선으로 조용히 판정**한다. 2026-08-17에
+    로컬에 5월자 파일(2종목)이 남아 있는 것을 확인했다 — 그대로면 '군중 미도달'이
+    3개월 전 분포로 결정된다. 파일 mtime은 못 쓴다(CI 체크아웃이 갱신한다).
+    같은 순간에 쓰이는 `status.json`의 `last_updated`를 본다.
+    (심0의 breadth가 stale CSV로 18일 박제됐던 것과 같은 유형이다.)
     """
     import json
+    from datetime import datetime, timedelta, timezone
+    try:
+        with open(os.path.join(data_dir, 'status.json'), encoding='utf-8-sig') as f:
+            updated = str(json.load(f).get('last_updated', ''))[:10]
+        today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
+        if updated != today:
+            print(f'[Sim8] 버즈 기준선이 낡았다(status.json {updated or "없음"} ≠ {today}) — 매집 보류')
+            return {}, None
+    except Exception as e:
+        print(f'[Sim8] 버즈 기준선 신선도 확인 실패: {e} — 매집 보류')
+        return {}, None
     try:
         with open(os.path.join(data_dir, 'latest_stocks.json'), encoding='utf-8-sig') as f:
             rows = json.load(f)

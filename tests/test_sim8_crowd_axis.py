@@ -16,6 +16,7 @@
 순위 유니버스 종목이 버즈 목록에 아예 없다는 것은 지어낸 값이 아니라 측정이다
 — 그 종목은 사람들이 글을 안 쓰고 있다.
 """
+import datetime
 import json
 import os
 import sys
@@ -58,12 +59,28 @@ def _prices(cands):
 
 
 # ── 관심 기준선 산출 ───────────────────────────────────────
+
+
+def _write_buzz(d, rows, updated=None):
+    """latest_stocks.json + status.json을 같이 쓴다.
+
+    2026-08-17: crowd_reference가 **신선도를 검사**하도록 바뀌었다. 낡은 파일은
+    값이 멀쩡히 들어 있어 fail-closed가 안 걸리고 옛 기준선으로 조용히 판정한다
+    (로컬에 5월자 파일이 남아 있는 것을 실제로 확인했다). 신선도 근거는 같은
+    순간에 쓰이는 status.json의 last_updated다 — 파일 mtime은 CI 체크아웃이
+    갱신해 버려 못 쓴다.
+    """
+    with open(os.path.join(d, 'latest_stocks.json'), 'w', encoding='utf-8') as f:
+        json.dump(rows, f)
+    stamp = updated or datetime.datetime.now().strftime('%Y-%m-%d 09:05:00')
+    with open(os.path.join(d, 'status.json'), 'w', encoding='utf-8') as f:
+        json.dump({'last_updated': stamp, 'stock_count': len(rows)}, f)
+
 def test_crowd_reference_reads_buzz_file():
     with tempfile.TemporaryDirectory() as d:
-        with open(os.path.join(d, 'latest_stocks.json'), 'w', encoding='utf-8') as f:
-            json.dump([{'code': 'A', 'unique_posters': 10},
-                       {'code': 'B', 'unique_posters': 30},
-                       {'code': 'C', 'unique_posters': 50}], f)
+        _write_buzz(d, [{'code': 'A', 'unique_posters': 10},
+                        {'code': 'B', 'unique_posters': 30},
+                        {'code': 'C', 'unique_posters': 50}])
         attention, median = crowd_reference(d)
         assert attention == {'A': 10, 'B': 30, 'C': 50}
         assert median == 30
@@ -77,8 +94,28 @@ def test_crowd_reference_returns_none_when_unreadable():
 
 def test_crowd_reference_ignores_rows_without_attention():
     with tempfile.TemporaryDirectory() as d:
+        _write_buzz(d, [{'code': 'A'}, {'code': 'B', 'unique_posters': 0}])
+        assert crowd_reference(d) == ({}, None)
+
+
+def test_crowd_reference_rejects_stale_buzz_file():
+    """낡은 기준선으로는 판정하지 않는다 — 값이 들어 있어도 어제 것이면 보류다.
+
+    이게 없으면 스크래퍼가 죽어도 심8은 옛 분포로 '군중 미도달'을 판정한다.
+    fail-closed가 안 걸리는 게 이 유형의 무서운 점이다.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        _write_buzz(d, [{'code': 'A', 'unique_posters': 10},
+                        {'code': 'B', 'unique_posters': 30}],
+                    updated='2026-05-31 14:12:16')
+        assert crowd_reference(d) == ({}, None)
+
+
+def test_crowd_reference_rejects_when_status_missing():
+    """status.json이 없으면 신선도를 모른다 = 판정 불가."""
+    with tempfile.TemporaryDirectory() as d:
         with open(os.path.join(d, 'latest_stocks.json'), 'w', encoding='utf-8') as f:
-            json.dump([{'code': 'A'}, {'code': 'B', 'unique_posters': 0}], f)
+            json.dump([{'code': 'A', 'unique_posters': 10}], f)
         assert crowd_reference(d) == ({}, None)
 
 
@@ -136,8 +173,7 @@ def test_run_injects_crowd_reference_into_view():
         sim.log_file = os.path.join(d, 'l.json')
         sim.csv_file = os.path.join(d, 't.csv')
         sim.reset_state()
-        with open(os.path.join(d, 'latest_stocks.json'), 'w', encoding='utf-8') as f:
-            json.dump([{'code': 'X', 'unique_posters': 40}], f)
+        _write_buzz(d, [{'code': 'X', 'unique_posters': 40}])
         cands = _cands()
         sim.run(cands, current_prices=_prices(cands))
         assert sim.state['portfolio'], 'run()이 기준선을 넣어주지 않아 매집이 막혔다'

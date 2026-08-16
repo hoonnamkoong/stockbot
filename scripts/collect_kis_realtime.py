@@ -1,4 +1,4 @@
-"""NXT 프리마켓 체결을 적재한다 — 개장 전에 관측 가능한 유일한 실거래.
+"""KIS 실시간(웹소켓)을 적재한다 — 프리마켓과 장중, 둘 다.
 
 왜 필요한가 (2026-08-16 실측): 급등의 수익은 **전부 갭에 있다.** 개장 전 뉴스가
 평소 대비 4배로 터지면 갭이 +1.30%로 벌어지고(평소 +0.17%) 시가→종가는 −0.79%다.
@@ -23,10 +23,23 @@
     # 일봉에서 전일 거래대금 급증배수 상위 30을 자동 선정
     PYTHONPATH=. python scripts/collect_nxt_premarket.py --daily output/research/daily400.csv --top 30
 
+## 왜 호가까지 받는가 (2026-08-17 실측)
+
+편향 없는 전수 표본(15거래일 × 394종목)에서 **거래대금·가격만으로는 "계속 갈 관심"과
+"곧 식을 관심"이 구분되지 않는다.** 관심 속도 상위 N을 실시간으로 뽑아 상승 중인
+것만 골라도 이후 30분이 −0.74~+0.04%로, 24개 조합 전부 수수료를 못 넘었다.
+청산 규칙 13종을 붙여도 전부 음수였다.
+
+거래대금은 **이미 체결된 것**(과거)이다. 호가 잔량은 **아직 체결 안 된 매수 의사**
+(미래)이고, 체결강도는 그 체결이 매수 호가에서 났는지 매도 호가에서 났는지를 가른다.
+셋 다 "이미 가격에 반영됨"의 바깥에 있는 정보다. 그리고 **전부 과거가 없다.**
+
 TR:
-    H0NXCNT0  NXT 실시간 체결   (기본)
+    H0STCNT0  KRX 실시간 체결       H0NXCNT0  NXT 실시간 체결
+    H0STASP0  KRX 실시간 호가       H0NXASP0  NXT 실시간 호가
     H0NXPGM0  NXT 실시간 프로그램매매
-    H0STCNT0  KRX 실시간 체결
+
+⚠ 구독 한도는 **TR×종목 총합**이 약 41건이다. TR 2개면 종목은 20개까지.
 """
 import argparse
 import asyncio
@@ -88,7 +101,7 @@ def read_universe(path):
         return [(r['code'], r.get('name', '')) for r in csv.DictReader(f)]
 
 
-async def collect(codes, tr_id, out_path, until_hhmm, key):
+async def collect(codes, tr_ids, out_path, until_hhmm, key):
     names = dict(codes)
     fields = ['recv_at', 'tr_id', 'code', 'raw']
     exists = os.path.exists(out_path)
@@ -101,13 +114,15 @@ async def collect(codes, tr_id, out_path, until_hhmm, key):
     n = 0
     try:
         async with websockets.connect(WS_URL, ping_interval=None, open_timeout=15) as ws:
-            for code, _ in codes:
-                await ws.send(json.dumps({
-                    'header': {'approval_key': key, 'custtype': 'P',
-                               'tr_type': '1', 'content-type': 'utf-8'},
-                    'body': {'input': {'tr_id': tr_id, 'tr_key': code}}}))
-                await asyncio.sleep(0.05)
-            print(f'{len(codes)}종목 구독 요청 완료 ({tr_id}). {until_hhmm}까지 수신.', flush=True)
+            for tr_id in tr_ids:
+                for code, _ in codes:
+                    await ws.send(json.dumps({
+                        'header': {'approval_key': key, 'custtype': 'P',
+                                   'tr_type': '1', 'content-type': 'utf-8'},
+                        'body': {'input': {'tr_id': tr_id, 'tr_key': code}}}))
+                    await asyncio.sleep(0.05)
+            print(f'{len(codes)}종목 × {len(tr_ids)}TR = {len(codes)*len(tr_ids)}건 구독 '
+                  f'({",".join(tr_ids)}). {until_hhmm}까지 수신.', flush=True)
 
             while True:
                 now = dt.datetime.now().strftime('%H%M')
@@ -151,7 +166,7 @@ def main():
     ap.add_argument('--universe', help='code[,name] CSV. 없으면 --daily에서 자동 선정')
     ap.add_argument('--daily', default='output/research/daily400.csv')
     ap.add_argument('--top', type=int, default=30, help='급증배수 상위 N종목')
-    ap.add_argument('--tr', default='H0NXCNT0', help='H0NXCNT0(NXT체결)/H0NXPGM0/H0STCNT0')
+    ap.add_argument('--tr', default='H0NXCNT0', help='콤마로 여러 개. 예: H0STCNT0,H0STASP0')
     ap.add_argument('--start', default='', help='이 시각(HHMM)까지 대기 후 시작. '
                                                 'GitHub cron은 발화가 밀리므로 일찍 깨워 여기서 맞춘다')
     ap.add_argument('--until', default='0850', help='이 시각(HHMM)까지 수신')
@@ -162,7 +177,9 @@ def main():
     if not codes:
         print('유니버스가 비었다', file=sys.stderr)
         return 1
-    codes = codes[:MAX_SUBSCRIBE]
+    tr_ids = [t.strip() for t in a.tr.split(',') if t.strip()]
+    # 한도는 TR×종목 총합이다. TR을 늘리면 종목을 줄여야 한다.
+    codes = codes[:max(1, MAX_SUBSCRIBE // len(tr_ids))]
     print('유니버스:', ', '.join(f'{n or c}' for c, n in codes[:10]),
           f'… (총 {len(codes)})')
 
@@ -174,8 +191,8 @@ def main():
             time.sleep(10)
         print(f'{a.start} 도달 — 수집 시작', flush=True)
 
-    out = a.out or os.path.join('data', f'nxt_{a.tr}_{dt.date.today():%Y%m%d}.csv')
-    asyncio.run(collect(codes, a.tr, out, a.until, approval_key()))
+    out = a.out or os.path.join('data', f'rt_{tr_ids[0]}_{dt.date.today():%Y%m%d}.csv')
+    asyncio.run(collect(codes, tr_ids, out, a.until, approval_key()))
     return 0
 
 

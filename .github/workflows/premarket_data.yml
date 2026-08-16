@@ -98,7 +98,7 @@ jobs:
           python - <<'PY'
           import csv, statistics as st, sys
           sys.path.insert(0, '.')
-          from scripts.collect_nxt_premarket import top_by_surge
+          from scripts.collect_kis_realtime import top_by_surge
           rows = top_by_surge('data/premarket_daily.csv', 30)
           with open('data/premarket_universe.csv', 'w', encoding='utf-8-sig', newline='') as f:
               w = csv.writer(f); w.writerow(['code', 'name']); w.writerows(rows)
@@ -110,7 +110,7 @@ jobs:
       - name: NXT 프리마켓 체결 적재 (08:00~08:50)
         if: steps.gate.outputs.open == 'true'
         run: |
-          python scripts/collect_nxt_premarket.py \
+          python scripts/collect_kis_realtime.py \
             --daily data/premarket_daily.csv --top 30 \
             --tr H0NXCNT0 --start 0800 --until "${{ github.event.inputs.until || '0850' }}"
 
@@ -127,4 +127,58 @@ jobs:
             [ -e "$f" ] && git add "$f" || echo "없음: $f"
           done
           git diff --cached --quiet || git commit -m "data(premarket): $(date +%Y-%m-%d) 프리마켓·미국지수 적재"
+          git push origin db-data
+
+  # 장중 호가·체결 적재. 거래대금·가격만으로는 "계속 갈 관심"과 "곧 식을 관심"이
+  # 구분되지 않는다는 것을 2026-08-17에 편향 없는 전수 표본으로 확인했다.
+  # 호가는 체결 **전**의 의사라 "이미 가격에 반영됨"의 바깥에 있다. 과거가 없으므로
+  # 지금부터 쌓는다. 매매하지 않는다 — 수집 전용.
+  intraday:
+    needs: collect
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+      KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+      KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests websockets beautifulsoup4
+
+      - name: Restore universe (db-data)
+        id: univ
+        run: |
+          git fetch origin db-data --depth=1 || true
+          git checkout origin/db-data -- data/ 2>/dev/null || true
+          if [ -e data/premarket_universe.csv ]; then echo "ok=true" >> $GITHUB_OUTPUT
+          else echo "ok=false" >> $GITHUB_OUTPUT; echo "유니버스 없음 — 휴장일이거나 앞 잡 실패"; fi
+
+      - name: 장중 체결+호가 적재 (09:00~11:30)
+        if: steps.univ.outputs.ok == 'true'
+        run: |
+          # 한도가 TR×종목이라 2TR이면 종목은 20개. 급증배수 상위 20이면
+          # 신호 리콜 83%(상위 30은 92%) — 한도와 맞바꾼 값이다.
+          python scripts/collect_kis_realtime.py \
+            --universe data/premarket_universe.csv \
+            --tr H0STCNT0,H0STASP0 --start 0900 --until 1130 \
+            -o data/rt_intraday_$(date +%Y%m%d).csv
+
+      - name: 커밋 (db-data)
+        if: steps.univ.outputs.ok == 'true'
+        run: |
+          git config user.name  "StockBot"
+          git config user.email "bot@stockbot.com"
+          git fetch origin db-data --depth=1 || true
+          git checkout -B db-data origin/db-data 2>/dev/null || git checkout -B db-data
+          for f in data/rt_intraday_*.csv; do
+            [ -e "$f" ] && git add "$f" || echo "없음: $f"
+          done
+          git diff --cached --quiet || git commit -m "data(intraday): $(date +%Y-%m-%d) 장중 호가·체결 적재"
           git push origin db-data

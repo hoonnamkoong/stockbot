@@ -30,7 +30,7 @@ import os
 import statistics as st
 
 R = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'output', 'research')
-FEE_PCT = 0.18          # 왕복 수수료+세금 근사(%)
+FEE_PCT = 0.18          # 왕복 수수료+세금 근사(%%)
 KOSPI_ETF = '069500'
 KOSDAQ_ETF = '229200'
 LAST_CONTINUOUS = '1519'   # 15:20~15:30은 종가 동시호가라 연속 체결이 없다
@@ -41,6 +41,13 @@ def _elapsed(a, b):
     return (int(b[:2]) * 60 + int(b[2:])) - (int(a[:2]) * 60 + int(a[2:]))
 
 
+def _rise_over(bars, i, window):
+    """직전 window개 봉 동안의 등락률(%%). 과거만 본다."""
+    j = max(0, i - window)
+    p0, p1 = bars[j][1], bars[i][1]
+    return 100 * (p1 / p0 - 1) if p0 > 0 else 0.0
+
+
 def _f(x, default=0.0):
     try:
         return float(x)
@@ -49,12 +56,16 @@ def _f(x, default=0.0):
 
 
 def load_minutes(path):
-    """(date,code) -> [(hhmm, price, high, low, vol), ...] 시간순."""
+    """(date,code) -> [(hhmm, price, high, low, vol, amount), ...] 시간순.
+
+    amount는 그 시점까지의 **누적** 거래대금(acml_tr_pbmn)이다. 분당 증분이 아니다.
+    """
     by = collections.defaultdict(list)
     with open(path, encoding='utf-8-sig') as f:
         for r in csv.DictReader(f):
             by[(r['date'], r['code'])].append(
-                (r['hhmm'], _f(r['price']), _f(r['high']), _f(r['low']), _f(r.get('vol'))))
+                (r['hhmm'], _f(r['price']), _f(r['high']), _f(r['low']),
+                 _f(r.get('vol')), _f(r.get('amount'))))
     for k in by:
         by[k].sort()
     return by
@@ -73,7 +84,7 @@ def load_daily(path):
 
 
 def load_index_trend(path, days=5):
-    """거래일 -> 직전 `days`일 KOSPI 추세(%). 진입일 시점에 알 수 있는 값만."""
+    """거래일 -> 직전 `days`일 KOSPI 추세(%%). 진입일 시점에 알 수 있는 값만."""
     close = {}
     with open(path, encoding='utf-8-sig') as f:
         for r in csv.DictReader(f):
@@ -110,15 +121,27 @@ def market_state(etf, date, code):
         return {}
     open_px = bars[0][1]
     out, peak = {}, open_px
-    for hhmm, price, high, low, vol in bars:
+    for hhmm, price, high, low, vol, amount in bars:
         peak = max(peak, price)
         out[hhmm] = (100 * (price / open_px - 1) if open_px else 0,
                      100 * (price / peak - 1) if peak else 0)
     return out
 
 
-def run(sig, minutes, etf, trend, args):
+def avg_amounts(daily, lookback=20):
+    """(code, 거래일) -> 직전 lookback일 평균 일거래대금. 그날 것은 안 쓴다."""
+    out = {}
+    for code, s in daily.items():
+        for i in range(lookback, len(s)):
+            hist = [x['amount'] for x in s[i - lookback:i] if x['amount'] > 0]
+            if hist:
+                out[(code, s[i]['date'])] = st.mean(hist)
+    return out
+
+
+def run(sig, minutes, etf, trend, args, avg_amount=None):
     """조건이 충족되는 순간 진입, 조건이 충족되는 순간 청산."""
+    avg_amount = avg_amount or {}
     trades = []
     for sig_date, trade_date, code, amul, chg, prev_close, name in sig:
         bars = minutes.get((trade_date, code))
@@ -141,13 +164,14 @@ def run(sig, minutes, etf, trend, args):
 
         # 장 초반 거래량 기준선 — 첫 20봉
         base_vol = st.mean([b[4] for b in bars[:20]]) or 1
+        prev_avg_amount = avg_amount.get((code, trade_date), 0)
 
         entry = None
         peak = open_px
         closed = False
         last_bar = None
         recent = collections.deque(maxlen=5)
-        for hhmm, price, high, low, vol in bars:
+        for i, (hhmm, price, high, low, vol, amount) in enumerate(bars):
             if hhmm > LAST_CONTINUOUS:
                 continue
             last_bar = (hhmm, price)
@@ -162,9 +186,16 @@ def run(sig, minutes, etf, trend, args):
                 # --- 진입 조건 ---
                 vol_ratio = (sum(recent) / len(recent)) / base_vol
                 from_open = 100 * (price / open_px - 1)
+                # 관심 소진도: 지금까지 쌓인 거래대금이 평소 하루치의 몇 배인가.
+                # 2026-08-16 실측 — 상승 중일 때 이 값이 낮을수록 이후가 좋다
+                # (<0.2 → +0.671% / 1.0+ → −0.070%, 10분 기준). "아직 초기인가"를 잰다.
+                spent = (amount / prev_avg_amount) if prev_avg_amount else 0
+                rise = _rise_over(bars, i, args.rise_window)
                 ok = (mkt[0] >= args.mkt_min
                       and mkt_q[0] >= args.mktq_min
                       and vol_ratio >= args.vol_ratio_min
+                      and args.spent_min <= spent <= args.spent_max
+                      and rise >= args.rise_min
                       and args.from_open_min <= from_open <= args.from_open_max)
                 if ok:
                     entry = (hhmm, price)
@@ -189,6 +220,9 @@ def run(sig, minutes, etf, trend, args):
                 hit = 'mkt_break'
             elif args.max_hold > 0 and _elapsed(e_hhmm, hhmm) >= args.max_hold:
                 hit = 'max_hold'
+            elif (args.spent_exit > 0 and prev_avg_amount
+                  and amount / prev_avg_amount >= args.spent_exit):
+                hit = 'spent'      # 관심이 다 소진됐다 — 하루치 거래대금이 채워졌다
             if hit:
                 trades.append(dict(date=trade_date, code=code, name=name, entry=e_hhmm,
                                    exit=hhmm, ret=ret - FEE_PCT, why=hit, trend=tr))
@@ -221,26 +255,31 @@ def main():
     ap.add_argument('--minutes', default=os.path.join(R, 'sig_minutes_v3.csv'))
     ap.add_argument('--daily', default=os.path.join(R, 'daily400.csv'))
     ap.add_argument('--min-amul', type=float, default=2.0, help='전일 거래대금 급증 배수 하한')
-    ap.add_argument('--min-chg', type=float, default=7.0, help='전일 등락률 하한(%)')
+    ap.add_argument('--min-chg', type=float, default=7.0, help='전일 등락률 하한(%%)')
     # 진입 조건
-    ap.add_argument('--mkt-min', type=float, default=-99, help='KOSPI ETF 시초대비 하한(%)')
-    ap.add_argument('--mktq-min', type=float, default=-99, help='KOSDAQ ETF 시초대비 하한(%)')
+    ap.add_argument('--mkt-min', type=float, default=-99, help='KOSPI ETF 시초대비 하한(%%)')
+    ap.add_argument('--mktq-min', type=float, default=-99, help='KOSDAQ ETF 시초대비 하한(%%)')
     ap.add_argument('--vol-ratio-min', type=float, default=0.0, help='최근5분 거래량/장초반 평균 하한')
-    ap.add_argument('--from-open-min', type=float, default=-99, help='시초 대비 위치 하한(%)')
-    ap.add_argument('--from-open-max', type=float, default=99, help='시초 대비 위치 상한(%)')
-    ap.add_argument('--gap-min', type=float, default=-99, help='시가 갭 하한(%)')
-    ap.add_argument('--gap-max', type=float, default=99, help='시가 갭 상한(%)')
-    ap.add_argument('--trend-min', type=float, default=-99, help='직전 5일 지수 추세 하한(%)')
-    ap.add_argument('--trend-max', type=float, default=99, help='직전 5일 지수 추세 상한(%)')
+    ap.add_argument('--from-open-min', type=float, default=-99, help='시초 대비 위치 하한(%%)')
+    ap.add_argument('--from-open-max', type=float, default=99, help='시초 대비 위치 상한(%%)')
+    ap.add_argument('--gap-min', type=float, default=-99, help='시가 갭 하한(%%)')
+    ap.add_argument('--gap-max', type=float, default=99, help='시가 갭 상한(%%)')
+    ap.add_argument('--trend-min', type=float, default=-99, help='직전 5일 지수 추세 하한(%%)')
+    ap.add_argument('--trend-max', type=float, default=99, help='직전 5일 지수 추세 상한(%%)')
     ap.add_argument('--no-entry-before', default='0900', help='이 시각 전에는 진입하지 않는다')
     ap.add_argument('--require-market', action='store_true', help='ETF 분봉 없는 날 제외')
     # 청산 조건
-    ap.add_argument('--take', type=float, default=0.0, help='이익 목표(%)')
-    ap.add_argument('--stop', type=float, default=0.0, help='손절(%)')
-    ap.add_argument('--trail', type=float, default=0.0, help='고점 대비 되밀림(%)')
+    ap.add_argument('--take', type=float, default=0.0, help='이익 목표(%%)')
+    ap.add_argument('--stop', type=float, default=0.0, help='손절(%%)')
+    ap.add_argument('--trail', type=float, default=0.0, help='고점 대비 되밀림(%%)')
     ap.add_argument('--vol-dry', type=float, default=0.0, help='거래량 소멸 배수 이하면 청산')
-    ap.add_argument('--mkt-break', type=float, default=0.0, help='시장 고점대비 되밀림(%, 음수)')
+    ap.add_argument('--mkt-break', type=float, default=0.0, help='시장 고점대비 되밀림(%%, 음수)')
     ap.add_argument('--max-hold', type=int, default=0, help='보유 상한(분). 시각이 아니라 경과 시간이다')
+    ap.add_argument('--spent-min', type=float, default=0.0, help='누적거래대금/평소일평균 하한')
+    ap.add_argument('--spent-max', type=float, default=999.0, help='상한. 낮을수록 "아직 초기"')
+    ap.add_argument('--spent-exit', type=float, default=0.0, help='이 값을 넘으면 관심 소진으로 보고 청산')
+    ap.add_argument('--rise-min', type=float, default=-99.0, help='직전 N봉 등락률 하한(%%)')
+    ap.add_argument('--rise-window', type=int, default=10, help='상승세를 재는 봉 수')
     ap.add_argument('--by', default='', help="분해 출력: month | trend")
     args = ap.parse_args()
 
@@ -251,7 +290,7 @@ def main():
     sig = signals(daily, args.min_amul, args.min_chg)
     print(f'[조건 백테스트] 신호 {len(sig)}건 | 분봉 보유 {len(minutes)}쌍\n')
 
-    trades = run(sig, minutes, etf, trend, args)
+    trades = run(sig, minutes, etf, trend, args, avg_amounts(daily))
     report(trades, '전체')
     if args.by == 'month':
         for m in sorted({t['date'][:6] for t in trades}):

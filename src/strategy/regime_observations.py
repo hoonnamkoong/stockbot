@@ -6,9 +6,10 @@
 바뀌면 리셋되며 백필은 KIS **당일**분봉이라 과거 재구성도 불가능했다. 그래서 10분 지평
 모델을 학습·검증할 이력이 0이었다.
 
-**위치**: `data/regime_observations.csv`. 워크플로 수정이 필요 없다 — scraper.yml이 런
-시작에 `git checkout db-data -- data/`로 복원하고 끝에 `data/*.csv`를 db-data로 복사한다.
-그래서 append가 런 사이에 이어진다.
+**위치**: `data/regime_observations.csv`(아카이브) + `month_path()`가 만드는 월별
+`data/regime_observations_YYYY-MM.csv`. writer는 trading.yml뿐이다 — scraper.yml은
+`regime_observations*.csv) continue ;;`로 이 파일들을 배포 대상에서 **제외**하고,
+trading.yml이 `data/.lite_deploy_manifest`를 통해 db-data로 배포한다.
 
 **표본이 적어도 버리지 않는다.** `_fetch_top100_breadth`는 표본 80 미만이면 None을
 반환해 관측을 통째로 폐기하는데, 확률 모형에서 적은 표본은 폐기 대상이 아니라

@@ -6,6 +6,8 @@
 목표 모델은 30분 앞 장중 breadth 포캐스트다. 승격 기준은
 docs/superpowers/specs/2026-08-17-regime-observation-accumulation-design.md §7.
 """
+import glob
+import io
 import os
 import sys
 from datetime import datetime
@@ -14,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.strategy.regime_observations import OBS_HEADER  # noqa: E402
 from src.strategy.regime_observations import load_all_observations  # noqa: E402
+from src.strategy.regime_observations import parse_observations  # noqa: E402
 
 HORIZON_MIN = 30
 TOL_MIN = 5
@@ -76,6 +79,24 @@ def column_coverage(rows):
     return out
 
 
+def contributing_files(data_dir='data'):
+    """관측을 채운 파일들 — 아카이브 + 존재하는 월별 파일. (path, 행수) 목록.
+
+    새 달 파일이 배포에서 빠지면 여기서 사라진다 — 사람이 알아챌 유일한 자리다.
+    """
+    paths = [os.path.join(data_dir, 'regime_observations.csv')]
+    paths += sorted(glob.glob(os.path.join(
+        data_dir, 'regime_observations_[0-9][0-9][0-9][0-9]-[0-9][0-9].csv')))
+    out = []
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with io.open(p, encoding='utf-8-sig') as f:
+            n = len(parse_observations(f.read()))
+        out.append((p, n))
+    return out
+
+
 def _bucket(row):
     hour = int(row['ts'][11:13])
     for label, lo, hi in _BUCKETS:
@@ -94,6 +115,11 @@ def main():
     print('=' * 60)
     print(f"거래일 {len(dates)}일 / {len(rows)}행   {dates[0]} ~ {dates[-1]}")
     print(f"§7 하한 {MIN_TRADING_DAYS}거래일까지 남은 일수: {max(0, MIN_TRADING_DAYS - len(dates))}")
+
+    print('-' * 60)
+    print('월별 파일')
+    for path, n in contributing_files():
+        print(f"  {path:<32} {n:>6}행")
 
     print('-' * 60)
     print('열별 채움률')

@@ -8,6 +8,7 @@
 되돌림은 실패로 안 보인다 — 워크플로는 초록색이고 국면 값만 몇 분 과거다.
 그래서 코드가 아니라 배포 규칙 자체를 테스트한다.
 """
+import fnmatch
 import os
 import re
 import sys
@@ -25,7 +26,7 @@ def _text(name: str) -> str:
 def _regime_files() -> list[str]:
     """국면 갱신이 쓰는 파일 — 매니페스트에서 파생한다(심 이름이 바뀌어도 따라간다)."""
     from scripts.trade_loop import regime_output_files
-    return regime_output_files()
+    return regime_output_files(__import__('datetime').datetime(2026, 8, 10, 11, 0))
 
 
 def test_scraper_does_not_deploy_regime_files():
@@ -35,8 +36,12 @@ def test_scraper_does_not_deploy_regime_files():
     # case 문의 제외 arm은 `a.json|b.csv) continue ;;` 처럼 묶여 있을 수 있다.
     # 파일명이 있는 줄에 continue가 함께 있으면 제외된 것으로 본다.
     skipped = {line for line in deploy.splitlines() if 'continue' in line}
+    # regime_observations*.csv 처럼 case arm이 글롭일 수 있다(월별 파일명이라
+    # 정적 텍스트가 정확한 이름을 담을 수 없다) — 문자열 포함이 아니라 글롭으로 맞춘다.
+    patterns = [p.strip() for line in skipped
+                for p in line.strip().split(')', 1)[0].split('|')]
     for name in _regime_files():
-        assert any(name in line for line in skipped), (
+        assert any(fnmatch.fnmatch(name, p) for p in patterns), (
             f'{name}이 scraper.yml 배포 제외 목록에 없다. trading.yml이 유일 '
             f'writer인데 여기서 올리면 런 시작 시점 사본으로 국면이 되돌아간다.')
 
@@ -146,8 +151,8 @@ def test_trading_does_not_deploy_the_report_gate_state():
     from src.report.gate import STATE_FILENAME
     import scripts.trade_loop as trade_loop
 
-    names = trade_loop.regime_output_files() + trade_loop.money_output_files(
-        __import__('datetime').datetime(2026, 8, 10, 11, 0))
+    now = __import__('datetime').datetime(2026, 8, 10, 11, 0)
+    names = trade_loop.regime_output_files(now) + trade_loop.money_output_files(now)
     assert STATE_FILENAME not in names
 
 

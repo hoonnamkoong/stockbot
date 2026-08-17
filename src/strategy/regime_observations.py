@@ -15,6 +15,7 @@
 **약한 증거**다(regime_filter가 sigma를 표본수로 보정한다).
 """
 import csv
+import glob
 import io
 import os
 from decimal import ROUND_HALF_UP, Decimal
@@ -40,14 +41,55 @@ _DECIMALS = {'breadth': 1, 'momentum': 2, 'trend': 1, 'breadth_cap': 1,
 _INT_COLS = ('sample', 'up', 'down', 'turnover')
 _TEXT_COLS = ('ts_kst', 'source')
 
-# 롤링 보관 거래일. 60일 × 39슬롯 ≈ 2,340행. 행 수 상한이 아니라 거래일 수로 자르는
-# 이유: 런이 지연되거나 건너뛴 날이 있어도 보관 기간의 뜻이 변하지 않는다.
+# 계산 창의 기본 거래일 수. **저장 창이 아니다** — 2026-08까지는 append가 매번
+# 이걸로 잘라서, 기다려도 표본이 60거래일에서 늘지 않았다. 지금은 판정기·라벨러가
+# 분위수 창을 잡을 때만 쓴다.
 MAX_DISTINCT_DATES = 60
 
 # 파이프라인이 쓰는 상대 경로. `data/` 아래 `.csv`라는 것이 계약이다 —
 # scraper.yml이 런 시작에 db-data에서 data/를 복원하고 끝에 data/*.csv를 배포한다.
 # 이 두 조건 중 하나만 어긋나도 이력이 런 사이에 이어지지 않는다.
 OBS_PATH_REL = 'data/regime_observations.csv'
+
+# 읽기 전용 아카이브. 2026-08 월별 분할 이전에 쌓인 426행이 여기 있다.
+# 새 쓰기는 전부 month_path()로 간다.
+OBS_ARCHIVE = 'regime_observations.csv'
+
+_MONTH_GLOB = 'regime_observations_[0-9][0-9][0-9][0-9]-[0-9][0-9].csv'
+
+
+def month_path(now, data_dir: str = 'data') -> str:
+    """월별 분할. rank_snapshot·sim_diag·post_archive와 같은 규약이다.
+
+    한 파일이 무한정 커지는 것을 막는다. append가 매번 전체 재작성이고
+    db-data가 10분마다 커밋을 받으므로, 단일 파일이면 1년차에 커밋당
+    ~810KB짜리 blob이 하루 39개씩 쌓인다.
+    """
+    return os.path.join(data_dir, f"regime_observations_{now.strftime('%Y-%m')}.csv")
+
+
+def load_all_observations(data_dir: str = 'data') -> list:
+    """아카이브 + 월별 전부를 시각 오름차순 단일 리스트로.
+
+    같은 `ts`가 두 파일에 있으면 **먼저 읽은 것**(아카이브 우선)을 남긴다.
+    이행 구간에 아카이브와 그 달 파일이 같은 분을 담을 수 있는데, 두 번 세면
+    표본이 부풀고 값이 다르면 같은 시각에 정답이 둘이 된다.
+    """
+    paths = [os.path.join(data_dir, OBS_ARCHIVE)]
+    paths += sorted(glob.glob(os.path.join(data_dir, _MONTH_GLOB)))
+
+    seen, rows = set(), []
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with io.open(p, encoding='utf-8-sig') as f:
+            for r in parse_observations(f.read()):
+                if r['ts'] in seen:
+                    continue
+                seen.add(r['ts'])
+                rows.append(r)
+    rows.sort(key=lambda r: r['ts'])
+    return rows
 
 
 def _round_str(value, ndigits):
@@ -159,13 +201,12 @@ def append_observation(path, ts, breadth, momentum, trend, sample, source, extra
            'trend': trend, 'sample': int(sample), 'source': str(source)}
     row.update({col: extra.get(col) for col in OBS_EXTRA})
     existing.append(row)
-    kept = trim_to_recent_dates(existing)   # 트림 제거는 Task 2의 단독 책임이다
 
     tmp = path + '.tmp'
     with io.open(tmp, 'w', encoding='utf-8-sig', newline='') as f:
         w = csv.writer(f)
         w.writerow(OBS_HEADER)
-        for r in kept:
+        for r in existing:
             w.writerow(format_row(r))
     os.replace(tmp, path)   # 중간에 죽어도 이력이 반토막 나지 않는다
     return True

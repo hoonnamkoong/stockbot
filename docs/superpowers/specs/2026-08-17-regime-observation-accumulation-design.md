@@ -121,19 +121,36 @@ db-data는 2026-08 기준 이미 335커밋 / 33MB다. 단일 파일은 몇 달 �
 
 ## 4. 경로 계약
 
-`OBS_PATH_REL` 상수를 함수로 바꾼다.
+월별 분할은 이 레포에 이미 있는 규약이다. `src/data/rank_snapshot.py`가 선례다:
 
 ```python
-OBS_ARCHIVE_REL = 'data/regime_observations.csv'          # 읽기 전용
-def obs_path_for(ts: str) -> str: ...                     # 'data/regime_observations_2026-08.csv'
-def obs_month_files(data_dir: str) -> list[str]: ...       # 아카이브 + 월별, 월 오름차순
-def load_all_observations(data_dir: str) -> list[dict]: ... # 전부 이어붙여 시각 오름차순
+def month_path(now, data_dir: str = 'data') -> str:
+    """월별 분할. sim_diag·post_archive와 같은 이유로 한 파일이 무한정 커지는 것을 막는다."""
+    return os.path.join(data_dir, f"money_{now.strftime('%Y-%m')}.csv")
 ```
 
-`obs_path_for`가 파일명의 **유일한 진실**이다. 파생하는 곳:
+**같은 이름·같은 시그니처를 쓴다.** 새 규약을 지어내지 않는다.
+
+```python
+OBS_ARCHIVE = 'regime_observations.csv'                     # 읽기 전용 아카이브(파일명)
+def month_path(now, data_dir: str = 'data') -> str: ...     # 'data/regime_observations_2026-08.csv'
+def load_all_observations(data_dir: str = 'data') -> list[dict]: ...  # 아카이브 + 월별 전부, 시각 오름차순
+```
+
+`month_path`가 파일명의 **유일한 진실**이다. 파생하는 곳:
 
 - `src/pipeline/workers/trade_engine.py::_append_regime_observation` — 쓰기
 - `scripts/trade_loop.py::regime_output_files` — 배포 매니페스트
+
+`regime_output_files()`는 인자가 없으므로 `regime_output_files(now)`로 바꾸고, `_write_deploy_manifest`가 `ctx.now_kst`를 넘긴다. `money_output_files(now)`가 이미 같은 모양이다.
+
+시각은 **관측을 기록한 그 시각**이어야 한다. `trade_loop.py`에 이미 남아 있는 경고 그대로다:
+
+> 배포 목록의 월별 파일명은 **기록한 시각**에서 나와야 한다. 런 시작 시각을 쓰면 월 경계를 넘어간 런에서 방금 쓴 파일이 아니라 지난달 파일을 올린다.
+
+`_append_regime_observation`도 `ctx.now_kst`를 쓰므로 둘이 같은 값이면 어긋나지 않는다. 이 동일성을 테스트로 잠근다(§7).
+
+배포 스텝이 `[ -f data/$name ]`로 한 줄씩 존재를 검사하므로 와일드카드는 매칭되지 않는다 — 파일명을 런타임에 해석해야 하는 이유다(`money_output_files` docstring과 같은 이유).
 
 읽기 쪽 워크플로는 손대지 않는다. `trading.yml`·`scraper.yml` 모두 `git checkout db-data -- data/`로 디렉터리 통째를 받으므로 월별 파일이 자동으로 따라온다. `get_sync_files_list`에는 이 파일이 없고, 넣을 필요도 없다.
 
@@ -203,8 +220,8 @@ def load_all_observations(data_dir: str) -> list[dict]: ... # 전부 이어붙�
 
 | 테스트 | 잠그는 것 |
 |---|---|
-| 월 경계 | `obs_path_for('2026-08-31 15:30')` ≠ `obs_path_for('2026-09-01 09:10')` |
-| 배포 파생 | `regime_output_files()`가 `obs_path_for(오늘)`의 basename을 포함한다 |
+| 월 경계 | `month_path(2026-08-31 15:30)` ≠ `month_path(2026-09-01 09:10)` |
+| 배포 파생 | `regime_output_files(now)`가 `month_path(now)`의 basename을 포함한다. 같은 `now`로 쓴 파일과 올릴 파일이 일치한다 |
 | 이어붙이기 | 아카이브 + 월별 2개 → `load_all_observations`가 시각 오름차순 단일 리스트 |
 | 구 스키마 호환 | 6열 행을 읽으면 신규 8열이 `None`. 예외 없음 |
 | 트림 제거 | 61거래일치를 append해도 첫날 행이 남아 있다 |

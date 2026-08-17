@@ -282,12 +282,13 @@ def append_observation(path, ts, breadth, momentum, trend, sample, source, extra
            'trend': trend, 'sample': int(sample), 'source': str(source)}
     row.update({col: extra.get(col) for col in OBS_EXTRA})
     existing.append(row)
+    kept = trim_to_recent_dates(existing)   # 트림 제거는 Task 2의 단독 책임이다
 
     tmp = path + '.tmp'
     with io.open(tmp, 'w', encoding='utf-8-sig', newline='') as f:
         w = csv.writer(f)
         w.writerow(OBS_HEADER)
-        for r in existing:
+        for r in kept:
             w.writerow(format_row(r))
     os.replace(tmp, path)   # 중간에 죽어도 이력이 반토막 나지 않는다
     return True
@@ -319,7 +320,7 @@ git commit -m "feat(regime): 관측 스키마를 6열에서 14열로 넓힌다"
   - `OBS_ARCHIVE: str` = `'regime_observations.csv'` (파일명만. 읽기 전용 아카이브)
   - `month_path(now, data_dir: str = 'data') -> str` — `now`는 `datetime`
   - `load_all_observations(data_dir: str = 'data') -> list[dict]` — 아카이브 + 월별 전부, 시각 오름차순, `ts` 중복은 먼저 나온 것 유지
-  - `OBS_PATH_REL` **제거**
+  - `OBS_PATH_REL`은 **이 태스크에서 지우지 않는다.** `trade_engine`·`trade_loop`이 아직 읽는다. 여기서 지우면 T3·T4 전까지 트리가 빨개지고, `trade_engine` 쪽은 `try/except` 안이라 **조용히** 실패한다 — 관측이 한 건도 안 쌓이는데 로그 한 줄로 끝난다. 삭제는 T4 Step 8이 한다
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
@@ -399,7 +400,7 @@ Expected: FAIL — `ImportError: cannot import name 'OBS_ARCHIVE'`
 
 - [ ] **Step 3: 월별 경로와 전체 로드를 추가한다**
 
-`src/strategy/regime_observations.py`에서 `OBS_PATH_REL` 정의를 **삭제**하고 그 자리에 아래를 넣는다. 파일 상단 import에 `import glob`을 더한다.
+`src/strategy/regime_observations.py`의 `OBS_PATH_REL` 정의는 **그대로 두고**, 그 아래에 아래를 넣는다. 파일 상단 import에 `import glob`을 더한다.
 
 ```python
 # 읽기 전용 아카이브. 2026-08 월별 분할 이전에 쌓인 426행이 여기 있다.
@@ -445,7 +446,25 @@ def load_all_observations(data_dir: str = 'data') -> list:
 
 - [ ] **Step 4: 트림 호출을 뗀다**
 
-`append_observation`의 쓰기 루프에서 트림을 쓰지 않는다. Task 1 Step 6의 코드는 이미 `existing`을 그대로 쓰므로 **추가 변경이 없다.** `trim_to_recent_dates`와 `MAX_DISTINCT_DATES`는 그대로 둔다 — 계산 창에서 쓴다. 다만 상수 주석을 아래로 바꾼다.
+`append_observation`에서 트림 두 줄을 걷어낸다. Task 1이 넣어둔 형태:
+
+```python
+    kept = trim_to_recent_dates(existing)   # 트림 제거는 Task 2의 단독 책임이다
+
+    tmp = path + '.tmp'
+    ...
+        for r in kept:
+```
+
+이걸 아래로 바꾼다.
+
+```python
+    tmp = path + '.tmp'
+    ...
+        for r in existing:
+```
+
+`trim_to_recent_dates`와 `MAX_DISTINCT_DATES`는 **지우지 않는다** — 계산 창에서 쓴다. 다만 상수 주석을 아래로 바꾼다.
 
 ```python
 # 계산 창의 기본 거래일 수. **저장 창이 아니다** — 2026-08까지는 append가 매번
@@ -459,10 +478,13 @@ MAX_DISTINCT_DATES = 60
 Run: `python -m pytest tests/test_regime_observations.py -v`
 Expected: PASS
 
-- [ ] **Step 6: `OBS_PATH_REL` 참조가 남아 있는지 확인한다**
+- [ ] **Step 6: 아직 아무것도 깨지지 않았는지 확인한다**
+
+Run: `python -m pytest tests/test_regime_observations.py tests/test_trade_loop.py -q`
+Expected: PASS. `OBS_PATH_REL`을 남겨뒀으므로 `trade_loop`은 그대로 돈다.
 
 Run: `grep -rn "OBS_PATH_REL" --include=*.py . | grep -v __pycache__`
-Expected: `src/pipeline/workers/trade_engine.py`와 `scripts/trade_loop.py` 두 곳. Task 3·4에서 고친다. 그 외에 나오면 그것도 고쳐야 한다.
+Expected: `regime_observations.py`(정의), `trade_engine.py`, `trade_loop.py` 세 곳. Task 3·4에서 걷어낸다.
 
 - [ ] **Step 7: 커밋**
 
@@ -916,10 +938,15 @@ Expected: PASS
             self.log_error(f"국면 관측 이력 기록 실패: {e}")
 ```
 
-- [ ] **Step 8: `OBS_PATH_REL` 잔여 참조를 정리한다**
+- [ ] **Step 8: `OBS_PATH_REL`을 지운다 — 마지막 참조가 사라진 지금이다**
 
 Run: `grep -rn "OBS_PATH_REL" --include=*.py . | grep -v __pycache__`
-Expected: `scripts/trade_loop.py:274`의 import 한 줄만 남았다면 삭제한다(Task 3에서 `month_path`로 바뀌었다). 아무것도 안 나오면 이미 끝났다.
+Expected: `src/strategy/regime_observations.py`의 정의 한 줄만 남는다(T3가 trade_loop을, Step 7이 trade_engine을 `month_path`로 옮겼다).
+
+그 정의를 삭제한다. 다른 곳이 아직 나오면 **지우지 말고** 그 참조부터 `month_path`로 옮긴다 — 상수를 먼저 지우면 `trade_engine`의 `try/except`가 ImportError를 삼켜 관측이 조용히 0건이 된다.
+
+Run: `grep -rn "OBS_PATH_REL" --include=*.py . | grep -v __pycache__`
+Expected: 아무것도 안 나온다.
 
 - [ ] **Step 9: 전체 테스트를 돌린다**
 

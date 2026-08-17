@@ -160,7 +160,7 @@ jobs:
           #   - 스냅샷(portfolio/order_status): writer 없음 → 미배포
           #
           # [소유권] sim_libero_state.json / trade_history_sim_libero.csv /
-          # regime_observations.csv 는 **trading.yml이 유일 writer다.**
+          # regime_observations*.csv(월별 분할 포함) 는 **trading.yml이 유일 writer다.**
           # 여기서 올리면 이 런이 시작할 때 받아온 사본으로 국면을 되돌린다 —
           # 두 워크플로는 concurrency 그룹이 달라 실제로 동시에 돌기 때문에
           # 그 되돌림이 상시 일어난다(lost update). 여기서는 읽기만 한다.
@@ -192,7 +192,7 @@ jobs:
             if owned_by_trading "$(basename "$f")"; then continue; fi
             case "$(basename "$f")" in
               trade_history_real.csv) continue ;;
-              regime_observations.csv|trade_history_sim_libero.csv) continue ;;
+              regime_observations*.csv|trade_history_sim_libero.csv) continue ;;
               money_*.csv) continue ;;   # 순위 스냅샷 — writer는 trading.yml
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true

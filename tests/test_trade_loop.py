@@ -291,20 +291,23 @@ def test_regime_files_are_not_deployed_when_refresh_failed(stub):
 def test_regime_output_files_cover_what_the_refresh_writes(tmp_path, monkeypatch):
     """국면 갱신이 건드리는 파일이 배포 목록에 다 들어 있는지 — 매니페스트에서
     파생하므로 심 이름이 바뀌어도 따라간다."""
-    from src.strategy.regime_observations import OBS_PATH_REL
+    from src.strategy.regime_observations import month_path
 
-    files = trade_loop.regime_output_files()
-    assert os.path.basename(OBS_PATH_REL) in files
+    now = _Ctx().now_kst
+    files = trade_loop.regime_output_files(now)
+    assert os.path.basename(month_path(now)) in files
     assert any(f.endswith('_state.json') for f in files), '분석기 심 상태 파일이 있어야 한다'
 
 
 def test_manifest_contains_regime_and_sim_files(tmp_path, monkeypatch):
+    from src.strategy.regime_observations import month_path
     monkeypatch.chdir(tmp_path)
+    now = _Ctx().now_kst
     trade_loop._write_deploy_manifest('sim4_bull_daytrading', log=lambda *a: None,
-                                      include_regime=True)
+                                      now=now, include_regime=True)
     lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
         encoding='utf-8').split()
-    assert 'regime_observations.csv' in lines
+    assert os.path.basename(month_path(now)) in lines
     assert 'sim_bulldaytrade_state.json' in lines
     assert len(lines) == len(set(lines)), '중복 없이 기록돼야 한다'
 
@@ -401,7 +404,7 @@ def test_does_not_mark_the_regime_gate_when_the_refresh_failed(stub):
 def test_regime_gate_file_is_deployed_with_the_regime(tmp_path, monkeypatch):
     """게이트 파일이 db-data에 안 올라가면 다음 런이 못 읽어 다시 격자당 3회로
     돌아간다 — 게이트를 만든 의미가 사라진다."""
-    assert 'regime_gate_state.json' in trade_loop.regime_output_files()
+    assert 'regime_gate_state.json' in trade_loop.regime_output_files(_Ctx().now_kst)
 
 
 def test_undecidable_trading_day_alerts_a_human(stub):
@@ -706,3 +709,36 @@ def test_snapshot_is_stamped_at_query_time_not_run_start(monkeypatch, tmp_path):
     assert rows[0]['ts'] == at.isoformat(timespec='seconds')
     assert int(rows[0]['cycle_id']) != _Ctx().cycle_id, \
         '런 시작 컨텍스트의 격자를 그대로 쓰고 있다'
+
+
+def test_배포_목록이_쓰기_경로와_같은_파일을_가리킨다():
+    """쓰는 파일과 올리는 파일이 갈리면 그 달 이력이 통째로 유실된다. 조용하다."""
+    import datetime as _dt
+    import os
+    from scripts.trade_loop import regime_output_files
+    from src.strategy.regime_observations import month_path
+
+    now = _dt.datetime(2026, 9, 1, 9, 10)
+    assert os.path.basename(month_path(now)) in regime_output_files(now)
+
+
+def test_월이_바뀌면_배포_대상도_바뀐다():
+    import datetime as _dt
+    from scripts.trade_loop import regime_output_files
+
+    aug = set(regime_output_files(_dt.datetime(2026, 8, 31, 15, 30)))
+    sep = set(regime_output_files(_dt.datetime(2026, 9, 1, 9, 10)))
+    assert 'regime_observations_2026-08.csv' in aug
+    assert 'regime_observations_2026-09.csv' in sep
+    assert 'regime_observations_2026-08.csv' not in sep
+
+
+def test_국면을_올리는데_시각이_없으면_시끄럽게_실패한다(tmp_path, monkeypatch):
+    """시각 없이 기본값으로 넘어가면 월 경계에서 조용히 틀린 파일을 올린다."""
+    import pytest
+    from scripts import trade_loop
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    with pytest.raises(ValueError):
+        trade_loop._write_deploy_manifest(None, log=lambda *a: None, include_regime=True)

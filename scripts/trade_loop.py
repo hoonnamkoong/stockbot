@@ -263,19 +263,24 @@ def money_output_files(now) -> list[str]:
     return [STATE_FILENAME, os.path.basename(month_path(now, 'data'))]
 
 
-def regime_output_files() -> list[str]:
+def regime_output_files(now) -> list[str]:
     """국면 갱신이 쓰는 파일들(data/ 기준 상대 이름).
 
     이 워크플로가 국면의 유일 writer가 됐으므로, 여기서 빠뜨리면 갱신한 국면이
     db-data에 영영 도달하지 못한다 — 그러면 두 워크플로가 모두 얼어붙은 국면을
     읽게 되고, 그건 실패가 아니라 '조용히 낡은 값으로 매매'다.
+
+    관측 이력은 월별 파일이다. 파일명을 런타임에 해석해야 한다 — 배포 스텝이
+    `[ -f data/$name ]`로 한 줄씩 존재를 검사하므로 와일드카드가 매칭되지 않는다.
+    `now`는 **관측을 기록한 시각**이어야 한다(= trade_engine이 쓴 ctx.now_kst).
     """
     from src.strategy.registry import get_sim_registry
-    from src.strategy.regime_observations import OBS_PATH_REL
+    from src.strategy.regime_observations import month_path
 
     # 게이트 파일도 함께 올린다. 이게 db-data에 도달하지 못하면 다음 런이 "아직
     # 안 갱신했다"로 읽어 격자당 3회로 되돌아간다 — 게이트를 만든 의미가 사라진다.
-    out = [os.path.basename(OBS_PATH_REL), 'regime_gate_state.json']
+    # 아카이브(regime_observations.csv)는 올리지 않는다 — 읽기 전용이라 안 바뀐다.
+    out = [os.path.basename(month_path(now)), 'regime_gate_state.json']
     for s in get_sim_registry(include_analyzers=True):
         if s['analyzer']:
             out += [s['state_file'], s['csv_file']]
@@ -283,6 +288,7 @@ def regime_output_files() -> list[str]:
 
 
 def _write_deploy_manifest(sim_id: str | None, log=print,
+                           now=None,
                            include_regime: bool = False,
                            include_money=None,
                            include_alerts: bool = False) -> None:
@@ -294,10 +300,14 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
     스크래퍼의 갱신을 되돌리게 된다(lost update). 두 워크플로는 concurrency
     그룹이 달라 실제로 동시에 돈다.
     """
+    if include_regime and now is None:
+        # try 안에 두면 아래 except가 삼켜서 로그 한 줄로 끝난다. 그러면 월 경계에
+        # 조용히 지난달 파일을 올리게 되고, 그게 이 가드가 막으려던 바로 그 실패다.
+        raise ValueError('include_regime에는 기록 시각(now)이 필요하다')
     try:
         names = []
         if include_regime:
-            names += regime_output_files()
+            names += regime_output_files(now)
         if include_money is not None:
             names += money_output_files(include_money)
         if include_alerts:
@@ -342,7 +352,7 @@ def run_trade_loop(ctx: PipelineContext) -> None:
         # 매니페스트 기록보다 앞에서 return하고 스크래퍼도 (dispatch가 아래에
         # 있으므로) 안 뜬다 — 여기서 안 올리면 아무도 안 올려서 억제가 무력화되고
         # 09:00~15:30 2분 간격 195건이 나간다. 억제 없는 알림은 알림이 없는 것과 같다.
-        _write_deploy_manifest(None, ctx.log,
+        _write_deploy_manifest(None, ctx.log, now=ctx.now_kst,
                                include_alerts=alerts.state_was_written())
         return
     if not trading:
@@ -433,7 +443,8 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     if traded_sim_id or regime_refreshed or money_at or alerts_written:
         # 배포 목록의 월별 파일명은 **기록한 시각**에서 나와야 한다. 런 시작 시각을
         # 쓰면 월 경계를 넘어간 런에서 방금 쓴 파일이 아니라 지난달 파일을 올린다.
-        _write_deploy_manifest(traded_sim_id, ctx.log, include_regime=regime_refreshed,
+        _write_deploy_manifest(traded_sim_id, ctx.log, now=ctx.now_kst,
+                               include_regime=regime_refreshed,
                                include_money=money_at,
                                include_alerts=alerts_written)
 

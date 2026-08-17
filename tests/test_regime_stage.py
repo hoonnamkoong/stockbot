@@ -47,7 +47,9 @@ def _libero(tmp_path):
 def test_run_regime_stage_returns_regime_from_live_breadth(tmp_path):
     w = _worker(tmp_path)
     sim = _libero(tmp_path)
-    with mock.patch.object(w, '_fetch_top100_breadth', return_value=(83.0, 3.5, 100, ['005930'])), \
+    with mock.patch.object(w, '_fetch_top100_breadth', return_value={
+             'breadth': 83.0, 'momentum': 3.5, 'sample': 100, 'codes': ['005930'], 'extra': {},
+         }), \
          mock.patch.object(w, '_top100_trend_from_csv', return_value=45.0), \
          mock.patch('src.strategy.registry.get_analyzer_simulator', return_value=sim), \
          mock.patch.object(w, '_append_regime_observation'):

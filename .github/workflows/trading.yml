@@ -78,6 +78,12 @@ jobs:
             git checkout db-data -- data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
           fi
           mkdir -p data
+          # 리베로 trend(ADX 근사)는 output/kospi_top100_close.csv를 읽는다. 이 파일은
+          # main에 없고 db-data의 data/ 아래에만 있다 — 08-08 매매/스크래핑 분리 때
+          # 이 복사가 scraper.yml에만 남아 08-10부터 trend가 전량 결측이었고,
+          # trend=0 폴백 탓에 국면이 SIDEWAYS로 고정됐다.
+          mkdir -p output
+          [ -f data/kospi_top100_close.csv ] && cp data/kospi_top100_close.csv output/ || true
           echo "[System] Remote data synchronized."
 
       - name: Manage KIS Token

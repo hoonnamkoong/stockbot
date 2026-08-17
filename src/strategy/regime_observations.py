@@ -46,11 +46,6 @@ _TEXT_COLS = ('ts_kst', 'source')
 # 분위수 창을 잡을 때만 쓴다.
 MAX_DISTINCT_DATES = 60
 
-# 파이프라인이 쓰는 상대 경로. `data/` 아래 `.csv`라는 것이 계약이다 —
-# scraper.yml이 런 시작에 db-data에서 data/를 복원하고 끝에 data/*.csv를 배포한다.
-# 이 두 조건 중 하나만 어긋나도 이력이 런 사이에 이어지지 않는다.
-OBS_PATH_REL = 'data/regime_observations.csv'
-
 # 읽기 전용 아카이브. 2026-08 월별 분할 이전에 쌓인 426행이 여기 있다.
 # 새 쓰기는 전부 month_path()로 간다.
 OBS_ARCHIVE = 'regime_observations.csv'

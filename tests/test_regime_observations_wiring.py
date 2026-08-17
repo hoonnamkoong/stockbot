@@ -19,10 +19,12 @@ def _read(rel):
 
 def test_경로가_data_아래_csv다():
     # scraper.yml의 배포 스텝이 data/*.csv를 db-data로 복사한다. 이 규칙을 벗어나면
-    # 이력이 런 사이에 이어지지 않는다.
-    from src.strategy.regime_observations import OBS_PATH_REL
-    assert OBS_PATH_REL.startswith('data/')
-    assert OBS_PATH_REL.endswith('.csv')
+    # 이력이 런 사이에 이어지지 않는다. (구 OBS_PATH_REL을 월별 경로로 대체 — Task 4)
+    import datetime
+    from src.strategy.regime_observations import month_path
+    path = month_path(datetime.datetime(2026, 8, 17))
+    assert os.path.dirname(path) == 'data'
+    assert path.endswith('.csv')
 
 
 def test_trade_engine이_append를_부른다():
@@ -33,7 +35,8 @@ def test_trade_engine이_append를_부른다():
 def test_trade_engine이_분_단위_시각을_넘긴다():
     src = _read('src/pipeline/workers/trade_engine.py')
     # '%H:00'으로 깎은 값을 넘기면 다시 5/6을 버린다.
-    m = re.search(r'append_observation\((.{0,400}?)\)', src, re.S)
+    # 괄호 한 겹 중첩(예: month_path(now_kst))까지 허용해야 호출 전체를 담는다.
+    m = re.search(r'append_observation\(((?:[^()]|\([^()]*\))*)\)', src, re.S)
     assert m, 'append_observation 호출을 찾지 못했다'
     call = m.group(1)
     assert "'%H:00'" not in call and '"%H:00"' not in call

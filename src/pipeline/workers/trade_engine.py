@@ -83,6 +83,60 @@ def libero_action(after_close: bool, market_hours: bool) -> str | None:
     return None
 
 
+# 네이버 시총 페이지의 열 라벨. 인덱스가 아니라 이 텍스트로 위치를 찾는다 —
+# 고정 인덱스를 5개로 늘리면 네이버가 열 하나를 끼워넣는 순간 5개가 동시에
+# 조용히 틀린다. 2026-08-17 실측: th 13개, td 13개, 인덱스 정렬됨.
+_MARKET_COL_LABELS = {'price': '현재가', 'rate': '등락률',
+                      'cap': '시가총액', 'volume': '거래량'}
+
+
+def resolve_market_columns(header_texts):
+    """헤더 텍스트 → td 인덱스. 하나라도 못 찾으면 None(호출부가 현행 폴백)."""
+    try:
+        return {k: header_texts.index(v) for k, v in _MARKET_COL_LABELS.items()}
+    except ValueError:
+        return None
+
+
+def _quantile(sorted_vals, q):
+    """정렬된 값에서 분위수. 선형보간 없이 floor(q·(n-1)) 인덱스.
+
+    보간하면 표본이 85~100으로 흔들릴 때 정의가 미묘하게 따라 움직인다.
+    """
+    return sorted_vals[int(q * (len(sorted_vals) - 1))]
+
+
+def market_extras(rates, caps=None, prices=None, volumes=None):
+    """top100 응답 → OBS_EXTRA 열들. **재료가 없는 열은 넣지 않는다**(0으로 안 채운다).
+
+    `caps`/`prices`/`volumes`는 헤더 해석에 실패하면 None이다. 그때도 등락률에서
+    나오는 열(분위수·상승하락수)은 그대로 채운다.
+    """
+    out = {}
+    if not rates:
+        return out
+
+    out['up'] = sum(1 for r in rates if r > 0)
+    out['down'] = sum(1 for r in rates if r < 0)
+
+    ordered = sorted(rates)
+    for name, q in (('p10', 0.10), ('p25', 0.25), ('p75', 0.75), ('p90', 0.90)):
+        out[name] = round(_quantile(ordered, q), 2)
+
+    if caps and len(caps) == len(rates):
+        total = sum(caps)
+        if total > 0:
+            up_cap = sum(c for c, r in zip(caps, rates) if r > 0)
+            out['breadth_cap'] = round(up_cap / total * 100, 1)
+
+    if prices and volumes and len(prices) == len(rates) == len(volumes):
+        # 정확한 거래대금이 아니다 — 현재가 × 누적거래량은 평균단가를 쓰지 않는다.
+        # 절대 수준이 아니라 시각 간 상대 변화를 보는 용도다.
+        out['turnover'] = int(sum(p * v for p, v in zip(prices, volumes)) / 1e8)
+
+    return out
+
+
 class TradeEngineWorker(BaseWorker):
     """
     Stage 3: 전략 판단(BUY/WATCH) + 시뮬레이터 주가 동기화.
@@ -281,11 +335,11 @@ class TradeEngineWorker(BaseWorker):
 
         반환: 확정 국면(current_regime) 문자열, 또는 판단 불가 시 None.
         """
-        live_breadth = None  # (breadth%, momentum, 표본수, [codes]) | None
+        live_breadth = None  # {'breadth','momentum','sample','codes','extra'} | None
         try:
             live_breadth = self._fetch_top100_breadth()
             if live_breadth:
-                self.log(f"  top100 라이브 breadth: {live_breadth[0]:.1f}% (표본 {live_breadth[2]})")
+                self.log(f"  top100 라이브 breadth: {live_breadth['breadth']:.1f}% (표본 {live_breadth['sample']})")
         except Exception as e:
             self.log_error(f"top100 라이브 breadth 수집 실패: {e}")
 
@@ -297,9 +351,9 @@ class TradeEngineWorker(BaseWorker):
             return None
 
         sim.live_market_metrics = {
-            'breadth': live_breadth[0], 'momentum': live_breadth[1],
+            'breadth': live_breadth['breadth'], 'momentum': live_breadth['momentum'],
             'trend': self._top100_trend_from_csv(),  # None이면 Sim0가 버즈 ADX로 폴백(candidates=[]라 0.0)
-            'sample': live_breadth[2],
+            'sample': live_breadth['sample'],
         } if live_breadth else None
 
         try:
@@ -318,13 +372,13 @@ class TradeEngineWorker(BaseWorker):
         try:
             if action == 'finalize':
                 # 마감 후 라이브 등락률 = 확정 종가 기준. 실패 시 당일 갱신 CSV 폴백.
-                actual_eod = live_breadth[0] if live_breadth else self._get_actual_breadth_from_csv()
+                actual_eod = live_breadth['breadth'] if live_breadth else self._get_actual_breadth_from_csv()
                 sim.finalize_eod(actual_eod, now_kst=now_kst)
                 self._append_regime_observation(now_kst, live_breadth)
             elif action == 'nowcast' and live_breadth:
-                codes = live_breadth[3]
+                codes = live_breadth['codes']
                 sim.update_nowcast(
-                    live_breadth[0], now_kst=now_kst,
+                    live_breadth['breadth'], now_kst=now_kst,
                     backfill=lambda hhmm: self._backfill_breadth_kis(hhmm, codes))
                 self._append_regime_observation(now_kst, live_breadth)
         except Exception as e:
@@ -667,11 +721,15 @@ class TradeEngineWorker(BaseWorker):
                 adxs.append(_adx(series))
         return round(_median(adxs), 1) if adxs else None
 
-    def _fetch_top100_breadth(self) -> tuple[float, float, int, list] | None:
-        """네이버 시총 페이지에서 KOSPI top100 장중 등락률 → 실측 breadth/momentum.
+    def _fetch_top100_breadth(self):
+        """네이버 시총 페이지에서 KOSPI top100 장중 등락률 → 실측 국면 지표.
 
-        fetch_kospi_top100.py와 동일 소스(sise_market_sum). 반환 (breadth, momentum, 표본수, codes).
-        표본이 80 미만이면 부분 실패로 보고 None (왜곡된 실측으로 채점 오염 방지).
+        fetch_kospi_top100.py와 동일 소스(sise_market_sum). 표본이 80 미만이면
+        부분 실패로 보고 None (왜곡된 실측으로 채점 오염 방지).
+
+        반환: {'breadth','momentum','sample','codes','extra'} 또는 None.
+        `extra`는 OBS_EXTRA의 부분집합이다 — 헤더 해석에 실패하면 등락률에서
+        나오는 열만 담긴다.
         """
         import requests
         from bs4 import BeautifulSoup
@@ -681,7 +739,18 @@ class TradeEngineWorker(BaseWorker):
             'Referer': 'https://finance.naver.com/',
         }
         codes, rates = [], []
+        caps, prices, volumes = [], [], []
         seen: set = set()
+
+        def _num(cols, idx):
+            if idx is None or idx >= len(cols):
+                return None
+            txt = cols[idx].get_text(strip=True).replace(',', '').replace('%', '')
+            try:
+                return float(txt)
+            except ValueError:
+                return None
+
         for page in range(1, 5):
             url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
             res = requests.get(url, headers=naver_hdrs, timeout=10)
@@ -689,6 +758,11 @@ class TradeEngineWorker(BaseWorker):
             table = soup.select_one('table.type_2')
             if not table:
                 break
+            # 헤더 해석 실패 시 등락률만 현행 고정 인덱스로 읽는다 — 기존 동작은
+            # 어떤 경우에도 나빠지지 않고, 신규 열만 비게 된다.
+            idx = resolve_market_columns(
+                [th.get_text(strip=True) for th in table.select('thead th')]
+            ) or {'rate': 4, 'price': None, 'cap': None, 'volume': None}
             for row in table.select('tr'):
                 cols = row.select('td')
                 if len(cols) < 5:
@@ -699,14 +773,15 @@ class TradeEngineWorker(BaseWorker):
                 code = name_tag['href'].split('code=')[-1]
                 if not code.isdigit() or code in seen:
                     continue
-                rate_txt = cols[4].get_text(strip=True).replace('%', '').replace(',', '')
-                try:
-                    rate = float(rate_txt)
-                except ValueError:
+                rate = _num(cols, idx['rate'])
+                if rate is None:
                     continue
                 seen.add(code)
                 codes.append(code)
                 rates.append(rate)
+                caps.append(_num(cols, idx['cap']))
+                prices.append(_num(cols, idx['price']))
+                volumes.append(_num(cols, idx['volume']))
                 if len(codes) >= 100:
                     break
             if len(codes) >= 100:
@@ -718,7 +793,14 @@ class TradeEngineWorker(BaseWorker):
             # 표본은 찼는데 아직 안 움직였다(개장 직후). 여기서 언팩하면 터지고,
             # 0으로 적으면 08-06~08-13처럼 리베로 예측이 통째로 0이 된다.
             return None
-        return bm[0], bm[1], len(codes), codes
+
+        def _clean(xs):
+            return xs if all(x is not None for x in xs) else None
+
+        return {
+            'breadth': bm[0], 'momentum': bm[1], 'sample': len(codes), 'codes': codes,
+            'extra': market_extras(rates, _clean(caps), _clean(prices), _clean(volumes)),
+        }
 
     def _append_regime_observation(self, now_kst, live_breadth) -> None:
         """국면 관측 이력에 한 건 남긴다 — 10분 해상도, 분 단위 시각.
@@ -732,13 +814,14 @@ class TradeEngineWorker(BaseWorker):
         if not live_breadth:
             return
         try:
-            from src.strategy.regime_observations import OBS_PATH_REL, append_observation
+            from src.strategy.regime_observations import append_observation, month_path
             append_observation(
-                OBS_PATH_REL,
+                month_path(now_kst),
                 now_kst.strftime('%Y-%m-%d %H:%M'),
-                live_breadth[0], live_breadth[1],
+                live_breadth['breadth'], live_breadth['momentum'],
                 self._top100_trend_from_csv(),
-                live_breadth[2], 'top100_live')
+                live_breadth['sample'], 'top100_live',
+                extra=live_breadth['extra'])
         except Exception as e:
             self.log_error(f"국면 관측 이력 기록 실패: {e}")
 

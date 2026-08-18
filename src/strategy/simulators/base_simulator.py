@@ -136,6 +136,11 @@ class BaseSimulator:
                     self.state = data
                     # 신규 필드 마이그레이션
                     self.state.setdefault('initial_cash', self.initial_cash)
+                    # state가 정본이다 — 리셋이 생성자 기본값과 다른 금액으로
+                    # 바뀌었으면 self.initial_cash(분모로 쓰는 인스턴스 속성)도
+                    # 따라가야 한다. 안 그러면 profit_rate·turnover가 옛 기본값
+                    # 기준으로 계산된다.
+                    self.initial_cash = self.state['initial_cash']
                     self.state.setdefault('peak_nav', data.get('cash', self.initial_cash))
                     self.state.setdefault('total_fees', 0)
                     self.state.setdefault('daily_trades', [])

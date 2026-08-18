@@ -55,9 +55,13 @@ export function deriveSimHoldings(
 /**
  * 누적 수익 = NAV − 초기자본. 수수료는 이미 현금에서 차감돼 있다.
  *
- * `total_asset`이 없으면 `cash`로 떨어진다 — 보유가 없는 심은 그게 곧 NAV다.
+ * `stats.profit`이 있으면 그걸 그대로 쓴다 — 서버(route.ts)가 `state.initial_cash`
+ * 기준으로 이미 계산해둔 정본이다. 리셋 예수금이 300만이 아니면 이 파일의
+ * `SIM_INITIAL_CASH`는 틀린 분모가 되므로, 그 값으로 재계산하는 건 `profit`이
+ * 없을 때(예: 옛 테스트 픽스처)의 폴백일 뿐이다.
  */
-export function computeNetPL(stats: { total_asset?: number; cash?: number } | null | undefined): number {
+export function computeNetPL(stats: { profit?: number; total_asset?: number; cash?: number } | null | undefined): number {
+  if (stats?.profit != null) return Math.round(stats.profit);
   return Math.round((stats?.total_asset || stats?.cash || 0) - SIM_INITIAL_CASH);
 }
 

@@ -65,6 +65,11 @@ test('total_asset이 없으면 cash가 NAV다 — 보유가 없는 심은 그게
   assert.equal(computeNetPL({ cash: SIM_INITIAL_CASH }), 0);
 });
 
+test('stats.profit이 있으면 그걸 그대로 쓴다 — 리셋 예수금이 300만이 아니어도 맞다', () => {
+  assert.equal(computeNetPL({ profit: -1234, total_asset: 2_900_000 }), -1234);
+  assert.equal(computeNetPL({ profit: 0, total_asset: 2_000_000 }), 0);
+});
+
 test('심 전체가 300만으로 출발한다', () => {
   assert.equal(SIM_INITIAL_CASH, 3_000_000);
 });

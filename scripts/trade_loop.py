@@ -291,14 +291,21 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
                            now=None,
                            include_regime: bool = False,
                            include_money=None,
-                           include_alerts: bool = False) -> None:
+                           include_alerts: bool = False,
+                           extra_sim_ids: set[str] | None = None) -> None:
     """이번 런이 실제로 갱신한 파일 이름을 적어둔다. 워크플로 배포 스텝이 읽는다.
 
-    "바뀐 파일을 전부 올린다"로는 안 된다. 이 런은 선택 심 하나(+국면)만 갱신하는데
-    data/에는 런 시작 시점에 받아온 다른 심들의 사본도 함께 있다. 그 사이
-    스크래퍼가 그 심들을 갱신했다면, 파일이 '다르다'는 이유로 낡은 사본을 올려
-    스크래퍼의 갱신을 되돌리게 된다(lost update). 두 워크플로는 concurrency
-    그룹이 달라 실제로 동시에 돈다.
+    "바뀐 파일을 전부 올린다"로는 안 된다. 이 런은 선택 심(+버즈 불필요 심
+    전체)과 국면만 갱신하는데 data/에는 런 시작 시점에 받아온 다른 심들의
+    사본도 함께 있다. 그 사이 스크래퍼가 그 심들을 갱신했다면, 파일이
+    '다르다'는 이유로 낡은 사본을 올려 스크래퍼의 갱신을 되돌리게 된다
+    (lost update). 두 워크플로는 concurrency 그룹이 달라 실제로 동시에 돈다.
+
+    extra_sim_ids: 2026-08-19, 버즈 불필요 심 전체(Sim2/3/4/6/8/9 등)를 이
+    워크플로의 60초 루프로 옮기면서 추가됨. sim_id(선택심) 하나만 올리던
+    시절과 이유는 같다 — 여기서 안 올리면 매분 계산한 그 심들의 매매가
+    컨테이너 종료와 함께 증발하고 다음 런은 db-data의 옛 상태에서 다시
+    시작한다(매분 도는 의미가 사라진다).
     """
     if include_regime and now is None:
         # try 안에 두면 아래 except가 삼켜서 로그 한 줄로 끝난다. 그러면 월 경계에
@@ -315,14 +322,18 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
             # 휴장 판정 실패 분기에서는 스크래퍼가 아예 안 뜬다 — 그때 여기서
             # 안 올리면 아무도 안 올려서 매 런이 '첫 알림'이 된다.
             names.append(alerts.STATE_FILENAME)
+        all_sim_ids = set(extra_sim_ids or set())
         if sim_id:
+            all_sim_ids.add(sim_id)
+        if all_sim_ids:
             from src.strategy.registry import get_sim_registry
-            entry = next((s for s in get_sim_registry(include_analyzers=True)
-                          if s['id'] == sim_id), None)
-            if entry:
-                names += [entry['state_file'], entry['csv_file']]
-            else:
-                log(f"[Deploy] '{sim_id}' 레지스트리에 없음 — 심 파일 생략")
+            reg = {s['id']: s for s in get_sim_registry(include_analyzers=True)}
+            for sid in sorted(all_sim_ids):
+                entry = reg.get(sid)
+                if entry:
+                    names += [entry['state_file'], entry['csv_file']]
+                else:
+                    log(f"[Deploy] '{sid}' 레지스트리에 없음 — 심 파일 생략")
         if not names:
             return
         os.makedirs('data', exist_ok=True)
@@ -392,6 +403,7 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     # ── 매매 루프 ─────────────────────────────────────────────────
     started = time.monotonic()
     traded_sim_id = None
+    buzz_free_ran: set[str] = set()
     turn = 0
     while True:
         turn += 1
@@ -401,8 +413,12 @@ def run_trade_loop(ctx: PipelineContext) -> None:
         turn_ctx = ctx if turn == 1 else PipelineContext.from_env()
         turn_ctx.log(f"── 매매 {turn}바퀴 ──")
         turn_started = time.monotonic()
-        traded = run_trade_only_cycle(turn_ctx, storage)
+        traded, ran_buzz_free = run_trade_only_cycle(turn_ctx, storage)
         traded_sim_id = traded or traded_sim_id
+        # 버즈 불필요 심들은 프로그램 매매 ON/OFF와 무관하게 매 바퀴 돈다
+        # (run_trade_only_cycle 참고) — 여러 바퀴에 걸쳐 돈 id를 전부 모아야
+        # 마지막에 한 번 쓰는 배포 매니페스트가 빠짐없이 반영한다.
+        buzz_free_ran |= ran_buzz_free
 
         if not traded:
             # OFF·버즈 필요 심(scraper 소관)·조회 실패 — 어느 쪽이든 60초 뒤에
@@ -440,13 +456,14 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     # 에서만 올렸는데, program_prep_over_budget(쿨다운 60분)은 정상 경로에서 나므로
     # 그쪽 억제가 통째로 무력화돼 2분마다 발송됐다.
     alerts_written = alerts.state_was_written()
-    if traded_sim_id or regime_refreshed or money_at or alerts_written:
+    if traded_sim_id or regime_refreshed or money_at or alerts_written or buzz_free_ran:
         # 배포 목록의 월별 파일명은 **기록한 시각**에서 나와야 한다. 런 시작 시각을
         # 쓰면 월 경계를 넘어간 런에서 방금 쓴 파일이 아니라 지난달 파일을 올린다.
         _write_deploy_manifest(traded_sim_id, ctx.log, now=ctx.now_kst,
                                include_regime=regime_refreshed,
                                include_money=money_at,
-                               include_alerts=alerts_written)
+                               include_alerts=alerts_written,
+                               extra_sim_ids=buzz_free_ran)
 
     ctx.log("=" * 50)
     ctx.log(f"TradeLoop 완료 ({turn}바퀴)")

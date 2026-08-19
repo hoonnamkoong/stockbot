@@ -227,6 +227,37 @@ def needs_buzz(sim_id: str, regime: str | None = None) -> bool:
     raise KeyError(f"[Registry] 심 '{sim_id}'를 매니페스트에서 찾을 수 없습니다.")
 
 
+def list_buzz_free_sim_ids(regime: str | None) -> set[str]:
+    """이번 국면에서 버즈가 필요 없는(=trading.yml 60초 루프 소관) 활성 심 id 집합.
+
+    2026-08-19: Sim2/3/4/6/8/9처럼 KIS 자체 유니버스만 쓰는 심들을 매분 갱신하기
+    위해 도입 — trading_cycle.py가 이 집합(에서 이미 선택심 매매로 처리한 것을
+    뺀 나머지)을 매분 돌리고, orchestrator.py는 같은 집합을 scraper.yml의
+    10분 스윕에서 빼야 한다(두 워크플로가 같은 상태 파일을 따로 쓰면
+    lost update가 난다 — exclude_sim_id 단일 버전과 같은 이유).
+
+    분석기(Sim0)·EOD 심(Sim9-1)의 id도 섞여 나올 수 있지만 해가 없다 —
+    _run_simulators가 그 둘은 이미 별도 조건(IS_ANALYZER/IS_EOD)으로 스스로
+    걸러낸다. 여기서 또 걸러내려면 인스턴스를 만들어야 하는데(그 속성은
+    클래스에 있어 id만으로는 모른다), 판정을 두 곳에 만들지 않는다.
+
+    판정 불가한 심(예외)은 넣지 않는다 — 모르면 버즈 필요로 보는
+    needs_buzz()의 fail-safe와 같은 방향이다.
+    """
+    manifest = _load_manifest()
+    out: set[str] = set()
+    for s in manifest.get('simulators', []):
+        if not s.get('active', True):
+            continue
+        sid = s['id']
+        try:
+            if not needs_buzz(sid, regime):
+                out.add(sid)
+        except Exception:
+            continue
+    return out
+
+
 def get_simulator_by_id(sim_id: str, initial_cash: int | None = None):
     """id로 매매 가능 시뮬레이터 인스턴스를 반환. active && tradeable 이 아니면 None(화이트리스트 강제).
 

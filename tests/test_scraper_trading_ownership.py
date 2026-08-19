@@ -137,19 +137,24 @@ def test_deploy_exclude_is_emptied_when_trading_owns_nothing(tmp_path):
         assert f.read().strip() == ''
 
 
-def test_the_run_writes_the_exclude_list_for_the_sim_trading_owns(tmp_path):
-    """소유권 판정과 배포 제외가 갈리면 안 된다 — 같은 값에서 나와야 한다."""
+def test_the_run_writes_the_exclude_list_for_the_buzz_free_set(tmp_path):
+    """2026-08-19: 배포 제외 집합은 선택 심 하나가 아니라 국면에서 정해지는
+    버즈 불필요 심 전체다(list_buzz_free_sim_ids) — trading.yml이 프로그램
+    매매 ON/OFF와 무관하게 이 집합을 60초마다 돌기 때문에, buzz_needed가
+    True든 False든 같은 값이 나와야 한다."""
     written = {}
     with mock.patch.object(orchestrator, 'write_deploy_exclude',
-                           side_effect=lambda sim_id, *a, **kw: written.setdefault('sim', sim_id)):
+                           side_effect=lambda sim_ids, *a, **kw: written.setdefault('ids', sim_ids)):
         _run(buzz_needed=False)
-    assert written['sim'] == 'sim4_bull_daytrading'
+    assert 'sim4_bull_daytrading' in written['ids']
 
     written.clear()
     with mock.patch.object(orchestrator, 'write_deploy_exclude',
-                           side_effect=lambda sim_id, *a, **kw: written.setdefault('sim', sim_id)):
+                           side_effect=lambda sim_ids, *a, **kw: written.setdefault('ids', sim_ids)):
         _run(buzz_needed=True)
-    assert written['sim'] is None, '스크래퍼가 매매하는 심은 스크래퍼가 배포한다'
+    assert 'sim4_bull_daytrading' in written['ids'], (
+        '선택 심이 버즈 필요라 스크래퍼가 그 심을 직접 매매해도, 다른 버즈 '
+        '불필요 심들의 페이퍼 쌍둥이는 여전히 trading.yml 소관이다')
 
 
 # ── 국면 ────────────────────────────────────────────────────────────
@@ -285,25 +290,31 @@ def test_blank_hint_is_not_a_regime(monkeypatch):
 # ── 페이퍼 쌍둥이의 writer도 하나다 (2026-08-08) ────────────────────
 
 def test_the_sim_owned_by_trading_yml_is_excluded_from_stage3():
-    """trading.yml은 실전이 돌린 심의 페이퍼 쌍둥이를 60초마다 갱신하고 배포한다.
-    여기서 같은 심을 런 시작 시점 스냅샷으로 다시 돌려 data/*.json을 통째로 밀면
-    그 4~5분치가 되돌아간다 — 실전과 페이퍼가 갈리는 방식이다."""
+    """trading.yml은 버즈 불필요 심 전체(선택 여부 무관)의 페이퍼 쌍둥이를
+    60초마다 갱신하고 배포한다. 여기서 같은 심들을 런 시작 시점 스냅샷으로
+    다시 돌려 data/*.json을 통째로 밀면 그 4~5분치가 되돌아간다."""
     tw, _ = _run(buzz_needed=False)
 
-    assert tw.return_value.run.call_args.kwargs['paper_owned_elsewhere'] \
-        == 'sim4_bull_daytrading'
+    excluded = tw.return_value.run.call_args.kwargs['paper_owned_elsewhere']
+    assert 'sim4_bull_daytrading' in excluded
 
 
-def test_nothing_is_excluded_when_the_scraper_owns_the_trading():
-    """버즈 필요 심은 여기서 매매하고 여기서 페이퍼도 돌린다."""
+def test_buzz_free_set_is_still_excluded_when_the_scraper_owns_the_trading():
+    """2026-08-19: 선택 심이 버즈 필요라 스크래퍼가 그 심을 직접 매매해도,
+    Sim2/3/4/6/8/9 같은 버즈 불필요 심들의 페이퍼 쌍둥이는 여전히
+    trading.yml 소관이다 — 이 집합은 국면에서 정해지지, 선택 심 매매 여부와
+    무관하다(list_buzz_free_sim_ids)."""
     tw, _ = _run(buzz_needed=True)
 
-    assert tw.return_value.run.call_args.kwargs['paper_owned_elsewhere'] is None
+    excluded = tw.return_value.run.call_args.kwargs['paper_owned_elsewhere']
+    assert excluded, '버즈 필요 심을 스크래퍼가 매매해도 버즈 불필요 심들은 여전히 제외돼야 한다'
+    assert 'sim_spillover' in excluded, 'Sim2 같은 버즈 불필요 심은 선택 심과 무관하게 제외돼야 한다'
 
 
-def test_nothing_is_excluded_when_ownership_is_undecidable():
-    """판정 불가면 trading.yml도 그 심을 안 돌린다 — 여기서 빼면 아무도 안 돌려
-    페이퍼가 그 사이클을 통째로 잃는다."""
+def test_buzz_free_set_is_still_excluded_when_ownership_is_undecidable():
+    """프로그램 매매 소유권을 못 정해도(선택 심 조회 실패 등), 국면에서 정해지는
+    버즈 불필요 심 전체는 그대로 trading.yml 소관이다 — 이 둘은 별개 판단이다."""
     tw, _ = _run(buzz_needed=None)
 
-    assert tw.return_value.run.call_args.kwargs['paper_owned_elsewhere'] is None
+    excluded = tw.return_value.run.call_args.kwargs['paper_owned_elsewhere']
+    assert excluded, '소유권 판정 불가와 무관하게 버즈 불필요 심들은 제외돼야 한다'

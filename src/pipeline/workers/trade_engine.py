@@ -153,7 +153,7 @@ class TradeEngineWorker(BaseWorker):
         stocks: list[StockData],
         sync_state: SyncState,
         skip_program_trading: bool = False,
-        paper_owned_elsewhere: str | None = None,
+        paper_owned_elsewhere: set[str] | None = None,
     ) -> tuple[list, list, dict]:
         """
         전략 판단과 딥다이브 대상 선정을 수행합니다.
@@ -162,9 +162,11 @@ class TradeEngineWorker(BaseWorker):
         낸다면 True. 원장 락·중복가드가 막아주긴 하지만, 불필요한 GitHub API
         왕복을 아예 피한다.
 
-        paper_owned_elsewhere: 그 심의 **페이퍼 쌍둥이도** trading.yml이 갱신·배포
-        한다는 뜻이다. 여기서 같은 심을 런 시작 시점 스냅샷으로 다시 돌리면
-        그 사이(4~5분) 페이퍼 매매가 되돌아간다 — 파일당 writer는 하나여야 한다.
+        paper_owned_elsewhere: 그 심들의 **페이퍼 쌍둥이도** trading.yml이 갱신·배포
+        한다는 뜻이다(2026-08-19: 선택 심 하나가 아니라 버즈 불필요 심 전체 —
+        trading.yml이 국면·선택 여부와 무관하게 이 집합을 60초마다 돈다). 여기서
+        같은 심을 런 시작 시점 스냅샷으로 다시 돌리면 그 사이(4~5분) 페이퍼
+        매매가 되돌아간다 — 파일당 writer는 하나여야 한다.
 
         Returns:
             (final_picks, simulation_results, sell_candidate)
@@ -290,7 +292,7 @@ class TradeEngineWorker(BaseWorker):
             self.log(f"[{session_name} 세션] 정각 아님 - 종목 상태 기록 생략")
 
         # 6. 시뮬레이터 실행 (Registry에서 자동 로드; sim0_libero는 run_regime_stage()가 별도로 돔)
-        self._run_simulators(candidates, exclude_sim_id=paper_owned_elsewhere)
+        self._run_simulators(candidates, exclude_sim_ids=paper_owned_elsewhere)
 
         # 7. 프로그램 매매(실전 계좌 자동 심 운용) — config ON & 유효 시에만 실주문(내부 fail-closed)
         # 버즈 불필요 심은 orchestrator가 Stage 1 이전에 이미 실행했다(skip_program_trading=True).
@@ -389,7 +391,9 @@ class TradeEngineWorker(BaseWorker):
     def _run_simulators(self, candidates: list[dict], only_sim_id: str | None = None,
                         allow_price_fallback: bool = True,
                         universe_override: list[dict] | None = None,
-                        exclude_sim_id: str | None = None) -> None:
+                        exclude_sim_id: str | None = None,
+                        exclude_sim_ids: set[str] | None = None,
+                        include_only_sim_ids: set[str] | None = None) -> None:
         """
         YAML Manifest의 active 시뮬레이터들을 실행합니다.
         실제 simulator.run(candidates, current_prices=dict) 시그니처 사용.
@@ -417,6 +421,15 @@ class TradeEngineWorker(BaseWorker):
           파리티가 문제다: 두 조회는 수십 초 차이라 서로 다른 '당일 등락률 상위
           30'을 볼 수 있고, 그러면 실전과 그 페이퍼 쌍둥이가 다른 유니버스로
           판단한다.
+        exclude_sim_ids: exclude_sim_id의 복수형(2026-08-19). trading.yml이 60초
+          루프로 이제 버즈 불필요 심 전체를 돌리므로, scraper.yml은 그 전체
+          집합을 자기 10분 스윕에서 빼야 한다 — 하나만 빼던 시절과 이유는 같다
+          (lost update). exclude_sim_id와 함께 줘도 되고(둘 다 합집합으로 제외),
+          단일 값만 남기지 않는 이유는 기존 호출부(단일 선택심 제외)를 건드리지
+          않기 위해서다.
+        include_only_sim_ids: 주어지면 이 집합의 상태 파일에 해당하는 심만
+          돈다(그 외는 전부 제외). trading.yml의 60초 루프가 버즈 불필요 심들만
+          골라 돌리는 데 쓴다 — only_sim_id(정확히 1개)의 다중 버전이다.
         """
         try:
             # 1. 오늘 candidates 기반으로 현재가 구성
@@ -437,11 +450,19 @@ class TradeEngineWorker(BaseWorker):
             else:
                 simulators = [s for s in get_active_simulators()
                               if not getattr(s, 'IS_ANALYZER', False)]
-                skip_file = self._state_file_of(exclude_sim_id)
-                if skip_file:
+                skip_files = self._state_files_of(exclude_sim_ids)
+                one_skip = self._state_file_of(exclude_sim_id)
+                if one_skip:
+                    skip_files.add(one_skip)
+                if skip_files:
                     simulators = [s for s in simulators
-                                  if os.path.basename(getattr(s, 'state_file', '')) != skip_file]
-                    self.log(f"  '{exclude_sim_id}' 제외 — trading.yml이 그 심의 writer다")
+                                  if os.path.basename(getattr(s, 'state_file', '')) not in skip_files]
+                    self.log(f"  제외 — trading.yml이 이 심들의 writer다: "
+                             f"{exclude_sim_id or ''} {sorted(exclude_sim_ids or [])}")
+                if include_only_sim_ids is not None:
+                    keep_files = self._state_files_of(include_only_sim_ids)
+                    simulators = [s for s in simulators
+                                  if os.path.basename(getattr(s, 'state_file', '')) in keep_files]
             self.log(f"시뮬레이터 동기화 시작 ({len(simulators)}개 활성, {len(current_prices)}개 현재가)")
 
             # 2. 포트폴리오 종목 중 현재가 미확보된 코드 수집
@@ -461,7 +482,30 @@ class TradeEngineWorker(BaseWorker):
                 self.log(f"  현재가 미확보 {len(missing_codes)}개 — 네이버 보강 생략"
                          f"(lite 경로). 자체 유니버스로 못 채우는 심은 건너뜁니다.")
 
-            for sim in simulators:
+            # 3.5. 자체 유니버스를 쓰는 심들이 이번 사이클에 조회할 종목을 먼저
+            # 모아 종목코드 기준으로 한 번만 보강한다(위 _merge_own_universes 참고).
+            # universe_override가 있으면(only_sim_id 경로) 그 심은 이미 유니버스를
+            # 확정받았으니 여기서 새로 만들 게 없다.
+            #
+            # 새 자체유니버스 심이 매니페스트에 추가되거나 기존 심이 교체돼도
+            # 이 for 루프(get_active_simulators가 넘겨주는 목록)에 들어오기만
+            # 하면 아무 배선 없이 이 캐시를 자동으로 나눠 쓴다 — 특정 심 id를
+            # 여기 하드코딩하지 않는 이유다.
+            own_universes: list[list[dict] | None] = [None] * len(simulators)
+            enriched_by_code: dict[str, dict] = {}
+            if not universe_override:
+                for i, sim in enumerate(simulators):
+                    if getattr(sim, 'IS_EOD', False):
+                        continue
+                    own_universes[i] = sim.get_universe()
+                pool = self._merge_own_universes([u for u in own_universes if u])
+                if pool:
+                    enriched_by_code = {s['code']: s for s in self._enrich_universe(pool)
+                                        if s.get('code')}
+                    self.log(f"  자체 유니버스 공유 보강: 종목 {len(pool)}개 "
+                             f"({sum(len(u) for u in own_universes if u)}건 중복 제거)")
+
+            for i, sim in enumerate(simulators):
                 try:
                     # 일봉 전략은 장중 10분 루프에서 돌 이유가 없다 —
                     # scripts/run_eod_sims.py가 마감 후 1회 돌린다.
@@ -472,9 +516,15 @@ class TradeEngineWorker(BaseWorker):
                     # 빈 유니버스로 돌리면 보유 종목 현재가가 통째로 사라져
                     # 허위 손절이 난다.
                     sim_candidates = universe_override or None
-                    own_universe = None if sim_candidates else sim.get_universe()
-                    if own_universe:
-                        sim_candidates = self._enrich_universe(own_universe)
+                    if sim_candidates is None:
+                        own_universe = own_universes[i]
+                        if own_universe:
+                            # 위에서 이미 보강한 공유 풀에서 이 심의 순서대로
+                            # 되돌려준다 — 심마다 사본을 줘야 뒤이어 도는 다른
+                            # 심의 in-place 변경이 이 심의 후보를 오염시키지 않는다.
+                            sim_candidates = [dict(enriched_by_code[s['code']])
+                                              for s in own_universe
+                                              if s.get('code') in enriched_by_code]
                     if sim_candidates:
                         sim_prices = dict(current_prices)
                         sim_prices.update({
@@ -506,6 +556,33 @@ class TradeEngineWorker(BaseWorker):
             self.log_error(f"시뮬레이터 전체 실패: {e}")
 
     @staticmethod
+    def _merge_own_universes(universes: list[list[dict]]) -> list[dict]:
+        """여러 심의 get_universe() 결과를 종목코드 기준으로 합친다 — 중복 종목은 한 번만.
+
+        2026-08-19 실측: Sim4/4-1/9는 완전히 같은 30종목을, Sim2/8은 77%
+        겹치는 종목을 각자 따로 보강해(_enrich_universe) 65초가 나왔다.
+        같은 코드가 여러 심 유니버스에 나오면 필드를 합집합으로 합친다 —
+        이미 채워진(참인) 값은 나중에 보는 심의 결손·0으로 덮어쓰지 않는다
+        (enrich_kis가 조회 실패를 0으로 채우지 않는 것과 같은 원칙). 이걸
+        어기면 어느 심의 원본이 먼저/나중에 도느냐에 따라 다른 심이 쓰는
+        필드가 조용히 사라진다.
+        """
+        merged: dict[str, dict] = {}
+        for universe in universes:
+            for stock in universe:
+                code = stock.get('code')
+                if not code:
+                    continue
+                if code not in merged:
+                    merged[code] = dict(stock)
+                else:
+                    dst = merged[code]
+                    for k, v in stock.items():
+                        if v and not dst.get(k):
+                            dst[k] = v
+        return list(merged.values())
+
+    @staticmethod
     def _state_file_of(sim_id: str | None) -> str | None:
         """매니페스트가 그 심에 물려둔 상태 파일 이름. 못 찾으면 None.
 
@@ -522,6 +599,20 @@ class TradeEngineWorker(BaseWorker):
         except Exception:
             pass
         return None
+
+    @staticmethod
+    def _state_files_of(sim_ids: set[str] | None) -> set[str]:
+        """_state_file_of의 복수형. 못 찾은 id는 조용히 빠진다(단일 버전과 같은 fail 방향)."""
+        if not sim_ids:
+            return set()
+        out = set()
+        try:
+            from src.strategy.registry import get_sim_registry
+            reg = {s['id']: s['state_file'] for s in get_sim_registry(include_analyzers=True)}
+            out = {reg[sid] for sid in sim_ids if sid in reg}
+        except Exception:
+            pass
+        return out
 
     def _enrich_universe(self, stocks: list[dict]) -> list[dict]:
         """
@@ -609,8 +700,32 @@ class TradeEngineWorker(BaseWorker):
         # kis 인스턴스를 스레드끼리 공유하는 이유는 스파크라인 단계와 같다: 그래야
         # get_price_quote의 인스턴스 캐시가(같은 종목이 중복 조회될 때) 의미가 있다.
         try:
+            import threading
             from src.trade.kis_data_provider import KISDataProvider
             kis = KISDataProvider()
+
+            # KIS 유량제한은 초당 20건(trade_engine.py의 다른 자리 주석 참고)인데
+            # 이 아래 ThreadPoolExecutor(10)는 종목당 최대 3콜을 아무 간격 없이
+            # 쏜다. 종목 수가 적을 때(개별 심 30종목)는 우연히 안 걸렸을 뿐, 08-19
+            # 실측에서 풀을 89종목으로 합치자(연속 버스트가 길어지자) 종목당
+            # 0~3.4%가 quote 응답 전체 결손(가짜 실패, 재조회하면 정상 값)으로
+            # 조용히 삼켜졌다(`_get`이 rt_cd≠0에 재시도하지 않는 설계라 그대로
+            # 빈 값이 된다). 유니버스를 합쳐 콜 수 자체는 줄었지만 그만큼 한
+            # 버스트에 몰리면서 순간 동시 요청이 늘어난 탓이다. 종목마다 최대
+            # 3콜이 이 잠금을 거치므로 전체 처리량은 최대 초당 (1/PACE_INTERVAL)
+            # 콜로 묶인다 — 병렬 스레드 수(10)와 무관하게 유량제한 아래로 눌러둔다.
+            pace_lock = threading.Lock()
+            pace_state = {'last': 0.0}
+            PACE_INTERVAL = 1.0 / 10  # 20건/초 한도에서 50% 여유(08-19 실측: 15건/초도 간헐 결손)
+
+            def _pace():
+                with pace_lock:
+                    now = time.monotonic()
+                    wait = pace_state['last'] + PACE_INTERVAL - now
+                    if wait > 0:
+                        time.sleep(wait)
+                        now = time.monotonic()
+                    pace_state['last'] = now
 
             def enrich_kis(stock):
                 code = stock.get('code', '')
@@ -621,6 +736,7 @@ class TradeEngineWorker(BaseWorker):
                 if (not (stock.get('per') and stock.get('pbr'))
                         or 'change_rate' not in stock or 'w52_hgpr' not in stock):
                     try:
+                        _pace()
                         quote = kis.get_price_quote(code)
                         for k in ('per', 'pbr', 'sector_name'):
                             if quote.get(k):
@@ -662,6 +778,7 @@ class TradeEngineWorker(BaseWorker):
                 # '측정 불가'와 '체결강도 0'이 합쳐진다.
                 if 'tick_power' not in stock:
                     try:
+                        _pace()
                         tp = kis.get_tick_power(code, timeout=_TICK_TIMEOUT_SEC)
                         if tp:
                             stock['tick_power'] = tp
@@ -670,6 +787,7 @@ class TradeEngineWorker(BaseWorker):
                 # 수급 — 유니버스 자체에 이미 값이 있으면 덮어쓰지 않음
                 if 'frgn_fake_ntby_qty' not in stock or 'orgn_fake_ntby_qty' not in stock:
                     try:
+                        _pace()
                         trend = kis.get_investor_trend_estimate(code)
                         stock.setdefault('frgn_fake_ntby_qty', trend.get('frgn_fake_ntby_qty', 0))
                         stock.setdefault('orgn_fake_ntby_qty', trend.get('orgn_fake_ntby_qty', 0))

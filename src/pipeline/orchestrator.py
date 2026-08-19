@@ -15,6 +15,7 @@ from src.pipeline.context import PipelineContext
 from src.data import sim_diag
 from src.data.storage_manager import StorageManager
 from src.pipeline.trading_cycle import selected_sim_and_buzz
+from src.strategy.registry import list_buzz_free_sim_ids
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
 from src.pipeline.workers.llm_analyzer import LLMAnalyzerWorker
 from src.pipeline.workers.trade_engine import TradeEngineWorker
@@ -52,7 +53,7 @@ def active_only(items: list) -> list:
 DEPLOY_EXCLUDE_REL = os.path.join('data', '.scraper_deploy_exclude')
 
 
-def write_deploy_exclude(sim_id: str | None, log=print,
+def write_deploy_exclude(sim_ids: set[str] | str | None, log=print,
                          path: str = DEPLOY_EXCLUDE_REL) -> list[str]:
     """trading.yml이 writer인 파일 이름을 배포 스텝에 넘긴다. 반환은 적어 넣은 이름들.
 
@@ -63,6 +64,11 @@ def write_deploy_exclude(sim_id: str | None, log=print,
     옛 사본으로 덮어쓴다 — 60초 루프 4~5분치가 통째로 되돌아간다(lost update).
     파일을 안 만드는 것과 파일을 안 올리는 것은 다른 문제다.
 
+    sim_ids: 2026-08-19부터 선택 심 하나가 아니라 **버즈 불필요 심 전체**다
+    (trading.yml이 국면·선택 여부와 무관하게 이 집합을 60초마다 돈다 —
+    src.strategy.registry.list_buzz_free_sim_ids). 단일 문자열도 받는다
+    (호환용 — 과거 호출부·테스트가 남아 있다면 그대로 동작한다).
+
     정적 case문에 못 넣는 이유: 선택 심은 program_trading.json이 정하므로 런타임에만
     안다. 그래서 이름을 파일로 넘긴다.
 
@@ -72,17 +78,19 @@ def write_deploy_exclude(sim_id: str | None, log=print,
     실패는 예외로 올리지 않는다. 여기서 죽으면 스크래핑 산출물 전체가 배포를 못 하는데,
     그건 되돌림보다 나쁘다 — 대신 로그에 남긴다.
     """
+    ids = {sim_ids} if isinstance(sim_ids, str) else set(sim_ids or ())
     names: list[str] = []
-    if sim_id:
+    if ids:
         try:
             from src.strategy.registry import get_sim_registry
-            entry = next((s for s in get_sim_registry(include_analyzers=True)
-                          if s['id'] == sim_id), None)
-            if entry:
-                names = [os.path.basename(entry['state_file']),
-                         os.path.basename(entry['csv_file'])]
-            else:
-                log(f"[Deploy] '{sim_id}' 레지스트리에 없음 — 배포 제외 없이 진행")
+            reg = {s['id']: s for s in get_sim_registry(include_analyzers=True)}
+            for sid in sorted(ids):
+                entry = reg.get(sid)
+                if entry:
+                    names += [os.path.basename(entry['state_file']),
+                             os.path.basename(entry['csv_file'])]
+                else:
+                    log(f"[Deploy] '{sid}' 레지스트리에 없음 — 배포 제외 없이 진행")
         except Exception as e:
             log(f"[경고] 배포 제외 목록 작성 실패(되돌림 위험): {e}")
     try:
@@ -168,11 +176,15 @@ def run_pipeline(ctx: PipelineContext) -> None:
     with ctx.stage("Stage 0.5: 매매 소유권 판정"):
         selected_sim, buzz_needed = selected_sim_and_buzz(ctx, regime)
         scraper_owns_trading = buzz_needed is True
-        # 페이퍼 쌍둥이도 writer가 하나여야 한다. trading.yml이 매매하는 심은
-        # 그쪽이 60초마다 갱신·배포하므로, 여기서 런 시작 시점 스냅샷으로 다시
-        # 돌리면 그 사이 페이퍼 매매가 통째로 되돌아간다(lost update).
-        # 판정 불가(None)면 trading.yml도 안 돌리므로 여기서 빼면 안 된다.
-        paper_owned_elsewhere = selected_sim if buzz_needed is False else None
+        # 페이퍼 쌍둥이도 writer가 하나여야 한다. 2026-08-19: 이 집합은 선택 심
+        # 하나가 아니라 **버즈 불필요 심 전체**다 — trading.yml이 국면·선택
+        # 여부와 무관하게 이 집합을 60초마다 돈다(trading_cycle.py의
+        # list_buzz_free_sim_ids 사용과 정확히 같은 계산). 여기서 런 시작
+        # 시점 스냅샷으로 같은 심을 다시 돌리면 그 사이 페이퍼 매매가 통째로
+        # 되돌아간다(lost update). 프로그램 매매 소유권(selected_sim/
+        # buzz_needed)과는 별개 판단이다 — trading.yml의 버즈 불필요 스윕은
+        # 프로그램 매매 ON/OFF와 무관하게 돈다.
+        paper_owned_elsewhere = list_buzz_free_sim_ids(regime)
         # Stage 3 제외(돌리지 않는다)와 배포 제외(올리지 않는다)는 다른 문제다.
         # 둘 다 같은 값에서 나와야 판정이 갈리지 않는다.
         write_deploy_exclude(paper_owned_elsewhere, ctx.log)

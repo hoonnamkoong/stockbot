@@ -23,7 +23,7 @@ orchestrator에서 떼어낸 이유는 두 가지다.
 """
 
 from src.strategy.regime_state import read_regime
-from src.strategy.registry import needs_buzz as sim_needs_buzz
+from src.strategy.registry import needs_buzz as sim_needs_buzz, list_buzz_free_sim_ids
 from src.pipeline.context import PipelineContext
 from src.data import sim_diag
 from src.data.storage_manager import StorageManager
@@ -112,8 +112,8 @@ def trade_if_buzz_free(ctx: PipelineContext, trade_worker,
         return None, None
 
 
-def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str | None:
-    """스크래핑 없이 매매 + 선택 심 페이퍼 동기화만 하고 끝나는 사이클 한 바퀴.
+def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> tuple[str | None, set[str]]:
+    """스크래핑 없이 매매 + 선택 심 페이퍼 동기화 + 버즈 불필요 심 전체를 도는 한 바퀴.
 
     국면은 **읽기만** 한다. 갱신은 10분 격자에서 딱 한 번 일어나야 한다 —
     국면은 최근 5회 관측의 과반으로 확정되므로(sim0_libero._confirm_regime)
@@ -122,7 +122,9 @@ def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str |
 
     휴장일 판정은 호출자가 이미 했다고 본다(중복 호출 = KIS 콜 낭비).
 
-    반환: 실제로 매매한 심 id, 안 했으면 None.
+    반환: (실제로 매매한 심 id(안 했으면 None), 이번 바퀴에 돌린 버즈 불필요 심 id 집합).
+    후자는 trade_loop이 배포 매니페스트에 그 심들의 상태 파일을 넣기 위해 필요하다 —
+    안 넣으면 여기서 계산한 매매가 컨테이너 종료와 함께 그냥 증발한다.
     """
     sim_diag.set_cycle(ctx.cycle_id)
 
@@ -147,4 +149,22 @@ def run_trade_only_cycle(ctx: PipelineContext, storage: StorageManager) -> str |
             except Exception as e:
                 ctx.log(f"[경고] 선택 심 페이퍼 동기화 실패(매매는 완료됨): {e}")
 
-    return traded_sim_id
+    # 버즈 불필요 심 전체(선택심 제외)도 같은 60초 주기로 갱신한다. 2026-08-19:
+    # 종목코드 기준 공유 보강(_merge_own_universes)으로 60초 예산 안에 들어오는
+    # 것을 실측 확인했다(89종목 고유, 유량제한 페이싱 포함 37~38초). 실전 선택
+    # 여부와 무관하게 돈다 — 이 심들은 페이퍼일 뿐이고 대시보드 성과가 실시간이길
+    # 기대하는 대상이라, 프로그램 매매 OFF라고 멈출 이유가 없다.
+    buzz_free_ids = list_buzz_free_sim_ids(regime)
+    if traded_sim_id:
+        buzz_free_ids = buzz_free_ids - {traded_sim_id}
+    ran_ids: set[str] = set()
+    if buzz_free_ids:
+        with ctx.stage("버즈 불필요 페이퍼 심 동기화"):
+            try:
+                trade_worker._run_simulators(
+                    [], allow_price_fallback=False, include_only_sim_ids=buzz_free_ids)
+                ran_ids = buzz_free_ids
+            except Exception as e:
+                ctx.log(f"[경고] 버즈 불필요 페이퍼 심 동기화 실패: {e}")
+
+    return traded_sim_id, ran_ids

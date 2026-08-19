@@ -90,7 +90,7 @@ def _budget(monkeypatch, turns: int):
 
 
 def test_repeats_until_the_budget_runs_out(stub):
-    cycles = mock.MagicMock(return_value='sim4_bull_daytrading')
+    cycles = mock.MagicMock(return_value=('sim4_bull_daytrading', set()))
     stub.setattr(trade_loop, 'run_trade_only_cycle', cycles)
     _budget(stub, 2)
 
@@ -107,7 +107,7 @@ def test_each_turn_gets_a_fresh_context(stub):
     stub.setattr(trade_loop.PipelineContext, 'from_env',
                  classmethod(lambda cls: made.append(1) or _Ctx()))
     stub.setattr(trade_loop, 'run_trade_only_cycle',
-                 mock.MagicMock(return_value='sim4_bull_daytrading'))
+                 mock.MagicMock(return_value=('sim4_bull_daytrading', set())))
     _budget(stub, 3)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -118,7 +118,7 @@ def test_each_turn_gets_a_fresh_context(stub):
 def test_exits_immediately_when_there_is_nothing_to_trade(stub):
     """OFF·버즈 필요 심·조회 실패는 전부 None이다. 60초를 자며 기다릴 이유가
     없다 — 재시도는 2분 뒤 태스커 하트비트가 한다."""
-    cycles = mock.MagicMock(return_value=None)
+    cycles = mock.MagicMock(return_value=(None, set()))
     stub.setattr(trade_loop, 'run_trade_only_cycle', cycles)
     _budget(stub, 5)
 
@@ -133,7 +133,7 @@ def test_exits_immediately_when_there_is_nothing_to_trade(stub):
 def test_refreshes_regime_and_wakes_scraper_only_when_due(stub):
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
     stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -143,7 +143,7 @@ def test_refreshes_regime_and_wakes_scraper_only_when_due(stub):
 
 
 def test_leaves_regime_and_scraper_alone_when_not_due(stub):
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -159,8 +159,11 @@ def test_regime_is_refreshed_before_trading(stub):
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
     stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'refresh_regime', lambda *a, **k: order.append('regime'))
-    stub.setattr(trade_loop, 'run_trade_only_cycle',
-                 lambda *a, **k: order.append('trade'))
+
+    def _trade(*a, **k):
+        order.append('trade')
+        return None, set()
+    stub.setattr(trade_loop, 'run_trade_only_cycle', _trade)
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -173,7 +176,7 @@ def test_scraper_dispatch_failure_does_not_stop_trading(stub):
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'dispatch_scraper',
                  mock.MagicMock(side_effect=RuntimeError('boom')))
-    cycles = mock.MagicMock(return_value=None)
+    cycles = mock.MagicMock(return_value=(None, set()))
     stub.setattr(trade_loop, 'run_trade_only_cycle', cycles)
     _budget(stub, 1)
 
@@ -188,7 +191,7 @@ def test_regime_refresh_failure_does_not_stop_trading(stub):
     stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'refresh_regime',
                  mock.MagicMock(side_effect=RuntimeError('boom')))
-    cycles = mock.MagicMock(return_value=None)
+    cycles = mock.MagicMock(return_value=(None, set()))
     stub.setattr(trade_loop, 'run_trade_only_cycle', cycles)
     _budget(stub, 1)
 
@@ -231,7 +234,7 @@ def test_deploy_manifest_written_once_after_the_loop(stub, tmp_path):
     stub.setattr(trade_loop, '_write_deploy_manifest',
                  lambda sim, log=print, **kw: written.append(sim))
     stub.setattr(trade_loop, 'run_trade_only_cycle',
-                 mock.MagicMock(return_value='sim4_bull_daytrading'))
+                 mock.MagicMock(return_value=('sim4_bull_daytrading', set())))
     _budget(stub, 2)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -243,7 +246,7 @@ def test_no_manifest_when_nothing_traded_and_regime_untouched(stub):
     written = []
     stub.setattr(trade_loop, '_write_deploy_manifest',
                  lambda sim, log=print, **kw: written.append(sim))
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -261,7 +264,7 @@ def test_regime_files_are_deployed_even_when_nothing_traded(stub):
     stub.setattr(trade_loop, '_write_deploy_manifest',
                  lambda sim, log=print, include_regime=False, **kw:
                      calls.append((sim, include_regime)))
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -280,7 +283,7 @@ def test_regime_files_are_not_deployed_when_refresh_failed(stub):
     stub.setattr(trade_loop, '_write_deploy_manifest',
                  lambda sim, log=print, include_regime=False, **kw:
                      calls.append((sim, include_regime)))
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -310,6 +313,53 @@ def test_manifest_contains_regime_and_sim_files(tmp_path, monkeypatch):
     assert os.path.basename(month_path(now)) in lines
     assert 'sim_bulldaytrade_state.json' in lines
     assert len(lines) == len(set(lines)), '중복 없이 기록돼야 한다'
+
+
+# ── extra_sim_ids: 버즈 불필요 심 전체 배포 (2026-08-19) ────────────────
+# 선택 심 하나만 올리던 매니페스트에, 60초 루프로 옮긴 나머지 버즈 불필요
+# 심들(Sim2/3/4/6/8/9 등)의 상태 파일도 실려야 한다 — 안 그러면 매분 계산한
+# 매매가 컨테이너 종료와 함께 증발한다.
+
+def test_extra_sim_ids_are_included_in_the_manifest(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    trade_loop._write_deploy_manifest(
+        None, log=lambda *a: None,
+        extra_sim_ids={'sim_spillover', 'sim_risk'})
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert 'sim_spillover_state.json' in lines
+    assert 'trade_history_sim_spillover.csv' in lines
+    assert 'sim_risk_state.json' in lines
+
+
+def test_extra_sim_ids_combine_with_the_selected_sim_without_duplicating():
+    """선택 심이 우연히 extra_sim_ids에도 들어 있어도(집합이라 안 그렇겠지만
+    방어적으로) 파일이 두 번 적히면 안 된다."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        import os as _os
+        cwd = _os.getcwd()
+        _os.chdir(d)
+        try:
+            trade_loop._write_deploy_manifest(
+                'sim4_bull_daytrading', log=lambda *a: None,
+                extra_sim_ids={'sim4_bull_daytrading', 'sim_spillover'})
+            lines = (open(_os.path.join(d, 'data', '.lite_deploy_manifest'),
+                          encoding='utf-8').read().split())
+        finally:
+            _os.chdir(cwd)
+    assert len(lines) == len(set(lines)), '중복 없이 기록돼야 한다'
+    assert 'sim_bulldaytrade_state.json' in lines
+    assert 'sim_spillover_state.json' in lines
+
+
+def test_no_extra_sim_ids_behaves_like_before(tmp_path, monkeypatch):
+    """extra_sim_ids를 안 주면(기본값 None) 기존 동작과 동일해야 한다."""
+    monkeypatch.chdir(tmp_path)
+    trade_loop._write_deploy_manifest('sim4_bull_daytrading', log=lambda *a: None)
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert lines == ['sim_bulldaytrade_state.json', 'trade_history_sim_bulldaytrade.csv']
 
 
 # ── 스크래퍼 중복 dispatch 방지 ──────────────────────────────────────
@@ -365,7 +415,7 @@ def test_regime_is_not_refreshed_again_while_the_scraper_is_still_running(stub):
     """스크래핑 게이트는 아직 열려 있어도(스크래퍼 미완료) 국면은 닫혀 있다."""
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
     stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: False)
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -378,7 +428,7 @@ def test_marks_the_regime_gate_after_a_successful_refresh(stub):
     marks = mock.MagicMock()
     stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop.scrape_gate, 'mark_regime', marks)
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -393,7 +443,7 @@ def test_does_not_mark_the_regime_gate_when_the_refresh_failed(stub):
     stub.setattr(trade_loop.scrape_gate, 'mark_regime', marks)
     stub.setattr(trade_loop, 'refresh_regime',
                  mock.MagicMock(side_effect=RuntimeError('boom')))
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -460,7 +510,7 @@ def test_the_alert_cooldown_file_is_deployed_on_an_ordinary_run(stub):
     stub.setattr(trade_loop.alerts, 'send_alert', mock.MagicMock(return_value=True))
     stub.setattr(trade_loop, '_write_deploy_manifest',
                  lambda sim, log=print, **kw: calls.append(kw))
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     stub.setattr(trade_loop, 'collect_rank_snapshot', lambda *a, **k: None)
     ctx = _Ctx()
     # 매매도 국면 갱신도 순위 수집도 없는 런에서 알림만 났다.
@@ -479,7 +529,7 @@ def test_a_run_that_alerted_nothing_does_not_deploy_the_cooldown_file(stub):
     calls = []
     stub.setattr(trade_loop, '_write_deploy_manifest',
                  lambda sim, log=print, **kw: calls.append(kw))
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value='sim4'))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=('sim4', set())))
     stub.setattr(trade_loop, 'collect_rank_snapshot', lambda *a, **k: None)
     _budget(stub, 1)
 
@@ -547,7 +597,7 @@ def test_the_dispatched_regime_is_the_one_just_refreshed(stub):
     stub.setattr(trade_loop.scrape_gate, 'is_scrape_due', lambda *a, **k: True)
     stub.setattr(trade_loop.scrape_gate, 'is_regime_due', lambda *a, **k: True)
     stub.setattr(trade_loop, 'refresh_regime', mock.MagicMock(return_value='SIDEWAYS'))
-    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=None))
+    stub.setattr(trade_loop, 'run_trade_only_cycle', mock.MagicMock(return_value=(None, set())))
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -566,7 +616,7 @@ def test_rank_snapshot_runs_once_per_run_not_per_turn(stub):
     snap = mock.MagicMock()
     stub.setattr(trade_loop, 'collect_rank_snapshot', snap)
     stub.setattr(trade_loop, 'run_trade_only_cycle',
-                 mock.MagicMock(return_value='sim4_bull_daytrading'))
+                 mock.MagicMock(return_value=('sim4_bull_daytrading', set())))
     _budget(stub, 3)
 
     trade_loop.run_trade_loop(_Ctx())
@@ -578,7 +628,7 @@ def test_rank_snapshot_failure_does_not_stop_trading(stub):
     """페이퍼 신호 수집이 실전 매매를 막으면 안 된다."""
     stub.setattr(trade_loop, 'collect_rank_snapshot',
                  mock.MagicMock(side_effect=RuntimeError('boom')))
-    cycles = mock.MagicMock(return_value='sim4_bull_daytrading')
+    cycles = mock.MagicMock(return_value=('sim4_bull_daytrading', set()))
     stub.setattr(trade_loop, 'run_trade_only_cycle', cycles)
     _budget(stub, 1)
 
@@ -591,8 +641,11 @@ def test_rank_snapshot_happens_after_trading(stub):
     """매매가 KIS 유량을 먼저 쓴다. 순위 수집이 앞서면 주문이 유량에 밀린다."""
     order = []
     stub.setattr(trade_loop, 'collect_rank_snapshot', lambda *a, **k: order.append('rank'))
-    stub.setattr(trade_loop, 'run_trade_only_cycle',
-                 lambda *a, **k: order.append('trade'))
+
+    def _trade(*a, **k):
+        order.append('trade')
+        return None, set()
+    stub.setattr(trade_loop, 'run_trade_only_cycle', _trade)
     _budget(stub, 1)
 
     trade_loop.run_trade_loop(_Ctx())

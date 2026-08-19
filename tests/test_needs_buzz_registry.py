@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.strategy.registry import needs_buzz, _load_manifest
+from src.strategy.registry import needs_buzz, list_buzz_free_sim_ids, _load_manifest
 
 
 # 2026-08-04 office-hours 설계 문서에서 확정한 마킹표.
@@ -74,3 +74,51 @@ def test_dynamic_sims_have_classmethod():
     for sim_id in dynamic_ids:
         # 예외 없이 호출되면 충분 — registry.needs_buzz()가 내부에서 classmethod를 찾는다.
         needs_buzz(sim_id, regime='SIDEWAYS')
+
+
+# ── list_buzz_free_sim_ids (2026-08-19) ─────────────────────────────
+# trading.yml의 60초 루프가 이 집합을 매분 돌린다. 08-19 실측: 로컬 테스트에서
+# 국면 두 입력(이 함수에 준 값 vs Sim10 자신이 내부에서 다시 읽은 값)이
+# 어긋나자 Sim10이 SIDEWAYS 전용의 무거운 유니버스(시총 상위 100)를 끌고 와
+# 60초 예산을 넘겼다(82초). 원인은 로컬 국면 파일이 낡아서였지, 이 함수의
+# 결함이 아니었다 — needs_buzz(SIDEWAYS)=True라 애초에 SIDEWAYS에서는 Sim10이
+# 이 집합에 안 들어간다. 그 전제가 깨지지 않게 고정한다.
+
+def test_list_buzz_free_sim_ids_matches_needs_buzz_for_every_active_sim():
+    manifest = _load_manifest()
+    for regime in ('BULL', 'SIDEWAYS', 'BEAR', None):
+        buzz_free = list_buzz_free_sim_ids(regime)
+        for s in manifest['simulators']:
+            if not s.get('active', True):
+                continue
+            sid = s['id']
+            expected_free = not needs_buzz(sid, regime)
+            assert (sid in buzz_free) == expected_free, (
+                f'{sid} @ {regime}: needs_buzz={not expected_free}인데 '
+                f'buzz_free 집합 소속={sid in buzz_free}')
+
+
+def test_sim10_only_joins_the_sweep_when_its_own_universe_is_cheap():
+    """Sim10은 BULL·BEAR에서만 이 집합에 들어가야 한다 — 그 두 국면에서만
+    get_universe()가 KIS 자체 유니버스(30종목/고정 1종목)를 쓴다. SIDEWAYS에서
+    들어가면 시총 상위 100짜리 무거운 유니버스가 60초 루프에 끼어든다."""
+    assert 'sim10_orchestrator' in list_buzz_free_sim_ids('BULL')
+    assert 'sim10_orchestrator' in list_buzz_free_sim_ids('BEAR')
+    assert 'sim10_orchestrator' not in list_buzz_free_sim_ids('SIDEWAYS')
+    assert 'sim10_orchestrator' not in list_buzz_free_sim_ids(None)
+
+
+def test_buzz_needing_sims_never_appear():
+    for regime in ('BULL', 'SIDEWAYS', 'BEAR', None):
+        buzz_free = list_buzz_free_sim_ids(regime)
+        assert 'sim_psych' not in buzz_free
+        assert 'sim5_sideways' not in buzz_free
+        assert 'sim7_report_follower' not in buzz_free
+
+
+def test_static_buzz_free_sims_are_always_present_regardless_of_regime():
+    for regime in ('BULL', 'SIDEWAYS', 'BEAR', None):
+        buzz_free = list_buzz_free_sim_ids(regime)
+        for sid in ('sim_spillover', 'sim_risk', 'sim4_bull',
+                    'sim6_bear', 'sim8_accumulation', 'sim9_gap_fade'):
+            assert sid in buzz_free, f'{sid}는 정적 버즈 불필요라 국면과 무관해야 한다({regime})'

@@ -407,8 +407,9 @@ class LiberoSimulator(BaseSimulator):
     # 실측은 채점 전용 — 예측에 정답을 섞지 않는다(룩어헤드 금지).
     # ──────────────────────────────────────────────────
     MARKET_CLOSE = '15:30'
-    SCORE_LOG_MAX = 800   # ≈ 16건/일 × 50일 (velocity·naive 두 모델 × 8시간대)
+    SCORE_LOG_MAX = 1200  # ≈ 24건/일 × 50일 (velocity·smoothed_velocity·naive 세 모델 × 8시간대)
     EOD_DAMPING = 0.5     # 속도 외삽 감쇠(모멘텀은 마감까지 절반만 이어진다고 가정)
+    VELOCITY_SMOOTH_WINDOW = 4  # 속도를 평균낼 관측 구간 수(약 40분)
 
     @staticmethod
     def _hour_label(now):
@@ -479,11 +480,22 @@ class LiberoSimulator(BaseSimulator):
         # 기존 경로를 그대로 타고, 로그의 model 필드로만 갈린다.
         if not any(p['made_at'] == label for p in preds):
             velocity = meas[-1]['breadth'] - meas[-2]['breadth'] if len(meas) >= 2 else 0.0
+            # velocity는 관측 두 개(약 10분 간격) 사이의 단일 차분이라 노이즈가 크다.
+            # 08-19 실측: 그 노이즈를 남은 시간만큼 그대로 늘리다 보니 velocity 모델이
+            # naive(직전값 유지)보다 못했다(EOD MAE 12.1 vs 8.8). smoothed_velocity는
+            # 최근 VELOCITY_SMOOTH_WINDOW개 구간의 평균 변화율을 써서 단일 구간의
+            # 튐을 상쇄한다 — 감쇠(EOD_DAMPING)는 그대로 둬서 "속도를 평활화한 효과"만
+            # 골라 비교할 수 있게 한다. 아직 표본이 없어 calibration_log(공식 노출값)는
+            # 건드리지 않는다 — naive를 붙였을 때와 같은 방식으로 며칠 나란히 채점만 한다.
+            k = min(self.VELOCITY_SMOOTH_WINDOW, len(meas) - 1)
+            smoothed_velocity = (meas[-1]['breadth'] - meas[-1 - k]['breadth']) / k if k > 0 else 0.0
             last = meas[-1]['breadth']
             next_label = f"{now.hour + 1:02d}:00"
             hours_left = max(0.0, 15.5 - (now.hour + now.minute / 60.0))
             for model, h1_value, eod_value in (
                 ('velocity', last + velocity, last + velocity * hours_left * self.EOD_DAMPING),
+                ('smoothed_velocity', last + smoothed_velocity,
+                 last + smoothed_velocity * hours_left * self.EOD_DAMPING),
                 ('naive', last, last),
             ):
                 if next_label <= '15:00':

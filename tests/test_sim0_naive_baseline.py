@@ -38,13 +38,16 @@ def _preds(sim, **kw):
 
 
 def test_naive_baseline_is_recorded_next_to_velocity_forecast(tmp_path):
-    """같은 시각·같은 대상에 대해 두 모델의 예측이 함께 남아야 비교가 성립한다."""
+    """같은 시각·같은 대상에 대해 모델들의 예측이 함께 남아야 비교가 성립한다.
+
+    2026-08-19: smoothed_velocity가 세 번째로 붙었다(test_sim0_smoothed_velocity.py) —
+    이 테스트의 취지(naive가 velocity와 나란히 채점된다)는 그대로이므로 부분집합으로 확인한다."""
     sim = _sim(tmp_path)
     sim.update_nowcast(50.0, now_kst=NOW_10)
     sim.update_nowcast(60.0, now_kst=NOW_11)
 
     h1 = _preds(sim, type='h1', made_at='11:00')
-    assert {p['model'] for p in h1} == {'velocity', 'naive'}
+    assert {'velocity', 'naive'} <= {p['model'] for p in h1}
 
 
 def test_naive_prediction_is_just_the_last_measurement(tmp_path):
@@ -75,7 +78,7 @@ def test_both_models_are_scored_separately(tmp_path):
     sim.finalize_eod(58.0, now_kst=datetime(2026, 8, 12, 15, 40))
 
     eod_scores = [s for s in sim.state['intraday_score_log'] if s['type'] == 'eod']
-    assert {s['model'] for s in eod_scores} == {'velocity', 'naive'}
+    assert {'velocity', 'naive'} <= {s['model'] for s in eod_scores}
     naive = [s for s in eod_scores if s['model'] == 'naive']
     assert all(s['actual'] == 58.0 for s in naive)
 

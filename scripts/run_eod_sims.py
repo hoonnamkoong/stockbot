@@ -23,6 +23,7 @@ import csv
 import os
 import re
 import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
@@ -191,10 +192,23 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
     return out
 
 
-def run_minervini(sim, candidates: list[dict]):
-    """심11을 1회 실행하고 결과 통계를 돌려준다."""
-    prices = {c['code']: c['price'] for c in candidates}
-    return sim.run(candidates, current_prices=prices)
+def build_sim11_watchlist(candidates: list[dict], log=print) -> dict[str, dict]:
+    """Sim11 후보들에서 감시 목록(오늘 밤 기준, 내일부터 쓸 pivot_price·ma50)을 만든다.
+
+    2026-08-20 재설계: 예전엔 이 자리에서 바로 sim.run()을 불러 그날 종가로
+    매수까지 끝냈다 — 마감 후 배치가 이미 지난 가격으로 "샀다"고 기록하는
+    룩어헤드였다(program-trading-parity-mandate 위반, 실전으로 승격해도
+    그 가격에 주문을 낼 방법이 없다). 이제 여기서는 자격 판정(추세 템플릿+
+    실적 가속+VCP 압축)까지만 하고 결과를 파일로 남긴다 — 실제 매수/매도는
+    Sim11이 다른 버즈 불필요 심들과 같은 장중 1분 루프에서 실시간가로 한다.
+    """
+    from src.strategy.simulators.sim11_minervini import build_watchlist_entry
+    entries: dict[str, dict] = {}
+    for c in candidates:
+        entry = build_watchlist_entry(c)
+        if entry:
+            entries[c['code']] = entry
+    return entries
 
 
 def _run_sim9_1(path: str) -> int:
@@ -218,9 +232,12 @@ def _run_sim9_1(path: str) -> int:
 
 
 def _run_sim11(path: str) -> int:
+    """심11 감시 목록을 하루 1회 갱신한다. 실제 매수/매도는 안 한다 —
+    Sim11은 더 이상 IS_EOD가 아니라 장중 1분 루프에서 이 감시 목록을 읽어
+    실시간가로 산다(build_sim11_watchlist 참고)."""
     pairs = codes_and_names_from_ohlcv(path)
     if not pairs:
-        print(f'[EOD] 심11 유니버스 0건 ({path}) — 실행하지 않는다')
+        print(f'[EOD] 심11 유니버스 0건 ({path}) — 감시 목록을 만들지 않는다')
         return 1
     try:
         from src.trade.kis_data_provider import KISDataProvider
@@ -230,16 +247,14 @@ def _run_sim11(path: str) -> int:
         return 1
     candidates = candidates_from_kis_live(pairs, kis, log=print)
     if not candidates:
-        print('[EOD] 심11 후보 0건(전부 조회 실패·이력 부족) — 실행하지 않는다')
+        print('[EOD] 심11 후보 0건(전부 조회 실패·이력 부족) — 감시 목록을 만들지 않는다')
         return 1
-    from src.strategy.simulators.sim11_minervini import MinerviniTrendSimulator
-    sim = MinerviniTrendSimulator(initial_cash=3_000_000)
-    before = len(sim.state.get('portfolio', {}))
-    stats = run_minervini(sim, candidates)
-    after = len(sim.state.get('portfolio', {}))
-    print(f'[EOD] 심11 실행: 유니버스 {len(pairs)}종목, 후보 {len(candidates)}종목, '
-          f'보유 {before} → {after}, 현금 {sim.state.get("cash", 0):,.0f}')
-    return 0 if stats is not None else 1
+    entries = build_sim11_watchlist(candidates, log=print)
+    from src.strategy.simulators.sim11_minervini import save_watchlist
+    save_watchlist(entries, time.strftime('%Y%m%d'))
+    print(f'[EOD] 심11 감시 목록 갱신: 유니버스 {len(pairs)}종목, 후보 {len(candidates)}종목, '
+          f'감시 목록 {len(entries)}종목')
+    return 0
 
 
 def main() -> int:

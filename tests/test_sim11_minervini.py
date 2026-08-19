@@ -1,8 +1,12 @@
 import os, sys
+from unittest import mock
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+from src.strategy.simulators import sim11_minervini as sim11
 from src.strategy.simulators.sim11_minervini import (
-    POSITION_WEIGHT, STOP_PCT, decide_minervini, _sma, _trend_template_ok, _vcp_breakout,
+    POSITION_WEIGHT, STOP_PCT, decide_minervini, build_watchlist_entry,
+    save_watchlist, load_watchlist, _sma, _trend_template_ok, _vcp_contracting,
 )
 
 
@@ -18,7 +22,7 @@ def _rising_closes(n=200, start=100.0, step=0.5):
 
 
 def _good_closes():
-    """추세 템플릿 + VCP 압축을 둘 다 만족하는 220일 종가열(당일 미포함).
+    """추세 템플릿 + VCP 압축을 둘 다 만족하는 220일 종가열(오늘 미포함).
 
     0~199일: 완만한 상승(100→199.5) — 정배열·MA200 상승추세 재료.
     200~209일(그 이전 10일): 199.5~201.5 사이 넓게 진동 — 압축 '이전' 구간.
@@ -30,10 +34,10 @@ def _good_closes():
     return base + prior_tail + recent_tail
 
 
-GOOD_CLOSES = _good_closes()
-GOOD_PRICE = 205.0     # 최근 20일 고점(201.5) 돌파
-GOOD_W52_LWPR = 90.0   # price(205) >= 90*1.3=117 충족
-GOOD_W52_HGPR = 210.0  # price(205) >= 210*0.75=157.5 충족
+GOOD_CLOSES = _good_closes()          # 오늘 미포함(어제까지)
+GOOD_PRICE = 201.2                    # 오늘 종가 — 감시목록 계산엔 이게 마지막 구간에 들어간다
+GOOD_W52_LWPR = 90.0                  # price(201.2) >= 90*1.3=117 충족
+GOOD_W52_HGPR = 210.0                 # price(201.2) >= 210*0.75=157.5 충족
 GOOD_EPS_G = 25.0
 GOOD_REV_G = 20.0
 
@@ -82,86 +86,142 @@ def test_trend_template_fails_with_short_history():
     assert _trend_template_ok(GOOD_PRICE, GOOD_CLOSES[-210:], GOOD_W52_HGPR, GOOD_W52_LWPR) is False
 
 
-def test_vcp_breakout_on_good_setup():
-    assert _vcp_breakout(GOOD_PRICE, GOOD_CLOSES) is True
+def test_vcp_contracting_on_good_setup():
+    assert _vcp_contracting(GOOD_CLOSES + [GOOD_PRICE]) is True
 
 
-def test_vcp_no_breakout_inside_pivot():
-    """최근 20일 고점을 못 넘으면 압축돼 있어도 진입 신호가 아니다."""
-    assert _vcp_breakout(199.0, GOOD_CLOSES) is False
+def test_vcp_no_contraction_when_recent_range_is_not_narrower():
+    wide_tail = _rising_closes(200) + [190 + (i % 2) * 20 for i in range(20)]  # 변동폭 20, 안 줄어듦
+    assert _vcp_contracting(wide_tail) is False
 
 
-def test_vcp_no_contraction_no_signal():
-    """돌파해도 직전 변동폭이 안 줄었으면(압축 없이 그냥 상승) VCP가 아니다."""
-    wide_tail_closes = _rising_closes(200) + [190 + (i % 2) * 20 for i in range(20)]  # 변동폭 20
-    assert _vcp_breakout(215.0, wide_tail_closes) is False
+def test_vcp_needs_enough_history():
+    assert _vcp_contracting([100.0] * 15) is False
 
 
-# ── decide_minervini: 진입 ──────────────────────────────
-def test_entry_when_all_gates_pass():
-    orders = decide_minervini(_view({}), [_stock()], {'T001': GOOD_PRICE})
+# ── build_watchlist_entry ────────────────────────────────
+def test_watchlist_entry_built_on_good_setup():
+    e = build_watchlist_entry(_stock())
+    assert e is not None
+    assert e['name'] == '추세주'
+    closes_through_today = GOOD_CLOSES + [GOOD_PRICE]
+    assert e['pivot_price'] == max(closes_through_today[-20:])
+    assert e['ma50'] == _sma(closes_through_today, 50)
+
+
+def test_watchlist_entry_none_without_earnings_acceleration():
+    assert build_watchlist_entry(_stock(eps_growth_yoy=5.0)) is None
+
+
+def test_watchlist_entry_none_when_eps_growth_missing():
+    """조회 실패로 결손이면 등재 근거가 없다."""
+    assert build_watchlist_entry(_stock(eps_growth_yoy=None)) is None
+
+
+def test_watchlist_entry_none_without_revenue_growth():
+    assert build_watchlist_entry(_stock(revenue_growth_yoy=5.0)) is None
+
+
+def test_watchlist_entry_none_when_trend_template_fails():
+    assert build_watchlist_entry(_stock(price=100.0)) is None
+
+
+def test_watchlist_entry_none_when_not_contracting():
+    wide_tail = _rising_closes(200) + [190 + (i % 2) * 20 for i in range(19)]
+    assert build_watchlist_entry(_stock(price=210.0, daily_closes=wide_tail)) is None
+
+
+# ── save_watchlist / load_watchlist ──────────────────────
+def test_watchlist_round_trips_for_the_same_date(tmp_path):
+    path = str(tmp_path / 'w.json')
+    with mock.patch.object(sim11, 'WATCHLIST_PATH', path):
+        save_watchlist({'T001': {'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}}, '20260820')
+        loaded = load_watchlist('20260820')
+    assert loaded == {'T001': {'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}}
+
+
+def test_watchlist_rejects_stale_date(tmp_path):
+    """날짜가 다르면 빈 감시목록이다 — 낡은 pivot으로 잘못된 시점에 사면 안 된다."""
+    path = str(tmp_path / 'w.json')
+    with mock.patch.object(sim11, 'WATCHLIST_PATH', path):
+        save_watchlist({'T001': {'name': 'x', 'pivot_price': 1.0, 'ma50': 1.0}}, '20260819')
+        loaded = load_watchlist('20260820')
+    assert loaded == {}
+
+
+def test_missing_watchlist_file_returns_empty(tmp_path):
+    path = str(tmp_path / '없음.json')
+    with mock.patch.object(sim11, 'WATCHLIST_PATH', path):
+        assert load_watchlist('20260820') == {}
+
+
+# ── decide_minervini: 진입(실시간가가 pivot을 넘어야 한다) ─
+def _watch_stock(**kw):
+    s = {'code': 'T001', 'name': '추세주', 'price': 210.0, 'amount': 50_000_000_000,
+         'pivot_price': 200.0, 'ma50': 150.0}
+    s.update(kw)
+    return s
+
+
+def test_entry_when_price_crosses_pivot_live():
+    orders = decide_minervini(_view({}), [_watch_stock()], {'T001': 210.0})
     b = _buys(orders)
-    assert len(b) == 1 and 'VCP 돌파' in b[0]['reason']
+    assert len(b) == 1 and 'pivot' in b[0]['reason']
 
 
-def test_no_entry_without_earnings_acceleration():
-    orders = decide_minervini(_view({}), [_stock(eps_growth_yoy=5.0)], {'T001': GOOD_PRICE})
+def test_no_entry_when_price_has_not_reached_pivot():
+    orders = decide_minervini(_view({}), [_watch_stock(price=199.0)], {'T001': 199.0})
     assert _buys(orders) == []
 
 
-def test_no_entry_when_eps_growth_missing():
-    """조회 실패로 결손이면 산다는 근거가 없다 — 게이트를 통과시키지 않는다."""
-    orders = decide_minervini(_view({}), [_stock(eps_growth_yoy=None)], {'T001': GOOD_PRICE})
-    assert _buys(orders) == []
-
-
-def test_no_entry_without_revenue_growth():
-    orders = decide_minervini(_view({}), [_stock(revenue_growth_yoy=5.0)], {'T001': GOOD_PRICE})
-    assert _buys(orders) == []
-
-
-def test_no_entry_when_trend_template_fails():
-    orders = decide_minervini(_view({}), [_stock(price=100.0)], {'T001': 100.0})
+def test_no_entry_exactly_at_pivot():
+    """같아도 돌파가 아니다 — 초과해야 한다."""
+    orders = decide_minervini(_view({}), [_watch_stock(price=200.0)], {'T001': 200.0})
     assert _buys(orders) == []
 
 
 def test_no_entry_when_illiquid():
-    orders = decide_minervini(_view({}), [_stock(amount=500_000_000)], {'T001': GOOD_PRICE})
+    orders = decide_minervini(_view({}), [_watch_stock(amount=500_000_000)], {'T001': 210.0})
+    assert _buys(orders) == []
+
+
+def test_no_entry_without_pivot_price():
+    """감시목록에 없는(pivot_price 결손) 종목은 자격이 없다."""
+    orders = decide_minervini(_view({}), [_watch_stock(pivot_price=None)], {'T001': 210.0})
     assert _buys(orders) == []
 
 
 def test_entry_takes_full_position_weight():
-    orders = decide_minervini(_view({}), [_stock()], {'T001': GOOD_PRICE})
+    orders = decide_minervini(_view({}), [_watch_stock()], {'T001': 210.0})
     b = _buys(orders)[0]
-    assert b['quantity'] == int(3_000_000 * POSITION_WEIGHT / GOOD_PRICE)
+    assert b['quantity'] == int(3_000_000 * POSITION_WEIGHT / 210.0)
 
 
 def test_max_holdings_caps_entries():
-    stocks = [_stock(code=f'T{i:03d}') for i in range(7)]
-    prices = {s['code']: GOOD_PRICE for s in stocks}
+    stocks = [_watch_stock(code=f'T{i:03d}') for i in range(7)]
+    prices = {s['code']: 210.0 for s in stocks}
     orders = decide_minervini(_view({}), stocks, prices)
     assert len(_buys(orders)) == 5   # MAX_HOLDINGS
 
 
 # ── decide_minervini: 청산 ──────────────────────────────
-def _held(avg=GOOD_PRICE):
+def _held(avg=210.0):
     return {'T001': {'name': '추세주', 'quantity': 10, 'avg_price': avg, 'peak_price': avg}}
 
 
 def test_hard_stop_fires():
     avg = 1000.0
     stop_price = avg * (1 + STOP_PCT / 100) - 1
-    orders = decide_minervini(_view(_held(avg=avg)), [_stock(price=stop_price)],
+    orders = decide_minervini(_view(_held(avg=avg)), [_watch_stock(price=stop_price)],
                               {'T001': stop_price})
     s = _sells(orders)
     assert len(s) == 1 and '손절' in s[0]['reason']
 
 
 def test_exit_below_50day_ma():
-    """MA50 아래로 종가가 내려오면 추세 종료로 보고 판다 — 손실이 아니어도."""
-    ma50 = _sma(GOOD_CLOSES, 50)
-    below_ma = ma50 - 1
-    orders = decide_minervini(_view(_held(avg=150.0)), [_stock(price=below_ma)],
+    """MA50(감시목록 값) 아래로 실시간가가 내려오면 판다 — 하드손절 폭 안쪽이어도."""
+    below_ma = 149.0   # ma50=150
+    orders = decide_minervini(_view(_held(avg=155.0)), [_watch_stock(price=below_ma)],
                               {'T001': below_ma})
     s = _sells(orders)
     assert len(s) == 1 and '50일선 이탈' in s[0]['reason']
@@ -169,16 +229,35 @@ def test_exit_below_50day_ma():
 
 def test_no_fixed_take_profit():
     """미너비니 철학 — 승자는 끝까지 탄다. 고정 익절 없음."""
-    far_above = GOOD_CLOSES[-1] * 2
-    orders = decide_minervini(_view(_held(avg=150.0)), [_stock(price=far_above)],
+    far_above = 1000.0
+    orders = decide_minervini(_view(_held(avg=180.0)), [_watch_stock(price=far_above)],
                               {'T001': far_above})
     assert _sells(orders) == []
 
 
 def test_holding_absent_from_candidates_is_not_touched():
-    """오늘 후보에 없으면 50일선을 계산할 수 없다 — 손절폭 밖이면 없는 근거로
-    팔지 않는다(하드손절은 가격만으로 판단하므로 여기서는 손절선 밖의 등락만 준다)."""
+    """오늘 후보에 없으면 ma50을 알 수 없다 — 손절폭 밖이면 없는 근거로 팔지 않는다."""
     orders = decide_minervini(
         _view({'ZZZ': {'name': 'x', 'quantity': 10, 'avg_price': 100, 'peak_price': 100}}),
         [], {'ZZZ': 98})
     assert _sells(orders) == []
+
+
+# ── get_universe: 오늘자 감시목록만 쓴다 ───────────────────
+def test_get_universe_returns_watchlist_without_price():
+    """price는 여기서 안 채운다 — _enrich_universe가 실시간 KIS 시세로 채운다."""
+    from src.strategy.simulators.sim11_minervini import MinerviniTrendSimulator
+    sim = object.__new__(MinerviniTrendSimulator)
+    today = sim11.get_kst_now().strftime('%Y%m%d')
+    with mock.patch.object(sim11, 'load_watchlist',
+                           return_value={'T001': {'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}}):
+        universe = sim.get_universe()
+    assert universe == [{'code': 'T001', 'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}]
+    assert 'price' not in universe[0]
+
+
+def test_get_universe_empty_without_todays_watchlist():
+    from src.strategy.simulators.sim11_minervini import MinerviniTrendSimulator
+    sim = object.__new__(MinerviniTrendSimulator)
+    with mock.patch.object(sim11, 'load_watchlist', return_value={}):
+        assert sim.get_universe() == []

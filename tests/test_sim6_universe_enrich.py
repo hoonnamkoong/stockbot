@@ -94,6 +94,34 @@ def test_enrich_does_not_fabricate_price_when_quote_fails():
     assert 'price' not in out[0]
 
 
+# ── amount(거래대금)도 같은 함정이었다 (2026-08-20 실측) ─────────
+# price는 08-19에 고쳤지만 amount는 그때도 지금도 _enrich_universe 어디서도
+# 채워진 적이 없었다. Sim11(감시목록이 code+name+pivot_price만 주는 리터럴)의
+# 라이브 검증 중 amount가 항상 결손 → 유동성 게이트(`0 < MIN_AMOUNT`)가
+# 전량 탈락시키는 것을 실측으로 발견했다.
+_AMOUNT_QUOTE = dict(_GOOD_QUOTE, amount=50_000_000_000)
+
+
+def test_enrich_uses_live_kis_amount_when_universe_has_no_amount():
+    """get_universe()가 amount를 안 준 종목(Sim11 감시목록 등)은 KIS 실시간
+    거래대금을 써야 한다 — 안 그러면 유동성 게이트가 전량 탈락시킨다."""
+    out = _enrich([{'code': '005930', 'name': '삼성전자'}], _AMOUNT_QUOTE)
+    assert out[0]['amount'] == 50_000_000_000
+
+
+def test_enrich_does_not_overwrite_existing_amount():
+    """KIS 순위 API가 이미 amount를 준 유니버스(Sim2/4/9-1 등)는 덮어쓰면 안 된다."""
+    out = _enrich([{'code': '005930', 'name': '삼성전자', 'amount': 12_345}],
+                  dict(_AMOUNT_QUOTE, amount=999_999_999_999))
+    assert out[0]['amount'] == 12_345
+
+
+def test_enrich_does_not_fabricate_amount_when_quote_fails():
+    """조회 실패를 0으로 채우면 '유동성 0'으로 읽혀 게이트가 전량 막는다 — 키를 안 붙인다."""
+    out = _enrich([{'code': '005930', 'name': '삼성전자'}], _FAILED_QUOTE)
+    assert 'amount' not in out[0]
+
+
 # ── 결함이 실제로 Sim6 진입을 막았다는 증거 ────────────────────
 def _inverse(**kw):
     """enrich를 통과한 뒤의 인버스 ETF. 완벽한 상승 추세(=시장 급락)."""

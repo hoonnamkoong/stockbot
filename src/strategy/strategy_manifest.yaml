@@ -296,4 +296,9 @@ simulators:
     active: true
     tradeable: false  # 신규(2026-08-20), 백테스트 없음(150/200일선·분기실적을 요구하는 과거
                       # 검증 데이터가 없다) — 페이퍼 관찰 단계
-    needs_buzz: true  # IS_EOD — 장중 10분 루프 밖(scripts/run_eod_sims.py). 값은 비관여이나 명시
+    needs_buzz: false  # 무거운 계산(추세 템플릿·실적 가속·VCP 압축)은 EOD 배치가 하루
+                       # 1회 감시 목록(data/sim11_watchlist.json)에 미리 남긴다.
+                       # get_universe()는 그 파일만 읽으므로 KIS 자체 유니버스 심들과
+                       # 같은 60초 루프에서 돈다 — 실제 매수/매도는 장중 실시간가로
+                       # 한다(program-trading-parity-mandate, backtest-lookahead-trap
+                       # 위반을 피하려고 08-20에 IS_EOD 방식에서 재설계)

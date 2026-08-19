@@ -93,13 +93,21 @@ jobs:
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
         run: PYTHONPATH=. python scratch/fetch_kospi_top100.py
 
-      # 심9-1(돈치안)은 일봉 전략이라 장중 루프에서 빠져 있다(IS_EOD).
-      # 방금 만든 top100 OHLCV로 하루 1회 돌린다 — 백테스트와 같은 유니버스·데이터다.
+      # 심9-1(돈치안)은 일봉 전략이라 장중 루프에서 빠져 있다(IS_EOD) —
+      # 방금 만든 top100 OHLCV로 하루 1회 돌린다. 심11(미너비니)은 08-20
+      # 재설계로 여기서 매매를 안 한다 — 감시 목록(sim11_watchlist.json)만
+      # 갱신하고, 실제 매수/매도는 장중 1분 루프가 실시간가로 한다
+      # (program-trading-parity-mandate, backtest-lookahead-trap 위반 회피).
+      # 심11 감시 목록 계산에 KIS 실시간 조회(일봉·실적)가 필요해 KIS 키가 있어야 한다.
       # 상태는 db-data가 원본이므로 실행 전에 내려받고 실행 후 함께 배포한다.
       # 상태를 못 받아오면 실행하지 않는다: 백지 상태로 돌리면 이미 보유 중인
       # 포지션을 잊고 중복 진입하거나 청산 판단을 건너뛴다.
-      - name: Run EOD simulators (Sim9-1 Donchian)
+      - name: Run EOD simulators (Sim9-1 Donchian, Sim11 감시목록)
         if: steps.gate.outputs.run == 'true'
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           mkdir -p data
           if git clone --branch db-data --depth 1 \
@@ -158,13 +166,16 @@ jobs:
           fi
           cd db_repo
           git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv
-          # 심9-1 상태·매매기록. 이걸 안 올리면 매일 백지에서 시작해 보유가 사라진다.
-          # git add는 인자로 받은 경로 중 하나라도 없으면 전체를 원자적으로 실패시킨다.
-          # sim_donchian_log.json은 실제로 쓰인 적 없는 파일이라 이 셋을 한 줄로 add하면
-          # 그 하나 때문에 state.json·CSV까지 매번 조용히 add가 안 됐다(2026-08-05 발견,
-          # 심9-1이 매일 실행·매수까지 하고도 db-data에 한 번도 반영되지 못한 원인).
-          # 파일별로 나눠서 서로 실패가 전염되지 않게 한다.
-          for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv; do
+          # 심9-1 상태·매매기록 + 심11 감시목록. 이걸 안 올리면 매일 백지에서
+          # 시작해 보유가 사라지거나(심9-1) 내일 장중 루프가 쓸 pivot이
+          # 없어진다(심11). git add는 인자로 받은 경로 중 하나라도 없으면
+          # 전체를 원자적으로 실패시킨다. sim_donchian_log.json은 실제로
+          # 쓰인 적 없는 파일이라 이 파일들을 한 줄로 add하면 그 하나 때문에
+          # state.json·CSV까지 매번 조용히 add가 안 됐다(2026-08-05 발견,
+          # 심9-1이 매일 실행·매수까지 하고도 db-data에 한 번도 반영되지
+          # 못한 원인). 파일별로 나눠서 서로 실패가 전염되지 않게 한다.
+          for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv \
+                   sim11_watchlist.json; do
             [ -f "../data/$f" ] && cp "../data/$f" "data/$f" && git add "data/$f"
           done
           # 1분봉. 위와 같은 이유로 별도 루프다 — 파일 하나가 없다고 심9-1 상태까지

@@ -747,6 +747,15 @@ class TradeEngineWorker(BaseWorker):
                         if needs_live_price and quote.get('price'):
                             stock['price'] = quote['price']
                             stock['current_price'] = quote['price']
+                        # get_universe()가 amount(거래대금)를 안 준 종목도 마찬가지다.
+                        # 2026-08-20 실측: Sim11(감시목록이 code+name+pivot_price만
+                        # 주는 리터럴)에서 amount가 항상 결손 → 유동성 게이트가
+                        # `0 < MIN_AMOUNT`로 전량 탈락시켰다 — Sim5의 06-17 함정과
+                        # 같은 유형(조회 실패를 0으로 읽으면 안 되는데, 여긴 아예
+                        # 필드 자체가 없었다). 이미 amount가 있는 심(랭킹 API가
+                        # 직접 준 값)은 덮어쓰지 않는다.
+                        if 'amount' not in stock and quote.get('amount'):
+                            stock['amount'] = quote['amount']
                         # 고정 유니버스(코드+이름만 든 리터럴)는 등락률이 없어 심의
                         # '당일 상승' 조건이 영원히 거짓이 된다 — Sim6가 6주간 거래
                         # 0건이던 원인이다. 네이버 frgn 페이지는 일봉이라 장중에 전일

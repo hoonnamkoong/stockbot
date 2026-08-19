@@ -138,3 +138,32 @@ def test_zero_price_is_skipped():
     kis._hist = hist_no_today
     out = candidates_from_kis_live([('005930', '삼성전자')], kis, pace_interval=0)
     assert out == []
+
+
+# ── build_sim11_watchlist ────────────────────────────────
+# 자격 판정 로직 자체(추세 템플릿·실적 가속·VCP 압축)는
+# tests/test_sim11_minervini.py가 이미 촘촘히 덮는다. 여기서는 이 함수가
+# 후보 목록을 build_watchlist_entry에 하나씩 넘기고 통과한 것만 code로
+# 모으는 '배선'만 확인한다.
+from scripts.run_eod_sims import build_sim11_watchlist
+from unittest import mock
+
+
+def test_watchlist_collects_only_qualifying_codes():
+    cands = [{'code': 'A'}, {'code': 'B'}, {'code': 'C'}]
+
+    def fake_entry(stock):
+        return {'name': stock['code'], 'pivot_price': 1.0, 'ma50': 1.0} if stock['code'] != 'B' else None
+
+    with mock.patch('src.strategy.simulators.sim11_minervini.build_watchlist_entry',
+                    side_effect=fake_entry):
+        entries = build_sim11_watchlist(cands)
+
+    assert set(entries.keys()) == {'A', 'C'}
+
+
+def test_watchlist_is_empty_when_nothing_qualifies():
+    cands = [{'code': 'A'}, {'code': 'B'}]
+    with mock.patch('src.strategy.simulators.sim11_minervini.build_watchlist_entry',
+                    return_value=None):
+        assert build_sim11_watchlist(cands) == {}

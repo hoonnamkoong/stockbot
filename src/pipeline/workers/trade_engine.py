@@ -533,6 +533,14 @@ class TradeEngineWorker(BaseWorker):
         from bs4 import BeautifulSoup
         from concurrent.futures import ThreadPoolExecutor
 
+        # get_universe()가 자체적으로 price를 안 준 종목(Sim6 고정 리터럴 등)은
+        # fetch_sparkline이 네이버 frgn(일봉) 값으로 price를 채운다 — 장중엔
+        # 전일 종가에서 박제될 수 있다(아래 change_rate와 같은 함정, 08-19 실측:
+        # BEAR 국면 종일 유지에도 Sim6가 하루 종일 매수 0건). 여기서 미리
+        # 표시해 두고, 이후 enrich_kis가 실시간 KIS 현재가로 덮어쓴다.
+        for s in stocks:
+            s['_needs_live_price'] = not s.get('price')
+
         def fetch_sparkline(stock):
             code = stock.get('code', '')
             if not code:
@@ -606,6 +614,7 @@ class TradeEngineWorker(BaseWorker):
 
             def enrich_kis(stock):
                 code = stock.get('code', '')
+                needs_live_price = stock.pop('_needs_live_price', False)
                 if not code:
                     return stock
                 # PER/PBR + 등락률 + 52주 고저
@@ -616,6 +625,12 @@ class TradeEngineWorker(BaseWorker):
                         for k in ('per', 'pbr', 'sector_name'):
                             if quote.get(k):
                                 stock[k] = quote[k]
+                        # get_universe()가 price를 안 준 종목은 price도 같은 이유로
+                        # 실시간 KIS 값으로 덮어쓴다 — 네이버 frgn 값은 장중 전일
+                        # 종가일 수 있어 '가격 > 이동평균' 진입 필터가 어긋난다.
+                        if needs_live_price and quote.get('price'):
+                            stock['price'] = quote['price']
+                            stock['current_price'] = quote['price']
                         # 고정 유니버스(코드+이름만 든 리터럴)는 등락률이 없어 심의
                         # '당일 상승' 조건이 영원히 거짓이 된다 — Sim6가 6주간 거래
                         # 0건이던 원인이다. 네이버 frgn 페이지는 일봉이라 장중에 전일

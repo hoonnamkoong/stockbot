@@ -65,6 +65,35 @@ def test_enrich_does_not_overwrite_existing_change_rate():
     assert out[0]['change_rate'] == '+1.00%'
 
 
+# ── price도 같은 함정이었다 (2026-08-19 실측) ──────────────────
+# change_rate는 위에서 고쳤지만 price 자체는 여전히 네이버 frgn(일봉)에서
+# 왔다. BEAR가 09:01부터 15:31까지 종일 유지됐는데도 Sim6 매수가 0건이었던
+# 실측 원인 — price가 전일 종가(네이버가 장중 갱신하지 않음)에 박제돼
+# '가격 > 이동평균' 필터가 그 값 기준으로 계속 거짓이었다.
+def test_enrich_uses_live_kis_price_when_universe_has_no_price():
+    """get_universe()가 price를 안 준 종목(Sim6 고정 리터럴)은 KIS 실시간가를 써야 한다."""
+    out = _enrich([{'code': '114800', 'name': 'KODEX 인버스'}], _GOOD_QUOTE)
+    assert out[0]['price'] == 6000
+    assert out[0]['current_price'] == 6000
+
+
+def test_enrich_does_not_overwrite_existing_price():
+    """KIS 순위 API 등에서 이미 price가 붙어온 유니버스(Sim4-1 등)는 덮어쓰면 안 된다.
+
+    2026-08-04: 이 자리의 덮어쓰기가 Sim4-1의 라이브 판단가를 지워 실전
+    계좌가 하루 종일 매수 0건이었다 — 같은 사고를 다시 내지 않기 위한 가드.
+    """
+    out = _enrich([{'code': '005930', 'name': '삼성전자', 'price': 71000}],
+                  dict(_GOOD_QUOTE, price=999999))
+    assert out[0]['price'] == 71000
+
+
+def test_enrich_does_not_fabricate_price_when_quote_fails():
+    """조회 실패를 0으로 채우면 실제 시장가 매도로 이어질 수 있다 — 키를 안 붙인다."""
+    out = _enrich([{'code': '114800', 'name': 'KODEX 인버스'}], _FAILED_QUOTE)
+    assert 'price' not in out[0]
+
+
 # ── 결함이 실제로 Sim6 진입을 막았다는 증거 ────────────────────
 def _inverse(**kw):
     """enrich를 통과한 뒤의 인버스 ETF. 완벽한 상승 추세(=시장 급락)."""

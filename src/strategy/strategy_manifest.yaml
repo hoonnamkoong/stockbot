@@ -280,3 +280,20 @@ simulators:
     active: true
     tradeable: false  # 과거 검증 불가(엑셀 유니버스가 동적이라 20일 채널 신호 4건) — 페이퍼 관찰
     needs_buzz: true  # IS_EOD — 장중 10분 루프 밖(scripts/run_eod_sims.py). 값은 비관여이나 명시
+
+  - id: "sim11_minervini"
+    module: "src.strategy.simulators.sim11_minervini"
+    class: "MinerviniTrendSimulator"
+    description: "Sim11 미너비니 추세형 — 추세 템플릿(정배열+MA200 상승) + 실적 가속(EPS·매출) + VCP 압축 돌파, 손절 -7.5%/50일선 이탈 청산"
+    state_file: "sim_minervini_state.json"
+    csv_file: "trade_history_sim_minervini.csv"
+    label: "미너비니 추세형 (Sim 11)"
+    display_order: 110
+    ui_key: "sim11"
+    short_desc: "추세 템플릿 + 실적 가속(EPS·매출) + VCP 압축 돌파"
+    chart_group: 4
+    color: "gray"
+    active: true
+    tradeable: false  # 신규(2026-08-20), 백테스트 없음(150/200일선·분기실적을 요구하는 과거
+                      # 검증 데이터가 없다) — 페이퍼 관찰 단계
+    needs_buzz: true  # IS_EOD — 장중 10분 루프 밖(scripts/run_eod_sims.py). 값은 비관여이나 명시

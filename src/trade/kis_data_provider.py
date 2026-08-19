@@ -378,6 +378,122 @@ class KISDataProvider:
                    - KISDataProvider._to_float(prev_same.get("eps", 0)))
         return {"eps_ttm": round(eps_ttm, 2), "bps": bps}
 
+    def get_earnings_growth(self, code: str) -> dict:
+        """분기 실적(FHKST66430300, get_ttm_valuation과 같은 TR)에서 최근 분기
+        EPS 전년동기대비 성장률과 매출증가율(grs)을 뽑는다 — Sim11(미너비니
+        SEPA)의 실적 가속 필터 재료다.
+
+        2026-08-20 실측: 이 TR이 분기 30개(7년+)를 주고 grs(매출증가율) 필드도
+        이미 포함돼 있다. get_ttm_valuation은 TTM PER 계산에만 쓰고 성장률
+        자체는 버리고 있었다.
+
+        반환 키: period(YYYYMM), revenue_growth_yoy, eps_growth_yoy(있으면).
+        전년동기 조각이 없거나 그때 EPS가 0 이하(적자) 면 eps_growth_yoy를
+        만들지 않는다 — 분모가 나쁜 성장률은 지어낸 숫자보다 결손이 낫다.
+        실패는 빈 dict.
+        """
+        key = f"earnings_growth_{code}"
+        cached = self._get_disk_cached(key, self.TTL_FINANCIAL)
+        if cached is not None:
+            return cached
+
+        body = self._get(
+            "/uapi/domestic-stock/v1/finance/financial-ratio",
+            "FHKST66430300",
+            {"FID_INPUT_ISCD": code, "FID_DIV_CLS_CODE": "1",
+             "FID_COND_MRKT_DIV_CODE": "J"},
+        )
+        rows = body.get("output") or body.get("output1") or []
+        if not isinstance(rows, list):
+            rows = [rows]
+        periods = {}
+        for r in rows:
+            ym = str(r.get("stac_yymm") or "").strip()
+            if len(ym) == 6:
+                periods[ym] = r
+
+        result: dict = {}
+        if periods:
+            latest = max(periods)
+            year, month = int(latest[:4]), latest[4:]
+            cur = periods[latest]
+            result["period"] = latest
+            result["revenue_growth_yoy"] = self._to_float(cur.get("grs", 0))
+            prev_same = periods.get(f"{year - 1}{month}")
+            if prev_same:
+                eps_prev = self._to_float(prev_same.get("eps", 0))
+                if eps_prev > 0:
+                    eps_cur = self._to_float(cur.get("eps", 0))
+                    result["eps_growth_yoy"] = round((eps_cur - eps_prev) / eps_prev * 100, 2)
+        self._set_disk_cache(key, result)
+        return result
+
+    def get_daily_history(self, code: str, days: int = 250) -> list[dict]:
+        """일별 시세(FHKST03010100) 최근 `days` 거래일, 오래된→최신 순.
+
+        Sim11(미너비니 트렌드 템플릿)의 50/150/200일 이동평균 재료 — 기존
+        `range_history`(네이버 frgn, 20일 상한)로는 부족해 KIS 일봉을 직접
+        쓴다. 2026-08-20 실측: 한 콜은 최대 100건만 준다(요청 구간과 무관하게
+        최신 100건). 여러 콜로 이어 붙이되, 각 콜의 FID_INPUT_DATE_2를 직전
+        콜에서 받은 가장 오래된 날짜의 전날로 옮겨가며 페이지네이션한다.
+
+        반환 원소: {'date','open','high','low','close','volume','amount'}.
+        디스크 캐시 TTL_DAILY(1일) — 일봉은 그날 하루 안 바뀐다(당일 진행 중인
+        봉은 이 TR에 안 잡힌다 — 최근 거래일까지의 확정 봉만 온다).
+        실패·결손은 빈 리스트다(있는 만큼만 주고 지어내지 않는다).
+        """
+        key = f"daily_hist_{code}_{days}"
+        cached = self._get_disk_cached(key, self.TTL_DAILY)
+        if cached is not None:
+            return cached
+
+        all_rows: dict[str, dict] = {}
+        end_date = datetime.now().strftime("%Y%m%d")
+        for _ in range(3):   # 최대 3콜 ≈ 300거래일. days=250이면 3콜로 충분.
+            body = self._get(
+                "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+                "FHKST03010100",
+                {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code,
+                 "FID_INPUT_DATE_1": "19000101", "FID_INPUT_DATE_2": end_date,
+                 "FID_PERIOD_DIV_CODE": "D", "FID_ORG_ADJ_PRC": "0"},
+            )
+            rows = body.get("output2") or []
+            new_dates = [r.get("stck_bsop_date") for r in rows
+                        if r.get("stck_bsop_date") not in all_rows]
+            if not new_dates:
+                break
+            for r in rows:
+                d = r.get("stck_bsop_date")
+                if d:
+                    all_rows[d] = r
+            if len(all_rows) >= days:
+                break
+            oldest = min(new_dates)
+            try:
+                end_date = (datetime.strptime(oldest, "%Y%m%d")
+                           - timedelta(days=1)).strftime("%Y%m%d")
+            except ValueError:
+                break
+
+        parsed = []
+        for d, r in all_rows.items():
+            try:
+                parsed.append({
+                    "date": d,
+                    "open": self._to_float(r.get("stck_oprc", 0)),
+                    "high": self._to_float(r.get("stck_hgpr", 0)),
+                    "low": self._to_float(r.get("stck_lwpr", 0)),
+                    "close": self._to_float(r.get("stck_clpr", 0)),
+                    "volume": self._to_float(r.get("acml_vol", 0)),
+                    "amount": self._to_float(r.get("acml_tr_pbmn", 0)),
+                })
+            except (KeyError, ValueError):
+                continue
+        parsed.sort(key=lambda x: x["date"])
+        result = parsed[-days:]
+        self._set_disk_cache(key, result)
+        return result
+
     # ──────────────────────────────────────────────────
     # 3. 재무 안정성비율 (부채비율 등)
     # ──────────────────────────────────────────────────

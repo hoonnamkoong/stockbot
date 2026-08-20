@@ -75,7 +75,16 @@ class SectorSpilloverSimulator(BaseSimulator):
                 except:
                     f_change = 0.0
 
-            if f_change <= -0.5: # 외인 지분 0.5% 이상 대량 이탈 시
+            # 2026-08-20 KOSPI 규칙마이닝 실측: 외인 20일 누적 수급이 매수국면(>0)에서
+            # 막 매도로 전환된 시점은 오히려 fwd_10d +3.72%(승률62%, n=42, 표본 얇음
+            # — 참고용)로 상승이 이어지는 경향이 있었다. 하루짜리 이탈 신호(f_change)만
+            # 보고 즉시 청산하면 그 상승 지속 구간까지 잘라낸다. 20일 누적이 아직
+            # 순매수(>0)로 남아 있으면 하루짜리 유출은 트레일링 스탑에 맡기고, 20일
+            # 누적도 이미 마이너스로 넘어갔을 때(또는 값을 모를 때는 기존대로 보수적으로)
+            # 만 즉시 청산한다.
+            frgn_20d = stock.get('frgn_net_20d')
+            still_in_buy_regime = frgn_20d is not None and frgn_20d > 0
+            if f_change <= -0.5 and not still_in_buy_regime: # 외인 지분 0.5% 이상 대량 이탈 시
                 self.sell(code, current_price, reason="[MFHS2] 외인 대량 이탈 감지 (수급 역전)")
                 self.add_cooldown(code, 3)
                 sold_today.add(code)
@@ -131,6 +140,15 @@ class SectorSpilloverSimulator(BaseSimulator):
         KIS 외인/기관 추정 순매수가 있으면 그것을 사용, 없으면 base 메서드 폴백.
         A(수급 40점) + B(발산 40점) + C(계절성 20점)
         """
+        # [게이트] 20일 누적 외인수급이 매도국면(하위20%대, 대략 -5% 이하)이면 오늘 하루의
+        # 반짝 매수 신호는 그 노이즈로 본다 — 2026-08-20 KOSPI 규칙마이닝 실측(105종목,
+        # 발견/홀드아웃 양쪽 검증): 20일 지속 매도 종목은 10일 후에도 시장평균 대비
+        # 저조했다(-0.64%p/-1.22%p). 값을 모르면(스크래핑 실패 등) 막지 않는다 —
+        # 모르는 걸 '매도국면 아님'으로 지어내지 않되, 매매 자체를 원천 차단하지도 않는다.
+        frgn_20d = stock_data.get('frgn_net_20d')
+        if frgn_20d is not None and frgn_20d <= -5.0:
+            return 0
+
         score = 0
 
         # [조건 A] 수급 (40점) — KIS 추정 데이터 우선

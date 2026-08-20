@@ -687,6 +687,22 @@ class TradeEngineWorker(BaseWorker):
                         )
                         stock.setdefault('foreign_change',
                                          round(stock['foreign_rate'] - prev_rate, 3))
+                    # [Sim2] 20일 누적 외국인 순매매(거래량 대비 %). 하루짜리 foreign_change와
+                    # 달리 추세를 본다 — 2026-08-20 KOSPI 규칙마이닝 실측: 20일 누적이 매도
+                    # 국면(하위20%, 대략 -5% 이하)이면 그날 하루 반짝 매수는 노이즈였고
+                    # 10일 후에도 시장평균 대비 저조했다(-0.64%p/-1.22%p). 같은 표(frgn.naver
+                    # 20일치)에서 재활용 — 추가 호출 0. 열 인덱스: [4]거래량 [6]외국인순매매량.
+                    ratios = []
+                    for row in data_rows:
+                        try:
+                            vol = float(row[4].get_text().replace(',', '').strip())
+                            net = float(row[6].get_text().replace(',', '').replace('+', '').strip())
+                            if vol > 0:
+                                ratios.append(net / vol * 100)
+                        except Exception:
+                            continue
+                    if ratios:
+                        stock.setdefault('frgn_net_20d', sum(ratios) / len(ratios))
             except Exception:
                 pass
             return stock

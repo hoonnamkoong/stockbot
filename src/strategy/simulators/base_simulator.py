@@ -606,6 +606,8 @@ class BaseSimulator:
         for o in orders:
             if o['action'] == 'BUY':
                 self.buy(o['code'], o['name'], o['price'], o['quantity'], reason=o.get('reason', ''))
+                if o.get('playbook') and o['code'] in self.state['portfolio']:
+                    self.state['portfolio'][o['code']]['playbook'] = o['playbook']
             elif o['action'] == 'SELL':
                 self.sell(o['code'], o['price'], quantity=o.get('quantity'), reason=o.get('reason', ''))
                 if o.get('mark_partial') and o['code'] in self.state['portfolio']:

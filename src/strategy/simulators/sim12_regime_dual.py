@@ -1,0 +1,244 @@
+from .base_simulator import BaseSimulator, get_kst_date
+
+_parse_change_rate = BaseSimulator.parse_change_rate
+_cooldown_active = BaseSimulator.cooldown_active
+_period_change = BaseSimulator.calc_period_change
+
+# ── 파라미터(2026-08-20 KOSPI 규칙마이닝 분위수 경계의 근사치 — 정밀 보정 아님) ──
+MAX_HOLDINGS = 5
+POSITION_WEIGHT = 0.19
+
+AMOUNT_RATIO_DRY = 0.65          # 거래대금 급감(회피). 리서치 q1 상한 그대로.
+AMOUNT_RATIO_OK = 1.0            # 플레이북2 최소 유동성. 리서치 quantile(0.6)≈1.01 근사.
+PER_HIGH = 40.0                  # 고PER(회피 조합용). 리서치 q5 하한 44.6의 보수적 근사.
+ORGN_NET_20D_SELL = -5.0         # 기관 20일 매도국면. 리서치 q1 상한 -5.94 근사.
+FRGN_NET_20D_SELL = -5.0         # 외국인 20일 매도국면. 리서치 q1 상한 -5.79 근사.
+FRGN_HOLD_CHG_5D_DROP = -1.0     # 외인 보유율 5일 급감. 표본이 작아 보수적으로 완화(원 규칙12는 더 좁음).
+
+PERIOD_CHG_10D_BULL_MIN = 8.0    # 플레이북1: 10일간 이미 상승 중(모멘텀 확인).
+DEV_MA20_BULL_MIN = 5.0          # 플레이북1: MA20 위로 뚜렷하게 이격.
+PERIOD_CHG_5D_CRASH_MAX = -6.0   # 플레이북2: 5일 급락(하위20% 근사, q1 상한 -5.78).
+
+RET_1D_HIGH = 5.0                # 회피(데드캣): 당일 급등 기준.
+PERIOD_CHG_10D_CRASH_MAX = -10.0  # 회피(데드캣): 10일간 하락추세였는지.
+
+STOP_PCT = -7.0                  # 하드손절. Sim2와 동일 관례.
+TRAIL_ACTIVATION_PCT = 5.0       # 트레일링 활성화 수익률. Sim2와 동일 관례.
+TRAIL_CALLBACK_PCT = 3.0         # 트레일링 콜백(고점 대비 하락률). Sim2와 동일 관례.
+PLAYBOOK2_TIMESTOP_DAYS = 5       # 급락반등형 최대 보유일(설계서 "3~5일" 상한).
+
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심4-1·심6·심9와 같은 방식)."""
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
+
+
+def _holding_days(p_item, today):
+    s = p_item.get('entry_date', '')
+    try:
+        return (today - date_fromiso(s)).days if s else 0
+    except Exception:
+        return 0
+
+
+def date_fromiso(s):
+    from datetime import datetime
+    return datetime.strptime(s, '%Y-%m-%d').date()
+
+
+def _pchg(range_history, days):
+    """N거래일 전 종가 대비 변동률(%). 행이 부족하면 None(모른다 — 0%로 지어내지 않는다)."""
+    if not range_history or len(range_history) < days + 1:
+        return None
+    return _period_change(range_history[-(days + 1):])
+
+
+def _dev_ma(range_history, price, window):
+    """가격이 최근 window일 평균(MA) 대비 몇 % 위/아래인지. 재료 부족하면 None."""
+    if not range_history or len(range_history) < window or price <= 0:
+        return None
+    hist = range_history[-window:]
+    ma = sum(hist) / len(hist)
+    if ma <= 0:
+        return None
+    return (price - ma) / ma * 100.0
+
+
+def _avoid(stock, funnel):
+    """국면 무관 공통 회피 게이트. 걸리면 True(신규 진입 금지)."""
+    code = stock['code']
+
+    amount = stock.get('amount')
+    amount_ma20 = stock.get('amount_ma20')
+    amount_ratio = (amount / amount_ma20) if (amount and amount_ma20) else None
+    if amount_ratio is not None and amount_ratio <= AMOUNT_RATIO_DRY:
+        _fn(funnel, code, 'avoid_amount_dry', amount_ratio=amount_ratio)
+        return True
+
+    orgn_20d = stock.get('orgn_net_20d')
+    per = stock.get('per')
+    if (orgn_20d is not None and orgn_20d <= ORGN_NET_20D_SELL
+            and per is not None and per >= PER_HIGH):
+        _fn(funnel, code, 'avoid_orgn_sell_high_per', orgn_net_20d=orgn_20d, per=per)
+        return True
+
+    frgn_20d = stock.get('frgn_net_20d')
+    if frgn_20d is not None and frgn_20d <= FRGN_NET_20D_SELL:
+        _fn(funnel, code, 'avoid_frgn_sell_20d', frgn_net_20d=frgn_20d)
+        return True
+
+    frgn_hold_chg = stock.get('frgn_hold_chg_5d')
+    if frgn_hold_chg is not None and frgn_hold_chg <= FRGN_HOLD_CHG_5D_DROP:
+        _fn(funnel, code, 'avoid_frgn_hold_drop', frgn_hold_chg_5d=frgn_hold_chg)
+        return True
+
+    ret_1d = _parse_change_rate(stock)
+    period_chg_10d = _pchg(stock.get('range_history', []), 10)
+    if (ret_1d >= RET_1D_HIGH and period_chg_10d is not None
+            and period_chg_10d <= PERIOD_CHG_10D_CRASH_MAX):
+        _fn(funnel, code, 'avoid_deadcat', ret_1d=ret_1d, period_chg_10d=period_chg_10d)
+        return True
+
+    return False
+
+
+def _playbook1_entry(stock, funnel):
+    """모멘텀 지속형(BULL 전용). (통과여부, 사유문구)."""
+    code = stock['code']
+    price = float(stock.get('price', 0))
+    range_history = stock.get('range_history', [])
+    period_chg_10d = _pchg(range_history, 10)
+    dev_ma20 = _dev_ma(range_history, price, 20)
+    if period_chg_10d is None or dev_ma20 is None:
+        _fn(funnel, code, 'pb1_no_history')
+        return False, ''
+    if period_chg_10d < PERIOD_CHG_10D_BULL_MIN:
+        _fn(funnel, code, 'pb1_momentum_weak', period_chg_10d=period_chg_10d)
+        return False, ''
+    if dev_ma20 < DEV_MA20_BULL_MIN:
+        _fn(funnel, code, 'pb1_below_ma20', dev_ma20=dev_ma20)
+        return False, ''
+    return True, f"[Sim12] 상승국면 모멘텀 지속 (10일 {period_chg_10d:+.1f}%, MA20이격 {dev_ma20:+.1f}%)"
+
+
+def _playbook2_entry(stock, funnel):
+    """급락반등형(SIDEWAYS/BEAR 전용). (통과여부, 사유문구)."""
+    code = stock['code']
+    range_history = stock.get('range_history', [])
+    period_chg_5d = _pchg(range_history, 5)
+    if period_chg_5d is None:
+        _fn(funnel, code, 'pb2_no_history')
+        return False, ''
+    if period_chg_5d > PERIOD_CHG_5D_CRASH_MAX:
+        _fn(funnel, code, 'pb2_not_crashed', period_chg_5d=period_chg_5d)
+        return False, ''
+
+    amount = stock.get('amount')
+    amount_ma20 = stock.get('amount_ma20')
+    amount_ratio = (amount / amount_ma20) if (amount and amount_ma20) else None
+    if amount_ratio is None or amount_ratio < AMOUNT_RATIO_OK:
+        _fn(funnel, code, 'pb2_thin_liquidity', amount_ratio=amount_ratio)
+        return False, ''
+
+    orgn_20d = stock.get('orgn_net_20d')
+    if orgn_20d is None or orgn_20d <= 0:
+        _fn(funnel, code, 'pb2_no_inst_buying', orgn_net_20d=orgn_20d)
+        return False, ''
+
+    return True, f"[Sim12] 급락반등 (5일 {period_chg_5d:.1f}%, 기관20일 {orgn_20d:+.1f}%)"
+
+
+def decide_sim12(view, candidates, current_prices, regime, funnel=None):
+    """[Sim12] 국면이원(모멘텀 지속형/급락반등형) 결정. 순수 함수. Order 리스트 반환.
+
+    BULL이면 플레이북1(이미 오르는 종목 순추세), SIDEWAYS/BEAR면 플레이북2(5일 급락
+    + 거래대금 유지 + 기관 20일 순매수)로 진입 로직 자체가 바뀐다 — 2026-08-20 KOSPI
+    규칙마이닝 "최고수익 종목 프로파일" 절 실측(강세장 4월 vs 약세~횡보 7~8월에서
+    최고수익 패턴이 정반대였다)을 그대로 반영.
+    """
+    orders = []
+    portfolio = view['portfolio']
+    today = get_kst_date()
+    sold = set()
+
+    # 1. 청산: 하드손절(공통) + 플레이북2 전용 5일 타임스탑.
+    for code in list(portfolio.keys()):
+        p = portfolio[code]
+        cur = current_prices.get(code, 0)
+        if cur <= 0:
+            continue
+        avg = p.get('avg_price', 0)
+        if avg <= 0:
+            continue
+        pr = (cur - avg) / avg * 100
+
+        if pr <= STOP_PCT:
+            orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                           'reason': f"[Sim12] 하드 손절 ({pr:.1f}%)", 'cooldown': 2, 'mark_partial': False})
+            sold.add(code)
+            continue
+
+        if p.get('playbook') == 2 and _holding_days(p, today) >= PLAYBOOK2_TIMESTOP_DAYS:
+            orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                           'reason': "[Sim12] 급락반등 타임스탑(5일)", 'cooldown': 1, 'mark_partial': False})
+            sold.add(code)
+            continue
+
+        # 트레일링 스탑: 수익이 한 번이라도 TRAIL_ACTIVATION_PCT를 찍었고 고점 대비
+        # TRAIL_CALLBACK_PCT 하락하면 매도. self.check_trailing_stop과 같은 계산이지만
+        # decide_sim12는 순수함수라 상태 메서드를 못 부른다 — 심6과 같은 방식으로
+        # portfolio에 이미 있는 peak_price를 직접 계산에 쓴다(run()이 decide 호출 전에
+        # update_peak_prices를 먼저 불러 최신 고점을 보장한다).
+        peak = p.get('peak_price', avg)
+        drop_from_peak = (peak - cur) / peak * 100 if peak > 0 else 0
+        activated = pr >= TRAIL_ACTIVATION_PCT or peak > avg * (1 + TRAIL_ACTIVATION_PCT / 100)
+        if activated and drop_from_peak >= TRAIL_CALLBACK_PCT:
+            orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                           'reason': f"[Sim12] 트레일링 스탑 (고점대비 -{drop_from_peak:.1f}%)",
+                           'cooldown': 2, 'mark_partial': False})
+            sold.add(code)
+            continue
+
+    # 2. 진입: 국면 판정불가면 신규 진입 없음(청산은 위에서 이미 처리했다).
+    if regime not in ('BULL', 'SIDEWAYS', 'BEAR'):
+        return orders
+
+    held = len(portfolio) - len(sold)
+    for stock in candidates:
+        if held >= MAX_HOLDINGS:
+            break
+        code = stock['code']
+        if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _fn(funnel, code, 'held_or_cooldown')
+            continue
+
+        if _avoid(stock, funnel):
+            continue
+
+        price = float(stock.get('price', 0))
+        if price <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+
+        if regime == 'BULL':
+            ok, reason = _playbook1_entry(stock, funnel)
+            playbook = 1
+        else:
+            ok, reason = _playbook2_entry(stock, funnel)
+            playbook = 2
+        if not ok:
+            continue
+
+        invest = view['nav'] * POSITION_WEIGHT
+        qty = int(invest / price)
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price)
+            continue
+
+        orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code), 'price': price,
+                       'quantity': qty, 'cooldown': None, 'playbook': playbook, 'reason': reason})
+        held += 1
+
+    return orders

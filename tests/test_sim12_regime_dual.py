@@ -93,6 +93,29 @@ def test_avoids_entry_when_foreign_20d_sell_regime():
     assert any(f['reason'] == 'avoid_frgn_sell_20d' for f in funnel)
 
 
+def test_avoids_entry_when_foreign_holding_rate_drops():
+    cand = _bull_candidate()
+    cand['frgn_hold_chg_5d'] = -2.0
+    funnel = []
+    orders = decide_sim12(_view(), [cand], {cand['code']: cand['price']}, 'BULL', funnel=funnel)
+
+    assert not [o for o in orders if o['action'] == 'BUY']
+    assert any(f['reason'] == 'avoid_frgn_hold_drop' for f in funnel)
+
+
+def test_avoids_entry_on_deadcat_bounce():
+    """당일 급등(+6%)이지만 10일간은 뚜렷한 하락추세(-16%)였던 경우 — 데드캣 바운스로 보고 회피."""
+    hist = [1000] * 9 + [1000, 975, 950, 925, 900, 890, 880, 870, 860, 850, 840]
+    cand = {'code': '333333', 'name': '데드캣', 'price': 890, 'amount': 5_000_000_000,
+            'amount_ma20': 4_000_000_000, 'change_rate': '+6.0%',
+            'range_history': hist, 'per': 15.0}
+    funnel = []
+    orders = decide_sim12(_view(), [cand], {cand['code']: cand['price']}, 'BULL', funnel=funnel)
+
+    assert not [o for o in orders if o['action'] == 'BUY']
+    assert any(f['reason'] == 'avoid_deadcat' for f in funnel)
+
+
 def test_missing_gate_fields_do_not_block_entry():
     """모르는 값은 '회피'로 지어내지 않는다."""
     cand = _bull_candidate()

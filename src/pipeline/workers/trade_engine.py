@@ -703,6 +703,43 @@ class TradeEngineWorker(BaseWorker):
                             continue
                     if ratios:
                         stock.setdefault('frgn_net_20d', sum(ratios) / len(ratios))
+
+                    # [Sim12] 기관 20일 누적 수급·20일 평균 거래대금·외인 보유율 5일 변화.
+                    # frgn_net_20d와 같은 표에서 재활용(추가 호출 0). 2026-08-20 KOSPI
+                    # 규칙마이닝: "기관 20일 순매도 + 고PER" 조합이 단독 효과의 4배가
+                    # 넘는 회피 신호였다(fwd_10d -8.78%p/-8.48%p) — 그 게이트의 재료.
+                    orgn_ratios = []
+                    for row in data_rows:
+                        try:
+                            vol = float(row[4].get_text().replace(',', '').strip())
+                            net = float(row[5].get_text().replace(',', '').replace('+', '').strip())
+                            if vol > 0:
+                                orgn_ratios.append(net / vol * 100)
+                        except Exception:
+                            continue
+                    if orgn_ratios:
+                        stock.setdefault('orgn_net_20d', sum(orgn_ratios) / len(orgn_ratios))
+
+                    amounts = []
+                    for row in data_rows:
+                        try:
+                            close_v = float(row[1].get_text().replace(',', '').strip())
+                            vol = float(row[4].get_text().replace(',', '').strip())
+                            amounts.append(close_v * vol)
+                        except Exception:
+                            continue
+                    if amounts:
+                        stock.setdefault('amount_ma20', sum(amounts) / len(amounts))
+
+                    if len(data_rows) >= 6:
+                        try:
+                            hold_5d_ago = float(
+                                data_rows[5][8].get_text().replace('%', '').replace(',', '').strip() or 0
+                            )
+                            stock.setdefault('frgn_hold_chg_5d',
+                                             round(stock['foreign_rate'] - hold_5d_ago, 3))
+                        except Exception:
+                            pass
             except Exception:
                 pass
             return stock

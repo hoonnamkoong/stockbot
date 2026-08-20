@@ -242,3 +242,80 @@ def decide_sim12(view, candidates, current_prices, regime, funnel=None):
         held += 1
 
     return orders
+
+
+from ..regime_state import read_regime
+
+
+class RegimeDualSimulator(BaseSimulator):
+    """
+    [Sim 12] 국면이원 반등/추세형 (Regime-Dual Momentum/Rebound)
+    - 2026-08-20 KOSPI 규칙마이닝(Tier1) 기반. Sim0(리베로) 국면에 따라 진입 로직
+      자체가 바뀐다.
+    - BULL: 플레이북1(모멘텀 지속형) — 10일간 이미 강하게 상승 + MA20 위로 크게 이격.
+    - SIDEWAYS/BEAR: 플레이북2(급락반등형) — 5일 급락 + 거래대금 유지 + 기관 20일
+      순매수.
+    - 공통 회피 게이트: 거래대금 급감/기관·외국인 20일 지속 순매도/외인 보유율
+      급감/데드캣(당일급등+10일 하락추세)은 국면 무관하게 신규 진입 금지.
+    - 청산: 하드손절 -7% + 트레일링(+5% 활성/-3% 콜백, 둘 다 공통·Sim2와 동일 관례).
+      플레이북2는 추가로 5일 타임스탑(반등이 10일 시계에서 재하락하는 경향 — 설계서
+      참고). 플레이북1은 타임스탑 없음(추세를 더 태운다).
+    - 페이퍼 관찰 단계(tradeable: false) — 백테스트 미검증, 임계값은 리서치 분위수
+      경계의 근사치다.
+    """
+    def __init__(self, initial_cash=3000000):
+        super().__init__("RegimeDual", initial_cash)
+
+    def get_universe(self):
+        """코스피 등락률 상승률·하락률 각 30개를 합친다. 상승률만 보면 플레이북2
+        (급락반등형)의 후보가 원천적으로 안 잡힌다 — 두 플레이북이 정반대 방향의
+        종목을 필요로 하므로 양쪽 다 확보해야 한다."""
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            kis = KISDataProvider()
+            gainers = kis.get_fluctuation_rank(market='0001', sort='0', limit=30)
+            decliners = kis.get_fluctuation_rank(market='0001', sort='1', limit=30)
+            merged = {s['code']: s for s in (gainers or [])}
+            for s in (decliners or []):
+                merged.setdefault(s['code'], s)
+            return list(merged.values()) or None
+        except Exception:
+            return None
+
+    def _read_regime(self):
+        """Sim0(리베로)의 국면 판단을 읽는다. 판단 불가면 None — 신규 진입을
+        건너뛴다(Sim6과 같은 원칙: 모르는 국면으로 실제 주문을 내지 않는다)."""
+        return read_regime(self.data_dir)[0]
+
+    def run(self, candidates, current_prices=None):
+        current_prices = current_prices or {}
+        self.update_peak_prices(current_prices)
+        regime = self._read_regime()
+        funnel = []
+        orders = decide_sim12(self._view(current_prices), candidates, current_prices,
+                              regime, funnel=funnel)
+        self._log_funnel(candidates, funnel, orders, regime)
+        self._apply(orders, current_prices)
+        self.save_state(current_prices)
+        return self.calculate_stats(current_prices)
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, orders, regime) -> None:
+        """어느 국면에서 어느 게이트에 막혔는지 남긴다 — 심6·심9와 같은 방식
+        (sim_diag)으로 db-data에 남아야 다음 사이클 이후에도 확인 가능하다."""
+        try:
+            from collections import Counter
+            if not funnel and not orders:
+                return
+            try:
+                from src.data import sim_diag
+                sim_diag.append('sim12', [dict(f, decision='skip') for f in funnel]
+                                + [dict(code=o.get('code'), reason='entry', decision='entry')
+                                   for o in orders], log=lambda *_: None)
+            except Exception:
+                pass
+            c = Counter(f['reason'] for f in funnel)
+            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
+            print(f"[Sim12 깔때기] 국면={regime} 후보 {len(candidates)} → 매수 {len(orders and [o for o in orders if o['action']=='BUY'])} | 탈락: {parts}")
+        except Exception as e:
+            print(f'[Sim12 깔때기] 기록 실패(무시): {e}')

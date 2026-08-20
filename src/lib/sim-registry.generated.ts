@@ -35,6 +35,7 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
   { id: 'sim9_1_donchian', uiKey: 'sim9_1', label: '돈치안 돌파 (Sim 9-1)', shortDesc: '20일 채널 상단 돌파 추종 · 10일 채널 이탈 / 2ATR 청산', color: 'lime', chartGroup: 4, stateFile: 'sim_donchian_state.json', csvFile: 'trade_history_sim_donchian.csv', tradeable: false },
   { id: 'sim10_orchestrator', uiKey: 'sim10', label: '오케스트레이터 (Sim 10)', shortDesc: 'Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용', color: 'grape', chartGroup: 4, stateFile: 'sim_orchestrator_state.json', csvFile: 'trade_history_sim_orchestrator.csv', tradeable: true },
   { id: 'sim11_minervini', uiKey: 'sim11', label: '미너비니 추세형 (Sim 11)', shortDesc: '추세 템플릿 + 실적 가속(EPS·매출) + VCP 압축 돌파', color: 'gray', chartGroup: 4, stateFile: 'sim_minervini_state.json', csvFile: 'trade_history_sim_minervini.csv', tradeable: false },
+  { id: 'sim12_regime_dual', uiKey: 'sim12', label: '국면이원 반등/추세형 (Sim 12)', shortDesc: 'BULL=모멘텀 지속 / SIDEWAYS·BEAR=급락반등(거래대금+기관수급 확인)', color: 'dark', chartGroup: 4, stateFile: 'sim_regimedual_state.json', csvFile: 'trade_history_sim_regimedual.csv', tradeable: false },
 ];
 
 /** 국면 분석기(매매 없음). 성과 목록에 오르지 않고 국면 표시로만 쓰인다. */
@@ -108,6 +109,7 @@ export const SIM_CHART_HEX: Record<string, string> = {
   lime: '#74b816',
   grape: '#ae3ec9',
   gray: '#495057',
+  dark: '#1a1b1e',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

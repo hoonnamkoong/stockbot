@@ -363,6 +363,18 @@ def test_sim9_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
     assert os.path.basename(month_path('sim9', now.strftime('%Y%m%d'))) in lines
 
 
+def test_sim12_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
+    from src.data.sim_diag import month_path
+    monkeypatch.chdir(tmp_path)
+    now = _Ctx().now_kst
+    trade_loop._write_deploy_manifest(
+        None, log=lambda *a: None, now=now, extra_sim_ids={'sim12_regime_dual'})
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert 'sim_regimedual_state.json' in lines
+    assert os.path.basename(month_path('sim12', now.strftime('%Y%m%d'))) in lines
+
+
 def test_both_diag_files_carried_when_both_sims_ran(tmp_path, monkeypatch):
     from src.data.sim_diag import month_path
     monkeypatch.chdir(tmp_path)

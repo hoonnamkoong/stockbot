@@ -302,3 +302,20 @@ simulators:
                        # 같은 60초 루프에서 돈다 — 실제 매수/매도는 장중 실시간가로
                        # 한다(program-trading-parity-mandate, backtest-lookahead-trap
                        # 위반을 피하려고 08-20에 IS_EOD 방식에서 재설계)
+
+  - id: "sim12_regime_dual"
+    module: "src.strategy.simulators.sim12_regime_dual"
+    class: "RegimeDualSimulator"
+    description: "Sim12 국면이원 반등/추세형 — BULL은 모멘텀 지속, SIDEWAYS/BEAR는 5일 급락+거래대금유지+기관순매수 반등"
+    state_file: "sim_regimedual_state.json"
+    csv_file: "trade_history_sim_regimedual.csv"
+    label: "국면이원 반등/추세형 (Sim 12)"
+    display_order: 120
+    ui_key: "sim12"
+    short_desc: "BULL=모멘텀 지속 / SIDEWAYS·BEAR=급락반등(거래대금+기관수급 확인)"
+    chart_group: 4
+    color: "dark"  # teal은 이미 다른 심이 사용 중(test_ui_keys_and_colors_are_unique) —
+                   # Mantine 팔레트에서 마지막으로 남은 색
+    active: true
+    tradeable: false  # 신규(2026-08-20), 백테스트 없음 — 페이퍼 관찰 단계(Sim11과 동일 관례)
+    needs_buzz: false  # KIS 등락률 순위 자체 유니버스 — 60초 매매 루프에서 돈다

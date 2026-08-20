@@ -90,6 +90,7 @@ export const SIM_CHART_HEX: Record<string, string> = {
   lime: '#74b816',
   grape: '#ae3ec9',
   gray: '#495057',
+  dark: '#1a1b1e',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

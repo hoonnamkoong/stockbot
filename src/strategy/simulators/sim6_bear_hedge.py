@@ -22,7 +22,21 @@ STOP_PCT = -12.0         # 하드 손절 (파국 방지용, 넓게)
 REENTRY_COOLDOWN = 1     # 청산 후 1일 쿨다운(추세 지속 시 재진입)
 
 
-def decide_sim6(view, candidates, current_prices):
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심4-1·심9와 같은 방식).
+
+    2026-08-20 감사: 08-19 리베로가 하루 종일 BEAR로 판정했는데도 매수가
+    0건이었다. 원인(고정 유니버스 현재가가 네이버 일봉에 박제)은 사후에
+    가격 스냅샷을 대조해서야 찾아냈다 — 이 심은 유니버스가 1종목뿐이라
+    "가격>MA5"와 "당일상승" 중 어느 쪽이 막았는지 로그 한 줄이면 됐을
+    일이었다. 다음 BEAR 구간부터는 추측 없이 바로 확정한다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
+
+
+def decide_sim6(view, candidates, current_prices, funnel=None):
     """[Sim6] 인버스 ETF 추세추종 결정. 순수 함수. Order 리스트 반환.
 
     Sim4(상승모멘텀)의 미러: 인버스 ETF 자체의 상승 추세(=시장 하락 추세)를 타고,
@@ -62,24 +76,30 @@ def decide_sim6(view, candidates, current_prices):
             break
         code = stock['code']
         if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
-            continue
+            _fn(funnel, code, 'held_or_cooldown'); continue
         price = float(stock.get('price', 0))
         if price <= 0:
-            continue
+            _fn(funnel, code, 'no_price'); continue
         sparkline = stock.get('sparkline_price', [])
         if len(sparkline) < 3:
-            continue
+            _fn(funnel, code, 'no_sparkline'); continue
         ma = sum(sparkline) / len(sparkline)
         daily_change = _parse_change_rate(stock)
         # 쉬운/빠른 진입: 인버스가 MA5 상회 + 당일 상승. (모멘텀 확인 대기 시 고점 못 잡음)
-        if price > ma and daily_change > 0:
-            invest = view['cash'] * ENTRY_RATIO
-            qty = int(invest / price)
-            if qty > 0:
-                orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code), 'price': price,
-                               'quantity': qty, 'cooldown': None,
-                               'reason': "[인버스] 하락 추세추종 매수 (MA5 상회 + 당일 상승)"})
-                held += 1
+        # 두 조건을 나눠서 세는 이유는 위 _fn 독스트링과 같다 — 한 if로 묶으면
+        # 어느 쪽이 막았는지 로그에 안 남는다.
+        if price <= ma:
+            _fn(funnel, code, 'below_ma', price=price, ma=round(ma, 1), change_rate=daily_change); continue
+        if daily_change <= 0:
+            _fn(funnel, code, 'daily_down', price=price, ma=round(ma, 1), change_rate=daily_change); continue
+        invest = view['cash'] * ENTRY_RATIO
+        qty = int(invest / price)
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, cash=view['cash']); continue
+        orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code), 'price': price,
+                       'quantity': qty, 'cooldown': None,
+                       'reason': "[인버스] 하락 추세추종 매수 (MA5 상회 + 당일 상승)"})
+        held += 1
     return orders
 
 
@@ -127,7 +147,9 @@ class BearHedgeSimulator(BaseSimulator):
             self.save_state(current_prices)
             return self.calculate_stats(current_prices)
         if regime == "BEAR":
-            orders = decide_sim6(self._view(current_prices), candidates, current_prices)
+            funnel = []
+            orders = decide_sim6(self._view(current_prices), candidates, current_prices, funnel=funnel)
+            self._log_funnel(candidates, funnel, orders)
         else:
             # 비(非)하락장: 인버스 매수 금지 + 보유분 전량 청산(국면 이탈)
             orders = [{'action': 'SELL', 'code': code, 'price': current_prices.get(code, 0),
@@ -138,3 +160,37 @@ class BearHedgeSimulator(BaseSimulator):
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, orders) -> None:
+        """BEAR 국면인데도 매수가 안 될 때 어느 게이트가 막았는지 남긴다.
+
+        유니버스가 1종목(KODEX 인버스)뿐이라 탈락 분포가 곧 그날의 답이다 —
+        `below_ma`뿐이면 MA5 필터가, `daily_down`뿐이면 "당일 상승" 조건이
+        원인으로 확정된다. print는 Actions 로그에만 남아 며칠 뒤엔 못 찾으므로
+        sim1·sim9와 같은 방식으로 파일에도 남긴다(sim_diag).
+
+        진단이 심을 죽이면 안 되니 통째로 삼킨다.
+        """
+        try:
+            from collections import Counter
+            if not funnel and not orders:
+                return
+            try:
+                from src.data import sim_diag
+                sim_diag.append('sim6', [dict(f, decision='skip') for f in funnel]
+                                + [dict(code=o.get('code'), reason='entry', decision='entry')
+                                   for o in orders], log=lambda *_: None)
+            except Exception:
+                pass
+            c = Counter(f['reason'] for f in funnel)
+            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
+            print(f"[Sim6 깔때기] 후보 {len(candidates)} → 매수 {len(orders)} | 탈락: {parts}")
+            for f in funnel[:5]:
+                if 'change_rate' in f:
+                    print(f"   {f['code']} 탈락={f['reason']} 가격={f.get('price', 0)} "
+                          f"MA5={f.get('ma', 0)} 등락률={f.get('change_rate', 0):+.2f}%")
+                else:
+                    print(f"   {f['code']} 탈락={f['reason']}")
+        except Exception as e:
+            print(f'[Sim6 깔때기] 기록 실패(무시): {e}')

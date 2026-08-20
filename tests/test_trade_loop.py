@@ -332,6 +332,62 @@ def test_extra_sim_ids_are_included_in_the_manifest(tmp_path, monkeypatch):
     assert 'sim_risk_state.json' in lines
 
 
+def test_sim6_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
+    """심6는 이 60초 루프에서만 돌고 배포는 명시적 매니페스트로만 나가므로,
+    sim_diag가 쓴 진단 CSV도 여기서 같이 실어야 db-data에 도달한다(sim1처럼
+    scraper.yml에 남은 심은 그쪽 `data/*.csv` 기본 경로로 나가지만, 이 루프로
+    옮겨온 sim6·sim9는 그 워크플로에서 안 돈다)."""
+    from src.data.sim_diag import month_path
+    monkeypatch.chdir(tmp_path)
+    now = _Ctx().now_kst
+    trade_loop._write_deploy_manifest(
+        None, log=lambda *a: None, now=now, extra_sim_ids={'sim6_bear'})
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert 'sim_bear_state.json' in lines
+    assert 'trade_history_sim_bear.csv' in lines
+    assert os.path.basename(month_path('sim6', now.strftime('%Y%m%d'))) in lines
+
+
+def test_sim9_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
+    """2026-08-20: sim6에서 이 함정을 고친 날, 같은 60초 루프로 옮겨와 있던
+    sim9도 diag를 쓰면서 똑같이 매니페스트에서 빠져 있던 게 드러났다."""
+    from src.data.sim_diag import month_path
+    monkeypatch.chdir(tmp_path)
+    now = _Ctx().now_kst
+    trade_loop._write_deploy_manifest(
+        None, log=lambda *a: None, now=now, extra_sim_ids={'sim9_gap_fade'})
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert 'sim_gapfade_state.json' in lines
+    assert os.path.basename(month_path('sim9', now.strftime('%Y%m%d'))) in lines
+
+
+def test_both_diag_files_carried_when_both_sims_ran(tmp_path, monkeypatch):
+    from src.data.sim_diag import month_path
+    monkeypatch.chdir(tmp_path)
+    now = _Ctx().now_kst
+    trade_loop._write_deploy_manifest(
+        None, log=lambda *a: None, now=now,
+        extra_sim_ids={'sim6_bear', 'sim9_gap_fade'})
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert os.path.basename(month_path('sim6', now.strftime('%Y%m%d'))) in lines
+    assert os.path.basename(month_path('sim9', now.strftime('%Y%m%d'))) in lines
+
+
+def test_sim6_diag_file_is_skipped_without_now(tmp_path, monkeypatch):
+    """now 없이 불리면(방어적 상황) 진단 파일명을 못 만드니 조용히 생략한다 —
+    죽지 않는다."""
+    monkeypatch.chdir(tmp_path)
+    trade_loop._write_deploy_manifest(
+        None, log=lambda *a: None, extra_sim_ids={'sim6_bear'})
+    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
+        encoding='utf-8').split()
+    assert 'sim_bear_state.json' in lines
+    assert not any('diag' in line for line in lines)
+
+
 def test_extra_sim_ids_combine_with_the_selected_sim_without_duplicating():
     """선택 심이 우연히 extra_sim_ids에도 들어 있어도(집합이라 안 그렇겠지만
     방어적으로) 파일이 두 번 적히면 안 된다."""

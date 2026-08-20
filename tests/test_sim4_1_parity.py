@@ -27,9 +27,18 @@ def test_partial_take_profit_at_plus_5pct():
 
 
 def test_breakeven_stop_after_partial():
-    orders = decide_bull_daytrade(_view({'005930': _pos(1000, partial=True)}), [], {'005930': 1000})
+    """2026-08-20: 버퍼 -1.5%(BREAKEVEN_STOP_PCT) 도입 — 정확히 본전(0%)에서는
+    더 이상 잘리지 않는다(실거래 손절 후 가격 역추적 분석 결과 완화)."""
+    orders = decide_bull_daytrade(_view({'005930': _pos(1000, partial=True)}), [], {'005930': 985})
     sells = [o for o in orders if o['action'] == 'SELL']
     assert len(sells) == 1 and '매입가 복귀' in sells[0]['reason']
+
+
+def test_breakeven_stop_buffer_tolerates_a_small_pullback():
+    """본전 근처 눌림(0% ~ -1.5%)은 이제 버틴다 — 조기 청산 방지가 목적."""
+    orders = decide_bull_daytrade(_view({'005930': _pos(1000, partial=True)}), [], {'005930': 1000})
+    sells = [o for o in orders if o['action'] == 'SELL']
+    assert sells == []
 
 
 def test_entry_when_conditions_met():

@@ -35,6 +35,14 @@ POSITION_WEIGHT = 0.19  # 종목당 NAV 대비 비중 (0.19 × 5 = 최대 95% �
 # 60을 그대로 쓴다.
 ADX_MAX = 60.0
 
+# 매입가 복귀 손절 버퍼(2026-08-20, 실거래 30건 손절 후 T+1/T+2/T+5 종가 역추적으로
+# 조정): +5% 분할익절을 이미 찍은(모멘텀이 한 번 검증된) 종목이 0.0%로 되돌아오면
+# 바로 잘랐는데, 그 9건 중 67~88%가 며칠만 더 버텼으면 더 나은 결과(평균 +2.7~+14.2pp)
+# 였다 — 검증된 종목을 일상적 눌림에 너무 일찍 내보낸 패턴. 반면 순수 하드손절(-3%)
+# 30건 중 21건은 반대로 즉시 반등 근거가 약해(T+1 평균 -0.76pp) 그쪽은 그대로 둔다.
+# 표본 9건이라 정밀 튜닝은 못 하고, 하드손절 폭(-3%)의 절반인 -1.5%를 완충으로 쓴다.
+BREAKEVEN_STOP_PCT = -1.5
+
 
 def _fn(funnel, code, reason, **vals):
     """왜 안 샀는지 한 줄 남긴다(심3·심5·심9와 같은 방식).
@@ -87,7 +95,7 @@ def decide_bull_daytrade(view, candidates, current_prices, funnel=None):
                 orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
                                'reason': "[단타] 5일 경과 2차 강제청산", 'cooldown': 1, 'mark_partial': False})
                 sold.add(code); continue
-            if pr <= 0.0:
+            if pr <= BREAKEVEN_STOP_PCT:
                 orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
                                'reason': f"[단타] 매입가 복귀 손절 ({pr:.1f}%)", 'cooldown': 2, 'mark_partial': False})
                 sold.add(code); continue

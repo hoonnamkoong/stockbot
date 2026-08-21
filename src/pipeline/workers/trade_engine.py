@@ -535,13 +535,24 @@ class TradeEngineWorker(BaseWorker):
                         sim_candidates = candidates
                         sim_prices = current_prices
 
-                    # 네이버 폴백을 끈 경로(lite)에서는 보유 종목 현재가가 비어 있을 수
-                    # 있다. 0을 현재가로 넘기면 심이 −100% 손실로 읽고 허위 손절을 낸다.
-                    # 모르는 값은 지어내지 않고 이번 사이클을 건너뛴다.
+                    # 네이버 폴백을 끈 경로(lite)에서는 보유 종목이 그날 자체 유니버스
+                    # (등락률·수급 상위 30)에서 밀려나면 현재가가 비어 있을 수 있다.
+                    # 그렇다고 바로 건너뛰면 그 종목이 다시 랭킹에 들 때까지 심 전체가
+                    # (진입도 청산도) 영구히 멈춘다 — 2026-08-19 23:57 lite 루프 전환
+                    # 이후 심2/4/8/9가 이렇게 멈췄다. 네이버 스크래핑은 느려 lite
+                    # 예산엔 못 쓰지만, KIS 단건 시세는 이미 이 파일의 다른 곳
+                    # (_backfill_breadth_kis)에서 같은 페이스로 쓰는 만큼 가볍다 —
+                    # 블라인드 종목(보통 1~4개)만 보강한다.
                     if not allow_price_fallback:
                         blind = [c for c in sim.state.get('portfolio', {})
                                  if not sim_prices.get(c)]
                         if blind:
+                            sim_prices.update(self._fetch_kis_prices(blind))
+                            blind = [c for c in blind if not sim_prices.get(c)]
+                        if blind:
+                            # 0을 현재가로 넘기면 심이 −100% 손실로 읽고 허위 손절을
+                            # 낸다. KIS 보강도 실패한 종목만 모르는 값을 지어내지
+                            # 않고 이번 사이클을 건너뛴다(상폐·조회 오류 등).
                             self.log(f"  {sim.__class__.__name__} 건너뜀 — 보유 "
                                      f"{len(blind)}종목 현재가 측정 불가 {blind}")
                             continue
@@ -1088,5 +1099,29 @@ class TradeEngineWorker(BaseWorker):
                     self.log(f"    {code}: {prices[code]:,}원")
             except Exception as e:
                 self.log_error(f"    {code} 현재가 조회 실패: {e}")
+        return prices
+
+    def _fetch_kis_prices(self, codes: list) -> dict:
+        """블라인드 보유 종목의 현재가를 KIS 단건 시세로 보강한다(lite 경로 전용).
+
+        네이버 스크래핑(_fetch_portfolio_prices)보다 훨씬 가볍다 — 이미 인증된
+        토큰을 재사용하는 REST 콜 하나다(get_price_quote). 초당 20건 유량제한을
+        고려해 코드당 0.06초 페이스를 둔다(_backfill_breadth_kis와 동일 페이스).
+        블라인드 종목은 보통 사이클당 1~4개라 lite 예산에 무리가 없다.
+        """
+        import time as _time
+        if self._kis_provider is None:
+            from src.trade.kis_data_provider import KISDataProvider
+            self._kis_provider = KISDataProvider()
+        prices = {}
+        for code in codes:
+            try:
+                quote = self._kis_provider.get_price_quote(code)
+                if quote.get('price'):
+                    prices[code] = quote['price']
+                    self.log(f"    {code}: {prices[code]:,}원 (KIS)")
+            except Exception as e:
+                self.log_error(f"    {code} KIS 현재가 조회 실패: {e}")
+            _time.sleep(0.06)
         return prices
 

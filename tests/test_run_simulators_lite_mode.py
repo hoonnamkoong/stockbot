@@ -54,13 +54,14 @@ def _worker():
 
 
 def test_lite_mode_never_calls_naver_fallback():
-    """보유 종목 현재가가 없어도 네이버 조회를 하지 않는다."""
+    """보유 종목 현재가가 없어도 네이버 조회를 하지 않는다(KIS 단건 조회는 별개)."""
     sim = _FakeSim(portfolio={'005930': {}})
     w = _worker()
 
     with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
                     return_value=[sim]), \
-         mock.patch.object(w, '_fetch_portfolio_prices') as naver:
+         mock.patch.object(w, '_fetch_portfolio_prices') as naver, \
+         mock.patch.object(w, '_fetch_kis_prices', return_value={}):
         w._run_simulators([], allow_price_fallback=False)
 
     naver.assert_not_called()
@@ -80,15 +81,35 @@ def test_default_mode_still_uses_naver_fallback():
 
 
 def test_lite_mode_skips_sim_whose_holding_price_is_unknown():
-    """가격을 모르면 0으로 넘기지 않고 그 심을 건너뛴다 (허위 손절 방지)."""
+    """KIS 단건 보강도 실패하면 0으로 넘기지 않고 그 심을 건너뛴다 (허위 손절 방지)."""
     sim = _FakeSim(portfolio={'005930': {}})
     w = _worker()
 
     with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
-                    return_value=[sim]):
+                    return_value=[sim]), \
+         mock.patch.object(w, '_fetch_kis_prices', return_value={}) as kis:
         w._run_simulators([], allow_price_fallback=False)
 
+    kis.assert_called_once_with(['005930'])
     assert sim.ran_with is None, '현재가를 모르는 채로 심을 돌리면 안 된다'
+
+
+def test_lite_mode_kis_backfill_recovers_blind_holding():
+    """보유 종목이 그날 자체 유니버스 밖으로 밀려나도, KIS 단건 조회가 가격을
+    채워주면 그 사이클에 정상적으로 돈다 — 2026-08-19 23:57 lite 전환 이후
+    심2/4/8/9가 랭킹 밖 보유 종목 하나 때문에 영구히 멈췄던 회귀의 재발 방지."""
+    sim = _FakeSim(portfolio={'005935': {}})
+    w = _worker()
+
+    with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
+                    return_value=[sim]), \
+         mock.patch.object(w, '_fetch_kis_prices',
+                           return_value={'005935': 68000}) as kis:
+        w._run_simulators([], allow_price_fallback=False)
+
+    kis.assert_called_once_with(['005935'])
+    assert sim.ran_with is not None
+    assert sim.ran_with['prices']['005935'] == 68000
 
 
 def test_lite_mode_runs_sim_when_own_universe_covers_holdings():
@@ -117,6 +138,37 @@ def test_lite_mode_runs_sim_with_no_holdings():
         w._run_simulators([], allow_price_fallback=False)
 
     assert sim.ran_with is not None
+
+
+def test_fetch_kis_prices_uses_kis_quote_not_naver():
+    """_fetch_kis_prices는 KISDataProvider.get_price_quote로 가격을 채운다."""
+    w = _worker()
+    fake_provider = mock.MagicMock()
+    fake_provider.get_price_quote.side_effect = [
+        {'price': 68000}, {'price': 0}, {},
+    ]
+    w._kis_provider = fake_provider
+
+    with mock.patch('time.sleep'):
+        result = w._fetch_kis_prices(['005935', '000660', '005930'])
+
+    assert result == {'005935': 68000}, '가격이 0이거나 없는 응답은 채우지 않는다'
+    assert fake_provider.get_price_quote.call_count == 3
+
+
+def test_fetch_kis_prices_survives_per_code_exception():
+    """한 종목 조회가 예외를 던져도 나머지 종목은 계속 조회한다."""
+    w = _worker()
+    fake_provider = mock.MagicMock()
+    fake_provider.get_price_quote.side_effect = [
+        Exception('boom'), {'price': 71000},
+    ]
+    w._kis_provider = fake_provider
+
+    with mock.patch('time.sleep'):
+        result = w._fetch_kis_prices(['005930', '000660'])
+
+    assert result == {'000660': 71000}
 
 
 def test_only_sim_id_runs_just_that_one():

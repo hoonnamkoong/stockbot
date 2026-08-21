@@ -8,6 +8,16 @@ _period_change = BaseSimulator.calc_period_change
 MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19
 
+# ⚠ amount_ratio(아래 두 게이트)는 리서치가 측정한 것과 시간 기준이 다르다 —
+# 리서치는 EOD(하루 완결) 거래대금 대비 20일 평균이었는데, 실전 후보의 `amount`는
+# KIS 등락률 순위가 주는 **조회 시점까지의 장중 누적** 거래대금이다(amount_ma20은
+# 여전히 완결된 하루 평균). 그 결과 장 초반엔 이 비율이 구조적으로 낮게 잡혀
+# avoid_amount_dry가 과도하게 걸리고, 플레이북2 진입은 하루 거래량이 상당히
+# 소화된 뒤(대체로 오후)로 몰릴 수 있다 — 2026-08-21 최종 리뷰 지적. 관찰 기간 중
+# sim12_diag_*.csv의 avoid_amount_dry/pb2_thin_liquidity 시간대별 비율을 봐서
+# 시각 스케일링(세션 경과 비율로 나누기, 또는 전일 완결 거래대금으로 교체 등)이
+# 필요한지 판단할 것 — 지금은 임계값을 건드리지 않는다(관찰 데이터 없이 추측하지
+# 않는다).
 AMOUNT_RATIO_DRY = 0.65          # 거래대금 급감(회피). 리서치 q1 상한 그대로.
 AMOUNT_RATIO_OK = 1.0            # 플레이북2 최소 유동성. 리서치 quantile(0.6)≈1.01 근사.
 PER_HIGH = 40.0                  # 고PER(회피 조합용). 리서치 q5 하한 44.6의 보수적 근사.
@@ -269,18 +279,36 @@ class RegimeDualSimulator(BaseSimulator):
     def get_universe(self):
         """코스피 등락률 상승률·하락률 각 30개를 합친다. 상승률만 보면 플레이북2
         (급락반등형)의 후보가 원천적으로 안 잡힌다 — 두 플레이북이 정반대 방향의
-        종목을 필요로 하므로 양쪽 다 확보해야 한다."""
+        종목을 필요로 하므로 양쪽 다 확보해야 한다.
+
+        ⚠ 하락률(sort='1') 조회는 이 심이 처음 쓴다 — 다른 매매 심은 전부 상승률만
+        본다. 상승률 30은 다른 심과 겹쳐 공유 보강 풀에서 사실상 공짜지만, 하락률
+        30종목은 이 심 때문에 순증되는 조회량이다. 60초 매매 루프의 예산은
+        빡빡하다(trade_loop.py LOOP_BUDGET_SEC=85초, 이 루프가 도는 모든 심이 같은
+        예산을 나눠 쓴다) — 2026-08-19에 다른 심(Sim10)이 예산을 넘겨 사이클
+        하나를 통째로 날린 전례가 있다. 배포 후 첫 사이클들의 실측 소요시간을
+        반드시 확인할 것 — 2026-08-21 최종 리뷰 지적. 초과하면 limit을 낮추거나
+        BULL 국면에서는 하락률 조회를 건너뛰는 완화가 필요하다(지금은 측정 없이
+        선제적으로 바꾸지 않는다).
+        """
         try:
             from src.trade.kis_data_provider import KISDataProvider
             kis = KISDataProvider()
-            gainers = kis.get_fluctuation_rank(market='0001', sort='0', limit=30)
-            decliners = kis.get_fluctuation_rank(market='0001', sort='1', limit=30)
-            merged = {s['code']: s for s in (gainers or [])}
-            for s in (decliners or []):
-                merged.setdefault(s['code'], s)
-            return list(merged.values()) or None
         except Exception:
             return None
+        merged: dict = {}
+        # 두 호출을 따로 감싼다 — 한쪽이 실패해도 이미 받은 반대쪽까지 버리지 않는다.
+        try:
+            for s in (kis.get_fluctuation_rank(market='0001', sort='0', limit=30) or []):
+                merged[s['code']] = s
+        except Exception:
+            pass
+        try:
+            for s in (kis.get_fluctuation_rank(market='0001', sort='1', limit=30) or []):
+                merged.setdefault(s['code'], s)
+        except Exception:
+            pass
+        return list(merged.values()) or None
 
     def _read_regime(self):
         """Sim0(리베로)의 국면 판단을 읽는다. 판단 불가면 None — 신규 진입을
@@ -316,6 +344,7 @@ class RegimeDualSimulator(BaseSimulator):
                 pass
             c = Counter(f['reason'] for f in funnel)
             parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            print(f"[Sim12 깔때기] 국면={regime} 후보 {len(candidates)} → 매수 {len(orders and [o for o in orders if o['action']=='BUY'])} | 탈락: {parts}")
+            buy_count = len([o for o in orders if o['action'] == 'BUY'])
+            print(f"[Sim12 깔때기] 국면={regime} 후보 {len(candidates)} → 매수 {buy_count} | 탈락: {parts}")
         except Exception as e:
             print(f'[Sim12 깔때기] 기록 실패(무시): {e}')

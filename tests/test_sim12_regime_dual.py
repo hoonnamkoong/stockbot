@@ -136,12 +136,25 @@ def test_bull_regime_enters_on_momentum_continuation():
     assert len(buys) == 1 and buys[0]['playbook'] == 1
 
 
-def test_bull_regime_skips_when_momentum_is_weak():
-    cand = _bull_candidate(price=1000)  # 이격 거의 없음
+def test_bull_regime_skips_on_weak_10day_momentum():
+    """10일간 거의 안 오른 종목(모멘텀 확인 실패) — MA20 이격과 무관하게 걸러진다."""
+    cand = _bull_candidate(price=1000)
+    cand['range_history'] = [1000] * 20  # 10일 변동 0% < 임계 8.0%
     funnel = []
     orders = decide_sim12(_view(), [cand], {cand['code']: cand['price']}, 'BULL', funnel=funnel)
 
     assert not [o for o in orders if o['action'] == 'BUY']
+    assert any(f['reason'] == 'pb1_momentum_weak' for f in funnel)
+
+
+def test_bull_regime_skips_when_price_is_still_below_ma20():
+    """10일 모멘텀은 확인되지만(+9%) 현재가가 아직 MA20 위로 뚜렷하게 못 올라온 경우."""
+    cand = _bull_candidate(price=1000)  # hist 그대로: 10일 변동 +9.0%, MA20 이격은 약함
+    funnel = []
+    orders = decide_sim12(_view(), [cand], {cand['code']: cand['price']}, 'BULL', funnel=funnel)
+
+    assert not [o for o in orders if o['action'] == 'BUY']
+    assert any(f['reason'] == 'pb1_below_ma20' for f in funnel)
 
 
 def test_sideways_regime_does_not_use_playbook1_entry():

@@ -32,6 +32,8 @@ EXPECTED_STATIC = {
     'sim11_minervini': False,  # 08-20 재설계: 무거운 계산은 EOD 배치가 감시 목록에
                                # 미리 남기고, get_universe()는 그 파일만 읽는다 —
                                # 자체 유니버스 심들과 같은 60초 루프에서 돈다
+    'sim12_regime_dual': False,  # KIS 등락률 순위 자체 유니버스, 버즈 무관 —
+                                 # 자체 유니버스 심들과 같은 60초 루프에서 돈다
 }
 
 

@@ -91,6 +91,12 @@ export const SIM_CHART_HEX: Record<string, string> = {
   grape: '#ae3ec9',
   gray: '#495057',
   dark: '#1a1b1e',
+  // Mantine 기본 팔레트(14색)가 Sim12에서 완전히 소진됐다(위 dark 주석 참고).
+  // Sim13부터는 리터럴 hex 문자열을 이름 대신 그대로 키·color 값으로 쓴다 —
+  // theme.colors에 등록된 이름이 아니어도 Mantine의 color prop은 유효한 CSS
+  // 색상값을 그대로 받아들인다(공식 지원 동작). shade 자동계산(filled/light
+  // variant의 밝기 단계)은 못 받지만 Badge/Text 등에서 문제없이 렌더된다.
+  '#a1662f': '#a1662f',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

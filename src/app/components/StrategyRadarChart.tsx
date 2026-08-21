@@ -42,6 +42,7 @@ const SERIES_G1 = simsInChartGroup(1).map(toSeries);
 const SERIES_G2 = simsInChartGroup(2).map(toSeries);
 const SERIES_G3 = simsInChartGroup(3).map(toSeries);
 const SERIES_G4 = simsInChartGroup(4).map(toSeries);
+const SERIES_G5 = simsInChartGroup(5).map(toSeries);
 
 // 나우캐스트 시간축: 장 시간대 고정 슬롯 (sim0_libero의 _hour_label과 동일한 'HH:00' 포맷)
 const HOUR_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'];
@@ -423,6 +424,13 @@ export default function StrategyRadarChart() {
         <RadarPanel
           title="Sim 9~10 (갭소진·돈치안·오케스트레이터)"
           series={SERIES_G4}
+          data={data}
+          hidden={hidden}
+          onToggle={toggleSeries}
+        />
+        <RadarPanel
+          title="Sim 11~13 (신규 페이퍼 관찰)"
+          series={SERIES_G5}
           data={data}
           hidden={hidden}
           onToggle={toggleSeries}

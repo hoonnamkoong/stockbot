@@ -121,8 +121,13 @@ def test_ui_keys_and_colors_are_unique():
 
 
 def test_every_color_has_a_chart_hex():
-    """생성된 hex 표에 없는 색을 쓰면 그 심만 회색 선으로 조용히 떨어진다."""
-    palette = set(re.findall(r'^\s{2}(\w+): \'#[0-9a-f]{6}\',$', _read(GENERATED_TS), re.M))
+    """생성된 hex 표에 없는 색을 쓰면 그 심만 회색 선으로 조용히 떨어진다.
+
+    키는 두 형태다: 기존 Mantine 팔레트 이름(맨 단어, 예 blue) 또는 팔레트 소진 후
+    Sim13부터 쓰는 리터럴 hex 키('#a1662f' 형태, 작은따옴표로 감싸짐).
+    """
+    palette = set(re.findall(r"^\s{2}'?(\w+|#[0-9a-f]{6})'?: '#[0-9a-f]{6}',$",
+                              _read(GENERATED_TS), re.M))
     for s in _manifest_sims():
         if s.get('analyzer', False):
             continue

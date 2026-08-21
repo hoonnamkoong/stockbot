@@ -291,7 +291,8 @@ simulators:
     display_order: 110
     ui_key: "sim11"
     short_desc: "추세 템플릿 + 실적 가속(EPS·매출) + VCP 압축 돌파"
-    chart_group: 4
+    chart_group: 5  # 2026-08-22: chart_group 4가 5개 심(10,9,9-1,11,12)으로 과밀해져 시인성이
+                    # 나빴다 — 신규·페이퍼 관찰 심(11,12,13)을 5번으로 분리했다.
     color: "gray"
     active: true
     tradeable: false  # 신규(2026-08-20), 백테스트 없음(150/200일선·분기실적을 요구하는 과거
@@ -313,9 +314,28 @@ simulators:
     display_order: 120
     ui_key: "sim12"
     short_desc: "BULL=모멘텀 지속 / SIDEWAYS·BEAR=급락반등(거래대금+기관수급 확인)"
-    chart_group: 4
+    chart_group: 5  # 2026-08-22: Sim11과 함께 신규 페이퍼 관찰군으로 분리(위 주석 참고)
     color: "dark"  # teal은 이미 다른 심이 사용 중(test_ui_keys_and_colors_are_unique) —
-                   # Mantine 팔레트에서 마지막으로 남은 색
+                   # 기존 Mantine 팔레트 14색 중 마지막으로 남은 색이었다(Sim13부터는
+                   # 팔레트가 완전히 소진돼 커스텀 hex를 쓴다, 아래 참고)
     active: true
     tradeable: false  # 신규(2026-08-20), 백테스트 없음 — 페이퍼 관찰 단계(Sim11과 동일 관례)
+    needs_buzz: false  # KIS 등락률 순위 자체 유니버스 — 60초 매매 루프에서 돈다
+
+  - id: "sim13_theme_cascade"
+    module: "src.strategy.simulators.sim13_theme_cascade"
+    class: "ThemeCascadeSimulator"
+    description: "Sim13 테마×모멘텀×밸류 계층분리 — 테마모멘텀 근사(1단)+ADX·거래대금서프라이즈·외국인수급(2단)+PER게이트(3단), 그룹집중상한 포함"
+    state_file: "sim_themecascade_state.json"
+    csv_file: "trade_history_sim_themecascade.csv"
+    label: "테마 캐스케이드 (Sim 13)"
+    display_order: 130
+    ui_key: "sim13"
+    short_desc: "테마모멘텀+ADX/거래대금서프라이즈+외국인수급 이벤트탐지, PER게이트+그룹집중상한"
+    chart_group: 5
+    color: "#a1662f"  # Mantine 14색 팔레트 완전 소진(위 Sim12 주석 참고) — 리터럴 hex를
+                      # 이름 대신 그대로 쓴다. gen_sim_registry.py SIM_CHART_HEX에 등록.
+    active: true
+    tradeable: false  # 신규(2026-08-22), 예비 백테스트뿐(단일 5개월 구간, 32~43건,
+                      # 국면게이트는 인과적 재검증 완료) — 페이퍼 관찰 단계
     needs_buzz: false  # KIS 등락률 순위 자체 유니버스 — 60초 매매 루프에서 돈다

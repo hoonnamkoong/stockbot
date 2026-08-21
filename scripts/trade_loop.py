@@ -340,7 +340,8 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
             # 배포되므로 여기 안 적으면 diag가 컨테이너와 함께 사라진다.
             # 2026-08-20: sim6에서 이 함정을 잡고 고쳤는데, 같은 날 이 루프로
             # 옮겨온 sim9도 diag를 쓰면서 똑같이 빠져 있었다.
-            diag_ids = {'sim6_bear': 'sim6', 'sim9_gap_fade': 'sim9', 'sim12_regime_dual': 'sim12'}
+            diag_ids = {'sim6_bear': 'sim6', 'sim9_gap_fade': 'sim9', 'sim12_regime_dual': 'sim12',
+                        'sim13_theme_cascade': 'sim13'}
             if now is not None:
                 for reg_id, diag_prefix in diag_ids.items():
                     if reg_id in all_sim_ids:

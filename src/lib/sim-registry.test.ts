@@ -40,7 +40,7 @@ test('모든 심에 라벨과 파일명이 채워져 있다', () => {
 test('차트 그룹이 전체를 빠짐없이 덮는다', () => {
   // 그룹에서 빠진 심은 레이더 차트 어디에도 안 그려진다 — 조용한 부재다.
   const grouped = new Set(
-    [1, 2, 3, 4].flatMap((g) => simsInChartGroup(g)).map((s) => s.id),
+    [1, 2, 3, 4, 5].flatMap((g) => simsInChartGroup(g)).map((s) => s.id),
   );
   const missing = SIM_REGISTRY.filter((s) => !grouped.has(s.id)).map((s) => s.id);
   assert.deepEqual(missing, [], `차트 그룹 1~4 어디에도 없는 심: ${missing}`);

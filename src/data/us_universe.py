@@ -33,6 +33,10 @@ def fetch_us_universe(limit: int = 1000) -> list[dict]:
         'offset': '0',
         'exchange': 'nasdaq,nyse,amex',
         'download': 'true',
+        # 정렬을 명시하지 않으면 limit=1000이 "시총 상위 1000"이 아니라
+        # API 기본 순서(심볼 알파벳 등)의 앞 1000이 될 수 있다.
+        'sortColumn': 'marketcap',
+        'sortOrder': 'desc',
     }
     r = requests.get(NASDAQ_SCREENER_URL, params=params, headers=HEADERS, timeout=20)
     r.raise_for_status()

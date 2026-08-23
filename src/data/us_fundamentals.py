@@ -13,7 +13,7 @@ import requests
 
 TICKERS_URL = 'https://www.sec.gov/files/company_tickers.json'
 CONCEPT_URL = 'https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{tag}.json'
-HEADERS = {'User-Agent': 'StockBot research contact@example.com'}
+HEADERS = {'User-Agent': 'stockbot-research (+https://github.com/hoonnamkoong/stockbot)'}
 
 REVENUE_TAGS = [
     'Revenues',
@@ -74,7 +74,9 @@ def _fetch_concept(cik: str, tag: str) -> dict | None:
         r = requests.get(url, headers=HEADERS, timeout=15)
         r.raise_for_status()
         return r.json()
-    except Exception:
+    except Exception as e:
+        # 조용히 None을 돌려주면 SEC가 UA를 막았을 때 워치리스트가 이유 없이 빈다.
+        print(f'[us_fundamentals] {tag} 조회 실패 (CIK {cik}): {e}')
         return None
 
 

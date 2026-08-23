@@ -1,0 +1,59 @@
+# .github/workflows/us_eod_watchlist.yml
+name: US EOD Watchlist (미국 심 감시목록)
+
+# 하루 1회, 미국장 마감(16:00 ET) 이후 안전 마진을 둔 UTC 고정 시각에 돈다.
+# 22:00 UTC는 EDT 마감(20:00 UTC)·EST 마감(21:00 UTC) 양쪽을 다 지난 시각이라
+# 이 배치 자체는 서머타임 분기가 필요 없다.
+on:
+  schedule:
+    - cron: '0 22 * * 2-6'  # 화~토 22:00 UTC(월~금 미국장 마감 다음)
+  workflow_dispatch: {}
+
+concurrency:
+  group: us-eod-watchlist
+  cancel-in-progress: false
+
+jobs:
+  watchlist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'scripts/requirements-trade.txt'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements-trade.txt
+
+      - name: Run EOD watchlist batch
+        run: python scripts/run_eod_sim_us.py
+
+      - name: Deploy watchlist (db-data)
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git clone --depth 1 --branch db-data \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {
+            echo "[Deploy] db-data 브랜치 clone 실패"; exit 1; }
+          mkdir -p db_data_repo/data
+          cp data/sim_us1_minervini_watchlist.json db_data_repo/data/ 2>/dev/null || true
+          cp data/us_universe.json db_data_repo/data/ 2>/dev/null || true
+          cd db_data_repo
+          git add -A data/
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "chore(us-eod): watchlist $(date +'%Y-%m-%d %H:%M UTC')"
+          for i in 1 2 3; do
+            if git push origin db-data; then exit 0; fi
+            git fetch --unshallow origin db-data 2>/dev/null || git fetch origin db-data
+            git pull --rebase origin db-data || { echo "rebase 실패"; exit 1; }
+          done
+          exit 1

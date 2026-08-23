@@ -45,6 +45,19 @@ def test_fetch_us_universe_raises_on_http_error():
             pass
 
 
+def test_fetch_us_universe_raises_on_empty_rows():
+    """HTTP 200이어도 rows가 null/비어있으면 예외를 올린다."""
+    with mock.patch('src.data.us_universe.requests.get') as m:
+        m.return_value.status_code = 200
+        m.return_value.json.return_value = {'data': {'rows': None}}
+        m.return_value.raise_for_status = lambda: None
+        try:
+            fetch_us_universe(limit=10)
+            assert False, '예외가 나야 한다'
+        except RuntimeError as e:
+            assert 'data.rows' in str(e)
+
+
 def test_filter_universe_excludes_etf_and_missing_marketcap():
     raw = [
         {'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3.4e12, 'country': 'United States', 'sector': 'Technology'},

@@ -37,7 +37,12 @@ def fetch_us_universe(limit: int = 1000) -> list[dict]:
     r = requests.get(NASDAQ_SCREENER_URL, params=params, headers=HEADERS, timeout=20)
     r.raise_for_status()
     body = r.json()
-    rows = ((body or {}).get('data') or {}).get('rows') or []
+    rows = ((body or {}).get('data') or {}).get('rows')
+    if not rows:
+        raise RuntimeError(
+            '나스닥 스크리너가 빈 응답을 반환했다(data.rows가 null/비어있음) — '
+            'HTTP 200이지만 소프트 차단 등으로 실패했을 가능성이 높다.'
+        )
     out = []
     for row in rows:
         out.append({

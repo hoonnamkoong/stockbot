@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 MANIFEST = os.path.join(ROOT, 'src', 'strategy', 'strategy_manifest.yaml')
 GENERATED_TS = os.path.join(ROOT, 'src', 'lib', 'sim-registry.generated.ts')
+US_GENERATED_TS = os.path.join(ROOT, 'src', 'lib', 'us-sim-registry.generated.ts')
 
 # 심 목록을 소비하는 곳. 여기에 상태·CSV 파일명이 다시 나타나면 복제가 부활한 것이다.
 CONSUMERS = {
@@ -179,8 +180,9 @@ def test_no_ts_file_reads_the_manifest_at_runtime():
             ts_files += [os.path.join(dirpath, n) for n in names
                          if n.endswith(('.ts', '.tsx'))]
     # 생성 파일 자신은 헤더에 원천 경로를 적는다 — 읽는 게 아니라 출처 표기다.
+    exempt = {os.path.abspath(GENERATED_TS), os.path.abspath(US_GENERATED_TS)}
     offenders = [os.path.relpath(p, ROOT).replace('\\', '/') for p in ts_files
-                 if os.path.abspath(p) != os.path.abspath(GENERATED_TS)
+                 if os.path.abspath(p) not in exempt
                  and 'strategy_manifest' in _read(p)]
     assert not offenders, (
         f'TS가 매니페스트를 직접 읽는다: {offenders} — '

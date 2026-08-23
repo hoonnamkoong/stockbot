@@ -9,13 +9,34 @@ EOD 배치(scripts/run_eod_sim_us.py)가 추세 템플릿+실적 가속+VCP 압�
 (scripts/us_trade_loop.py)가 실시간에 가까운 가격으로 판단한다
 (program-trading-parity 원칙 — 국내와 동일하게 룩어헤드를 피한다).
 """
+import datetime as dt
 import json
 import os
+from zoneinfo import ZoneInfo
 
 from .us_base_simulator import USBaseSimulator
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator
 
 _cooldown_active = BaseSimulator.cooldown_active
+
+_NY = ZoneInfo('America/New_York')
+
+
+def us_trading_date(now_utc: dt.datetime | None = None) -> str:
+    """읽기 시점의 미국 거래일(ET 캘린더 날짜, YYYYMMDD). 장중 루프가
+    is_us_market_open()으로 게이트한 뒤 호출하므로 항상 평일이다."""
+    now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
+    return now_utc.astimezone(_NY).strftime('%Y%m%d')
+
+
+def next_us_trading_date(now_utc: dt.datetime | None = None) -> str:
+    """EOD 배치가 저장할 날짜 키 — '오늘 마감 기준으로 계산한, 다음 거래일'
+    (ET 기준, 주말은 건너뛴다). 금요일 마감 배치는 월요일 날짜를 찍는다."""
+    now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
+    local = now_utc.astimezone(_NY) + dt.timedelta(days=1)
+    while local.weekday() >= 5:  # 토(5)·일(6)
+        local += dt.timedelta(days=1)
+    return local.strftime('%Y%m%d')
 
 MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19
@@ -204,7 +225,7 @@ class USMinerviniSimulator(USBaseSimulator):
         super().__init__("Us1Minervini", initial_cash)
 
     def get_universe(self):
-        today = get_kst_now().strftime('%Y%m%d')
+        today = us_trading_date()
         entries = load_watchlist(today)
         return [
             {'code': code, 'name': e.get('name', code),

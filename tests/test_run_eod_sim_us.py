@@ -18,7 +18,8 @@ def _uptrend_with_vcp_closes():
     return base + prior + recent
 
 
-def test_build_watchlist_skips_short_history_without_fundamentals_call():
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_build_watchlist_skips_short_history_without_fundamentals_call(mock_sleep):
     universe = [{'symbol': 'NEWCO', 'name': 'New Co', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=[{'close': 10.0, 'high': 10.0, 'low': 9.0}] * 30)
     fetch_fund = mock.Mock()
@@ -41,10 +42,12 @@ def test_build_watchlist_includes_symbol_passing_all_filters(mock_sleep):
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert 'AAPL' in out
     fetch_fund.assert_called_once_with('0000320193')
-    mock_sleep.assert_called_once()  # SEC EDGAR 10 req/s 제한 준수용 슬립
+    # 야후 스로틀(종목마다) + SEC EDGAR 스로틀(템플릿 통과 종목만) = 2회
+    assert mock_sleep.call_count == 2
 
 
-def test_build_watchlist_skips_symbol_without_cik():
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_build_watchlist_skips_symbol_without_cik(mock_sleep):
     closes = _uptrend_closes()
     bars = [{'close': c, 'high': c, 'low': c} for c in closes]
     universe = [{'symbol': 'NOCIK', 'name': 'No Cik', 'market_cap': 1e9}]
@@ -54,3 +57,24 @@ def test_build_watchlist_skips_symbol_without_cik():
         universe, cik_map={}, fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert out == {}
     fetch_fund.assert_not_called()
+
+
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_build_watchlist_survives_single_symbol_fetch_failure(mock_sleep):
+    """상장폐지·티커 불일치 한 건이 배치 전체를 죽이면 그날 워치리스트가 통째로 빈다."""
+    closes = _uptrend_with_vcp_closes()
+    bars = [{'close': c, 'high': c, 'low': c} for c in closes]
+
+    def fetch_ohlcv(symbol):
+        if symbol == 'DEAD':
+            raise RuntimeError('404 Not Found')
+        return bars
+
+    universe = [{'symbol': 'DEAD', 'name': 'Delisted Co', 'market_cap': 1e8},
+                {'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3e12}]
+    fetch_fund = mock.Mock(return_value={'eps_growth_yoy': 25.0, 'revenue_growth_yoy': 20.0})
+    out = build_watchlist_for_universe(
+        universe, cik_map={'AAPL': '0000320193'},
+        fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
+    assert 'AAPL' in out
+    assert 'DEAD' not in out

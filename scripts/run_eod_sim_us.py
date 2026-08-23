@@ -19,9 +19,8 @@ from src.data.us_universe import fetch_us_universe, filter_universe, save_univer
 from src.data.us_ohlcv import fetch_daily_ohlcv  # noqa: E402
 from src.data.us_fundamentals import fetch_cik_map, fetch_eps_revenue_growth  # noqa: E402
 from src.strategy.simulators.us_sim1_minervini import (  # noqa: E402
-    build_watchlist_entry, save_watchlist, _trend_template_ok,
+    build_watchlist_entry, save_watchlist, next_us_trading_date, _trend_template_ok,
 )
-from src.strategy.simulators.base_simulator import get_kst_now  # noqa: E402
 
 MIN_HISTORY_DAYS = 220
 
@@ -30,14 +29,26 @@ MIN_HISTORY_DAYS = 220
 # EDGAR를 호출하는 종목마다 호출 직후 슬립을 준다.
 FUNDAMENTALS_RATE_LIMIT_SLEEP_SEC = 0.15
 
+# 야후 비공식 API는 지속적인 고속 요청에 429로 소프트 차단을 건다.
+# 유니버스 전체(최대 1000종목)를 무지연으로 때리지 않도록 종목마다 슬립을 준다.
+YAHOO_RATE_LIMIT_SLEEP_SEC = 0.15
+
 
 def build_watchlist_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamentals):
     """오케스트레이션. 네트워크 함수는 주입 — 테스트에서 모킹한다."""
     out = {}
+    failures = 0
     for row in universe:
         symbol = row['symbol']
-        bars = fetch_ohlcv(symbol)
-        if len(bars) < MIN_HISTORY_DAYS:
+        # 상장폐지·신규상장·티커 표기 불일치는 1000종목 규모에선 늘 몇 건 나온다.
+        # 한 종목의 조회 실패가 배치 전체를 죽이면 그날 워치리스트가 통째로 빈다.
+        try:
+            bars = fetch_ohlcv(symbol)
+        except Exception:
+            failures += 1
+            bars = None
+        time.sleep(YAHOO_RATE_LIMIT_SLEEP_SEC)
+        if bars is None or len(bars) < MIN_HISTORY_DAYS:
             continue
         closes = [b['close'] for b in bars]
         price = closes[-1]
@@ -63,6 +74,8 @@ def build_watchlist_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundament
         })
         if entry:
             out[symbol] = entry
+    if failures:
+        print(f'[EOD-US] 종목 조회 실패 {failures}건 (건너뜀)')
     return out
 
 
@@ -76,7 +89,7 @@ def main():
     cik_map = fetch_cik_map()
     watchlist = build_watchlist_for_universe(
         universe, cik_map, fetch_daily_ohlcv, fetch_eps_revenue_growth)
-    today = get_kst_now().strftime('%Y%m%d')
+    today = next_us_trading_date()
     save_watchlist(watchlist, today)
     print(f'[EOD-US] 워치리스트 {len(watchlist)}종목 저장 (날짜 {today})')
 

@@ -16,7 +16,8 @@ concurrency:
 jobs:
   watchlist:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 최대 1000종목 × (야후 스로틀 0.15s + 요청 지연) + EDGAR 조회 여유.
+    timeout-minutes: 40
     env:
       PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul

@@ -2,12 +2,14 @@
 
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack, SimpleGrid,
     Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider, Alert
+    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider, Alert,
+    Anchor
 } from '@mantine/core';
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
@@ -741,7 +743,10 @@ function TradeContent() {
                 </Stack>
             </Modal>
             <Group justify="space-between" mb="lg">
-                <Title order={2}>Stock Dashboard</Title>
+                <Group gap="sm">
+                    <Title order={2}>국내 트레이딩</Title>
+                    <Anchor component={Link} href="/trade/us" size="sm">미국 →</Anchor>
+                </Group>
                 <Group gap="xs">
                     <Badge color="pink" variant="filled">V8.7.2-UI</Badge>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>

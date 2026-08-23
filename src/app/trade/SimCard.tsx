@@ -79,7 +79,7 @@ export default function SimCard({
             <Paper p="md" withBorder radius="md" bg="gray.0">
                 <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{label} 기록</Text>
                 {/* 5행(행 ~52px + 헤더)까지 표시 후 스크롤 */}
-                <TradeHistoryTable history={history} targetType={type} maxHeight={305} onShowReason={onShowReason} />
+                <TradeHistoryTable history={history} targetType={type} maxHeight={305} onShowReason={onShowReason} currency={currency} />
             </Paper>
         </Stack>
     );

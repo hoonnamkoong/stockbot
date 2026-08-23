@@ -111,6 +111,13 @@ test('실현손익 0원은 값이다 — 측정 불가로 뭉개지 않는다', 
   assert.deepEqual(amount, { kind: 'value', text: '+0원', color: 'gray' });
 });
 
+test('US 심은 원이 아니라 달러로, 소수점 두 자리까지 그린다', () => {
+  // 기본값(KRW)은 위 테스트들이 지킨다 — 여기선 통화를 넘겼을 때만 바뀌는지 본다.
+  assert.equal((roiCells({ action: 'SELL', roi: '+3.5', roiAmount: 123.456 }, 'USD').amount as any).text, '+$123.46');
+  assert.equal((roiCells({ action: 'SELL', roi: '-2.0', roiAmount: -20.5 }, 'USD').amount as any).text, '-$20.50');
+  assert.equal((roiCells({ action: 'SELL', roi: '0.0', roiAmount: 0 }, 'USD').amount as any).text, '+$0.00');
+});
+
 // ── 기록 시각 ───────────────────────────────────────────────────────
 
 test('시각은 MM-DD 와 HH:mm:ss 두 줄로 쪼갠다', () => {

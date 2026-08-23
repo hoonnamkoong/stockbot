@@ -21,11 +21,13 @@ function RoiText({ cell }: { cell: RoiCell }) {
  */
 export default function TradeHistoryTable({
     history, targetType, maxHeight = 'calc(100vh - 320px)', onShowReason,
+    currency = 'KRW',
 }: {
     history: any[];
     targetType: string;
     maxHeight?: string | number;
     onShowReason: (title: string, content: string) => void;
+    currency?: 'KRW' | 'USD';
 }) {
     const isReal = targetType === 'real';
     const filtered = history.filter((h) => h.type === targetType).slice(0, 100);
@@ -55,7 +57,7 @@ export default function TradeHistoryTable({
                 <Table.Tbody>
                     {filtered.map((h, i) => {
                         const { date, clock } = splitTimestamp(h.time);
-                        const roi = roiCells(h);
+                        const roi = roiCells(h, currency);
                         return (
                             <Table.Tr key={i}>
                                 <Table.Td style={{ whiteSpace: 'nowrap' }}>

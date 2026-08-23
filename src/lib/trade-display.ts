@@ -8,6 +8,7 @@
  * 원칙: 모르는 값을 0이나 0%로 그리지 않는다. 실현손익을 확보 못 한 매도는
  * '측정 불가'다 — [[no-fabricated-financial-values]].
  */
+import { formatMoney } from './currency-format.ts';
 
 /**
  * 보유 종목 한 줄의 표시값. 잔고 API와 심 상태가 필드명이 달라 양쪽을 받아준다.
@@ -54,9 +55,10 @@ export type RoiCell = { kind: 'value'; text: string; color: 'red' | 'blue' | 'gr
  * (심 CSV의 구 포맷), 무언가 실패한 것이 아니다. 실패가 아닌 것을 '측정 불가'로
  * 그리면 매일 보는 화면이 경고로 도배된다.
  */
-export function roiCells(h: {
-  action?: string; roi?: string | null; roiAmount?: number | null; roiTracked?: boolean;
-}): { pct: RoiCell; amount: RoiCell } {
+export function roiCells(
+  h: { action?: string; roi?: string | null; roiAmount?: number | null; roiTracked?: boolean },
+  currency: 'KRW' | 'USD' = 'KRW',
+): { pct: RoiCell; amount: RoiCell } {
   if (h.roiTracked === false) return { pct: { kind: 'none' }, amount: { kind: 'none' } };
 
   const isSell = h.action === 'SELL';
@@ -70,7 +72,10 @@ export function roiCells(h: {
     ? missing
     : {
         kind: 'value',
-        text: `${signed(h.roiAmount)}원`,
+        // KRW 분기는 기존 식을 그대로 둔다 — 화면 출력이 바이트 단위로 같아야 한다.
+        text: currency === 'USD'
+          ? `${h.roiAmount >= 0 ? '+' : ''}${formatMoney(h.roiAmount, 'USD')}`
+          : `${signed(h.roiAmount)}원`,
         color: h.roiAmount > 0 ? 'red' : h.roiAmount < 0 ? 'blue' : 'gray',
       };
   return { pct: { kind: 'value', text: `${roi}%`, color: pctColor }, amount };

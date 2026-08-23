@@ -112,21 +112,41 @@ SEC EDGAR — 완전 무료, 키 불필요, 10 req/s.
 
 ## 원장 · 통화 스키마
 
+- **US 심은 `strategy_manifest.yaml`에 등록하지 않는다.** 구현 착수 전 확인 결과,
+  `src/pipeline/workers/trade_engine.py:_run_simulators()`가
+  `get_active_simulators()`(매니페스트의 `active: true` 전체)를 그대로 받아 KIS
+  실시간가·국내 후보로 돌린다 — 여기에 US 심을 얹으면 60초 국내 루프가 매 틱마다
+  US 심에도 원화 후보/시세를 먹이려 시도해 조용히 망가진다. "국내 파이프라인은
+  건드리지 않는다" 원칙을 지키려면 **완전히 별도인 매니페스트**가 있어야 한다.
+- 신규 `src/strategy/us_strategy_manifest.yaml`(국내 매니페스트와 같은 YAML
+  구조·주석 관례를 따르되 파일 자체가 별도) + 신규 로더
+  `src/strategy/us_registry.py`(`registry.py`를 본떠 `get_us_sim_registry()`,
+  `get_active_us_simulators()`만 제공 — `get_current_strategy()` 같은 월별 전략
+  관련 함수는 불필요). 국내 `registry.py`/`trade_engine.py`는 이 파일의 존재를
+  모른다 — 참조하는 코드가 없다.
 - 심마다 자체 `sim_us{N}_*_state.json` / `trade_history_sim_us{N}_*.csv` — 국내와
-  동일 shape, `currency` 필드만 `"USD"`.
-- `src/strategy/strategy_manifest.yaml`에 `currency` 필드 추가(기본값 `"KRW"`,
-  기존 국내 심은 값을 안 적으면 그대로 KRW로 동작 — 하위 호환). US 심 6개 블록은
-  `currency: "USD"`로 등록.
-- `scripts/gen_sim_registry.py`가 이 필드를 `src/lib/sim-registry.generated.ts`로
-  옮긴다.
-- `src/lib/sim-reset-targets.ts`의 `RESET_TARGETS`(현재 `SIM_REGISTRY` 전체를
-  대상으로 KRW 리셋 검증 `100_000~1_000_000_000`을 적용)는 **KRW 심만**(즉
-  `currency !== 'USD'`) 대상으로 좁힌다. US 심은 별도 `US_RESET_TARGETS` +
-  신규 API `src/app/api/simulation/reset-us/route.ts`가 전담하고, USD 검증 범위는
-  `$1,000 ~ $500,000` 정수로 별도 검증한다(원화보다 자리수가 훨씬 작다).
+  동일 shape(단, 아래 `USBaseSimulator` 참고).
+- `scripts/gen_sim_registry.py`와 별개로 신규 `scripts/gen_us_sim_registry.py`가
+  `us_strategy_manifest.yaml`을 읽어 `src/lib/us-sim-registry.generated.ts`
+  (`US_SIM_REGISTRY` 배열, 국내 `SIM_REGISTRY`와 같은 shape)를 생성한다 — 국내
+  생성기·생성 파일은 손대지 않는다.
+- 신규 `src/lib/us-sim-reset-targets.ts`가 `US_SIM_REGISTRY` 전체를 리셋 대상으로
+  삼고, 신규 API `src/app/api/simulation/reset-us/route.ts`가 이를 전담한다.
+  USD 검증 범위는 `$1,000 ~ $500,000` 정수(원화보다 자리수가 훨씬 작다). 기존
+  `src/lib/sim-reset-targets.ts`·`/api/simulation/reset`은 전혀 수정하지 않는다
+  (건드릴 이유가 없다 — US 심이애초에 그 목록에 없다).
 - 초기 자본은 하드코딩하지 않는다 — 국내와 동일하게 리셋 버튼 옆 입력창(USD)에서
   사용자가 지정한 값으로 초기화한다. `BaseSimulator.__init__`의 `initial_cash`
   기본값은 리셋 전 최초 기동용 placeholder로만 쓰이며 $20,000을 기본값으로 둔다.
+- **`BaseSimulator` 직접 상속 시 2개의 KRW 전제가 깨진다**(구현 착수 전 코드
+  확인으로 발견): (1) `BUY_FEE_RATE`/`SELL_FEE_RATE`/`SELL_TAX_RATE`가
+  `src/trade/fees.py`의 한국 위탁수수료·증권거래세 요율이고, (2)
+  `log_trade()`가 가격을 `int(price)`로 절사해 KRW(정수 원)에는 문제없지만
+  USD 소수점 가격(예: $45.67)을 정수로 뭉갠다. 이 두 가지를 흡수하는 공용
+  `USBaseSimulator`(`BaseSimulator` 상속)를 두고 US 심 6개가 전부 이걸
+  상속한다 — 개별 심마다 중복 오버라이드하지 않는다. 수수료는 0으로 둔다
+  (미국 대다수 리테일 브로커가 커미션 프리이고, 페이퍼 심의 손익 순수성이
+  우선이므로 SEC 초소액 수수료도 반영하지 않는다 — 실주문 연동 시점에 재검토).
 
 ## 프론트엔드
 

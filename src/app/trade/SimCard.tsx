@@ -5,6 +5,7 @@ import { IconHistory } from '@tabler/icons-react';
 import PortfolioTable from './PortfolioTable';
 import TradeHistoryTable from './TradeHistoryTable';
 import { computeNetPL, countTodayTickers, deriveSimHoldings, todayKST } from '@/lib/sim-card';
+import { formatMoney } from '@/lib/currency-format';
 
 /**
  * 심 하나의 카드 — 요약 6칸 + 포트폴리오 표 + 기록 표.
@@ -17,6 +18,7 @@ import { computeNetPL, countTodayTickers, deriveSimHoldings, todayKST } from '@/
  */
 export default function SimCard({
     uiKey, label, color, type, stats, portfolio, history, onPickCode, onShowReason,
+    currency = 'KRW',
 }: {
     uiKey: string;
     label: string;
@@ -27,6 +29,7 @@ export default function SimCard({
     history: any[];
     onPickCode: (code: string, name: string) => void;
     onShowReason: (title: string, content: string) => void;
+    currency?: 'KRW' | 'USD';
 }) {
     const holdings = deriveSimHoldings(portfolio, stats.current_prices);
     const netPL = computeNetPL(stats);
@@ -42,7 +45,7 @@ export default function SimCard({
                 <SimpleGrid cols={{ base: 3, sm: 6 }} mb="md">
                     <Stack gap={2}>
                         <Text size="xs" c="dimmed">예수금</Text>
-                        <Text fw={700} size="sm">{(Math.round(stats.cash || 0)).toLocaleString()}원</Text>
+                        <Text fw={700} size="sm">{formatMoney(stats.cash || 0, currency)}</Text>
                     </Stack>
                     <Stack gap={2}>
                         <Text size="xs" c="dimmed">수익률</Text>
@@ -53,12 +56,12 @@ export default function SimCard({
                     <Stack gap={2}>
                         <Text size="xs" c="dimmed">누적 수익</Text>
                         <Text size="sm" fw={800} c={netPL >= 0 ? 'red' : 'blue'}>
-                            {netPL >= 0 ? '+' : ''}{netPL.toLocaleString()}원
+                            {netPL >= 0 ? '+' : ''}{formatMoney(netPL, currency)}
                         </Text>
                     </Stack>
                     <Stack gap={2}>
                         <Text size="xs" c="dimmed">누적 수수료</Text>
-                        <Text size="sm" fw={700} c="gray.6">{(Math.round(stats.total_fees || 0)).toLocaleString()}원</Text>
+                        <Text size="sm" fw={700} c="gray.6">{formatMoney(stats.total_fees || 0, currency)}</Text>
                     </Stack>
                     <Stack gap={2}>
                         <Text size="xs" c="dimmed">보유 종목</Text>
@@ -71,7 +74,7 @@ export default function SimCard({
                 </SimpleGrid>
                 <Divider mb="xs" label="포트폴리오 (NAV)" labelPosition="center" />
                 {/* 5행(행 ~61px + 헤더)까지 표시 후 스크롤 */}
-                <PortfolioTable holdings={holdings} maxHeight={360} onPickCode={onPickCode} />
+                <PortfolioTable holdings={holdings} maxHeight={360} onPickCode={onPickCode} currency={currency} />
             </Paper>
             <Paper p="md" withBorder radius="md" bg="gray.0">
                 <Text size="xs" fw={700} mb="xs"><IconHistory size={12} style={{ marginRight: 5 }}/>{label} 기록</Text>

@@ -1,7 +1,8 @@
 'use client';
 
 import { Table, Text, Badge, Checkbox, ScrollArea, Box } from '@mantine/core';
-import { derivePosition, pnlColor, signed } from '@/lib/trade-display';
+import { derivePosition, pnlColor } from '@/lib/trade-display';
+import { formatMoney } from '@/lib/currency-format';
 
 /**
  * 보유 종목 표. 실계좌(isReal)일 때만 일괄매도용 체크박스 열이 붙는다.
@@ -12,6 +13,7 @@ import { derivePosition, pnlColor, signed } from '@/lib/trade-display';
  */
 export default function PortfolioTable({
     holdings, isReal = false, maxHeight = 560, selectedCodes = [], onToggleCode, onPickCode,
+    currency = 'KRW',
 }: {
     holdings: any[];
     isReal?: boolean;
@@ -20,6 +22,7 @@ export default function PortfolioTable({
     selectedCodes?: string[];
     onToggleCode?: (code: string, checked: boolean) => void;
     onPickCode: (code: string, name: string) => void;
+    currency?: 'KRW' | 'USD';
 }) {
     if (!holdings || holdings.length === 0) {
         return (
@@ -40,7 +43,7 @@ export default function PortfolioTable({
                         <Table.Th style={{ textAlign: 'right' }}>현재가</Table.Th>
                         <Table.Th style={{ textAlign: 'right' }}>체결금액</Table.Th>
                         <Table.Th style={{ textAlign: 'center' }}>수익률(%)</Table.Th>
-                        <Table.Th style={{ textAlign: 'right' }}>손익(원)</Table.Th>
+                        <Table.Th style={{ textAlign: 'right' }}>손익({currency === 'USD' ? '$' : '원'})</Table.Th>
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -69,15 +72,15 @@ export default function PortfolioTable({
                                     <Text size="sm">{qty.toLocaleString()}주</Text>
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
-                                    <Text size="sm">{Math.round(avgPrice).toLocaleString()}원</Text>
+                                    <Text size="sm">{formatMoney(avgPrice, currency)}</Text>
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
                                     {priceKnown
-                                        ? <Text size="sm" fw={500} c="teal">{Math.round(currentPrice).toLocaleString()}원</Text>
+                                        ? <Text size="sm" fw={500} c="teal">{formatMoney(currentPrice, currency)}</Text>
                                         : <Text size="sm" c="dimmed">시세 미확인</Text>}
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
-                                    <Text size="sm" fw={700}>{Math.round(amount).toLocaleString()}원</Text>
+                                    <Text size="sm" fw={700}>{formatMoney(amount, currency)}</Text>
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'center' }}>
                                     {/* 시세를 모르면 등락률도 모른다. 0%로 그리면 '안 움직였다'는 거짓이 된다. */}
@@ -91,7 +94,7 @@ export default function PortfolioTable({
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
                                     {priceKnown
-                                        ? <Text size="sm" fw={700} c={pnlColor(plAmount)}>{signed(plAmount)}</Text>
+                                        ? <Text size="sm" fw={700} c={pnlColor(plAmount)}>{plAmount >= 0 ? '+' : ''}{formatMoney(plAmount, currency)}</Text>
                                         : <Text size="xs" c="dimmed">측정 불가</Text>}
                                 </Table.Td>
                             </Table.Tr>

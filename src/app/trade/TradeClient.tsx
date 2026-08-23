@@ -8,8 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack, SimpleGrid,
     Badge, Button, Tabs, TextInput, NumberInput,
-    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider, Alert,
-    Anchor
+    Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider, Alert
 } from '@mantine/core';
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
@@ -745,10 +744,10 @@ function TradeContent() {
             <Group justify="space-between" mb="lg">
                 <Group gap="sm">
                     <Title order={2}>국내 트레이딩</Title>
-                    <Anchor component={Link} href="/trade/us" size="sm">미국 →</Anchor>
                 </Group>
                 <Group gap="xs">
                     <Badge color="pink" variant="filled">V8.7.2-UI</Badge>
+                    <Button component={Link} href="/trade/us" size="sm" variant="light" color="blue">미국 트레이딩 →</Button>
                     <Button component="a" href="/research" size="sm" variant="light">Research</Button>
                     <Button color="gray" variant="subtle" size="sm" onClick={() => signOut({ callbackUrl: '/login' })}>Out</Button>
                 </Group>

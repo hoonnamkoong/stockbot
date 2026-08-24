@@ -161,13 +161,36 @@ def test_scraper_deploys_the_sim_diag_logs():
     나간다. 2026-08-09에 db-data의 diag 파일이 0개인 것이 드러났는데, 원인이
     '쓰기 실패'인지 '배포 누락'인지 가르려면 배포 쪽을 먼저 고정해야 한다.
 
-    여기가 통과하는데도 파일이 없으면 원인은 쓰기 쪽이다(로그가 이제 말해준다)."""
+    여기가 통과하는데도 파일이 없으면 원인은 쓰기 쪽이다(로그가 이제 말해준다).
+
+    sim1은 이 목록에 없다 — 여전히 이 기본 경로가 유일 배포자다."""
+    from scripts.trade_loop import DIAG_LOG_SIM_IDS
+
     deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
     skipped = {line for line in deploy.splitlines() if 'continue' in line}
 
     assert 'for f in data/*.csv' in deploy, 'csv 배포 루프가 사라졌다'
-    assert not any('diag' in line for line in skipped), (
-        'diag CSV가 배포 제외에 들어갔다 — 진단이 db-data에 영영 도달하지 못한다')
+    assert not any('sim1_diag' in line for line in skipped), (
+        'sim1_diag CSV가 배포 제외에 들어갔다 — 진단이 db-data에 영영 도달하지 못한다')
+
+
+def test_scraper_does_not_deploy_the_diag_logs_owned_by_trading():
+    """sim6/9/12/13은 버즈 불필요 심이라 trading.yml의 60초 루프로 옮겨갔고,
+    그 diag는 거기서 매 사이클 배포한다(DIAG_LOG_SIM_IDS). scraper.yml도 같은
+    파일을 밀면 두 writer가 경합해 push가 non-fast-forward로 계속 실패한다
+    (2026-08-24, 하루 4번 실패 알림)."""
+    from scripts.trade_loop import DIAG_LOG_SIM_IDS
+
+    deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
+    skipped = {line for line in deploy.splitlines() if 'continue' in line}
+    patterns = [p.strip() for line in skipped
+                for p in line.strip().split(')', 1)[0].split('|')]
+
+    for diag_prefix in DIAG_LOG_SIM_IDS.values():
+        name = f'{diag_prefix}_diag_2026-08.csv'
+        assert any(fnmatch.fnmatch(name, p) for p in patterns), (
+            f'{name}이 scraper.yml 배포 제외 목록에 없다. trading.yml이 유일 '
+            f'writer인데 여기서 올리면 push 충돌이 반복된다.')
 
 
 def test_scraper_does_not_deploy_money_files():

@@ -194,6 +194,12 @@ jobs:
               trade_history_real.csv) continue ;;
               regime_observations*.csv|trade_history_sim_libero.csv) continue ;;
               money_*.csv) continue ;;   # 순위 스냅샷 — writer는 trading.yml
+              # sim6/9/12/13은 버즈 불필요 심이라 trading.yml의 60초 루프로
+              # 옮겨갔고, 그 diag는 거기서 매 사이클 배포한다(script/trade_loop.py
+              # DIAG_LOG_SIM_IDS). 여기서도 밀면 두 writer가 같은 파일을 두고
+              # 경합해 push가 non-fast-forward로 계속 실패한다(2026-08-24).
+              # sim1처럼 이 목록에 없는 심의 diag는 계속 여기서 나간다.
+              sim6_diag_*.csv|sim9_diag_*.csv|sim12_diag_*.csv|sim13_diag_*.csv) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done

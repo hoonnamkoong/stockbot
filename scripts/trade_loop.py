@@ -67,6 +67,14 @@ LOOP_BUDGET_SEC = 85
 
 DEPLOY_MANIFEST = os.path.join('data', '.lite_deploy_manifest')
 
+# sim_diag(진단 CSV)를 쓰는, 버즈 불필요라 이 60초 루프로 옮겨온 심들.
+# scraper.yml은 이 심들의 diag 파일을 배포 제외해야 한다 — 안 그러면 이 루프가
+# 매 사이클 push하는 파일을 scraper.yml도 같은 이름으로 밀어 non-fast-forward
+# 충돌이 난다(2026-08-24). sim1처럼 이 루프로 안 옮겨온 심의 diag는 여기 없고
+# scraper.yml의 `data/*.csv` 기본 경로로만 나간다.
+DIAG_LOG_SIM_IDS = {'sim6_bear': 'sim6', 'sim9_gap_fade': 'sim9',
+                     'sim12_regime_dual': 'sim12', 'sim13_theme_cascade': 'sim13'}
+
 _SCRAPER_WORKFLOW = 'scraper.yml'
 _REPO = os.environ.get('GITHUB_REPOSITORY') or 'hoonnamkoong/stockbot'
 
@@ -340,10 +348,8 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
             # 배포되므로 여기 안 적으면 diag가 컨테이너와 함께 사라진다.
             # 2026-08-20: sim6에서 이 함정을 잡고 고쳤는데, 같은 날 이 루프로
             # 옮겨온 sim9도 diag를 쓰면서 똑같이 빠져 있었다.
-            diag_ids = {'sim6_bear': 'sim6', 'sim9_gap_fade': 'sim9', 'sim12_regime_dual': 'sim12',
-                        'sim13_theme_cascade': 'sim13'}
             if now is not None:
-                for reg_id, diag_prefix in diag_ids.items():
+                for reg_id, diag_prefix in DIAG_LOG_SIM_IDS.items():
                     if reg_id in all_sim_ids:
                         from src.data.sim_diag import month_path
                         names.append(os.path.basename(

@@ -17,4 +17,5 @@ export interface USSimRegistryEntry {
 
 export const US_SIM_REGISTRY: USSimRegistryEntry[] = [
   { id: 'us_sim1_minervini', uiKey: 'us_sim1', label: 'US 미너비니 추세형 (US Sim 1)', shortDesc: '추세 템플릿 + 실적 가속(EPS·매출) + VCP 압축 돌파', color: 'blue', chartGroup: 1, stateFile: 'sim_us1minervini_state.json', csvFile: 'trade_history_sim_us1minervini.csv', tradeable: false, currency: 'USD' },
+  { id: 'us_sim2_donchian', uiKey: 'us_sim2', label: 'US 돈치안 돌파 (US Sim 2)', shortDesc: '20일 채널 상단 돌파 추종 · 10일 채널 이탈/2ATR 손절', color: 'orange', chartGroup: 1, stateFile: 'sim_us2donchian_state.json', csvFile: 'trade_history_sim_us2donchian.csv', tradeable: false, currency: 'USD' },
 ];

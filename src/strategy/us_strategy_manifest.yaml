@@ -28,3 +28,19 @@ simulators:
     currency: "USD"
     active: true
     tradeable: false  # 페이퍼 관찰 단계
+
+  - id: "us_sim2_donchian"
+    module: "src.strategy.simulators.us_sim2_donchian"
+    class: "USDonchianSimulator"
+    description: "US Sim2 돈치안 채널 돌파 — 20일 채널 상단 돌파 매수, 10일 채널 이탈/2ATR 손절 청산"
+    state_file: "sim_us2donchian_state.json"
+    csv_file: "trade_history_sim_us2donchian.csv"
+    label: "US 돈치안 돌파 (US Sim 2)"
+    display_order: 20
+    ui_key: "us_sim2"
+    short_desc: "20일 채널 상단 돌파 추종 · 10일 채널 이탈/2ATR 손절"
+    chart_group: 1
+    color: "orange"
+    currency: "USD"
+    active: true
+    tradeable: false  # 페이퍼 관찰 단계 (국내 Sim9-1도 아직 관찰 단계)

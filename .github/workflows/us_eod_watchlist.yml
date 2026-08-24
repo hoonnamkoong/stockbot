@@ -47,6 +47,7 @@ jobs:
             echo "[Deploy] db-data 브랜치 clone 실패"; exit 1; }
           mkdir -p db_data_repo/data
           cp data/sim_us1_minervini_watchlist.json db_data_repo/data/ 2>/dev/null || true
+          cp data/sim_us2_donchian_watchlist.json db_data_repo/data/ 2>/dev/null || true
           cp data/us_universe.json db_data_repo/data/ 2>/dev/null || true
           cd db_data_repo
           git add -A data/

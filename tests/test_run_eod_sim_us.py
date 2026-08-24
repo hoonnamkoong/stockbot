@@ -1,6 +1,7 @@
 from unittest import mock
 
-from scripts.run_eod_sim_us import build_watchlist_for_universe
+from scripts.run_eod_sim_us import build_watchlists_for_universe
+from src.strategy.simulators.us_sim2_donchian import MIN_AMOUNT as SIM2_MIN_AMOUNT
 
 
 def _uptrend_closes(n=230, start=50.0, step=0.15):
@@ -18,52 +19,70 @@ def _uptrend_with_vcp_closes():
     return base + prior + recent
 
 
+def _bars(closes, volume=0):
+    """close 이력을 EOD 배치가 기대하는 bar 딕셔너리 목록으로 변환."""
+    return [{'close': c, 'high': c, 'low': c, 'volume': volume} for c in closes]
+
+
+# 220일치 상승 이력 + 하루치 큰 거래량 → Sim1(미너비니) 탈락(VCP 수축 없음),
+# Sim2(돈치안) 통과에 필요한 최소 거래대금은 충분(220일 내내 volume을 주므로
+# 최근 20일 평균거래대금 = close*volume 그대로).
+_SIM2_ONLY_VOLUME = int(SIM2_MIN_AMOUNT / 50.0) + 1_000  # 종가 근사 50 기준 여유있게 통과
+
+
 @mock.patch('scripts.run_eod_sim_us.time.sleep')
 def test_build_watchlist_skips_short_history_without_fundamentals_call(mock_sleep):
     universe = [{'symbol': 'NEWCO', 'name': 'New Co', 'market_cap': 1e9}]
-    fetch_ohlcv = mock.Mock(return_value=[{'close': 10.0, 'high': 10.0, 'low': 9.0}] * 30)
+    fetch_ohlcv = mock.Mock(return_value=_bars([10.0] * 30, volume=1_000_000))
     fetch_fund = mock.Mock()
-    out = build_watchlist_for_universe(
+    out1, out2 = build_watchlists_for_universe(
         universe, cik_map={'NEWCO': '0000000001'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
-    assert out == {}
+    assert out1 == {}
+    assert out2 == {}
     fetch_fund.assert_not_called()  # 추세 템플릿 탈락 종목엔 EDGAR 콜을 안 낸다
 
 
 @mock.patch('scripts.run_eod_sim_us.time.sleep')
 def test_build_watchlist_includes_symbol_passing_all_filters(mock_sleep):
     closes = _uptrend_with_vcp_closes()
-    bars = [{'close': c, 'high': c, 'low': c} for c in closes]
+    bars = _bars(closes, volume=_SIM2_ONLY_VOLUME)
     universe = [{'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3e12}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock(return_value={'eps_growth_yoy': 25.0, 'revenue_growth_yoy': 20.0})
-    out = build_watchlist_for_universe(
+    out1, out2 = build_watchlists_for_universe(
         universe, cik_map={'AAPL': '0000320193'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
-    assert 'AAPL' in out
+    assert 'AAPL' in out1
     fetch_fund.assert_called_once_with('0000320193')
     # 야후 스로틀(종목마다) + SEC EDGAR 스로틀(템플릿 통과 종목만) = 2회
     assert mock_sleep.call_count == 2
+    # 추세 템플릿을 통과한 종목은 거래대금 조건도 넉넉히 충족하므로 Sim2도 같이 통과.
+    assert 'AAPL' in out2
 
 
 @mock.patch('scripts.run_eod_sim_us.time.sleep')
 def test_build_watchlist_skips_symbol_without_cik(mock_sleep):
     closes = _uptrend_closes()
-    bars = [{'close': c, 'high': c, 'low': c} for c in closes]
+    bars = _bars(closes, volume=_SIM2_ONLY_VOLUME)
     universe = [{'symbol': 'NOCIK', 'name': 'No Cik', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock()
-    out = build_watchlist_for_universe(
+    out1, out2 = build_watchlists_for_universe(
         universe, cik_map={}, fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
-    assert out == {}
+    assert out1 == {}
     fetch_fund.assert_not_called()
+    # CIK가 없어 Sim1은 탈락해도, Sim2는 펀더멘털이 필요 없으므로 독립적으로 평가된다
+    # (단, 이 종가는 VCP 수축이 없어 Sim1 추세템플릿 통과 여부와 무관하게 채널 계산만
+    # 확인하면 된다 — 이력 20일 이상 + 거래대금 충분이면 통과).
+    assert 'NOCIK' in out2
 
 
 @mock.patch('scripts.run_eod_sim_us.time.sleep')
 def test_build_watchlist_survives_single_symbol_fetch_failure(mock_sleep):
     """상장폐지·티커 불일치 한 건이 배치 전체를 죽이면 그날 워치리스트가 통째로 빈다."""
     closes = _uptrend_with_vcp_closes()
-    bars = [{'close': c, 'high': c, 'low': c} for c in closes]
+    bars = _bars(closes, volume=_SIM2_ONLY_VOLUME)
 
     def fetch_ohlcv(symbol):
         if symbol == 'DEAD':
@@ -73,8 +92,24 @@ def test_build_watchlist_survives_single_symbol_fetch_failure(mock_sleep):
     universe = [{'symbol': 'DEAD', 'name': 'Delisted Co', 'market_cap': 1e8},
                 {'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3e12}]
     fetch_fund = mock.Mock(return_value={'eps_growth_yoy': 25.0, 'revenue_growth_yoy': 20.0})
-    out = build_watchlist_for_universe(
+    out1, out2 = build_watchlists_for_universe(
         universe, cik_map={'AAPL': '0000320193'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
-    assert 'AAPL' in out
-    assert 'DEAD' not in out
+    assert 'AAPL' in out1
+    assert 'DEAD' not in out1
+    assert 'AAPL' in out2
+    assert 'DEAD' not in out2
+
+
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_sim2_excluded_when_dollar_volume_too_low(mock_sleep):
+    """220일 이력은 충분해도 거래대금이 문턱 미달이면 Sim2 워치리스트에서 빠진다."""
+    closes = _uptrend_closes()  # VCP 수축 없어 Sim1도 어차피 탈락
+    bars = _bars(closes, volume=1)  # 종가×1 ≈ 문턱에 한참 못 미침
+    universe = [{'symbol': 'THIN', 'name': 'Thin Co', 'market_cap': 1e9}]
+    fetch_ohlcv = mock.Mock(return_value=bars)
+    fetch_fund = mock.Mock()
+    out1, out2 = build_watchlists_for_universe(
+        universe, cik_map={}, fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
+    assert out1 == {}
+    assert out2 == {}

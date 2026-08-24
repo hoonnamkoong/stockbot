@@ -9,34 +9,14 @@ EOD 배치(scripts/run_eod_sim_us.py)가 추세 템플릿+실적 가속+VCP 압�
 (scripts/us_trade_loop.py)가 실시간에 가까운 가격으로 판단한다
 (program-trading-parity 원칙 — 국내와 동일하게 룩어헤드를 피한다).
 """
-import datetime as dt
 import json
 import os
-from zoneinfo import ZoneInfo
 
 from .us_base_simulator import USBaseSimulator
+from .us_calendar import us_trading_date, next_us_trading_date  # noqa: F401
 from .base_simulator import BaseSimulator
 
 _cooldown_active = BaseSimulator.cooldown_active
-
-_NY = ZoneInfo('America/New_York')
-
-
-def us_trading_date(now_utc: dt.datetime | None = None) -> str:
-    """읽기 시점의 미국 거래일(ET 캘린더 날짜, YYYYMMDD). 장중 루프가
-    is_us_market_open()으로 게이트한 뒤 호출하므로 항상 평일이다."""
-    now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
-    return now_utc.astimezone(_NY).strftime('%Y%m%d')
-
-
-def next_us_trading_date(now_utc: dt.datetime | None = None) -> str:
-    """EOD 배치가 저장할 날짜 키 — '오늘 마감 기준으로 계산한, 다음 거래일'
-    (ET 기준, 주말은 건너뛴다). 금요일 마감 배치는 월요일 날짜를 찍는다."""
-    now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
-    local = now_utc.astimezone(_NY) + dt.timedelta(days=1)
-    while local.weekday() >= 5:  # 토(5)·일(6)
-        local += dt.timedelta(days=1)
-    return local.strftime('%Y%m%d')
 
 MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19
@@ -142,6 +122,7 @@ def build_watchlist_entry(stock: dict) -> dict | None:
         'name': stock.get('name', stock.get('symbol', '')),
         'pivot_price': max(closes_through_today[-PIVOT_WINDOW:]),
         'ma50': ma50,
+        'avg_dollar_volume': stock.get('avg_dollar_volume'),
     }
 
 
@@ -165,7 +146,12 @@ def load_watchlist(date_str: str) -> dict[str, dict]:
 
 
 def decide_us_minervini(view, candidates, current_prices):
-    """국내 Sim11의 decide_minervini와 동일 로직(통화 무관 순수 함수)."""
+    """국내 Sim11의 decide_minervini와 동일 로직(통화 무관 순수 함수).
+
+    유동성 문턱(MIN_AMOUNT)은 candidates의 실시간 amount가 아니라 워치리스트에
+    실려온 avg_dollar_volume(EOD 배치가 계산한 최근 평균거래대금)으로 판정한다.
+    실시간 amount는 당일 누적 거래량 기준이라 개장 직후 몇 시간은 실제로 유동성이
+    충분한 종목도 낮게 잡혀 진입이 스퓨리어스하게 막힌다(2026-08-24 리뷰에서 발견)."""
     orders = []
     portfolio = view['portfolio']
     sold = set()
@@ -202,9 +188,9 @@ def decide_us_minervini(view, candidates, current_prices):
             continue
 
         price = float(stock.get('price', 0) or 0)
-        amount = float(stock.get('amount', 0) or 0)
+        avg_dollar_volume = stock.get('avg_dollar_volume')
         pivot = stock.get('pivot_price')
-        if price <= 0 or pivot is None or amount < MIN_AMOUNT:
+        if price <= 0 or pivot is None or avg_dollar_volume is None or avg_dollar_volume < MIN_AMOUNT:
             continue
         if price <= pivot:
             continue
@@ -229,7 +215,8 @@ class USMinerviniSimulator(USBaseSimulator):
         entries = load_watchlist(today)
         return [
             {'code': code, 'name': e.get('name', code),
-             'pivot_price': e.get('pivot_price'), 'ma50': e.get('ma50')}
+             'pivot_price': e.get('pivot_price'), 'ma50': e.get('ma50'),
+             'avg_dollar_volume': e.get('avg_dollar_volume')}
             for code, e in entries.items()
         ]
 

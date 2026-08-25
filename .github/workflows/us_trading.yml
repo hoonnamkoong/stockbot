@@ -58,6 +58,8 @@ jobs:
           cp data/trade_history_sim_us1minervini.csv db_data_repo/data/ 2>/dev/null || true
           cp data/sim_us2donchian_state.json db_data_repo/data/ 2>/dev/null || true
           cp data/trade_history_sim_us2donchian.csv db_data_repo/data/ 2>/dev/null || true
+          cp data/sim_us3liquidity_state.json db_data_repo/data/ 2>/dev/null || true
+          cp data/trade_history_sim_us3liquidity.csv db_data_repo/data/ 2>/dev/null || true
           cd db_data_repo
           git add -A data/
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi

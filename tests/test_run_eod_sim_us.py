@@ -35,7 +35,7 @@ def test_build_watchlist_skips_short_history_without_fundamentals_call(mock_slee
     universe = [{'symbol': 'NEWCO', 'name': 'New Co', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=_bars([10.0] * 30, volume=1_000_000))
     fetch_fund = mock.Mock()
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={'NEWCO': '0000000001'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert out1 == {}
@@ -50,7 +50,7 @@ def test_build_watchlist_includes_symbol_passing_all_filters(mock_sleep):
     universe = [{'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3e12}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock(return_value={'eps_growth_yoy': 25.0, 'revenue_growth_yoy': 20.0})
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={'AAPL': '0000320193'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert 'AAPL' in out1
@@ -68,7 +68,7 @@ def test_build_watchlist_skips_symbol_without_cik(mock_sleep):
     universe = [{'symbol': 'NOCIK', 'name': 'No Cik', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock()
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={}, fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert out1 == {}
     fetch_fund.assert_not_called()
@@ -92,7 +92,7 @@ def test_build_watchlist_survives_single_symbol_fetch_failure(mock_sleep):
     universe = [{'symbol': 'DEAD', 'name': 'Delisted Co', 'market_cap': 1e8},
                 {'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3e12}]
     fetch_fund = mock.Mock(return_value={'eps_growth_yoy': 25.0, 'revenue_growth_yoy': 20.0})
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={'AAPL': '0000320193'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert 'AAPL' in out1
@@ -109,7 +109,7 @@ def test_sim2_excluded_when_dollar_volume_too_low(mock_sleep):
     universe = [{'symbol': 'THIN', 'name': 'Thin Co', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock()
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={}, fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert out1 == {}
     assert out2 == {}

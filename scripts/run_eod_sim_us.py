@@ -33,6 +33,10 @@ from src.strategy.simulators.us_sim2_donchian import (  # noqa: E402
     save_watchlist as save_sim2_watchlist,
     CHANNEL_DAYS as SIM2_CHANNEL_DAYS,
 )
+from src.strategy.simulators.us_sim3_liquidity import (  # noqa: E402
+    build_watchlist as build_sim3_watchlist,
+    save_watchlist as save_sim3_watchlist,
+)
 
 MIN_HISTORY_DAYS = 220
 
@@ -49,10 +53,14 @@ YAHOO_RATE_LIMIT_SLEEP_SEC = 0.15
 def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamentals):
     """오케스트레이션. 네트워크 함수는 주입 — 테스트에서 모킹한다.
 
-    반환: (sim1_watchlist, sim2_watchlist). 두 판정은 서로 독립이라 한쪽이
-    탈락해도 다른 쪽은 계속 평가한다."""
+    반환: (sim1_watchlist, sim2_watchlist, sim3_watchlist). 세 판정은 서로 독립이라
+    한쪽이 탈락해도 다른 쪽은 계속 평가한다.
+
+    US Sim3(기준선)은 판정이 없다 — 여기서 모은 (심볼, 이름, 평균거래대금)을
+    그대로 정렬해 상위 N을 뽑을 뿐이다. 그래서 추가 네트워크 호출이 0이다."""
     out1 = {}
     out2 = {}
+    liquidity_rows = []
     failures = 0
     for row in universe:
         symbol = row['symbol']
@@ -84,6 +92,9 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
                                                 volumes[-SIM2_CHANNEL_DAYS:])]
         avg_dollar_volume = sum(recent_dollar) / len(recent_dollar) if recent_dollar else 0.0
 
+        # US Sim3(기준선) — 판정 없이 전 종목을 모아 두고, 아래에서 상위 N만 남긴다.
+        liquidity_rows.append((symbol, name, avg_dollar_volume))
+
         # US Sim1 — 추세 템플릿 통과 종목만 EDGAR 조회.
         if _trend_template_ok(price, daily_closes, w52_hgpr, w52_lwpr):
             cik = cik_map.get(symbol)
@@ -106,7 +117,7 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
             out2[symbol] = entry2
     if failures:
         print(f'[EOD-US] 종목 조회 실패 {failures}건 (건너뜀)')
-    return out1, out2
+    return out1, out2, build_sim3_watchlist(liquidity_rows)
 
 
 def main():
@@ -117,13 +128,15 @@ def main():
     print(f'[EOD-US] 유니버스 {len(universe)}종목')
 
     cik_map = fetch_cik_map()
-    watchlist1, watchlist2 = build_watchlists_for_universe(
+    watchlist1, watchlist2, watchlist3 = build_watchlists_for_universe(
         universe, cik_map, fetch_daily_ohlcv, fetch_eps_revenue_growth)
     today = next_us_trading_date()
     save_sim1_watchlist(watchlist1, today)
     save_sim2_watchlist(watchlist2, today)
+    save_sim3_watchlist(watchlist3, today)
     print(f'[EOD-US] US Sim1 워치리스트 {len(watchlist1)}종목, '
-          f'US Sim2 워치리스트 {len(watchlist2)}종목 저장 (날짜 {today})')
+          f'US Sim2 워치리스트 {len(watchlist2)}종목, '
+          f'US Sim3 워치리스트 {len(watchlist3)}종목 저장 (날짜 {today})')
 
 
 if __name__ == '__main__':

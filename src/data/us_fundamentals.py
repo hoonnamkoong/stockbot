@@ -1,6 +1,8 @@
 """SEC EDGAR XBRL — EPS·매출 YoY 성장률(SEPA 실적 가속 필터용).
 
-키 불필요, 완전 무료. User-Agent에 연락 가능한 문자열을 넣는 것이 SEC 정책이다.
+키 불필요, 완전 무료. SEC 정책상 User-Agent로 신원을 밝혀야 한다 — 다만 UA에
+URL이 들어가면 403으로 막힌다(2026-08-26 실측: www.sec.gov·data.sec.gov 양쪽).
+URL 없는 이름만으로 통과한다.
 
 EDGAR의 분기 facts에는 같은 종료일(end)에 대해 "이번 분기"와 "연초부터 누적"
 값이 섞여 나온다 — 둘 다 같은 태그를 쓴다. 진짜 분기 값만 골라내려면 duration
@@ -13,7 +15,8 @@ import requests
 
 TICKERS_URL = 'https://www.sec.gov/files/company_tickers.json'
 CONCEPT_URL = 'https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{tag}.json'
-HEADERS = {'User-Agent': 'stockbot-research (+https://github.com/hoonnamkoong/stockbot)'}
+# URL을 넣지 말 것 — SEC가 403을 준다. tests/test_us_fundamentals.py가 이걸 지킨다.
+HEADERS = {'User-Agent': 'stockbot-research'}
 
 REVENUE_TAGS = [
     'Revenues',

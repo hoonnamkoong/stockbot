@@ -20,6 +20,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+from src import alerts  # noqa: E402
 from src.data.us_universe import fetch_us_universe, filter_universe, save_universe  # noqa: E402
 from src.data.us_ohlcv import fetch_daily_ohlcv  # noqa: E402
 from src.data.us_fundamentals import fetch_cik_map, fetch_eps_revenue_growth  # noqa: E402
@@ -121,6 +122,21 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
 
 
 def main():
+    # 이 배치가 죽으면 다음 거래일 미국 심은 통째로 0건이 된다. 예외는 알린 뒤
+    # 그대로 올린다 — 삼키면 잡이 초록으로 끝나 실패가 두 겹으로 묻힌다.
+    # (2026-08-26: 08-24·08-25 두 번 다 유니버스 조회에서 죽었는데 이틀 동안
+    #  아무도 몰랐다. 빨간 X가 Actions 로그에만 남았기 때문이다.)
+    try:
+        _run()
+    except Exception as e:
+        alerts.send_alert(
+            '<b>US EOD 워치리스트 배치 실패</b>\n\n'
+            f'{type(e).__name__}: {e}\n\n'
+            '다음 거래일 미국 심은 한 건도 매매하지 않습니다.')
+        raise
+
+
+def _run():
     data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
     universe_raw = fetch_us_universe(limit=1000)
     universe = filter_universe(universe_raw)
@@ -137,6 +153,15 @@ def main():
     print(f'[EOD-US] US Sim1 워치리스트 {len(watchlist1)}종목, '
           f'US Sim2 워치리스트 {len(watchlist2)}종목, '
           f'US Sim3 워치리스트 {len(watchlist3)}종목 저장 (날짜 {today})')
+
+    # 예외 없이 끝나도 셋이 전부 비면 결과는 배치가 죽은 것과 같다. 심마다 판정이
+    # 다른데 동시에 0이 되는 건 정상 결과가 아니라 입력 쪽 고장에 가깝다
+    # (US Sim3는 판정이 없어 유니버스만 살아 있으면 늘 채워진다).
+    if not (watchlist1 or watchlist2 or watchlist3):
+        alerts.send_alert(
+            '<b>US 워치리스트가 전부 비었습니다</b>\n\n'
+            f'유니버스 {len(universe)}종목을 훑었으나 세 심 모두 0종목입니다 (날짜 {today}).\n'
+            '야후 OHLCV 또는 SEC EDGAR 조회를 확인하세요.')
 
 
 if __name__ == '__main__':

@@ -36,6 +36,11 @@ jobs:
         run: pip install -r scripts/requirements-trade.txt
 
       - name: Run EOD watchlist batch
+        # 배치 실패·빈 워치리스트를 텔레그램으로 알린다(scripts/run_eod_sim_us.py).
+        # 이 배선이 빠지면 알림 코드가 있어도 한 통도 안 나간다.
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/run_eod_sim_us.py
 
       - name: Deploy watchlist (db-data)

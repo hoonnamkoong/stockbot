@@ -1,9 +1,9 @@
 """미국 주식 유니버스 소스 — 네이버 시총랭킹의 미국판.
 
 api.nasdaq.com 스크리너는 키가 필요 없고 나스닥·NYSE·AMEX 상장 전체를
-시가총액 포함해 JSON으로 준다. ETF·우선주·워런트는 심볼에 `.`/`^`/`/`가
-섞이거나 marketCap이 비는 경우가 많아 그걸로 거른다 — 완벽하지는 않지만
-추가 조회 없이 되는 선에서의 근사다.
+시가총액 포함해 JSON으로 준다(거래소 필터를 생략하면 셋 다 들어온다).
+ETF·우선주·워런트는 심볼에 `.`/`^`/`/`가 섞이거나 marketCap이 비는 경우가
+많아 그걸로 거른다 — 완벽하지는 않지만 추가 조회 없이 되는 선에서의 근사다.
 """
 import json
 import os
@@ -31,8 +31,10 @@ def fetch_us_universe(limit: int = 1000) -> list[dict]:
         'tableonly': 'true',
         'limit': str(limit),
         'offset': '0',
-        'exchange': 'nasdaq,nyse,amex',
-        'download': 'true',
+        # exchange를 아예 보내지 않는다. 2026-08-26 확인 — 'nasdaq,nyse,amex'처럼
+        # 콤마로 이으면 HTTP 200에 0행을 준다(단일 값은 동작). 생략하면 세 거래소가
+        # 모두 들어온다(NASDAQ의 NVDA·AAPL과 NYSE의 JPM·WMT·XOM 동시 확인).
+        # download=true도 같은 날 죽었다 — data.rows를 늘 null로 준다.
         # 정렬을 명시하지 않으면 limit=1000이 "시총 상위 1000"이 아니라
         # API 기본 순서(심볼 알파벳 등)의 앞 1000이 될 수 있다.
         'sortColumn': 'marketcap',
@@ -41,11 +43,15 @@ def fetch_us_universe(limit: int = 1000) -> list[dict]:
     r = requests.get(NASDAQ_SCREENER_URL, params=params, headers=HEADERS, timeout=20)
     r.raise_for_status()
     body = r.json()
-    rows = ((body or {}).get('data') or {}).get('rows')
+    data = (body or {}).get('data') or {}
+    # 현행은 data.table.rows. data.rows는 구 download 모드의 형태로, 되살아날
+    # 경우를 위해 폴백으로만 남긴다.
+    rows = (data.get('table') or {}).get('rows') or data.get('rows')
     if not rows:
         raise RuntimeError(
-            '나스닥 스크리너가 빈 응답을 반환했다(data.rows가 null/비어있음) — '
-            'HTTP 200이지만 소프트 차단 등으로 실패했을 가능성이 높다.'
+            '나스닥 스크리너가 빈 응답을 반환했다(data.table.rows/data.rows가 '
+            'null·비어있음) — HTTP 200이지만 소프트 차단이나 파라미터 변경으로 '
+            '실패했을 가능성이 높다.'
         )
     out = []
     for row in rows:

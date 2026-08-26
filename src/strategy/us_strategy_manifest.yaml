@@ -44,3 +44,19 @@ simulators:
     currency: "USD"
     active: true
     tradeable: false  # 페이퍼 관찰 단계 (국내 Sim9-1도 아직 관찰 단계)
+
+  - id: "us_sim3_liquidity"
+    module: "src.strategy.simulators.us_sim3_liquidity"
+    class: "USLiquidityBaselineSimulator"
+    description: "US Sim3 유동성 상위 보유 — 기준선 심. 거래대금 상위 5종목을 20거래일마다 리밸런스, 신호 없음"
+    state_file: "sim_us3liquidity_state.json"
+    csv_file: "trade_history_sim_us3liquidity.csv"
+    label: "US 기준선·유동성 상위 (US Sim 3)"
+    display_order: 30
+    ui_key: "us_sim3"
+    short_desc: "거래대금 상위 5종목 20거래일 리밸런스 · 신호 없는 잣대"
+    chart_group: 1
+    color: "gray"
+    currency: "USD"
+    active: true
+    tradeable: false  # 잣대용 페이퍼. 다른 US 심의 성과를 재는 기준선이다.

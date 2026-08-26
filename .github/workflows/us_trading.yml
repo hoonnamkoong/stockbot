@@ -44,6 +44,11 @@ jobs:
           mkdir -p data
 
       - name: Run US trade loop
+        # 워치리스트 결손을 텔레그램으로 알린다(scripts/us_trade_loop.py).
+        # 이 배선이 빠지면 알림 코드가 있어도 한 통도 안 나간다.
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/us_trade_loop.py
 
       - name: Deploy state (db-data)
@@ -58,6 +63,8 @@ jobs:
           cp data/trade_history_sim_us1minervini.csv db_data_repo/data/ 2>/dev/null || true
           cp data/sim_us2donchian_state.json db_data_repo/data/ 2>/dev/null || true
           cp data/trade_history_sim_us2donchian.csv db_data_repo/data/ 2>/dev/null || true
+          cp data/sim_us3liquidity_state.json db_data_repo/data/ 2>/dev/null || true
+          cp data/trade_history_sim_us3liquidity.csv db_data_repo/data/ 2>/dev/null || true
           cd db_data_repo
           git add -A data/
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi

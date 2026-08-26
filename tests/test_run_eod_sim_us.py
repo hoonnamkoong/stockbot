@@ -1,6 +1,6 @@
 from unittest import mock
 
-from scripts.run_eod_sim_us import build_watchlists_for_universe
+from scripts.run_eod_sim_us import build_watchlists_for_universe, main as eod_main
 from src.strategy.simulators.us_sim2_donchian import MIN_AMOUNT as SIM2_MIN_AMOUNT
 
 
@@ -35,7 +35,7 @@ def test_build_watchlist_skips_short_history_without_fundamentals_call(mock_slee
     universe = [{'symbol': 'NEWCO', 'name': 'New Co', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=_bars([10.0] * 30, volume=1_000_000))
     fetch_fund = mock.Mock()
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={'NEWCO': '0000000001'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert out1 == {}
@@ -50,7 +50,7 @@ def test_build_watchlist_includes_symbol_passing_all_filters(mock_sleep):
     universe = [{'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3e12}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock(return_value={'eps_growth_yoy': 25.0, 'revenue_growth_yoy': 20.0})
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={'AAPL': '0000320193'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert 'AAPL' in out1
@@ -68,7 +68,7 @@ def test_build_watchlist_skips_symbol_without_cik(mock_sleep):
     universe = [{'symbol': 'NOCIK', 'name': 'No Cik', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock()
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={}, fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert out1 == {}
     fetch_fund.assert_not_called()
@@ -92,7 +92,7 @@ def test_build_watchlist_survives_single_symbol_fetch_failure(mock_sleep):
     universe = [{'symbol': 'DEAD', 'name': 'Delisted Co', 'market_cap': 1e8},
                 {'symbol': 'AAPL', 'name': 'Apple Inc.', 'market_cap': 3e12}]
     fetch_fund = mock.Mock(return_value={'eps_growth_yoy': 25.0, 'revenue_growth_yoy': 20.0})
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={'AAPL': '0000320193'},
         fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert 'AAPL' in out1
@@ -109,7 +109,55 @@ def test_sim2_excluded_when_dollar_volume_too_low(mock_sleep):
     universe = [{'symbol': 'THIN', 'name': 'Thin Co', 'market_cap': 1e9}]
     fetch_ohlcv = mock.Mock(return_value=bars)
     fetch_fund = mock.Mock()
-    out1, out2 = build_watchlists_for_universe(
+    out1, out2, out3 = build_watchlists_for_universe(
         universe, cik_map={}, fetch_ohlcv=fetch_ohlcv, fetch_fundamentals=fetch_fund)
     assert out1 == {}
     assert out2 == {}
+
+
+# 2026-08-26 — 이 배치는 08-24·08-25 두 번 다 유니버스 조회에서 예외로 죽었는데,
+# 빨간 X가 Actions 로그에만 남아 이틀 동안 아무도 몰랐다. 그 사이 장중 루프는
+# 빈 워치리스트로 계속 돌아 매매가 0건이었다. 실패는 사람에게 가야 한다.
+
+def _patch_main(**kw):
+    """main()의 네트워크·저장을 전부 막고 알림만 관찰한다."""
+    defaults = {
+        'fetch_us_universe': mock.DEFAULT, 'filter_universe': mock.DEFAULT,
+        'save_universe': mock.DEFAULT, 'fetch_cik_map': mock.DEFAULT,
+        'build_watchlists_for_universe': mock.DEFAULT,
+        'save_sim1_watchlist': mock.DEFAULT, 'save_sim2_watchlist': mock.DEFAULT,
+        'save_sim3_watchlist': mock.DEFAULT,
+    }
+    defaults.update(kw)
+    return mock.patch.multiple('scripts.run_eod_sim_us', **defaults)
+
+
+def test_main_alerts_and_reraises_on_failure():
+    """실패는 알리되 예외를 삼키지 않는다 — 잡이 초록으로 끝나면 안 된다."""
+    with _patch_main(fetch_us_universe=mock.Mock(side_effect=RuntimeError('스크리너 빈 응답'))), \
+         mock.patch('scripts.run_eod_sim_us.alerts.send_alert') as alert:
+        try:
+            eod_main()
+            assert False, '예외가 그대로 올라와야 한다'
+        except RuntimeError:
+            pass
+    assert alert.called, '실패가 조용히 묻혔다'
+    assert '스크리너 빈 응답' in alert.call_args.args[0], '원인이 알림에 없다'
+
+
+def test_main_alerts_when_all_watchlists_empty():
+    """예외 없이 끝나도 세 워치리스트가 전부 비면 다음 날 매매가 0건이 된다."""
+    with _patch_main(filter_universe=mock.Mock(return_value=[{'symbol': 'AAPL'}]),
+                     build_watchlists_for_universe=mock.Mock(return_value=({}, {}, {}))), \
+         mock.patch('scripts.run_eod_sim_us.alerts.send_alert') as alert:
+        eod_main()
+    assert alert.called, '전부 빈 워치리스트를 성공으로 넘겼다'
+
+
+def test_main_does_not_alert_when_any_watchlist_filled():
+    with _patch_main(filter_universe=mock.Mock(return_value=[{'symbol': 'AAPL'}]),
+                     build_watchlists_for_universe=mock.Mock(
+                         return_value=({}, {}, {'NVDA': {'rank': 1}}))), \
+         mock.patch('scripts.run_eod_sim_us.alerts.send_alert') as alert:
+        eod_main()
+    assert not alert.called

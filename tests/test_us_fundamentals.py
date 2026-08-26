@@ -1,5 +1,6 @@
 from unittest import mock
 
+from src.data import us_fundamentals
 from src.data.us_fundamentals import fetch_cik_map, fetch_eps_revenue_growth
 
 TICKERS_RESPONSE = {
@@ -63,3 +64,15 @@ def test_fetch_eps_revenue_growth_no_prior_year_match_is_none():
         m.return_value = _resp(only_current)
         out = fetch_eps_revenue_growth('0000320193')
     assert out['eps_growth_yoy'] is None
+
+
+def test_user_agent_has_no_url():
+    """SEC는 User-Agent에 URL이 들어간 요청을 403으로 막는다(2026-08-26 실측).
+
+    이 UA가 막히면 US Sim1의 실적 가속 필터가 통째로 죽고, EOD 배치가
+    fetch_cik_map()에서 예외로 끝나 그날 워치리스트가 아예 안 만들어진다.
+    """
+    ua = us_fundamentals.HEADERS['User-Agent']
+    assert ua, 'SEC 정책상 User-Agent는 비울 수 없다'
+    for token in ('http://', 'https://', '.com/', '.org/', 'github.com'):
+        assert token not in ua, f'UA에 URL 조각이 있으면 SEC가 403을 준다: {token!r}'

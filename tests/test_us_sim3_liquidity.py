@@ -190,3 +190,61 @@ def test_get_universe_reads_watchlist(tmp_path, monkeypatch):
     uni = sim.get_universe()
     assert {u['code'] for u in uni} == {'R000', 'R001', 'R002'}
     assert all('avg_dollar_volume' in u for u in uni)
+
+
+# 2026-08-26 프로덕션 — 이 심이 보유 0종목·현금 전액인 채로 리밸런스 카운터만
+# 시작돼 있었다: rebalance={'elapsed': 0, 'last_seen': '20260826'}.
+# 워치리스트가 없어 후보 0개로 돌던 런들이 카운터를 켜 버린 것이다. run()은
+# 주문이 없어도 rebalance를 저장했고, 그 다음 런부터 had_schedule=True /
+# elapsed<20이라 **20거래일 동안 잠긴다** — 한 주도 안 들고 있는데.
+# "첫 실행은 즉시 리밸런스"라는 탈출구를, 아무것도 못 산 런이 소진했다.
+
+def _sim_with_tmp_state(tmp_path, monkeypatch, date='20260826'):
+    monkeypatch.setattr(m, 'WATCHLIST_PATH', str(tmp_path / 'wl.json'))
+    monkeypatch.setattr(m, 'us_trading_date', lambda: date)
+    sim = m.USLiquidityBaselineSimulator(initial_cash=20000)
+    sim.state_file = str(tmp_path / 's.json')
+    sim.log_file = str(tmp_path / 'l.json')
+    sim.csv_file = str(tmp_path / 't.csv')
+    sim.reset_state()
+    return sim
+
+
+def test_empty_candidate_run_does_not_start_rebalance_counter(tmp_path, monkeypatch):
+    """후보가 없어 아무것도 못 산 런은 카운터를 켜지 않는다."""
+    sim = _sim_with_tmp_state(tmp_path, monkeypatch)
+    sim.run([], {})
+    assert not sim.state.get('rebalance'), \
+        f"못 산 런이 카운터를 켰다: {sim.state.get('rebalance')}"
+
+
+def test_first_real_candidates_are_bought_after_empty_runs(tmp_path, monkeypatch):
+    """후보 0개로 며칠 돌다가 워치리스트가 생기면 그 즉시 산다 — 20거래일을
+    기다리지 않는다."""
+    sim = _sim_with_tmp_state(tmp_path, monkeypatch, date='20260824')
+    sim.run([], {})
+    monkeypatch.setattr(m, 'us_trading_date', lambda: '20260825')
+    sim.run([], {})
+    monkeypatch.setattr(m, 'us_trading_date', lambda: '20260826')
+
+    entries = _entries(8)
+    cands = _cands(entries)
+    sim.run(cands, {c['code']: c['price'] for c in cands})
+
+    assert len(sim.state['portfolio']) == m.MAX_HOLDINGS, \
+        f"후보가 생겼는데 안 샀다: 보유 {len(sim.state['portfolio'])}종목"
+    assert sim.state['rebalance']['elapsed'] == 0
+
+
+def test_rebalance_counter_keeps_running_once_started(tmp_path, monkeypatch):
+    """실제로 리밸런스한 뒤에는 지금까지처럼 거래일을 센다."""
+    sim = _sim_with_tmp_state(tmp_path, monkeypatch, date='20260826')
+    entries = _entries(8)
+    cands = _cands(entries)
+    prices = {c['code']: c['price'] for c in cands}
+    sim.run(cands, prices)
+    assert sim.state['rebalance']['last_seen'] == '20260826'
+
+    monkeypatch.setattr(m, 'us_trading_date', lambda: '20260827')
+    sim.run(cands, prices)
+    assert sim.state['rebalance']['elapsed'] == 1, '카운터가 안 돈다'

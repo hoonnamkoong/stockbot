@@ -31,6 +31,7 @@ from src.strategy.simulators.us_sim1_minervini import (  # noqa: E402
 )
 from src.strategy.simulators.us_sim2_donchian import (  # noqa: E402
     build_watchlist_entry as build_sim2_entry,
+    cap_watchlist as cap_sim2_watchlist,
     save_watchlist as save_sim2_watchlist,
     CHANNEL_DAYS as SIM2_CHANNEL_DAYS,
 )
@@ -118,7 +119,12 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
             out2[symbol] = entry2
     if failures:
         print(f'[EOD-US] 종목 조회 실패 {failures}건 (건너뜀)')
-    return out1, out2, build_sim3_watchlist(liquidity_rows)
+    # US Sim2는 셋업 판정을 통과한 종목이 수백 개가 된다(2026-08-26 실측 930).
+    # 장중 루프의 호출 예산에 맞춰 거래대금 상위만 남긴다 — 판정 뒤에 자른다.
+    capped2 = cap_sim2_watchlist(out2)
+    if len(capped2) < len(out2):
+        print(f'[EOD-US] US Sim2 워치리스트 {len(out2)}→{len(capped2)}종목 (거래대금 상위 상한)')
+    return out1, capped2, build_sim3_watchlist(liquidity_rows)
 
 
 def main():

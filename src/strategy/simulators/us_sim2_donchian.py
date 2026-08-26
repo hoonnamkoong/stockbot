@@ -15,6 +15,11 @@ EOD 배치(scripts/run_eod_sim_us.py)가 채널 상단·하단·ATR을 하루 1�
 단계에서 평균거래대금 문턱(MIN_AMOUNT)을 미리 걸어 워치리스트를 좁힌다 — 국내
 원본의 "거래대금 동반" 의도와도 맞는다. 장중 진입 시점의 거래대금 z-score는
 당일 실시간 값이라 EOD에서 대체 불가능해 그대로 런타임에 남긴다.
+
+**MIN_AMOUNT만으로는 부족했다(2026-08-26).** 유니버스 조회가 복구되고 처음
+실제로 돌려보니 998종목 중 930종목이 문턱을 통과했다 — 시총 상위 1000 종목에
+일 거래대금 $10M은 사실상 아무 제약이 아니다. 그래서 거래대금 상위
+MAX_WATCHLIST개로 한 번 더 자른다(위에서 우려한 타임아웃이 실제 값이 되었다).
 """
 import json
 import os
@@ -33,6 +38,16 @@ EXIT_DAYS = 10           # 청산 채널
 ATR_STOP_MULT = 2.0      # 손절 = 진입가 - 2*ATR
 MIN_SAMPLE = 10          # 거래대금 횡단면 z 최소 표본. 미달이면 신호 없음(fail-closed)
 MIN_AMOUNT = 10_000_000  # 미국 대형주 유동성 기준 일일 거래대금 최소 문턱(USD) — US Sim1과 동일
+
+# 워치리스트 상한(거래대금 상위 N). 장중 루프의 잡 타임아웃에서 역산한 값이다:
+#   러너 실측 0.26초/종목(2026-08-26 EOD 런: 998종목 406초 중 슬립 150초 제외)
+#   잡 타임아웃 240초 - 오버헤드 40초(체크아웃·pip) = 가용 200초
+#   안전마진 50% → 조회 예산 100초 → 총 385종목
+#   run_cycle은 심마다 따로 조회한다(심 간 중복 제거 없음) — US Sim1 ~18 +
+#   US Sim3 20 + 보유 ~15 = 55를 빼면 이 심 몫이 약 330. 내려서 300.
+# 신호 필터가 아니라 유동성·호출예산 제약이다. 순서도 그래서 중요하다 —
+# 돌파 셋업 판정을 먼저 하고, 통과한 것 중에서 가장 유동적인 300을 남긴다.
+MAX_WATCHLIST = 300
 
 WATCHLIST_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data',
@@ -81,6 +96,21 @@ def build_watchlist_entry(name: str, daily_closes: list[float], avg_dollar_volum
         'atr': _atr(window),
         'avg_dollar_volume': avg_dollar_volume,
     }
+
+
+def cap_watchlist(entries: dict[str, dict]) -> dict[str, dict]:
+    """거래대금 상위 MAX_WATCHLIST개만 남긴다. 상한 이하면 그대로 돌려준다.
+
+    거래대금을 모르는(None) 종목은 0으로 취급해 '최하위'로 줄 세우지 않고 뺀다 —
+    측정 실패를 최하위로 두면 조회에 실패한 종목이 조용히 밀려나기만 하고 실패
+    사실 자체가 사라진다(US Sim3의 build_watchlist와 같은 관례)."""
+    measured = {k: v for k, v in entries.items()
+                if v.get('avg_dollar_volume') is not None}
+    if len(measured) <= MAX_WATCHLIST:
+        return measured
+    top = sorted(measured.items(),
+                 key=lambda kv: -float(kv[1]['avg_dollar_volume']))[:MAX_WATCHLIST]
+    return dict(top)
 
 
 def save_watchlist(entries: dict[str, dict], date_str: str) -> None:

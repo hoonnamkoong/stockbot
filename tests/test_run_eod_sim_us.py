@@ -161,3 +161,19 @@ def test_main_does_not_alert_when_any_watchlist_filled():
          mock.patch('scripts.run_eod_sim_us.alerts.send_alert') as alert:
         eod_main()
     assert not alert.called
+
+
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_sim2_watchlist_is_capped(mock_sleep):
+    """EOD 배치가 US Sim2 워치리스트에 상한을 적용한다.
+
+    2026-08-26 실제 값이 930종목이었다. 장중 루프는 워치리스트 종목마다 개별
+    호출하므로 상한이 없으면 한 사이클이 잡 타임아웃(4분)을 넘긴다."""
+    closes = _uptrend_closes()
+    bars = _bars(closes, volume=_SIM2_ONLY_VOLUME)
+    universe = [{'symbol': f'S{i}', 'name': f'Co{i}', 'market_cap': 1e9} for i in range(6)]
+    with mock.patch('src.strategy.simulators.us_sim2_donchian.MAX_WATCHLIST', 4):
+        _, out2, _ = build_watchlists_for_universe(
+            universe, cik_map={}, fetch_ohlcv=mock.Mock(return_value=bars),
+            fetch_fundamentals=mock.Mock())
+    assert len(out2) == 4, f'상한이 안 걸렸다: {len(out2)}종목'

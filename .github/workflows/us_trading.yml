@@ -17,7 +17,12 @@ concurrency:
 jobs:
   trade:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    # 워치리스트 상한(MAX_WATCHLIST=300)과 묶여 있다 — 조회 92초 + 셋업 23초 +
+    # 배포 충돌 시 142초(push 실패 → unshallow → rebase, 2026-08-26 실측) = 최악 257초.
+    # 4분이면 취소되고, 배포가 마지막 스텝이라 그 사이클 판단이 통째로 유실된다.
+    # public 레포라 Actions 사용량은 무제한이고, cron이 실제 30분 간격이라 잡이
+    # 겹칠 일도 없다. tests/test_us_trading_timeout_budget.py가 이 결합을 지킨다.
+    timeout-minutes: 8
     env:
       PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul

@@ -193,9 +193,15 @@ class USLiquidityBaselineSimulator(USBaseSimulator):
         orders = decide_us_liquidity(self._view(current_prices), candidates,
                                      current_prices,
                                      sched=sched if had_schedule else {})
+        # 카운터는 **실제로 리밸런스한 뒤에만** 시작한다. 2026-08-26 프로덕션에서
+        # 워치리스트가 없어 후보 0개로 돌던 런들이 카운터를 켜 버렸고, 그 다음
+        # 런부터 had_schedule=True/elapsed<REBALANCE_DAYS라 보유 0종목인 채로
+        # 20거래일 동안 잠겼다 — "첫 실행은 즉시 리밸런스"라는 탈출구를 아무것도
+        # 못 산 런이 소진한 것이다. 이미 돌던 카운터는 그대로 센다.
         if orders:
-            sched = mark_rebalanced(sched)
-        self.state['rebalance'] = sched
+            self.state['rebalance'] = mark_rebalanced(sched)
+        elif had_schedule:
+            self.state['rebalance'] = sched
 
         self._apply(orders, current_prices)
         self.save_state(current_prices)

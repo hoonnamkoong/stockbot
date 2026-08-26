@@ -177,3 +177,19 @@ def test_sim2_watchlist_is_capped(mock_sleep):
             universe, cik_map={}, fetch_ohlcv=mock.Mock(return_value=bars),
             fetch_fundamentals=mock.Mock())
     assert len(out2) == 4, f'상한이 안 걸렸다: {len(out2)}종목'
+
+
+def test_main_stamps_watchlist_for_nearest_open_session():
+    """장중에 배치를 돌리면 워치리스트가 **오늘치**로 찍혀 그 자리에서 쓰인다.
+
+    next_us_trading_date를 쓰면 언제 돌리든 내일치가 되어, 고장을 고친 날
+    검증할 수 없다(2026-08-26에 실제로 이걸로 하루 밀렸다)."""
+    saved = {}
+    with _patch_main(
+            filter_universe=mock.Mock(return_value=[{'symbol': 'AAPL'}]),
+            build_watchlists_for_universe=mock.Mock(return_value=({}, {}, {'NVDA': {}})),
+            save_sim3_watchlist=mock.Mock(side_effect=lambda e, d: saved.update(date=d))), \
+         mock.patch('scripts.run_eod_sim_us.watchlist_target_date', return_value='20260826'), \
+         mock.patch('scripts.run_eod_sim_us.alerts.send_alert'):
+        eod_main()
+    assert saved['date'] == '20260826'

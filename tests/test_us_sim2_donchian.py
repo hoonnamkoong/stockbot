@@ -1,5 +1,6 @@
 import os
 import tempfile
+from unittest import mock
 
 from src.strategy.simulators import us_sim2_donchian as m
 
@@ -169,3 +170,36 @@ def test_us_donchian_simulator_get_universe_reads_todays_watchlist(tmp_path, mon
                           'channel_high': entry['channel_high'],
                           'channel_low': entry['channel_low'], 'atr': entry['atr'],
                           'avg_dollar_volume': entry['avg_dollar_volume']}]
+
+
+# 2026-08-26 — 유니버스 조회가 복구되자 이 워치리스트가 930종목으로 나왔다.
+# MIN_AMOUNT($10M)는 시총 상위 1000 유니버스에서 사실상 아무것도 못 거른다(998→930).
+# 장중 루프는 워치리스트 종목마다 개별 호출하므로 930종목이면 한 사이클이
+# 약 8분(러너 실측 0.26초/종목) — 잡 타임아웃 4분을 넘긴다.
+
+def _entry(dollar_volume):
+    return {'name': 'X', 'channel_high': 10.0, 'channel_low': 8.0,
+            'atr': 0.5, 'avg_dollar_volume': dollar_volume}
+
+
+def test_cap_watchlist_keeps_most_liquid():
+    entries = {f'S{i}': _entry(float(i)) for i in range(10)}
+    with mock.patch.object(m, 'MAX_WATCHLIST', 3):
+        out = m.cap_watchlist(entries)
+    assert set(out) == {'S9', 'S8', 'S7'}, '거래대금 상위가 남아야 한다'
+    assert out['S9'] == entries['S9'], '엔트리 내용은 그대로여야 한다'
+
+
+def test_cap_watchlist_leaves_small_watchlist_untouched():
+    entries = {f'S{i}': _entry(float(i)) for i in range(3)}
+    with mock.patch.object(m, 'MAX_WATCHLIST', 10):
+        assert m.cap_watchlist(entries) == entries
+
+
+def test_cap_watchlist_drops_unmeasured_dollar_volume():
+    """거래대금을 모르는 종목을 0으로 취급해 '최하위'로 줄 세우지 않는다 —
+    조회 실패가 조용히 후보에서 밀려나기만 하고 사실 자체는 사라진다."""
+    entries = {'OK': _entry(5.0), 'UNKNOWN': _entry(None)}
+    with mock.patch.object(m, 'MAX_WATCHLIST', 10):
+        out = m.cap_watchlist(entries)
+    assert set(out) == {'OK'}

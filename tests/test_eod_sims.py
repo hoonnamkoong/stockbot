@@ -31,8 +31,12 @@ def _csv(tmp_path, rows):
     return str(p)
 
 
-def _series(code, name, closes, amount=5_000_000_000):
-    return [f'2026{i+301:04d},{code},{name},{c},{c},{c},{c},1000,{amount}'
+def _series(code, name, closes, amount=5_000_000_000, last_amount=None):
+    """last_amount를 주면 마지막 날(당일)만 거래대금을 다르게 둔다 — Sim9-1의
+    '자기 평균 대비 급증'을 만들 때 쓴다."""
+    n = len(closes)
+    return [f'2026{i+301:04d},{code},{name},{c},{c},{c},{c},1000,'
+            f'{last_amount if (last_amount is not None and i == n - 1) else amount}'
             for i, c in enumerate(closes)]
 
 
@@ -112,14 +116,16 @@ def test_intraday_sims_are_not_marked_eod():
 
 # ── EOD 러너가 실제로 매수를 낸다 ──────────────────────────
 def test_eod_run_enters_on_channel_breakout(tmp_path):
-    """20일 채널을 뚫고 거래대금 z가 양수면 산다 (top100 조건 재현)."""
+    """20일 채널을 뚫고 거래대금이 자기 평균 대비 급증하면 산다 (top100 조건 재현)."""
     from scripts.run_eod_sims import run_donchian
     rows = []
-    # 19종목은 평탄(거래대금 작음), 1종목만 돌파 + 거래대금 큼
+    # 19종목은 평탄하고 거래대금도 평소대로(급증 배수 1.0).
     for i in range(19):
         rows += _series(f'{i:06d}', f'평탄{i}', [1000] * (CHANNEL_DAYS + 1), amount=1_500_000_000)
+    # 돌파주는 절대 거래대금이 배경보다 작아도 자기 평균 대비 9배로 늘었다 —
+    # 게이트가 '크기'가 아니라 '급증'을 재는지 확인하는 자리다.
     rows += _series('005930', '돌파주', list(range(1000, 1000 + CHANNEL_DAYS)) + [2000],
-                    amount=90_000_000_000)
+                    amount=1_000_000_000, last_amount=9_000_000_000)
     sim = DonchianBreakoutSimulator(initial_cash=3_000_000)
     sim.state_file = str(tmp_path / 's.json')
     sim.log_file = str(tmp_path / 'l.json')
@@ -127,3 +133,25 @@ def test_eod_run_enters_on_channel_breakout(tmp_path):
     sim.reset_state()
     run_donchian(sim, candidates_from_ohlcv(_csv(tmp_path, rows)))
     assert '005930' in sim.state['portfolio']
+
+
+# 2026-08-26 — Sim9-1의 거래대금 게이트를 "자기 평균 대비 급증"으로 바꾸면서
+# amount_history가 필요해졌다. 이 심의 입력 경로는 둘이다(장중 스크래퍼,
+# EOD 일봉 CSV). 한쪽만 배선하면 다른 쪽이 조용히 0건이 된다.
+
+def test_candidates_carry_amount_history_aligned_with_channel(tmp_path):
+    """거래대금 이력도 range_history와 같이 **직전** CHANNEL_DAYS일이어야 한다.
+    당일이 섞이면 '평소 대비'의 분모에 오늘이 들어가 급증이 희석된다."""
+    closes = list(range(1000, 1000 + CHANNEL_DAYS + 1))
+    rows = []
+    for i, c in enumerate(closes):
+        amt = 1_000_000_000 * (i + 1)        # 날마다 다른 거래대금
+        rows.append(f'2026{i+301:04d},005930,삼성전자,{c},{c},{c},{c},1000,{amt}')
+    cands = candidates_from_ohlcv(_csv(tmp_path, rows))
+
+    c = cands[0]
+    assert len(c['amount_history']) == CHANNEL_DAYS
+    assert len(c['amount_history']) == len(c['range_history'])
+    assert c['amount_history'][-1] == 1_000_000_000 * CHANNEL_DAYS   # 어제
+    assert c['amount'] == 1_000_000_000 * (CHANNEL_DAYS + 1)         # 오늘은 amount로만
+    assert c['amount'] not in c['amount_history']

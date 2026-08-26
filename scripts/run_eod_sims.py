@@ -58,6 +58,10 @@ def candidates_from_ohlcv(path: str) -> list[dict]:
     max(채널) >= 당일종가라 돌파가 정의상 불가능해진다(백테스트도 dates[t-n:t]).
     이력이 모자란 종목은 채널을 만들 수 없으므로 후보에서 뺀다 — 없는 근거로
     사지 않는다.
+
+    amount_history도 같은 구간이다(Sim9-1의 '거래대금 급증' 분모). 이 심의 입력
+    경로는 둘이다 — 장중 스크래퍼(data_fetcher)와 여기. 한쪽만 배선하면 다른
+    쪽이 조용히 0건이 된다.
     """
     if not os.path.exists(path):
         return []
@@ -91,6 +95,7 @@ def candidates_from_ohlcv(path: str) -> list[dict]:
         if len(rows) < CHANNEL_DAYS + 1:
             continue
         closes = [x[1] for x in rows]
+        amounts = [x[2] for x in rows]
         out.append({
             'code': code,
             'name': names[code],
@@ -98,6 +103,9 @@ def candidates_from_ohlcv(path: str) -> list[dict]:
             'current_price': closes[-1],
             'amount': rows[-1][2],
             'range_history': closes[-CHANNEL_DAYS - 1:-1],
+            # [Sim9-1] 거래대금 급증의 분모. range_history와 같이 **직전**
+            # CHANNEL_DAYS일이다 — 당일이 분모에 섞이면 급증이 스스로 희석된다.
+            'amount_history': amounts[-CHANNEL_DAYS - 1:-1],
         })
     return out
 

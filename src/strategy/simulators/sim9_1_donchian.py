@@ -29,6 +29,35 @@ def _zmap(pairs):
     return {c: (v - mu) / sd for c, v in pairs}
 
 
+def _surge_pairs(candidates):
+    """[(code, 당일거래대금 / 그 종목의 평균거래대금)] — '거래대금 급증' 배수.
+
+    2026-08-26까지는 절대 거래대금을 그대로 횡단면 z에 넣었다. 그런데 당일
+    거래대금 분포는 대형주가 평균을 끌어올려 심하게 치우쳐서, z>0이 사실상
+    "대형주인가" 필터로 동작한다 — 돌파했는지와 무관하게. 미국판(US Sim2)에서
+    같은 코드를 실측했더니 후보 300종목 중 20일 채널을 돌파한 16종목이 **전부**
+    이 게이트에서 막혔다(z -0.09 ~ -0.38).
+
+    자기 평균 대비 배수로 바꾸면 종목 크기가 상쇄되고 '평소보다 얼마나 많이
+    도는가'만 남는다. 이 배수를 다시 횡단면 z로 만드는 이유는 장중 경과시간
+    때문이다 — amount는 당일 누적이라 개장 직후면 정상 종목도 배수가 작다.
+    모든 후보가 같은 경과시간을 공유하므로 횡단면 z가 그 효과를 상쇄한다.
+
+    기준선(amount_history)이 없는 종목은 **뺀다**. 0으로 두면 '측정 불가'가
+    '급증 없음'으로 둔갑하고, 스크래퍼가 이 필드를 아직 안 싣는 구간에서는
+    조용히 전 종목이 후보에서 사라진다(그 결손은 data_fetcher가 따로 경고한다).
+    """
+    out = []
+    for s in candidates:
+        code = s.get('code')
+        hist = [a for a in (s.get('amount_history') or []) if a and a > 0]
+        if not code or not hist:
+            continue
+        base = sum(hist) / len(hist)
+        out.append((code, float(s.get('amount', 0) or 0) / base))
+    return out
+
+
 def _atr(hist):
     """종가 간 절대변동의 평균. base_simulator.calculate_atr과 같은 근사식이다.
 
@@ -47,8 +76,7 @@ def decide_donchian(view, candidates, current_prices):
     portfolio = view['portfolio']
     sold = set()
     cand_by_code = {s.get('code'): s for s in candidates if s.get('code')}
-    zamt = _zmap([(s['code'], float(s.get('amount', 0) or 0))
-                  for s in candidates if s.get('code')])
+    zamt = _zmap(_surge_pairs(candidates))
 
     # 1. 청산 — 10일 채널 이탈 또는 2*ATR 손절. 고정 익절 없음(터틀은 추세를 끝까지 탄다).
     for code in list(portfolio.keys()):
@@ -114,7 +142,8 @@ class DonchianBreakoutSimulator(BaseSimulator):
     - 레퍼런스: Richard Dennis & William Eckhardt 터틀 트레이딩 실험(1983).
     - 심9(갭소진)와 성격이 정반대다. 심9는 1일 역추세, 심9-1은 다일 추세추종.
       묶인 이유는 '차트 데이터 계열'뿐이라 나중에 독립 번호로 옮기는 게 자연스럽다.
-    - 진입: 20일 채널(range_history 종가) 상단 돌파 + 거래대금 횡단면 z > 0 + 거래대금>=10억
+    - 진입: 20일 채널(range_history 종가) 상단 돌파 + 거래대금 급증(자기 평균
+      대비 배수의 횡단면 z > 0, _surge_pairs 참고) + 거래대금>=10억
     - 청산: 10일 채널 저점 이탈 / 진입가 - 2*ATR 손절. 고정 익절 없음.
     - Sim5와 같은 `range_history`를 정반대 방향으로 쓴다(Sim5는 채널 저점 매수).
     - **실행 위치: 장중 루프가 아니라 마감 후 1회**(IS_EOD). scripts/run_eod_sims.py가

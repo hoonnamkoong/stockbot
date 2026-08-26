@@ -247,6 +247,7 @@ class DataFetcherWorker(BaseWorker):
             ('per', 'Sim3 가치페어 밸류에이션 판정 불가'),
             ('tick_power', '체결강도 판정 불가'),
             ('range_history', 'Sim5 채널 산출 불가'),
+            ('amount_history', 'Sim9-1 거래대금 급증 판정 불가'),
         ):
             missing = sum(1 for s in results_raw if not s.get(field))
             if missing:
@@ -310,14 +311,26 @@ class DataFetcherWorker(BaseWorker):
 
                 # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
                 # [Sim5] range_history: 최근 20영업일 종가 (채널 산출용). 동일 페이지라 추가 콜 0.
-                closes = []
+                # [Sim9-1] amount_history: 같은 행의 거래량(4열)까지 읽어 거래대금
+                # 이력을 만든다. "거래대금 급증"을 종목 자신의 평균 대비로 재려면
+                # 기준선이 필요한데, 2026-08-26까지 국내에는 그 이력이 아예 없어서
+                # 절대 거래대금의 횡단면 z를 쓰고 있었다(= 대형주 필터로 동작).
+                # 같은 표라 추가 호출 0이다.
+                closes, amounts = [], []
                 for r in data_rows[:20]:
                     try:
-                        closes.append(int(r[1].get_text().replace(',', '').strip()))
-                    except:
-                        pass
+                        close = int(r[1].get_text().replace(',', '').strip())
+                    except Exception:
+                        continue
+                    closes.append(close)
+                    try:
+                        vol = int(r[4].get_text().replace(',', '').strip())
+                    except Exception:
+                        continue   # 거래량만 깨진 행은 거래대금에서만 뺀다
+                    amounts.append(close * vol)
                 details['sparkline_price'] = closes[:5][::-1]
                 details['range_history'] = closes[::-1]
+                details['amount_history'] = amounts[::-1]
         except Exception as e:
             print(f"   [DataFetcher] 외인비중 수집 실패 {code}: {e}")
 

@@ -24,10 +24,11 @@ from src import alerts  # noqa: E402
 from src.data.us_universe import fetch_us_universe, filter_universe, save_universe  # noqa: E402
 from src.data.us_ohlcv import fetch_daily_ohlcv  # noqa: E402
 from src.data.us_fundamentals import fetch_cik_map, fetch_eps_revenue_growth  # noqa: E402
+from src.strategy.simulators.us_calendar import watchlist_target_date  # noqa: E402
 from src.strategy.simulators.us_sim1_minervini import (  # noqa: E402
     build_watchlist_entry as build_sim1_entry,
     save_watchlist as save_sim1_watchlist,
-    next_us_trading_date, _trend_template_ok,
+    _trend_template_ok,
 )
 from src.strategy.simulators.us_sim2_donchian import (  # noqa: E402
     build_watchlist_entry as build_sim2_entry,
@@ -152,7 +153,9 @@ def _run():
     cik_map = fetch_cik_map()
     watchlist1, watchlist2, watchlist3 = build_watchlists_for_universe(
         universe, cik_map, fetch_daily_ohlcv, fetch_eps_revenue_growth)
-    today = next_us_trading_date()
+    # 아직 안 끝난 가장 가까운 세션 — 장중에 돌리면 오늘치로 찍혀 그 자리에서
+    # 쓰인다. 마감 뒤 정규 배치(22:00 UTC)는 지금까지처럼 다음 거래일이다.
+    today = watchlist_target_date()
     save_sim1_watchlist(watchlist1, today)
     save_sim2_watchlist(watchlist2, today)
     save_sim3_watchlist(watchlist3, today)

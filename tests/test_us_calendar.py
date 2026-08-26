@@ -31,3 +31,39 @@ def test_date_key_holds_in_est_period():
     assert c.next_us_trading_date(_utc(2026, 1, 8, 22)) == '20260109'   # 목요일 마감 → 금요일
     assert c.us_trading_date(_utc(2026, 1, 9, 14, 30)) == '20260109'    # 09:30 EST 개장
     assert c.us_trading_date(_utc(2026, 1, 9, 20, 55)) == '20260109'    # 15:55 EST
+
+
+# 2026-08-26 — next_us_trading_date는 **언제 돌리든 내일**을 찍는다. 그래서 장이
+# 열려 있는 동안 배치를 돌려도 그 워치리스트를 오늘 못 쓴다. 고장을 고친 날 바로
+# 검증할 수 없고 "내일 확인"이 반복됐다(그 다음 날 또 다른 게 걸리면 무한히 밀린다).
+# 워치리스트가 서빙해야 할 날짜는 "아직 안 끝난 가장 가까운 세션"이다.
+
+def test_target_date_is_today_during_session():
+    """장중에 돌리면 오늘치 — 그 자리에서 쓸 수 있어야 한다."""
+    assert c.watchlist_target_date(_utc(2026, 8, 26, 15, 16)) == '20260826'  # 11:16 EDT
+
+
+def test_target_date_is_today_before_open():
+    """개장 전에 돌려도 오늘치 — 오늘 세션이 아직 안 끝났다."""
+    assert c.watchlist_target_date(_utc(2026, 8, 26, 12)) == '20260826'  # 08:00 EDT
+
+
+def test_target_date_is_next_day_after_close():
+    """정규 야간 배치(22:00 UTC = 18:00 EDT)는 지금까지처럼 다음 거래일."""
+    assert c.watchlist_target_date(_utc(2026, 8, 26, 22)) == '20260827'
+
+
+def test_target_date_friday_after_close_is_monday():
+    assert c.watchlist_target_date(_utc(2026, 8, 28, 22)) == '20260831'
+
+
+def test_target_date_on_weekend_is_monday():
+    """토요일 낮은 '오늘 세션'이 없다 — 다음 거래일로 넘어가야 한다."""
+    assert c.watchlist_target_date(_utc(2026, 8, 29, 15)) == '20260831'  # 토 11:00 EDT
+    assert c.watchlist_target_date(_utc(2026, 8, 30, 15)) == '20260831'  # 일 11:00 EDT
+
+
+def test_target_date_matches_intraday_reader_during_session():
+    """쓰는 쪽과 읽는 쪽이 같은 키여야 한다 — 이 모듈이 존재하는 이유."""
+    now = _utc(2026, 8, 26, 15, 16)
+    assert c.watchlist_target_date(now) == c.us_trading_date(now)

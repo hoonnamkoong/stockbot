@@ -27,3 +27,30 @@ def next_us_trading_date(now_utc: dt.datetime | None = None) -> str:
     while local.weekday() >= 5:  # 토(5)·일(6)
         local += dt.timedelta(days=1)
     return local.strftime('%Y%m%d')
+
+
+# 정규장 마감(ET). 이 시각을 지나야 "오늘 세션은 끝났다"고 본다.
+_CLOSE_HOUR = 16
+
+
+def watchlist_target_date(now_utc: dt.datetime | None = None) -> str:
+    """워치리스트가 서빙할 거래일 — **아직 안 끝난 가장 가까운 세션**.
+
+    오늘 세션이 아직 안 끝났으면(개장 전이든 장중이든) 오늘, 이미 끝났거나
+    주말이면 다음 거래일. 정규 야간 배치(22:00 UTC = 18:00 ET)는 마감 뒤라
+    지금까지처럼 다음 거래일을 찍는다 — 그 경로의 동작은 그대로다.
+
+    next_us_trading_date는 **언제 돌리든 내일**을 찍는다. 그래서 장이 열려 있는
+    동안 배치를 돌려도 그 워치리스트를 오늘 쓸 수 없었고, 고장을 고친 날 바로
+    검증하지 못해 "내일 확인"이 반복됐다(그 다음 날 또 다른 게 걸리면 무한히
+    밀린다). 배치를 언제 돌리든 가장 가까운 세션에 쓰이게 하는 게 이 함수다.
+
+    장중에 만들어도 룩어헤드가 아니다 — 채널·피봇·ATR·평균거래대금은 전부
+    `daily_closes`(오늘 봉 제외, 어제까지 확정치)로 계산한다. 어젯밤 배치가
+    만들었을 값과 같다. 현재가만 판정 시점 관측값으로 더 신선하게 들어간다.
+    """
+    now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
+    local = now_utc.astimezone(_NY)
+    if local.weekday() < 5 and local.hour < _CLOSE_HOUR:
+        return local.strftime('%Y%m%d')
+    return next_us_trading_date(now_utc)

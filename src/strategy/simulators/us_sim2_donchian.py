@@ -71,6 +71,34 @@ def _zmap(pairs):
     return {c: (v - mu) / sd for c, v in pairs}
 
 
+def _surge_pairs(candidates):
+    """[(code, 당일거래대금 / 그 종목의 평균거래대금)] — '거래대금 급증' 배수.
+
+    2026-08-26까지는 절대 거래대금을 그대로 횡단면 z에 넣었다. 그런데 당일
+    거래대금 분포는 초대형주가 평균을 끌어올려 심하게 치우친다(그날 후보 300종목
+    실측: 평균 $469M / 중앙값 $164M / 최대 $12,310M). z>0을 통과하는 건 상위
+    18%뿐이라, 게이트 이름은 "거래대금 동반(급증)"인데 실제로는 "다른 종목보다
+    큰가" = 초대형주 필터로 동작했다. 그날 20일 채널을 돌파한 16종목이 **전부**
+    이 게이트에서 막혔다(z가 -0.09 ~ -0.38로 전부 음수).
+
+    자기 평균 대비 배수로 바꾸면 종목 크기가 상쇄되고 '평소보다 얼마나 많이
+    도는가'만 남는다. 이 배수를 다시 횡단면 z로 만드는 이유는 장중 경과시간
+    때문이다 — amount는 당일 누적이라 개장 2시간이면 정상 종목도 배수가 0.3대다.
+    모든 후보가 같은 경과시간을 공유하므로 횡단면 z를 취하면 그 효과가 상쇄된다.
+
+    평균거래대금을 모르는 종목은 **뺀다**. 0으로 두면 0으로 나누거나 '측정 불가'가
+    '급증 없음'으로 둔갑한다(US Sim3 build_watchlist와 같은 관례).
+    """
+    out = []
+    for s in candidates:
+        code = s.get('code')
+        base = s.get('avg_dollar_volume')
+        if not code or base is None or float(base) <= 0:
+            continue
+        out.append((code, float(s.get('amount', 0) or 0) / float(base)))
+    return out
+
+
 def _atr(hist):
     """종가 간 절대변동의 평균(근사 ATR). 국내 Sim9-1과 동일 근사식 — 고가/저가
     없이 종가만으로 계산하므로 갭을 못 보고 실제보다 작게 나온다(손절이 타이트해진다)."""
@@ -142,13 +170,13 @@ def decide_us_donchian(view, candidates, current_prices):
     avg_dollar_volume(EOD 배치가 계산한 최근 평균거래대금)으로 판정한다 — 실시간
     amount는 당일 누적 거래량 기준이라 개장 직후 몇 시간은 채널 돌파가 스퓨리어스
     하게 막힌다(2026-08-24 리뷰에서 발견). 거래대금 z-score(zamt)는 당일 실시간
-    급증을 보는 지표라 그대로 실시간 amount를 쓴다."""
+    급증을 보는 지표라 그대로 실시간 amount를 쓰되, **자기 평균 대비 배수**로
+    바꿔서 쓴다(_surge_pairs 참고)."""
     orders = []
     portfolio = view['portfolio']
     sold = set()
     cand_by_code = {s.get('code'): s for s in candidates if s.get('code')}
-    zamt = _zmap([(s['code'], float(s.get('amount', 0) or 0))
-                  for s in candidates if s.get('code')])
+    zamt = _zmap(_surge_pairs(candidates))
 
     # 1. 청산 — 10일 채널 이탈 또는 2*ATR 손절. 고정 익절 없음(터틀은 추세를 끝까지 탄다).
     for code in list(portfolio.keys()):

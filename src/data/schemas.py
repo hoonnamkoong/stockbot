@@ -61,6 +61,7 @@ class StockData(BaseModel):
     posts: list = []  # 상세 게시글 목록
     sparkline_price: list = []  # [V50.3] 최근 N일 종가 (과거->최신순)
     range_history: list = []    # [Sim5] 최근 20영업일 종가 (채널 산출용, 과거->최신순)
+    amount_history: list = []   # [Sim9-1] 최근 20영업일 거래대금(종가x거래량, 과거->최신순)
     tick_power: float = 0.0     # [V60.0] 체결강도 (%)
     bid_ask_ratio: float = 1.0  # [V60.0] 매도호가잔량 / 매수호가잔량 비
     # ── KIS API 보강 필드 ──────────────────────────────

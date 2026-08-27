@@ -114,6 +114,11 @@ jobs:
               https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git state_repo 2>/dev/null; then
             cp state_repo/data/sim_donchian_state.json data/ 2>/dev/null \
               && echo "[EOD] 심9-1 상태 복원" || echo "[EOD] 기존 상태 없음(최초 실행)"
+            # 심11 감시 목록이 찍을 "다음 개장일"은 이 달력으로 정한다. 없으면
+            # 주말 근사로 떨어져 연휴 직전 배치가 휴장일을 찍는다(그 감시 목록은
+            # 아무도 못 읽는다). 원본은 db-data이고 이미 clone했으니 한 줄이면 된다.
+            cp state_repo/data/market_calendar.json data/ 2>/dev/null \
+              && echo "[EOD] 휴장일 달력 복원" || echo "[EOD] 달력 없음 — 주말 근사로 진행"
             rm -rf state_repo
             PYTHONPATH=. python scripts/run_eod_sims.py || echo "[EOD] 실행 실패 — CSV 배포는 계속한다"
           else

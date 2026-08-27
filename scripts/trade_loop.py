@@ -44,6 +44,7 @@ LOOP_BUDGET_SEC는 셋업+배포를 더해도 120초를 넘지 않게 잡아야 
     그래서 10분 격자에서만 갱신한다(scraper.yml과 같은 격자).
 """
 
+import json
 import os
 import sys
 import time
@@ -364,6 +365,59 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
         log(f"[경고] 배포 목록 기록 실패(배포 생략됨): {e}")
 
 
+# EOD 배치 미발화 알림의 억제 간격(분). 하루 한 번만 울리면 충분하다 —
+# 배치는 하루 1회고, 고칠 수 있는 시점도 그날 마감 뒤 한 번뿐이다.
+EOD_STALE_ALERT_COOLDOWN_MIN = 480
+
+
+def eod_batch_is_stale(now_kst, watchlist_date: str | None) -> bool:
+    """전날 EOD 배치가 오늘 세션용 산출물을 남겼는지.
+
+    감시 목록의 날짜 키를 프로브로 쓴다. 배치는 "아직 안 끝난 가장 가까운 세션"을
+    찍으므로(kr_calendar.watchlist_target_date), 오늘 장중에는 그 키가 오늘이어야
+    한다. 뒤처져 있으면 어젯밤 배치가 없었거나 실패한 것이다.
+
+    앞선 키는 장애가 아니다 — 배치가 최근에 돌았다는 뜻이다.
+
+    2026-08-27: eod_data.yml의 cron이 그날 한 번도 발화하지 않았는데, 워크플로가
+    실패한 게 아니라 **아예 안 생겨서** Actions에 빨간 X조차 없었다. 심9-1·심11은
+    그날 판단 자체가 없었고 아무도 몰랐다(silent-failure-needs-a-human-path).
+    """
+    if not watchlist_date:
+        return True
+    return watchlist_date < now_kst.strftime('%Y%m%d')
+
+
+def warn_if_eod_batch_stale(ctx) -> None:
+    """낡았으면 사람에게 알린다. 매매는 멈추지 않는다 — 나머지 심은 정상이다."""
+    try:
+        from src.strategy.simulators.sim11_minervini import WATCHLIST_PATH
+        try:
+            with open(WATCHLIST_PATH, encoding='utf-8-sig') as f:
+                stamped = json.load(f).get('date')
+        except Exception:
+            stamped = None
+        if not eod_batch_is_stale(ctx.now_kst, stamped):
+            return
+        ctx.log(f"[경고] EOD 배치 산출물이 낡았습니다(감시 목록 날짜={stamped or '없음'})")
+        alerts.send_alert_once(
+            'eod_batch_stale',
+            f"<b>EOD 배치가 안 돌았습니다</b>\n\n"
+            f"심11 감시 목록 날짜가 <b>{stamped or '없음'}</b>입니다 "
+            f"(오늘 {ctx.now_kst.strftime('%Y%m%d')} 세션용이 아닙니다).\n"
+            f"어젯밤 eod_data.yml이 안 돌았거나 실패했습니다 — GitHub cron은 "
+            f"발화 자체가 드롭될 수 있습니다.\n\n"
+            f"영향: 심9-1(돈치안)·심11(미너비니)은 오늘 매매 판단이 없습니다.\n"
+            f"복구: eod_data.yml → Run workflow (마감 후라면 그대로, "
+            f"장중이면 force=true).",
+            now=ctx.now_kst,
+            cooldown_min=EOD_STALE_ALERT_COOLDOWN_MIN,
+            log=ctx.log,
+        )
+    except Exception as e:
+        ctx.log(f"[경고] EOD 신선도 점검 실패(무시): {e}")
+
+
 def run_trade_loop(ctx: PipelineContext) -> None:
     storage = StorageManager()
 
@@ -389,6 +443,8 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     if not trading:
         ctx.log(f"오늘은 휴장일({ctx.today_display})입니다. 종료합니다.")
         return
+
+    warn_if_eod_batch_stale(ctx)
 
     # ── 10분 격자: 국면 갱신 + 스크래퍼 깨우기 ────────────────────
     # 매매보다 먼저 한다. 매매가 국면을 읽어 소유권을 정하므로, 갱신이 뒤에 오면

@@ -29,7 +29,13 @@ def _status_of(item) -> str:
     return getattr(item, 'status', '활성')
 
 
-SIM7_BULL_SCORE_MIN = 45.0
+# 2026-08-27: 45.0 → 40.0. 그날 14시 슬롯에 딥다이브 강력매수가 2개 있었는데
+# bull_score 43.1로 미달해 통째로 스킵됐다. 40~45는 "약한 횡보"이고 리포트
+# 강력매수는 국면과 독립된 별도 신호라, 같은 약세를 두 번 세고 있었다.
+# 심의 비중 앵커(ReportFollowerSimulator.GATE=45)는 일부러 그대로 둔다 —
+# 40~45 구간은 최소 비중(WEIGHT_MIN)으로 클램프돼 가장 약한 확신에 가장
+# 작은 포지션이 붙는다.
+SIM7_BULL_SCORE_MIN = 40.0
 
 
 def sim7_should_buy(strong_picks: list, bull_score) -> bool:

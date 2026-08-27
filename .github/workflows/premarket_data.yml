@@ -134,7 +134,20 @@ jobs:
             [ -e "$f" ] && git add "$f" || echo "없음: $f"
           done
           git diff --cached --quiet || git commit -m "data(premarket): $(date +%Y-%m-%d) 프리마켓·미국지수 적재"
-          git push origin db-data
+          # 이 워크플로는 장중에 돈다 — db-data는 trading.yml이 2분마다 밀고 있어
+          # non-fast-forward가 예외가 아니라 정상이다. 남의 커밋 위에 내 것을 얹어
+          # 다시 시도한다(덮어쓰지 않는다). shallow fetch라 unshallow 후 rebase한다.
+          for i in 1 2 3; do
+            if git push origin db-data; then
+              echo "[Deploy] push 성공 (시도 $i)"
+              exit 0
+            fi
+            echo "[Deploy] push 충돌 — rebase 후 재시도 ($i/3)"
+            git fetch --unshallow origin db-data 2>/dev/null || git fetch origin db-data
+            git pull --rebase origin db-data || { echo "[Deploy] rebase 실패"; exit 1; }
+          done
+          echo "[Deploy] push 3회 실패"
+          exit 1
 
   # 장중 호가·체결 적재. 거래대금·가격만으로는 "계속 갈 관심"과 "곧 식을 관심"이
   # 구분되지 않는다는 것을 2026-08-17에 편향 없는 전수 표본으로 확인했다.
@@ -188,4 +201,17 @@ jobs:
             [ -e "$f" ] && git add "$f" || echo "없음: $f"
           done
           git diff --cached --quiet || git commit -m "data(intraday): $(date +%Y-%m-%d) 장중 호가·체결 적재"
-          git push origin db-data
+          # 이 워크플로는 장중에 돈다 — db-data는 trading.yml이 2분마다 밀고 있어
+          # non-fast-forward가 예외가 아니라 정상이다. 남의 커밋 위에 내 것을 얹어
+          # 다시 시도한다(덮어쓰지 않는다). shallow fetch라 unshallow 후 rebase한다.
+          for i in 1 2 3; do
+            if git push origin db-data; then
+              echo "[Deploy] push 성공 (시도 $i)"
+              exit 0
+            fi
+            echo "[Deploy] push 충돌 — rebase 후 재시도 ($i/3)"
+            git fetch --unshallow origin db-data 2>/dev/null || git fetch origin db-data
+            git pull --rebase origin db-data || { echo "[Deploy] rebase 실패"; exit 1; }
+          done
+          echo "[Deploy] push 3회 실패"
+          exit 1

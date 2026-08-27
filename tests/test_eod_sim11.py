@@ -167,3 +167,30 @@ def test_watchlist_is_empty_when_nothing_qualifies():
     with mock.patch('src.strategy.simulators.sim11_minervini.build_watchlist_entry',
                     return_value=None):
         assert build_sim11_watchlist(cands) == {}
+
+
+# ── 감시 목록 날짜 키 (2026-08-27) ─────────────────────
+# _run_sim11이 `time.strftime('%Y%m%d')`로 **배치를 돌린 날**을 찍고 있었다.
+# 배치는 마감 뒤 16시에 도는데 장중 로더는 오늘 날짜로만 읽으니(fail-closed)
+# 그 키가 맞는 사이클이 존재하지 않았다 — 심11은 배포 이래 매수 0건이었다.
+# 이제 kr_calendar.watchlist_target_date()가 "아직 안 끝난 가장 가까운 세션"을 준다.
+
+def test_watchlist_is_stamped_with_next_session_not_batch_day(tmp_path, monkeypatch):
+    """마감 뒤 배치는 다음 거래일 키를 찍는다 — 그날 장중 루프가 읽을 수 있게."""
+    import scripts.run_eod_sims as r
+    from src.strategy.simulators import sim11_minervini as m
+
+    monkeypatch.setattr(m, 'WATCHLIST_PATH', str(tmp_path / 'wl.json'))
+    monkeypatch.setattr(r, 'codes_and_names_from_ohlcv', lambda p: [('005930', '삼성전자')])
+    monkeypatch.setattr(r, 'candidates_from_kis_live', lambda pairs, kis, log=None: [
+        {'code': '005930', 'name': '삼성전자'}])
+    monkeypatch.setattr(r, 'build_sim11_watchlist', lambda c, log=None: {
+        '005930': {'name': '삼성전자', 'pivot_price': 1000.0, 'ma50': 900.0}})
+    monkeypatch.setattr(r, 'KISDataProvider', object, raising=False)
+    monkeypatch.setattr('src.trade.kis_data_provider.KISDataProvider', lambda: object())
+    monkeypatch.setattr(r, 'watchlist_target_date', lambda: '20260828')
+
+    assert r._run_sim11('irrelevant.csv') == 0
+    # 로더는 그 키로만 열어 준다. 배치를 돌린 날(08-27)로는 안 열린다.
+    assert m.load_watchlist('20260828') != {}
+    assert m.load_watchlist('20260827') == {}

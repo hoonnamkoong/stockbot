@@ -29,3 +29,31 @@ def test_does_not_buy_below_the_gate():
 
 def test_no_strong_picks_does_not_buy():
     assert sim7_should_buy([], 90.0) is False
+
+
+# ── 게이트 45.0 → 40.0 (2026-08-27) ────────────────────
+# 08-27 14시 슬롯에 딥다이브 '강력 매수'가 2개 있었는데 bull_score 43.1로 미달해
+# 통째로 스킵됐다. bull_score 40~45는 '약한 횡보'이고, 리포트 강력매수는 국면과
+# 독립된 별도 신호다 — 같은 약세를 두 번 세는 셈이라 게이트를 40으로 내린다.
+#
+# 위쪽 테스트들은 SIM7_BULL_SCORE_MIN을 상징적으로 써서 값이 뭐든 통과한다.
+# 실제 값이 바뀌었는지는 그날의 구체적 점수로 못 박는다.
+
+def test_the_score_that_was_wrongly_skipped_now_buys():
+    """2026-08-27 14:04 슬롯의 실측값. 예전 게이트(45.0)에서는 스킵됐다."""
+    assert sim7_should_buy(PICKS, 43.1) is True
+
+
+def test_weak_market_still_blocks():
+    """내려도 바닥은 있다 — 확실한 약세에서는 여전히 안 산다."""
+    assert sim7_should_buy(PICKS, 39.9) is False
+
+
+def test_weight_at_the_new_gate_is_the_minimum():
+    """심의 비중 앵커(GATE=45)는 그대로 둔다 — 게이트를 내리면서 비중까지
+    올리면 두 가지를 한꺼번에 바꾸는 것이다. 40~45 구간은 최소 비중으로 클램프된다."""
+    from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator
+    sim = ReportFollowerSimulator()
+    assert sim._calc_weight(43.1) == sim.WEIGHT_MIN
+    assert sim._calc_weight(40.0) == sim.WEIGHT_MIN
+    assert sim._calc_weight(100.0) == sim.WEIGHT_MAX

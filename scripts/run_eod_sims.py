@@ -23,10 +23,10 @@ import csv
 import os
 import re
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
+from src.strategy.simulators.kr_calendar import watchlist_target_date  # noqa: E402
 from src.strategy.simulators.sim9_1_donchian import CHANNEL_DAYS  # noqa: E402
 
 DEFAULT_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
@@ -259,9 +259,13 @@ def _run_sim11(path: str) -> int:
         return 1
     entries = build_sim11_watchlist(candidates, log=print)
     from src.strategy.simulators.sim11_minervini import save_watchlist
-    save_watchlist(entries, time.strftime('%Y%m%d'))
+    # 배치를 돌린 날이 아니라 **아직 안 끝난 가장 가까운 세션**을 찍는다.
+    # 마감 뒤 16시 배치가 '오늘'을 찍으면 그 키를 읽을 장중 사이클이 없다 —
+    # 심11이 08-20 배포 이래 매수 0건이던 원인이다(2026-08-27 확인).
+    target = watchlist_target_date()
+    save_watchlist(entries, target)
     print(f'[EOD] 심11 감시 목록 갱신: 유니버스 {len(pairs)}종목, 후보 {len(candidates)}종목, '
-          f'감시 목록 {len(entries)}종목')
+          f'감시 목록 {len(entries)}종목 (날짜 {target})')
     return 0
 
 

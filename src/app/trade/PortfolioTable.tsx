@@ -42,13 +42,14 @@ export default function PortfolioTable({
                         <Table.Th style={{ textAlign: 'right' }}>평단가</Table.Th>
                         <Table.Th style={{ textAlign: 'right' }}>현재가</Table.Th>
                         <Table.Th style={{ textAlign: 'right' }}>체결금액</Table.Th>
+                        <Table.Th style={{ textAlign: 'right' }}>현재금액</Table.Th>
                         <Table.Th style={{ textAlign: 'center' }}>수익률(%)</Table.Th>
                         <Table.Th style={{ textAlign: 'right' }}>손익({currency === 'USD' ? '$' : '원'})</Table.Th>
                     </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                     {holdings.map((h) => {
-                        const { qty, avgPrice, currentPrice, amount, plRate, plAmount, priceKnown } = derivePosition(h);
+                        const { qty, avgPrice, currentPrice, amount, evalAmount, plRate, plAmount, priceKnown } = derivePosition(h);
                         const isSelected = selectedCodes.includes(h.code);
 
                         return (
@@ -81,6 +82,11 @@ export default function PortfolioTable({
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>
                                     <Text size="sm" fw={700}>{formatMoney(amount, currency)}</Text>
+                                </Table.Td>
+                                <Table.Td style={{ textAlign: 'right' }}>
+                                    {evalAmount === null
+                                        ? <Text size="xs" c="dimmed">측정 불가</Text>
+                                        : <Text size="sm" fw={700} c={pnlColor(plAmount)}>{Math.round(evalAmount).toLocaleString()}원</Text>}
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'center' }}>
                                     {/* 시세를 모르면 등락률도 모른다. 0%로 그리면 '안 움직였다'는 거짓이 된다. */}

@@ -87,20 +87,3 @@ def test_us_est_경계():
 def test_us_주말은_닫힌다():
     assert us_session_open(_utc(2026, 8, 29, 15, 0)) is False  # 토
     assert us_session_open(_utc(2026, 8, 30, 15, 0)) is False  # 일
-
-
-def test_us_창이_태스커_창_안에_들어온다():
-    """태스커 창(09:00~06:00 KST)이 미국 세션 전체를 덮는지.
-
-    EDT면 22:30~05:00 KST, EST면 23:30~06:00 KST다. EST 마감이 06:00 KST 정각이라
-    경계에 걸린다 — 이 테스트가 깨지면 태스커 창을 06:10까지 늘려야 한다.
-    """
-    kst = dt.timezone(dt.timedelta(hours=9))
-    for day in (dt.date(2026, 8, 27), dt.date(2026, 1, 15)):   # EDT, EST
-        opens = [t for t in (_utc(day.year, day.month, day.day, h, m)
-                             for h in range(24) for m in (0, 30))
-                 if us_session_open(t)]
-        assert opens, f'{day}에 개장 구간이 없다'
-        for t in opens:
-            hhmm = t.astimezone(kst).strftime('%H%M')
-            assert hhmm >= '0900' or hhmm <= '0600', f'{day} {hhmm} KST가 태스커 창 밖'

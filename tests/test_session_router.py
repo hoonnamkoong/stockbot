@@ -60,3 +60,54 @@ def test_표준_라이브러리만_import한다():
     out = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == '', f'서드파티 import: {out.stdout.strip()}'
+
+
+# ── 태스커 창과의 결합 ──────────────────────────────────────────────
+# 실제 설정: **월~토** 09:00~06:00 KST, 2분 간격. 요일이 월~금이 아니라 월~토인
+# 게 핵심이다 — 금요일 미국장이 KST로 금 22:30~토 05:00(EST면 토 06:00)이라
+# 월~금으로 걸면 금요일 세션을 통째로 놓친다.
+#
+# 라우터를 넓히거나(예: EOD 창을 18시로) 창을 좁히면 이 테스트가 깨진다.
+TASKER_DAYS = range(6)          # 월(0)~토(5)
+TASKER_FROM = (9, 0)
+TASKER_TO = (6, 0)
+
+
+def _tasker_on(t_kst):
+    if t_kst.weekday() not in TASKER_DAYS:
+        return False
+    hm = (t_kst.hour, t_kst.minute)
+    return hm >= TASKER_FROM or hm < TASKER_TO
+
+
+def test_태스커_창이_필요한_시각을_전부_덮는다():
+    kst = dt.timezone(dt.timedelta(hours=9))
+    for label, start in (('EDT', dt.date(2026, 8, 24)), ('EST', dt.date(2026, 1, 12))):
+        needed = 0
+        t = dt.datetime.combine(start, dt.time(0, 0), tzinfo=kst)
+        end = t + dt.timedelta(days=8)
+        while t < end:
+            for key, on in session_router.decide(t.astimezone(dt.timezone.utc)).items():
+                if not on:
+                    continue
+                needed += 1
+                assert _tasker_on(t), (
+                    f'{label} {t:%a %m-%d %H:%M} KST에 {key} 트리거가 필요한데 '
+                    '태스커 창 밖이다')
+            t += dt.timedelta(minutes=2)
+        assert needed > 2000, f'{label} 표본이 너무 적다({needed}) — 창 계산을 확인할 것'
+
+
+def test_금요일_미국장_마감까지_커버된다():
+    """토요일 새벽이 빠지면 금요일 세션을 통째로 놓친다."""
+    kst = dt.timezone(dt.timedelta(hours=9))
+    for label, sat, last in (('EDT', dt.date(2026, 8, 29), '04:58'),
+                             ('EST', dt.date(2026, 1, 17), '05:58')):
+        t = dt.datetime.combine(sat, dt.time(0, 0), tzinfo=kst)
+        covered = [t + dt.timedelta(minutes=2 * i) for i in range(360)
+                   if session_router.decide(
+                       (t + dt.timedelta(minutes=2 * i)).astimezone(dt.timezone.utc))['us']
+                   and _tasker_on(t + dt.timedelta(minutes=2 * i))]
+        assert covered, f'{label}: 토요일 새벽에 미국장 커버가 하나도 없다'
+        assert covered[-1].strftime('%H:%M') == last, (
+            f'{label}: 마지막 커버가 {covered[-1]:%H:%M} (기대 {last})')

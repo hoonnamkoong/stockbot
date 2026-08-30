@@ -44,7 +44,18 @@ def test_라우팅_스텝에_id가_있다():
     steps = _steps(_load('trading.yml'))
     step = steps[_index_of(steps, 'session_router.py')]
     assert step.get('id') == 'route'
-    assert 'GITHUB_OUTPUT' in step['run'], 'kr/us를 스텝 출력으로 내보내야 한다'
+    assert 'GITHUB_OUTPUT' in step['run'], 'kr/us/eod를 스텝 출력으로 내보내야 한다'
+
+
+def test_라우팅_판정이_로그에도_남는다():
+    """리다이렉트만 하면 'kr=false를 썼다'와 '아무것도 안 썼다'가 로그에서 똑같다.
+
+    둘 다 하위 스텝이 전부 스킵된 런으로 보인다. 이 `if:`가 장 밖에서 실전 매매
+    루프가 도는 걸 막는 유일한 방벽이므로 그 둘은 구분돼야 한다.
+    """
+    steps = _steps(_load('trading.yml'))
+    run = steps[_index_of(steps, 'session_router.py')]['run']
+    assert 'tee' in run, f'판정이 로그에 안 남는다: {run.strip()!r}'
 
 
 # ── 국내 경로 ───────────────────────────────────────────────────────

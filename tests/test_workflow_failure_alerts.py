@@ -20,7 +20,8 @@ import os
 import yaml
 
 WF_DIR = os.path.join(os.path.dirname(__file__), '..', '.github', 'workflows')
-EXEMPT = {'tests.yml'}          # CI 실패는 PR에서 보인다
+EXEMPT = {'tests.yml', 'pr_checklist.yml'}   # CI 실패는 PR에서 보인다 —
+                                            # 거기가 사람이 보고 있는 곳이다
 
 
 def _workflows():

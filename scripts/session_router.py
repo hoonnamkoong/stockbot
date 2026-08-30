@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.session_gate import (  # noqa: E402
-    kr_eod_window, kr_session_open, us_session_open)
+    kr_audit_window, kr_eod_window, kr_session_open, us_session_open)
 
 _KST = dt.timezone(dt.timedelta(hours=9))
 
@@ -26,7 +26,8 @@ def decide(now_utc: dt.datetime | None = None) -> dict[str, bool]:
     now_kst = now_utc.astimezone(_KST).replace(tzinfo=None)
     return {'kr': kr_session_open(now_kst),
             'us': us_session_open(now_utc),
-            'eod': kr_eod_window(now_kst)}
+            'eod': kr_eod_window(now_kst),
+            'audit': kr_audit_window(now_kst)}
 
 
 def render() -> str:

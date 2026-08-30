@@ -25,6 +25,14 @@ _KST = dt.timezone(dt.timedelta(hours=9))
 KR_OPEN_HHMM = (9, 0)
 KR_CLOSE_HHMM = (15, 50)
 
+# 산출물 신선도 감사를 돌리는 창 — "어젯밤 뭐가 안 돌았나"를 하루 한 번 받는다.
+#
+# 개장 **전**(08:30)에 두고 싶었지만 태스커 창이 09:00부터라 그 시각엔 트리거가
+# 없다(tests/test_session_router.py의 창 검사가 이걸 잡았다). 개장 직후로 둔다 —
+# 감사는 알려줄 뿐 고쳐주지 않으므로, 사람이 세션 중에 대응할 시간이면 충분하다.
+KR_AUDIT_OPEN_HHMM = (9, 0)
+KR_AUDIT_CLOSE_HHMM = (9, 30)
+
 # 장 마감 뒤 EOD 배치를 깨우는 창. 태스커가 2분마다 때리므로 넓을 필요는 없지만,
 # 트리거 몇 개가 유실돼도 하루 한 번은 걸리도록 1시간을 준다. 실제 중복 방지는
 # scripts/dispatch_eod_data.py의 '오늘 마감 뒤 런이 있나'가 한다.
@@ -44,6 +52,15 @@ def kr_session_open(now_kst: dt.datetime | None = None) -> bool:
     if now_kst.weekday() >= 5:
         return False
     return KR_OPEN_HHMM <= (now_kst.hour, now_kst.minute) < KR_CLOSE_HHMM
+
+
+def kr_audit_window(now_kst: dt.datetime | None = None) -> bool:
+    """평일 08:30~09:00 KST인가 — 개장 전 신선도 감사 창."""
+    if now_kst is None:
+        now_kst = dt.datetime.now(_KST).replace(tzinfo=None)
+    if now_kst.weekday() >= 5:
+        return False
+    return KR_AUDIT_OPEN_HHMM <= (now_kst.hour, now_kst.minute) < KR_AUDIT_CLOSE_HHMM
 
 
 def kr_eod_window(now_kst: dt.datetime | None = None) -> bool:

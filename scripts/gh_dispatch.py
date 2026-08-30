@@ -68,6 +68,18 @@ def list_run_times(wf: str, per_page: int = 100, log=print) -> list[str] | None:
         return None
 
 
+def ran_since(wf: str, since, log=print) -> bool | None:
+    """since(tz 있는 datetime) 이후에 시작한 런이 있는가. 조회 실패는 None."""
+    import datetime as _dt
+    times = list_run_times(wf, log=log)
+    if times is None:
+        return None
+    for raw in times:
+        if _dt.datetime.fromisoformat(raw.replace('Z', '+00:00')) >= since:
+            return True
+    return False
+
+
 def dispatch(wf: str, log=print) -> bool:
     tok = token()
     if not tok:

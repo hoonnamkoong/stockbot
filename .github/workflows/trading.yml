@@ -98,6 +98,20 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: python3 scripts/dispatch_eod_data.py
 
+      # 개장 직후 산출물 신선도 감사를 깨운다 — "실패했나"가 아니라 "나와야 할
+      # 게 나왔나". cron 미발화(②)와 "성공했는데 산출물이 없다"(③)는 실패 알림으로
+      # 안 잡힌다.
+      #
+      # 창(09:00~09:30 KST)에 2분마다 트리거가 오지만 dispatch_data_audit.py가
+      # "오늘 이미 돌았나"를 먼저 봐서 하루 한 번만 나간다.
+      - name: Wake data freshness audit
+        if: steps.route.outputs.audit == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python3 scripts/dispatch_data_audit.py
+
       - name: Set up Python
         if: steps.route.outputs.kr == 'true'
         uses: actions/setup-python@v4

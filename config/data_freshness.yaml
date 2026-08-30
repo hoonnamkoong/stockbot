@@ -69,6 +69,14 @@ outputs:
       미국 심2 감시목록을 장중 루프가 읽는다. 이 파일이 낡으면 us_trading이
       돌았어도 판단 근거가 없다 — 2026-08-27~28 미발화가 이 자리에 걸린다.
 
+  - path: data/us_universe.json
+    producer: us_eod_watchlist.yml
+    calendar: us
+    max_age_sessions: 3
+    why: >
+      미국 상장 종목 목록. 스크리너가 소프트 차단되면 배치가 직전 것을 재사용하고
+      이 파일을 갱신하지 않는다 — 폴백이 며칠씩 이어지면 여기서 드러난다.
+
   # ── 토큰·달력 ─────────────────────────────────────────────────────
   - path: data/market_calendar.json
     producer: token_refresh.yml

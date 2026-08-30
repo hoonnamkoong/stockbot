@@ -7,10 +7,19 @@ ETF·우선주·워런트는 심볼에 `.`/`^`/`/`가 섞이거나 marketCap이 
 """
 import json
 import os
+import time
 
 import requests
 
 NASDAQ_SCREENER_URL = 'https://api.nasdaq.com/api/screener/stocks'
+
+# 소프트 차단 재시도. 2026-08-24·25에 us_eod_watchlist가 이걸로 죽어 미국
+# 워치리스트가 이틀 결손이었고, 미국 심 3개가 그 세션을 통째로 잃었다.
+# HTTP 200에 rows만 비어 오므로 raise_for_status로는 안 걸린다.
+#
+# 4xx/5xx는 재시도하지 않는다 — 소프트 차단과 달리 반복해봐야 차단만 깊어진다.
+SOFT_BLOCK_RETRIES = 4
+SOFT_BLOCK_BACKOFF_SEC = (5, 20, 60)
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'Accept': 'application/json',
@@ -40,18 +49,28 @@ def fetch_us_universe(limit: int = 1000) -> list[dict]:
         'sortColumn': 'marketcap',
         'sortOrder': 'desc',
     }
-    r = requests.get(NASDAQ_SCREENER_URL, params=params, headers=HEADERS, timeout=20)
-    r.raise_for_status()
-    body = r.json()
-    data = (body or {}).get('data') or {}
-    # 현행은 data.table.rows. data.rows는 구 download 모드의 형태로, 되살아날
-    # 경우를 위해 폴백으로만 남긴다.
-    rows = (data.get('table') or {}).get('rows') or data.get('rows')
+    rows = None
+    for attempt in range(SOFT_BLOCK_RETRIES):
+        r = requests.get(NASDAQ_SCREENER_URL, params=params, headers=HEADERS,
+                         timeout=20)
+        r.raise_for_status()      # 4xx/5xx는 여기서 바로 올린다(재시도 안 함)
+        body = r.json()
+        data = (body or {}).get('data') or {}
+        # 현행은 data.table.rows. data.rows는 구 download 모드의 형태로, 되살아날
+        # 경우를 위해 폴백으로만 남긴다.
+        rows = (data.get('table') or {}).get('rows') or data.get('rows')
+        if rows:
+            break
+        if attempt < SOFT_BLOCK_RETRIES - 1:
+            wait = SOFT_BLOCK_BACKOFF_SEC[min(attempt, len(SOFT_BLOCK_BACKOFF_SEC) - 1)]
+            print(f'[US-Universe] 빈 응답(소프트 차단 의심) — {wait}초 뒤 재시도 '
+                  f'({attempt + 1}/{SOFT_BLOCK_RETRIES})')
+            time.sleep(wait)
     if not rows:
         raise RuntimeError(
-            '나스닥 스크리너가 빈 응답을 반환했다(data.table.rows/data.rows가 '
-            'null·비어있음) — HTTP 200이지만 소프트 차단이나 파라미터 변경으로 '
-            '실패했을 가능성이 높다.'
+            f'나스닥 스크리너가 {SOFT_BLOCK_RETRIES}회 연속 빈 응답을 반환했다'
+            '(data.table.rows/data.rows가 null·비어있음) — HTTP 200이지만 '
+            '소프트 차단이나 파라미터 변경으로 실패했을 가능성이 높다.'
         )
     out = []
     for row in rows:

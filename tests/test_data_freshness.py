@@ -116,7 +116,7 @@ def test_db_data에_쓰는_워크플로는_전부_감시된다():
     d = os.path.join(os.path.dirname(__file__), '..', '.github', 'workflows')
     deploying = set()
     for f in os.listdir(d):
-        if not f.endswith('.yml') or f == 'tests.yml':
+        if not f.endswith('.yml') or f in ('tests.yml', 'pr_checklist.yml'):
             continue
         with open(os.path.join(d, f), encoding='utf-8') as fh:
             if 'db_data_repo' in fh.read() or f in ('scraper.yml', 'token_refresh.yml'):

@@ -1,0 +1,31 @@
+name: PR Checklist (배포 후 검증 지점)
+
+# PR이 "배포 후 검증 지점"을 비운 채 올라오는 걸 막는다.
+#
+# 2026-08-30 조사에서 같은 날 두 사례가 나왔다. PR #60은 trading.yml의 rebase
+# 재시도 루프를 프리마켓에 복사하면서 그게 성립하는 전제(전용 클론 격리)를 안
+# 가져왔고, 같은 PR이 붙인 EOD 미발화 감지기는 감시 대상인 장중 루프 **안에**
+# 있었다. 둘 다 "고쳤다"의 근거가 코드 변경이었지 다음 런의 실제 통과가 아니었다.
+#
+# 실패 알림을 붙이지 않는다 — CI 결과는 PR에서 이미 보이고, 거기가 사람이 보고
+# 있는 곳이다(tests.yml과 같은 이유).
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: pr-checklist-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: 배포 후 검증 지점 확인
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python3 scripts/check_pr_checklist.py

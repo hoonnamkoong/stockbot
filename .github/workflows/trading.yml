@@ -54,7 +54,33 @@ jobs:
       - name: Checkout content
         uses: actions/checkout@v3
 
+      # ── 세션 라우팅 ────────────────────────────────────────────────
+      # 태스커는 09:00~06:00 KST에 2분 간격으로 이 워크플로 **하나만** 부른다.
+      # 미국 장중 루프를 GitHub 네이티브 cron으로 돌리던 방식이 2026-08-27부터
+      # 통째로 죽었기 때문이다(발화 18 → 1 → 0건/일, 남은 런도 폐장 뒤라 즉시
+      # 종료 — 목·금 세션 거래 0건). 실패가 아니라 미발화라 내내 초록이었다.
+      #
+      # 설치보다 **앞에** 둔다. 그 창의 절반 이상(15:50~22:30 KST)은 어느 장도
+      # 아니라, 그 트리거들이 checkout만 하고 20초에 끝나야 한다. 그래서
+      # session_router.py는 표준 라이브러리만 쓴다.
+      - name: Route session
+        id: route
+        run: python3 scripts/session_router.py >> "$GITHUB_OUTPUT"
+
+      # 미국 심은 페이퍼다 — 실전 경로보다 먼저, 설치 없이(urllib) 끝낸다.
+      # continue-on-error: 여기서 실패해도 아래 "실전 매매 실패" 알림이 울리면
+      # 안 된다. 미국 쪽 침묵은 세션 밖 감지기가 따로 잡는다
+      # (scripts/check_us_loop_fired.py).
+      - name: Wake US trading loop
+        if: steps.route.outputs.us == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python3 scripts/dispatch_us_trading.py
+
       - name: Set up Python
+        if: steps.route.outputs.kr == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -65,11 +91,13 @@ jobs:
       # google-genai까지 깔면 설치에만 24초가 들고(08-07 실측), 그만큼 루프
       # 예산이 줄어 두 바퀴가 안 돈다 = 1분 매매가 2분 매매로 되돌아간다.
       - name: Install dependencies
+        if: steps.route.outputs.kr == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r scripts/requirements-trade.txt
 
       - name: Fetch remote data (db-data)
+        if: steps.route.outputs.kr == 'true'
         run: |
           # --depth 1: 최신 스냅샷만 필요하다. 2분마다 도는 경로에서 전체 이력을
           # 받으면 그 비용이 매 트리거마다 든다(db-data는 하루 수십 커밋이 쌓인다).
@@ -87,6 +115,7 @@ jobs:
           echo "[System] Remote data synchronized."
 
       - name: Manage KIS Token
+        if: steps.route.outputs.kr == 'true'
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
@@ -94,6 +123,7 @@ jobs:
         run: python scripts/token_manager.py
 
       - name: Run trade loop
+        if: steps.route.outputs.kr == 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -122,7 +152,7 @@ jobs:
       # 국면 파일(sim_libero_state.json 등)은 이 워크플로가 유일 writer이므로
       # 매니페스트에 함께 들어간다(trade_loop가 갱신한 사이클에 한해).
       - name: Deploy state (db-data)
-        if: success()
+        if: success() && steps.route.outputs.kr == 'true'
         run: |
           if [ ! -f data/.lite_deploy_manifest ]; then
             echo "[Deploy] 배포 목록 없음 — 생략"

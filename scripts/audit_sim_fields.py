@@ -36,15 +36,63 @@ SKIP_SIMS = {'sim0_libero', 'sim10_orchestrator', 'sim7_report_follower'}
 SELF_FILLED = {('sim3_risk', 'per_ttm'), ('sim3_risk', 'pbr_ttm')}
 # 없는 게 **정상이고 코드가 대비하고 있는** 필드. 근거를 같이 적는다.
 KNOWN_ABSENT = {
+    # 심 이름이 '*'이면 전 심에 적용된다. 헬퍼 안의 폴백처럼 특정 심의 문제가
+    # 아닌 필드를 심마다 적으면 목록이 금방 낡는다.
+    ('*', 'daily_change_rate'):
+        'BaseSimulator.parse_change_rate가 change_rate의 **폴백**으로만 읽는다 '
+        "(.get('change_rate', .get('daily_change_rate', 0))). 없는 게 정상이다.",
     ('sim8_accumulation', 'unique_posters'):
         '유니버스가 외인·기관 순매수 상위라 버즈 필드가 없다. '
         '_crowd_baseline()이 버즈 기준선으로 폴백한다(설계상 의도).',
 }
 
 
-def fields_read(path):
+def _receiver_re(names):
+    """주어진 수신자 이름들에 대한 `<name>.get('key')` 패턴."""
+    return re.compile(r"(?:%s)\.get\(\s*['\"]([a-z_0-9]+)['\"]"
+                      % '|'.join(re.escape(n) for n in sorted(names, key=len, reverse=True)))
+
+
+def _helper_sources(module_name):
+    """심 모듈이 들고 있는 **다른 모듈 소속** 헬퍼의 (소스, 파라미터 이름들).
+
+    심6은 `_parse_change_rate = BaseSimulator.parse_change_rate`로 필드를 읽는다.
+    필드를 읽는 코드가 심 파일에 없으니 파일 텍스트만 훑으면 change_rate를 통째로
+    놓친다 — 심6이 6주간 거래 0건이던 바로 그 필드다.
+
+    수신자 이름은 헬퍼의 **시그니처에서 가져온다**(parse_change_rate의 파라미터는
+    `stock_data`다). 이름 목록을 여기 하드코딩하면 다음 헬퍼에서 또 어긋난다.
+    """
+    import importlib
+    import inspect
+    try:
+        mod = importlib.import_module(f'src.strategy.simulators.{module_name}')
+    except Exception:
+        return
+    for obj in vars(mod).values():
+        if not inspect.isroutine(obj):
+            continue
+        if not (getattr(obj, '__module__', '') or '').startswith('src.'):
+            continue
+        if inspect.getmodule(obj) is mod:
+            continue          # 심 파일 본문은 이미 텍스트로 훑었다
+        try:
+            src = inspect.getsource(obj)
+            params = [p for p in inspect.signature(obj).parameters]
+        except (OSError, TypeError, ValueError):
+            continue          # 소스를 못 읽는 헬퍼가 있어도 감사 전체는 살린다
+        if params:
+            yield src, params
+
+
+def fields_read(path, module_name=None):
+    """심이 읽는 후보 필드 이름들. 헬퍼를 통한 간접 접근까지 본다."""
     src = open(path, encoding='utf-8').read()
-    return sorted(set(FIELD_RE.findall(src)) - PORTFOLIO_KEYS)
+    found = set(FIELD_RE.findall(src))
+    if module_name:
+        for helper_src, params in _helper_sources(module_name):
+            found |= set(_receiver_re(params).findall(helper_src))
+    return sorted(found - PORTFOLIO_KEYS)
 
 
 def load_sim(module_name):
@@ -86,7 +134,7 @@ def main():
         name = os.path.basename(path)[:-3]
         if name in SKIP_SIMS or (only and name != only):
             continue
-        keys = fields_read(path)
+        keys = fields_read(path, name)
         if not keys:
             continue
         cls = load_sim(name)
@@ -116,8 +164,9 @@ def main():
             if (name, k) in SELF_FILLED:
                 print(f'  {k:22} (심이 직접 조회 — 보강 대상 아님)')
                 continue
-            if (name, k) in KNOWN_ABSENT:
-                print(f'  {k:22} (결손이 정상) {KNOWN_ABSENT[(name, k)]}')
+            known = KNOWN_ABSENT.get((name, k)) or KNOWN_ABSENT.get(('*', k))
+            if known:
+                print(f'  {k:22} (결손이 정상) {known}')
                 continue
             if missing == n:
                 flag = '  ← 키가 아예 없다'

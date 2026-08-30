@@ -125,18 +125,27 @@ jobs:
         # 게이트를 걸지 않는다 — 한국 휴장일에도 미국 지수는 쌓여야 한다.
         # 바뀐 게 없으면 diff --cached가 걸러낸다.
         run: |
-          git config user.name  "StockBot"
-          git config user.email "bot@stockbot.com"
-          git fetch origin db-data --depth=1 || true
-          git checkout -B db-data origin/db-data 2>/dev/null || git checkout -B db-data
+          # **전용 클론 안에서** 돈다. 예전에는 main 워킹트리의 브랜치를 db-data로
+          # 갈아타고 거기에 커밋했는데, grafted(shallow) 커밋 위에 얹힌 그 커밋이
+          # unshallow 뒤 rebase에서 워킹트리 이력 전체(1287커밋)를 재생하려 들고
+          # 2026년 초 커밋에서 매번 충돌했다 — 2026-08-16 도입 이래 10런 중 9번이
+          # 그렇게 죽어 프리마켓 산출물이 db-data에 하나도 안 올라갔다.
+          git config --global user.name  "StockBot"
+          git config --global user.email "bot@stockbot.com"
+          repo_url="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git clone --depth 1 --branch db-data "$repo_url" db_data_repo || {
+            echo "[Deploy] db-data 클론 실패"; exit 1; }
+          mkdir -p db_data_repo/data
           # 여러 경로를 한 줄로 add 하면 하나만 없어도 전체가 실패한다(2026-08-05 사고).
           for f in data/us_daily.csv data/investor_flows.csv data/nxt_*.csv data/premarket_daily.csv data/premarket_universe.csv data/premarket_news_*.csv; do
-            [ -e "$f" ] && git add "$f" || echo "없음: $f"
+            [ -e "$f" ] && cp "$f" db_data_repo/data/ || echo "없음: $f"
           done
-          git diff --cached --quiet || git commit -m "data(premarket): $(date +%Y-%m-%d) 프리마켓·미국지수 적재"
-          # 이 워크플로는 장중에 돈다 — db-data는 trading.yml이 2분마다 밀고 있어
-          # non-fast-forward가 예외가 아니라 정상이다. 남의 커밋 위에 내 것을 얹어
-          # 다시 시도한다(덮어쓰지 않는다). shallow fetch라 unshallow 후 rebase한다.
+          cd db_data_repo
+          git add -A data/
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "data(premarket): $(date +%Y-%m-%d) 프리마켓·미국지수 적재"
+          # db-data는 trading.yml이 2분마다 밀고 있어 non-fast-forward가 예외가
+          # 아니라 정상이다. 남의 커밋 위에 내 것을 얹어 다시 시도한다(덮어쓰지 않는다).
           for i in 1 2 3; do
             if git push origin db-data; then
               echo "[Deploy] push 성공 (시도 $i)"
@@ -149,10 +158,6 @@ jobs:
           echo "[Deploy] push 3회 실패"
           exit 1
 
-  # 장중 호가·체결 적재. 거래대금·가격만으로는 "계속 갈 관심"과 "곧 식을 관심"이
-  # 구분되지 않는다는 것을 2026-08-17에 편향 없는 전수 표본으로 확인했다.
-  # 호가는 체결 **전**의 의사라 "이미 가격에 반영됨"의 바깥에 있다. 과거가 없으므로
-  # 지금부터 쌓는다. 매매하지 않는다 — 수집 전용.
   intraday:
     needs: collect
     runs-on: ubuntu-latest
@@ -193,17 +198,27 @@ jobs:
       - name: 커밋 (db-data)
         if: steps.univ.outputs.ok == 'true'
         run: |
-          git config user.name  "StockBot"
-          git config user.email "bot@stockbot.com"
-          git fetch origin db-data --depth=1 || true
-          git checkout -B db-data origin/db-data 2>/dev/null || git checkout -B db-data
+          # **전용 클론 안에서** 돈다. 예전에는 main 워킹트리의 브랜치를 db-data로
+          # 갈아타고 거기에 커밋했는데, grafted(shallow) 커밋 위에 얹힌 그 커밋이
+          # unshallow 뒤 rebase에서 워킹트리 이력 전체(1287커밋)를 재생하려 들고
+          # 2026년 초 커밋에서 매번 충돌했다 — 2026-08-16 도입 이래 10런 중 9번이
+          # 그렇게 죽어 프리마켓 산출물이 db-data에 하나도 안 올라갔다.
+          git config --global user.name  "StockBot"
+          git config --global user.email "bot@stockbot.com"
+          repo_url="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git clone --depth 1 --branch db-data "$repo_url" db_data_repo || {
+            echo "[Deploy] db-data 클론 실패"; exit 1; }
+          mkdir -p db_data_repo/data
+          # 여러 경로를 한 줄로 add 하면 하나만 없어도 전체가 실패한다(2026-08-05 사고).
           for f in data/rt_intraday_*.csv; do
-            [ -e "$f" ] && git add "$f" || echo "없음: $f"
+            [ -e "$f" ] && cp "$f" db_data_repo/data/ || echo "없음: $f"
           done
-          git diff --cached --quiet || git commit -m "data(intraday): $(date +%Y-%m-%d) 장중 호가·체결 적재"
-          # 이 워크플로는 장중에 돈다 — db-data는 trading.yml이 2분마다 밀고 있어
-          # non-fast-forward가 예외가 아니라 정상이다. 남의 커밋 위에 내 것을 얹어
-          # 다시 시도한다(덮어쓰지 않는다). shallow fetch라 unshallow 후 rebase한다.
+          cd db_data_repo
+          git add -A data/
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "data(intraday): $(date +%Y-%m-%d) 장중 호가·체결 적재"
+          # db-data는 trading.yml이 2분마다 밀고 있어 non-fast-forward가 예외가
+          # 아니라 정상이다. 남의 커밋 위에 내 것을 얹어 다시 시도한다(덮어쓰지 않는다).
           for i in 1 2 3; do
             if git push origin db-data; then
               echo "[Deploy] push 성공 (시도 $i)"

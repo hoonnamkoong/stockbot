@@ -1,36 +1,28 @@
 """US Sim1(이후 US 심 전체) 장중 페이퍼 체결 루프.
 
-국내(trading.yml)는 태스커가 2분마다 repository_dispatch로 깨우는데, 그건
-GitHub Actions 네이티브 cron이 부하 시 밀리는 지연이 **실손실**로 이어지기
-때문이다. US 심은 페이퍼(자본 이동 없음)라 그 제약이 없다 — 네이티브 cron +
-zoneinfo 게이트로 충분하고, 사용자 폰(태스커)이 한국시간 밤새 깨어 있을 필요가
-없다.
+발화는 태스커가 한다. trading.yml이 09:00~06:00 KST 2분 트리거를 받아
+세션을 가르고(src/session_gate.py), 미국장이면 us_trading.yml을 dispatch한다.
+
+예전에는 "US 심은 페이퍼라 네이티브 cron으로 충분하다"고 봤는데 그게 틀렸다.
+2026-08-27부터 `*/5 13-21` cron 발화 자체가 드롭됐고(18 → 1 → 0건/일), 남은
+런마저 폐장 뒤라 즉시 종료해 목·금 세션 거래가 0건이었다. 실패가 아니라
+미발화라 Actions는 내내 초록이었다. cron은 이제 30분 간격 백업으로만 남는다.
 
     PYTHONPATH=. python scripts/us_trade_loop.py
 """
 import datetime as dt
 import os
 import sys
-from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src import alerts  # noqa: E402
 from src.data.us_ohlcv import fetch_current_quote  # noqa: E402
+from src.session_gate import us_session_open as is_us_market_open  # noqa: E402,F401
 from src.strategy.us_registry import get_active_us_simulators  # noqa: E402
 
-_NY = ZoneInfo('America/New_York')
-
-
-def is_us_market_open(now_utc: dt.datetime | None = None) -> bool:
-    """평일 09:30~16:00 ET. zoneinfo가 서머타임을 자동 반영한다."""
-    now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
-    local = now_utc.astimezone(_NY)
-    if local.weekday() >= 5:  # 토(5)·일(6)
-        return False
-    open_t = local.replace(hour=9, minute=30, second=0, microsecond=0)
-    close_t = local.replace(hour=16, minute=0, second=0, microsecond=0)
-    return open_t <= local < close_t
+# 판정은 src/session_gate.py 하나에 있다. 라우팅 스텝(trading.yml)이 pip install
+# 앞에서 같은 판정을 해야 하는데, 이 모듈은 requests·yfinance를 끌고 온다.
 
 
 def run_cycle(simulators, fetch_quote) -> dict[str, int]:

@@ -12,79 +12,35 @@ dispatch하면 concurrency 그룹(us-trading)에 런이 쌓이고, 세 번째가
 취소되는 손해는 사이클 하나다. 이 선택 때문에 '영영 안 부름'이 조용해질 수
 있어, 세션 밖 미발화 감지기(scripts/check_us_loop_fired.py)가 짝이다.
 """
-import io
-import json
 from unittest import mock
 
 from scripts import dispatch_us_trading as d
 
 
-class _Res(io.BytesIO):
-    def __init__(self, payload, status=200):
-        super().__init__(json.dumps(payload).encode())
-        self.status = status
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        return False
+def test_토큰이_없으면_부르지_않는다():
+    with mock.patch.object(d.gh, 'token', return_value=None):
+        assert d.dispatch_us_trading(log=lambda *_: None) == 'no-token'
 
 
-def _env(monkeypatch):
-    monkeypatch.setenv('GITHUB_TOKEN', 't0ken')
-    monkeypatch.setenv('GITHUB_REPOSITORY', 'owner/repo')
-    monkeypatch.setenv('GITHUB_REF_NAME', 'main')
-
-
-def test_토큰이_없으면_부르지_않는다(monkeypatch):
-    monkeypatch.delenv('GH_PAT', raising=False)
-    monkeypatch.delenv('GITHUB_TOKEN', raising=False)
-    assert d.dispatch_us_trading(log=lambda *_: None) == 'no-token'
-
-
-def test_이미_실행_중이면_생략한다(monkeypatch):
-    _env(monkeypatch)
-    with mock.patch.object(d.request, 'urlopen',
-                           return_value=_Res({'total_count': 1})) as up:
+def test_이미_실행_중이면_생략한다():
+    with mock.patch.object(d.gh, 'token', return_value='t'),          mock.patch.object(d.gh, 'is_running', return_value=True),          mock.patch.object(d.gh, 'dispatch') as post:
         assert d.dispatch_us_trading(log=lambda *_: None) == 'skipped'
-    # POST가 나가지 않았는지 — 조회 GET만 있어야 한다.
-    assert all(getattr(c.args[0], 'method', 'GET') != 'POST' for c in up.call_args_list)
+    post.assert_not_called()
 
 
-def test_한가하면_dispatch한다(monkeypatch):
-    _env(monkeypatch)
-    calls = []
-
-    def fake_urlopen(req, timeout=None):
-        calls.append(req)
-        if req.get_method() == 'POST':
-            return _Res({}, status=204)
-        return _Res({'total_count': 0})
-
-    with mock.patch.object(d.request, 'urlopen', side_effect=fake_urlopen):
-        assert d.dispatch_us_trading(log=lambda *_: None) == 'dispatched'
-    post = [c for c in calls if c.get_method() == 'POST']
-    assert len(post) == 1
-    assert post[0].full_url.endswith('/workflows/us_trading.yml/dispatches')
-    assert json.loads(post[0].data)['ref'] == 'main'
-
-
-def test_조회_실패면_부르지_않는다(monkeypatch):
+def test_조회_실패면_부르지_않는다():
     """fail-open이면 대기열이 취소돼 사이클이 사라진다."""
-    _env(monkeypatch)
-    with mock.patch.object(d.request, 'urlopen', side_effect=OSError('boom')) as up:
+    with mock.patch.object(d.gh, 'token', return_value='t'),          mock.patch.object(d.gh, 'is_running', return_value=None),          mock.patch.object(d.gh, 'dispatch') as post:
         assert d.dispatch_us_trading(log=lambda *_: None) == 'skipped'
-    assert all(c.args[0].get_method() != 'POST' for c in up.call_args_list)
+    post.assert_not_called()
 
 
-def test_dispatch_실패는_결과로_드러난다(monkeypatch):
-    _env(monkeypatch)
+def test_한가하면_dispatch한다():
+    with mock.patch.object(d.gh, 'token', return_value='t'),          mock.patch.object(d.gh, 'is_running', return_value=False),          mock.patch.object(d.gh, 'dispatch', return_value=True) as post:
+        assert d.dispatch_us_trading(log=lambda *_: None) == 'dispatched'
+    post.assert_called_once_with('us_trading.yml', log=mock.ANY)
 
-    def fake_urlopen(req, timeout=None):
-        if req.get_method() == 'POST':
-            raise OSError('403')
-        return _Res({'total_count': 0})
 
-    with mock.patch.object(d.request, 'urlopen', side_effect=fake_urlopen):
+def test_dispatch_실패는_결과로_드러난다():
+    with mock.patch.object(d.gh, 'token', return_value='t'),          mock.patch.object(d.gh, 'is_running', return_value=False),          mock.patch.object(d.gh, 'dispatch', return_value=False):
         assert d.dispatch_us_trading(log=lambda *_: None) == 'failed'

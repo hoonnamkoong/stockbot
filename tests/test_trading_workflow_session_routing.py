@@ -94,6 +94,28 @@ def test_us_trading_cron은_백업_간격이다():
         assert len(minute.split(',')) <= 2, f'{expr!r} — 시간당 3회 이상'
 
 
+def test_마감_뒤에_eod_배치를_깨운다():
+    """eod_data.yml cron이 2026-08-27부터 11~12시간 밀렸다. 그 배치는 심9-1·심11의
+    다음 세션 감시목록을 만들어, 지연이 09:00 KST를 넘기면 두 심이 세션을 잃는다."""
+    steps = _steps(_load('trading.yml'))
+    step = steps[_index_of(steps, 'dispatch_eod_data.py')]
+    assert "steps.route.outputs.eod == 'true'" in (step.get('if') or '')
+
+
+def test_eod_배치에_동시실행_방지가_있다():
+    """태스커(2분 간격)와 cron 백업이 겹치면 db-data push에서 서로 밟는다."""
+    wf = _load('eod_data.yml')
+    assert (wf.get('concurrency') or {}).get('group'), 'concurrency 그룹이 없다'
+
+
+def test_토큰_발급이_직렬화된다():
+    """refresh_token dispatch가 같은 초에 여러 번 온다. KIS는 분당 1회만 발급한다."""
+    wf = _load('token_refresh.yml')
+    assert (wf.get('concurrency') or {}).get('group'), 'concurrency 그룹이 없다'
+    assert (wf.get('concurrency') or {}).get('cancel-in-progress') is False, (
+        '발급 도중에 끊으면 발급됐는데 저장 안 된 상태가 남는다')
+
+
 # ── 미발화 감지기 ───────────────────────────────────────────────────
 def test_감지기는_감시대상과_다른_워크플로에_있다():
     """장중 루프 안에 두면 루프가 안 돌 때 감지기도 안 돈다(2026-08-27의 교훈)."""

@@ -25,6 +25,12 @@ _KST = dt.timezone(dt.timedelta(hours=9))
 KR_OPEN_HHMM = (9, 0)
 KR_CLOSE_HHMM = (15, 50)
 
+# 장 마감 뒤 EOD 배치를 깨우는 창. 태스커가 2분마다 때리므로 넓을 필요는 없지만,
+# 트리거 몇 개가 유실돼도 하루 한 번은 걸리도록 1시간을 준다. 실제 중복 방지는
+# scripts/dispatch_eod_data.py의 '오늘 마감 뒤 런이 있나'가 한다.
+KR_EOD_OPEN_HHMM = (16, 0)
+KR_EOD_CLOSE_HHMM = (17, 0)
+
 # 미국 정규장. zoneinfo가 서머타임을 자동 반영하므로 ET로 적는다.
 US_OPEN_HHMM = (9, 30)
 US_CLOSE_HHMM = (16, 0)
@@ -38,6 +44,15 @@ def kr_session_open(now_kst: dt.datetime | None = None) -> bool:
     if now_kst.weekday() >= 5:
         return False
     return KR_OPEN_HHMM <= (now_kst.hour, now_kst.minute) < KR_CLOSE_HHMM
+
+
+def kr_eod_window(now_kst: dt.datetime | None = None) -> bool:
+    """평일 16:00~17:00 KST인가 — 장 마감 뒤 EOD 배치를 깨우는 창."""
+    if now_kst is None:
+        now_kst = dt.datetime.now(_KST).replace(tzinfo=None)
+    if now_kst.weekday() >= 5:
+        return False
+    return KR_EOD_OPEN_HHMM <= (now_kst.hour, now_kst.minute) < KR_EOD_CLOSE_HHMM
 
 
 def us_session_open(now_utc: dt.datetime | None = None) -> bool:

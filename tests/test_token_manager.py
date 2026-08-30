@@ -124,3 +124,46 @@ def test_issue_new_token_does_not_retry_on_explicit_rejection(monkeypatch):
 
     assert tm.issue_new_token() is None
     assert len(attempts) == 1
+
+
+# ── 동시 트리거(EGW00133) ────────────────────────────────────────────
+# repository_dispatch(refresh_token)가 같은 초에 여러 번 들어온다: 2026-08-30
+# 10:59:01Z에 2건(1성공 1실패), 08-23 11:13:34~45에 4건(1성공 3실패). KIS는 토큰
+# 발급을 분당 1회로 제한하므로(EGW00133) 늦게 도착한 런은 반드시 거부된다.
+#
+# 발급은 실제로 성공했는데 런만 빨갛다 — 그 빨강이 진짜 장애와 섞인다.
+# 형제 런이 **방금** 발급해 저장소에 넣어 뒀다면 이 런의 목적은 이미 달성된 것이다.
+# '방금'을 요구하는 게 핵심이다: 오래된(그러나 아직 안 만료된) 토큰까지 성공으로
+# 봐주면 진짜 발급 실패가 조용해진다.
+
+def _cache_issued_minutes_ago(minutes):
+    issued = tm.get_current_kst_time() - tm.timedelta(minutes=minutes)
+    return {"access_token": "abc",
+            "issued_at": issued.isoformat(),
+            "expires_at": (issued + tm.timedelta(hours=24)).isoformat()}
+
+
+def test_형제_런이_방금_발급했으면_성공으로_본다(monkeypatch):
+    monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
+    monkeypatch.setattr(tm, "load_token_cache", lambda: _cache_issued_minutes_ago(1))
+    monkeypatch.setattr(tm, "issue_new_token", lambda: None)   # EGW00133
+    monkeypatch.setattr(tm, "save_token_cache", lambda t: None)
+
+    assert tm.manage() is True
+
+
+def test_오래된_토큰은_발급실패를_덮지_않는다(monkeypatch):
+    """아직 안 만료됐어도 '방금 발급'이 아니면 진짜 실패다 — 조용해지면 안 된다."""
+    monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
+    monkeypatch.setattr(tm, "load_token_cache", lambda: _cache_issued_minutes_ago(600))
+    monkeypatch.setattr(tm, "issue_new_token", lambda: None)
+
+    assert tm.manage() is False
+
+
+def test_토큰이_아예_없으면_실패다(monkeypatch):
+    monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
+    monkeypatch.setattr(tm, "load_token_cache", lambda: None)
+    monkeypatch.setattr(tm, "issue_new_token", lambda: None)
+
+    assert tm.manage() is False

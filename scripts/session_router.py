@@ -14,7 +14,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.session_gate import kr_session_open, us_session_open  # noqa: E402
+from src.session_gate import (  # noqa: E402
+    kr_eod_window, kr_session_open, us_session_open)
 
 _KST = dt.timezone(dt.timedelta(hours=9))
 
@@ -23,7 +24,9 @@ def decide(now_utc: dt.datetime | None = None) -> dict[str, bool]:
     now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
     # 국내 게이트는 naive KST를 받는다(PipelineContext.now_kst와 같은 표현).
     now_kst = now_utc.astimezone(_KST).replace(tzinfo=None)
-    return {'kr': kr_session_open(now_kst), 'us': us_session_open(now_utc)}
+    return {'kr': kr_session_open(now_kst),
+            'us': us_session_open(now_utc),
+            'eod': kr_eod_window(now_kst)}
 
 
 def render() -> str:

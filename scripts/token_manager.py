@@ -24,6 +24,12 @@ NET_RETRIES = 3
 NET_BACKOFF_SEC = (5, 15)  # 시도 사이 대기 (마지막 시도 뒤에는 대기하지 않음)
 
 
+# 형제 런이 "방금" 발급했다고 볼 창. repository_dispatch(refresh_token)가 같은 초에
+# 여러 번 도착하는데(2026-08-30 2건, 08-23 4건) KIS는 분당 1회만 발급한다(EGW00133).
+# 넉넉히 잡되, 오래된 토큰이 진짜 발급 실패를 덮지 않도록 짧게 유지한다.
+SIBLING_ISSUE_WINDOW_MIN = 10
+
+
 class TokenSourceUnavailable(Exception):
     """네트워크 문제로 토큰 저장소에 닿지 못함 — 토큰의 유효 여부를 알 수 없는 상태."""
 
@@ -201,6 +207,29 @@ def is_token_valid(cache):
         pass
     return False
 
+def _token_issued_recently(window_min=SIBLING_ISSUE_WINDOW_MIN):
+    """저장소에 window_min분 이내에 발급된 **유효한** 토큰이 있는가.
+
+    '아직 안 만료됨'이 아니라 '방금 발급됨'을 본다. 만료 전이기만 하면 성공으로
+    봐주면 진짜 발급 실패가 조용해진다.
+    """
+    from datetime import timezone
+    try:
+        cache = load_token_cache()
+    except TokenSourceUnavailable:
+        return False
+    if not is_token_valid(cache):
+        return False
+    try:
+        issued = datetime.fromisoformat(
+            str(cache.get('issued_at', '')).replace('Z', '+00:00'))
+    except ValueError:
+        return False
+    if issued.tzinfo is None:
+        issued = issued.replace(tzinfo=timezone(timedelta(hours=9)))
+    return get_current_kst_time() - issued <= timedelta(minutes=window_min)
+
+
 def manage():
     print(f"\n[TokenManager] --- KIS 토큰 상태 점검 ({get_current_kst_time().strftime('%Y-%m-%d %H:%M:%S')} KST) ---")
     
@@ -235,6 +264,14 @@ def manage():
             sys.exit(0) # 갱신 모드일 때는 여기서 종료
         return True
     
+    # 발급이 거부됐다. 같은 초에 들어온 형제 런이 방금 발급했을 수 있다 —
+    # 그 경우 이 런의 목적은 이미 달성됐고, 실패로 두면 중복 트리거마다 빨간 런이
+    # 남아 진짜 장애와 섞인다.
+    if _token_issued_recently():
+        print("[TokenManager] * 발급은 거부됐지만 저장소에 방금 발급된 토큰이 "
+              "있습니다 — 동시 트리거로 봅니다.")
+        return True
+
     print("[TokenManager] ❌ 토큰 관리 실패")
     return False
 

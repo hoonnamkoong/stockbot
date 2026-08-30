@@ -79,6 +79,21 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: python3 scripts/dispatch_us_trading.py
 
+      # 장 마감 뒤 EOD 배치를 깨운다. eod_data.yml의 cron(`0 7 * * 1-5`)은 평소
+      # 40~57분 지연이었는데 2026-08-27부터 11~12시간으로 벌어졌다. 그 배치는
+      # 심9-1·심11의 **다음 세션 감시목록**을 만들기 때문에, 지연이 다음 09:00
+      # KST를 넘기면 두 심이 그 세션을 통째로 잃는다.
+      #
+      # 창(16:00~17:00 KST)에 2분마다 트리거가 들어오지만 실제 dispatch는 한 번만
+      # 나간다 — dispatch_eod_data.py가 '오늘 마감 뒤 런이 있나'를 먼저 본다.
+      - name: Wake EOD batch
+        if: steps.route.outputs.eod == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python3 scripts/dispatch_eod_data.py
+
       - name: Set up Python
         if: steps.route.outputs.kr == 'true'
         uses: actions/setup-python@v4

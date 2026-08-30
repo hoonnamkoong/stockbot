@@ -38,6 +38,8 @@ jobs:
       KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
     permissions:
       contents: write
+      # 실패 알림이 직전 런의 결과를 읽는다(연속 실패 억제).
+      actions: read
     steps:
       - uses: actions/checkout@v4
 
@@ -158,6 +160,18 @@ jobs:
           echo "[Deploy] push 3회 실패"
           exit 1
 
+      # 실패 **연속당 1통**이다. 런마다 보내면 지속 실패에 수백 통이 나가고,
+      # 도배는 침묵과 같다 — scripts/notify_workflow_failure.py가 직전 완료 런의
+      # 결과를 보고 억제한다. cancelled에는 걸리지 않는다(if: failure()).
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: premarket_data.yml
+        run: python3 scripts/notify_workflow_failure.py
+
   intraday:
     needs: collect
     runs-on: ubuntu-latest
@@ -169,6 +183,8 @@ jobs:
       KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
     permissions:
       contents: write
+      # 실패 알림이 직전 런의 결과를 읽는다(연속 실패 억제).
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -230,3 +246,15 @@ jobs:
           done
           echo "[Deploy] push 3회 실패"
           exit 1
+
+      # 실패 **연속당 1통**이다. 런마다 보내면 지속 실패에 수백 통이 나가고,
+      # 도배는 침묵과 같다 — scripts/notify_workflow_failure.py가 직전 완료 런의
+      # 결과를 보고 억제한다. cancelled에는 걸리지 않는다(if: failure()).
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: premarket_data.yml
+        run: python3 scripts/notify_workflow_failure.py

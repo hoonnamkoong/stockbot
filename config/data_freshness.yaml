@@ -1,0 +1,89 @@
+# 산출물 신선도 매니페스트 — "나와야 할 게 나왔나"
+#
+# scripts/audit_data_freshness.py가 매 거래일 아침(08:30~09:00 KST) 이 목록을 훑고,
+# 기대 주기를 어긴 항목을 텔레그램으로 보낸다.
+#
+# 고르는 기준: **결정과 무관하게 매번 나와야 하는 산출물.** 심 상태 파일은 값이
+# 바뀔 때만 커밋되므로 안 사고 안 판 심이 정지처럼 보인다 — 넣지 않는다.
+#
+# 워크플로마다 최소 하나씩 둔다. 하나가 조용히 산출을 멈추면 걸려야 한다
+# (tests/test_data_freshness.py가 이 커버리지를 강제한다).
+#
+#   max_age_sessions: 마지막 갱신 뒤에 마감된 거래일이 이 수를 넘으면 결손
+#   calendar: kr(=KIS chk-holiday 달력) | us(평일 근사)
+outputs:
+  # ── 국내 장중 (태스커 → trading.yml) ──────────────────────────────
+  - path: data/sim_libero_state.json
+    producer: trading.yml
+    calendar: kr
+    max_age_sessions: 1
+    why: 리베로 국면. 10분 격자마다 갱신되므로 멈추면 장중 루프가 안 돈 것이다.
+
+  - path: data/regime_observations_*.csv
+    producer: scraper.yml
+    calendar: kr
+    max_age_sessions: 1
+    why: >
+      국면 관측 이력. 월별로 분할돼 있어 **반드시 글롭**이어야 한다 —
+      리터럴 data/regime_observations.csv는 분할 이후 안 쓰이는 파일이라
+      영원히 낡음으로 뜬다(2026-08-30 이 매니페스트 초안이 실제로 그랬다).
+
+  # ── 국내 EOD ──────────────────────────────────────────────────────
+  - path: data/kospi_top100_close.csv
+    producer: eod_data.yml
+    calendar: kr
+    max_age_sessions: 1
+    why: 종가 CSV. 리베로 trend(ADX 근사)의 입력이라 끊기면 국면이 굳는다.
+
+  - path: data/sim11_watchlist.json
+    producer: eod_data.yml
+    calendar: kr
+    max_age_sessions: 1
+    why: 심11(미너비니) 감시목록. 없으면 그 세션 매수 판단이 통째로 없다.
+
+  # ── 프리마켓 (2026-08-16~08-30 배포가 통째로 실패해 하나도 안 올라왔다) ──
+  - path: data/premarket_daily.csv
+    producer: premarket_data.yml
+    calendar: kr
+    max_age_sessions: 1
+    why: 프리마켓 적재. 배포 격리 버그로 2주간 db-data에 존재조차 안 했다.
+
+  - path: data/us_daily.csv
+    producer: premarket_data.yml
+    calendar: kr
+    max_age_sessions: 2
+    why: 미국 지수. 국면 판정 입력이며 한국 휴장일에도 쌓여야 한다.
+
+  # ── 미국 ──────────────────────────────────────────────────────────
+  - path: data/sim_us1_minervini_watchlist.json
+    producer: us_eod_watchlist.yml
+    calendar: us
+    max_age_sessions: 2
+    why: 미국 심1 감시목록. 나스닥 스크리너 소프트 차단으로 08-24·25에 결손이었다.
+
+  - path: data/sim_us2_donchian_watchlist.json
+    producer: us_trading.yml
+    calendar: us
+    max_age_sessions: 2
+    why: >
+      미국 심2 감시목록을 장중 루프가 읽는다. 이 파일이 낡으면 us_trading이
+      돌았어도 판단 근거가 없다 — 2026-08-27~28 미발화가 이 자리에 걸린다.
+
+  # ── 토큰·달력 ─────────────────────────────────────────────────────
+  - path: data/market_calendar.json
+    producer: token_refresh.yml
+    calendar: kr
+    max_age_sessions: 3
+    why: KIS 휴장 달력. 낡으면 휴장 판정이 fail-closed로 매매를 통째로 멈춘다.
+
+  # ── 리포트 ────────────────────────────────────────────────────────
+  # weekly_report.yml은 여기 없다 — db-data에 파일을 안 남기고 텔레그램으로만
+  # 보낸다. 파일이 없으면 신선도로 잴 게 없다. 그쪽은 실패 알림이 덮는다.
+  - path: data/monthly_report_*.xlsx
+    producer: monthly_report.yml
+    calendar: kr
+    max_age_sessions: 25
+    why: >
+      월간 리포트. 워크플로는 2026-04~08 매달 성공했는데 db-data에는 2026-03이
+      마지막이다 — 성공한 런이 산출물을 안 남긴 ③유형으로 보인다. 이 항목이
+      그걸 계속 지적한다.

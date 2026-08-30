@@ -1,0 +1,61 @@
+name: Data Freshness Audit (산출물 신선도 감사)
+
+# "실패했나"가 아니라 **"나와야 할 게 나왔나"**를 본다.
+#
+# 2026-08-30에 하루 만에 네 건이 나왔는데(프리마켓 2주 결손, 미국 워치리스트 2일
+# 결손, EOD 11~12시간 지연, 미국 심 상태 정지) 전부 사람이 증상을 보고 물어서
+# 찾은 것이었다. 고장은 세 종류인데 실패 알림은 첫 번째만 잡는다:
+#   ① 런이 빨갛다                  → 실패 알림
+#   ② 런이 초록인데 안 돌았다       → cron 미발화. 빨간 X조차 안 남는다
+#   ③ 돌았는데 산출물이 없다/낡았다  → 아무도 안 봤다
+#
+# 발화는 태스커다(trading.yml의 audit 창 09:00~09:30 KST → dispatch_data_audit.py가
+# "오늘 이미 돌았나"를 보고 하루 한 번만 부른다). cron을 안 쓰는 이유는 이 레포에서
+# cron이 08-27부터 11~12시간씩 밀리거나 통째로 드롭됐기 때문이다 —
+# 그걸 감시하는 감사기를 그 위에 올릴 수는 없다.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: data-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+    permissions:
+      contents: read
+      # 실패 알림이 직전 런의 결과를 읽는다(연속 실패 억제).
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml --quiet
+
+      - name: Audit
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/audit_data_freshness.py
+
+      # 실패 **연속당 1통**이다. 런마다 보내면 지속 실패에 수백 통이 나가고,
+      # 도배는 침묵과 같다 — scripts/notify_workflow_failure.py가 직전 완료 런의
+      # 결과를 보고 억제한다. cancelled에는 걸리지 않는다(if: failure()).
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: data_audit.yml
+        run: python3 scripts/notify_workflow_failure.py

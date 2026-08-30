@@ -127,6 +127,22 @@ def test_토큰_발급이_직렬화된다():
         '발급 도중에 끊으면 발급됐는데 저장 안 된 상태가 남는다')
 
 
+def test_개장_직후에_신선도_감사를_깨운다():
+    """산출물 감사는 실패 알림이 못 잡는 ②③유형(미발화·산출물 결손)을 덮는다."""
+    steps = _steps(_load('trading.yml'))
+    step = steps[_index_of(steps, 'dispatch_data_audit.py')]
+    assert "steps.route.outputs.audit == 'true'" in (step.get('if') or '')
+
+
+def test_감사기는_cron에_기대지_않는다():
+    """cron이 08-27부터 11~12시간씩 밀리거나 드롭됐다. 그걸 감시하는 감사기를
+    그 위에 올릴 수는 없다."""
+    wf = _load('data_audit.yml')
+    triggers = wf.get('on') or wf.get(True)
+    assert 'schedule' not in triggers, '감사기가 cron에 의존한다'
+    assert 'workflow_dispatch' in triggers
+
+
 # ── 미발화 감지기 ───────────────────────────────────────────────────
 def test_감지기는_감시대상과_다른_워크플로에_있다():
     """장중 루프 안에 두면 루프가 안 돌 때 감지기도 안 돈다(2026-08-27의 교훈)."""

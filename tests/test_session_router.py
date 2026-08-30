@@ -20,31 +20,38 @@ def _utc(y, mo, d, h, mi):
 
 def test_국내장중이면_kr만_참():
     # 2026-08-27(목) 01:00 UTC = 10:00 KST
-    assert session_router.decide(_utc(2026, 8, 27, 1, 0)) == {'kr': True, 'us': False, 'eod': False}
+    assert session_router.decide(_utc(2026, 8, 27, 1, 0)) == {'kr': True, 'us': False, 'eod': False, 'audit': False}
 
 
 def test_미국장중이면_us만_참():
     # 2026-08-27(목) 15:00 UTC = 11:00 EDT / 다음날 00:00 KST
-    assert session_router.decide(_utc(2026, 8, 27, 15, 0)) == {'kr': False, 'us': True, 'eod': False}
+    assert session_router.decide(_utc(2026, 8, 27, 15, 0)) == {'kr': False, 'us': True, 'eod': False, 'audit': False}
 
 
 def test_둘_다_아니면_둘_다_거짓():
     # 2026-08-27(목) 11:00 UTC = 20:00 KST — 국내 마감 뒤, 미국 개장 전
     assert session_router.decide(_utc(2026, 8, 27, 11, 0)) == {
-        'kr': False, 'us': False, 'eod': False}
+        'kr': False, 'us': False, 'eod': False, 'audit': False}
+
+
+def test_개장_직후는_kr과_audit이_함께_참():
+    # 2026-08-27(목) 00:10 UTC = 09:10 KST
+    assert session_router.decide(_utc(2026, 8, 27, 0, 10)) == {
+        'kr': True, 'us': False, 'eod': False, 'audit': True}
 
 
 def test_마감_직후는_eod만_참():
     # 2026-08-27(목) 07:10 UTC = 16:10 KST
     assert session_router.decide(_utc(2026, 8, 27, 7, 10)) == {
-        'kr': False, 'us': False, 'eod': True}
+        'kr': False, 'us': False, 'eod': True, 'audit': False}
 
 
 def test_출력은_github_output_형식():
     with mock.patch.object(session_router, 'decide',
-                           return_value={'kr': True, 'us': False, 'eod': False}):
+                           return_value={'kr': True, 'us': False, 'eod': False,
+                                         'audit': False}):
         lines = session_router.render()
-    assert lines == 'kr=true\nus=false\neod=false'
+    assert lines == 'kr=true\nus=false\neod=false\naudit=false'
 
 
 def test_표준_라이브러리만_import한다():

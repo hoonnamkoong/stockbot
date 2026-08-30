@@ -21,7 +21,8 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src import alerts  # noqa: E402
-from src.data.us_universe import fetch_us_universe, filter_universe, save_universe  # noqa: E402
+from src.data.us_universe import (  # noqa: E402
+    fetch_us_universe, filter_universe, load_universe, save_universe)
 from src.data.us_ohlcv import fetch_daily_ohlcv  # noqa: E402
 from src.data.us_fundamentals import fetch_cik_map, fetch_eps_revenue_growth  # noqa: E402
 from src.strategy.simulators.us_calendar import watchlist_target_date  # noqa: E402
@@ -143,12 +144,45 @@ def main():
         raise
 
 
+def resolve_universe(path: str) -> tuple[list[dict], bool]:
+    """(유니버스, 직전 것을 쓴 건가).
+
+    스크리너가 죽어도 워치리스트는 만든다. 2026-08-24·25에 나스닥 소프트 차단으로
+    이 배치가 예외로 죽었고 미국 심 3개가 그 세션을 워치리스트 없이 보냈다 —
+    매매도 손절도 0건이다.
+
+    유니버스는 **상장 종목 목록**이라 하루 이틀 낡아도 거의 안 변한다. 워치리스트가
+    아예 없는 것보다 낫다. 다만 조용히 넘어가지 않는다 — 알림을 보내고, 파일 자체는
+    config/data_freshness.yaml의 data/us_universe.json 항목이 계속 지적한다.
+    """
+    try:
+        return filter_universe(fetch_us_universe(limit=1000)), False
+    except Exception as e:
+        prev = load_universe(path)
+        if not prev:
+            # 빈 유니버스로 "정상 종료"하면 워치리스트 0종목이 정상처럼 보인다.
+            raise RuntimeError(
+                f'유니버스 조회 실패({type(e).__name__}: {e})이고 직전 유니버스도 '
+                '없다 — 워치리스트를 만들 수 없다.') from e
+        alerts.send_alert(
+            '<b>US 유니버스 조회 실패 — 직전 것으로 진행</b>\n\n'
+            f'{type(e).__name__}: {e}\n\n'
+            f'직전 유니버스 {len(prev)}종목으로 워치리스트를 만듭니다. '
+            '종목 목록은 하루 이틀 낡아도 거의 안 변하지만, 계속되면 '
+            '신규 상장·상폐가 반영되지 않습니다.')
+        return prev, True
+
+
 def _run():
     data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
-    universe_raw = fetch_us_universe(limit=1000)
-    universe = filter_universe(universe_raw)
-    save_universe(universe, os.path.join(data_dir, 'us_universe.json'))
-    print(f'[EOD-US] 유니버스 {len(universe)}종목')
+    universe_path = os.path.join(data_dir, 'us_universe.json')
+    universe, stale = resolve_universe(universe_path)
+    if not stale:
+        # 폴백일 때는 저장하지 않는다 — 같은 내용을 다시 쓰면 커밋 시각이 갱신돼
+        # 신선도 감사가 "방금 갱신됨"으로 속는다.
+        save_universe(universe, universe_path)
+    print(f'[EOD-US] 유니버스 {len(universe)}종목'
+          + (' (직전 것 재사용)' if stale else ''))
 
     cik_map = fetch_cik_map()
     watchlist1, watchlist2, watchlist3 = build_watchlists_for_universe(

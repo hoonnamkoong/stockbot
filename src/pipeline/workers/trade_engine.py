@@ -1021,13 +1021,29 @@ class TradeEngineWorker(BaseWorker):
             return
         try:
             from src.strategy.regime_observations import append_observation, month_path
+            from src.strategy.regime_state import read_regime
+            # 그 순간 심들을 게이팅하고 있던 국면을 같이 남긴다. 관측치로 다시
+            # 계산한 값이 아니라 **봇이 읽은 값**이다 — 임계값도 코드도 나중에
+            # 바뀌므로 재계산은 당시 판단을 복원하지 못한다.
+            #
+            # 2026-08-30에 "심6이 BEAR 창(08-18~21)에 왜 0건이었나"를 소급으로
+            # 답할 수 없었다. 라벨이 남는 곳이 없었기 때문이다.
+            #
+            # 읽기 실패는 빈 칸이다(SIDEWAYS로 채우지 않는다) — 모르는 것과
+            # '횡보였다'는 다르다. read_regime이 이미 그 계약을 지킨다.
+            # 워커에는 data_dir가 없다. read_regime의 기본값(레포 data/)이
+            # 심들이 읽는 것과 같은 파일이다.
+            regime, bull_score = read_regime()
+            extra = dict(live_breadth['extra'] or {})
+            extra['regime'] = regime
+            extra['bull_score'] = bull_score
             append_observation(
                 month_path(now_kst),
                 now_kst.strftime('%Y-%m-%d %H:%M'),
                 live_breadth['breadth'], live_breadth['momentum'],
                 self._top100_trend_from_csv(),
                 live_breadth['sample'], 'top100_live',
-                extra=live_breadth['extra'])
+                extra=extra)
         except Exception as e:
             self.log_error(f"국면 관측 이력 기록 실패: {e}")
 

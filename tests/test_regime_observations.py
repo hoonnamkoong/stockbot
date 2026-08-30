@@ -23,6 +23,7 @@ def test_헤더가_계약이다():
     assert OBS_HEADER == [
         'ts_kst', 'breadth', 'momentum', 'trend', 'sample', 'source',
         'breadth_cap', 'p10', 'p25', 'p75', 'p90', 'up', 'down', 'turnover',
+        'regime', 'bull_score',
     ], '기존 6열의 이름과 순서는 불변이다 — db-data에 426행이 이 스키마로 쌓여 있다'
     assert list(OBS_EXTRA) == OBS_HEADER[6:]
 
@@ -54,7 +55,7 @@ def test_신규_열이_없으면_빈_칸이고_None으로_읽힌다(tmp_path):
     p = str(tmp_path / 'obs.csv')
     append_observation(p, '2026-08-17 09:10', 61.0, 0.42, 44.9, 100, 'top100_live')
     line = _read(p).strip().splitlines()[1]
-    assert line.endswith(',,,,,,,,'), '신규 8열이 빈 칸이어야 한다 — 0으로 채우지 않는다'
+    assert line.endswith(',' * len(OBS_EXTRA)), '신규 열은 빈 칸이어야 한다 — 0으로 채우지 않는다'
     row = parse_observations(_read(p))[0]
     for col in OBS_EXTRA:
         assert row[col] is None
@@ -243,4 +244,48 @@ def test_format_row는_문자열_리스트다():
     rec = {'ts': '2026-07-30 09:10', 'breadth': 51.0, 'momentum': -0.125,
            'trend': None, 'sample': 100, 'source': 'x'}
     assert format_row(rec) == ['2026-07-30 09:10', '51.0', '-0.13', '', '100', 'x',
-                               '', '', '', '', '', '', '', '']
+                               '', '', '', '', '', '', '', '', '', '']
+
+
+# ── 국면 라벨 보존 (2026-08-30) ─────────────────────────────────────
+# "심6이 BEAR 창(08-18~21)에 왜 0건이었나"를 소급으로 답할 수 없었다. 봇이 그때
+# 실제로 판정한 국면이 어디에도 안 남기 때문이다 — regime_gate_state.json엔 마지막
+# 시각만, sim_libero_state엔 최근 5개만 있다. 관측치로 오늘 코드를 다시 돌려 추정할
+# 수는 있지만 그건 당시 봇의 판단이 아니다(임계값도 코드도 그 뒤로 바뀐다).
+
+def test_국면_라벨과_점수가_왕복한다(tmp_path):
+    p = str(tmp_path / 'obs.csv')
+    append_observation(p, '2026-08-19 10:00', 33.0, -3.10, 22.0, 100, 'top100_live',
+                       extra={'regime': 'BEAR', 'bull_score': 21.4})
+    row = parse_observations(_read(p))[0]
+    assert row['regime'] == 'BEAR'
+    assert row['bull_score'] == 21.4
+
+
+def test_판정_불가는_빈_칸이지_SIDEWAYS가_아니다(tmp_path):
+    """모르는 국면을 SIDEWAYS로 적으면 '국면이 아니다'와 구분이 안 된다.
+
+    bull_score도 0으로 채우면 안 된다 — 0점은 '최악의 장'이라는 뜻이다.
+    """
+    p = str(tmp_path / 'obs.csv')
+    append_observation(p, '2026-08-19 10:00', 33.0, -3.10, 22.0, 100, 'top100_live',
+                       extra={'regime': None, 'bull_score': None})
+    row = parse_observations(_read(p))[0]
+    assert row['regime'] is None
+    assert row['bull_score'] is None
+    line = _read(p).strip().splitlines()[1]
+    assert line.endswith(',,'), '두 열이 빈 칸이어야 한다'
+
+
+def test_옛_파일도_그대로_읽힌다(tmp_path):
+    """열이 늘기 전에 쌓인 행은 새 열이 없다. 깨지지 않고 None으로 읽혀야 한다."""
+    p = tmp_path / 'obs.csv'
+    old_lines = [
+        'ts_kst,breadth,momentum,trend,sample,source',
+        '2026-08-14 15:30,77.0,1.35,,100,top100_live',
+        '',
+    ]
+    p.write_text(chr(10).join(old_lines), encoding='utf-8')
+    row = parse_observations(_read(str(p)))[0]
+    assert row['breadth'] == 77.0
+    assert row['regime'] is None and row['bull_score'] is None

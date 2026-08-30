@@ -62,8 +62,11 @@ def test_마감_런에서도_관측을_남긴다():
 def test_기록_실패가_매매를_막지_않는다():
     src = _read('src/pipeline/workers/trade_engine.py')
     # append 호출은 try로 감싸고, 그렇다고 조용히 넘기지도 않는다(log_error).
+    # 고정 바이트 창(구 1400자)으로 자르면 주석 몇 줄에 밀려 거짓 실패가 난다
+    # — 2026-08-30에 실제로 그랬다. 다음 def까지를 함수 본문으로 본다.
     idx = src.index('def _append_regime_observation')
-    window = src[idx:idx + 1400]
+    nxt = src.index(chr(10) + '    def ', idx + 1)
+    window = src[idx:nxt]
     assert 'try:' in window
     assert 'log_error' in window, '조용한 실패는 이 레포에서 금지다'
     assert 'if not live_breadth:' in window, '없는 관측을 지어내지 않는다'

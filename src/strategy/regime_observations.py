@@ -29,6 +29,19 @@ OBS_HEADER = [
     'p10', 'p25', 'p75', 'p90',         # 등락률 분위수. p50은 momentum과 같아 넣지 않는다
     'up', 'down',                       # 상승·하락 종목 수. flat = sample - up - down
     'turnover',                         # Σ(현재가 × 거래량) / 1e8, 억원. 정확한 거래대금이 아닌 근사다
+    # 아래 2열은 2026-08-30 추가. **봇이 그 순간 실제로 판정하고 있던 국면**이다
+    # (관측치로 다시 계산한 값이 아니다 — read_regime()이 돌려준 것을 그대로 적는다).
+    #
+    # 왜 필요한가. 이게 없어서 "심6이 BEAR 창에 왜 0건이었나"를 소급으로 답할 수
+    # 없었다(2026-08-30). 라벨이 남는 곳이 어디에도 없었다 — regime_gate_state.json엔
+    # 마지막 시각만, sim_libero_state엔 최근 5개만 있다. 관측치로 오늘 코드를 다시
+    # 돌려 추정할 수는 있지만 그건 **당시 봇의 판단이 아니다**(임계값도 코드도 그 뒤로
+    # 바뀐다). 국면은 심의 소유권과 매매 여부를 가르므로, 사후에 재현 가능해야 한다.
+    #
+    # 한 격자(최대 10분) 낡을 수 있다 — 국면은 10분 격자에서 갱신되고 이 관측은
+    # 매 사이클 남는다. 그래도 '그 시점에 심들을 게이팅하던 값'이라 의미가 정확하다.
+    'regime',                           # BULL·SIDEWAYS·BEAR. 판정 불가면 빈 칸
+    'bull_score',                       # 0~100. 판정 불가면 빈 칸(0이 아니다 — 0은 '최악의 장')
 ]
 
 OBS_EXTRA = tuple(OBS_HEADER[6:])
@@ -38,9 +51,9 @@ _RECORD_KEY = {'ts_kst': 'ts'}
 
 # 열별 소수 자릿수.
 _DECIMALS = {'breadth': 1, 'momentum': 2, 'trend': 1, 'breadth_cap': 1,
-             'p10': 2, 'p25': 2, 'p75': 2, 'p90': 2}
+             'p10': 2, 'p25': 2, 'p75': 2, 'p90': 2, 'bull_score': 1}
 _INT_COLS = ('sample', 'up', 'down', 'turnover')
-_TEXT_COLS = ('ts_kst', 'source')
+_TEXT_COLS = ('ts_kst', 'source', 'regime')
 
 # 계산 창의 기본 거래일 수. **저장 창이 아니다** — 2026-08까지는 append가 매번
 # 이걸로 잘라서, 기다려도 표본이 60거래일에서 늘지 않았다. 지금은 판정기·라벨러가
@@ -156,7 +169,12 @@ def parse_observations(text):
         except (KeyError, ValueError):
             continue
         for col in OBS_EXTRA:
-            row[col] = _opt(rec.get(col), int if col in _INT_COLS else float)
+            if col in _TEXT_COLS:
+                # 텍스트 열(regime)을 float으로 캐스팅하면 'BEAR'가 통째로 None이 된다.
+                v = rec.get(col)
+                row[col] = v if v else None
+            else:
+                row[col] = _opt(rec.get(col), int if col in _INT_COLS else float)
         rows.append(row)
     return rows
 

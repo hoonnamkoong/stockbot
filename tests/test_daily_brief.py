@@ -42,7 +42,7 @@ OK_SIMS = [
 
 
 def test_brief_has_header_and_account_numbers():
-    msg = build_daily_brief(OK_BALANCE, OK_SIMS, NOW)
+    msg = build_daily_brief(OK_BALANCE, OK_SIMS, NOW, '15:00')
     assert '07/22 (수)' in msg
     assert '1,240,000원' in msg          # 예수금
     assert '5,250,000원' in msg          # 보유총액 = 10*300000 + 5*450000
@@ -51,7 +51,7 @@ def test_brief_has_header_and_account_numbers():
 
 
 def test_brief_lists_every_sim_with_rate_and_count():
-    msg = build_daily_brief(OK_BALANCE, OK_SIMS, NOW)
+    msg = build_daily_brief(OK_BALANCE, OK_SIMS, NOW, '15:00')
     assert '심리 괴리형 (Sim 1)' in msg
     assert '-1.11%' in msg
     assert '6종목' in msg
@@ -61,7 +61,7 @@ def test_brief_lists_every_sim_with_rate_and_count():
 
 
 def test_brief_reports_balance_error_without_dropping_sims():
-    msg = build_daily_brief({'error': 'KIS API 오류: 토큰 만료', 'holdings': []}, OK_SIMS, NOW)
+    msg = build_daily_brief({'error': 'KIS API 오류: 토큰 만료', 'holdings': []}, OK_SIMS, NOW, '15:00')
     assert '조회 실패' in msg
     assert 'KIS API 오류: 토큰 만료' in msg
     assert '1,240,000원' not in msg
@@ -70,7 +70,7 @@ def test_brief_reports_balance_error_without_dropping_sims():
 
 def test_brief_no_holdings_shows_dash_not_zero_percent():
     """분모(매입원가)가 0이면 수익률은 0%가 아니라 모르는 값이다."""
-    msg = build_daily_brief({'deposit': 3_000_000, 'holdings': []}, OK_SIMS, NOW)
+    msg = build_daily_brief({'deposit': 3_000_000, 'holdings': []}, OK_SIMS, NOW, '15:00')
     assert '3,000,000원' in msg
     assert '—' in msg
     assert '0.00%' not in msg.split('🤖')[0]   # 계좌 블록 한정
@@ -78,7 +78,7 @@ def test_brief_no_holdings_shows_dash_not_zero_percent():
 
 def test_brief_sim_without_raw_stats_marked_unmeasurable():
     sims = [{'label': '하락 줍줍형 (Sim 6)', 'profit_rate': None, 'ticker_count': 0}]
-    msg = build_daily_brief(OK_BALANCE, sims, NOW)
+    msg = build_daily_brief(OK_BALANCE, sims, NOW, '15:00')
     assert '측정 불가' in msg
     assert '하락 줍줍형 (Sim 6)' in msg
 
@@ -233,11 +233,11 @@ def test_brief_only_in_the_fifteen_slot(tmp_path):
     from datetime import datetime
     d = str(tmp_path)
 
-    assert should_send_brief(datetime(2026, 8, 10, 15, 0), d) is True
-    assert should_send_brief(datetime(2026, 8, 10, 15, 30), d) is True
-    assert should_send_brief(datetime(2026, 8, 10, 14, 59), d) is False
-    assert should_send_brief(datetime(2026, 8, 10, 9, 1), d) is False
-    assert should_send_brief(datetime(2026, 8, 10, 15, 41), d) is False
+    assert should_send_brief(datetime(2026, 8, 10, 15, 0), d) == '15:00'
+    assert should_send_brief(datetime(2026, 8, 10, 15, 30), d) == '15:00'
+    assert should_send_brief(datetime(2026, 8, 10, 14, 59), d) is None
+    assert should_send_brief(datetime(2026, 8, 10, 9, 1), d) is None
+    assert should_send_brief(datetime(2026, 8, 10, 15, 41), d) is None
 
 
 def test_report_slots_do_not_consume_the_brief(tmp_path):
@@ -248,7 +248,7 @@ def test_report_slots_do_not_consume_the_brief(tmp_path):
     gate.mark_sent('11:00', datetime(2026, 8, 10, 11, 2), d)
     gate.mark_sent('14:00', datetime(2026, 8, 10, 14, 1), d)
 
-    assert should_send_brief(datetime(2026, 8, 10, 15, 5), d) is True
+    assert should_send_brief(datetime(2026, 8, 10, 15, 5), d) == '15:00'
 
 
 # --- 픽스 2: send_message 실패를 발송 완료로 기록하지 않는다 -----------------
@@ -281,7 +281,7 @@ def test_send_daily_brief_raises_when_telegram_send_fails(monkeypatch):
     worker.tg = _FakeTelegram(result=False)
 
     with pytest.raises(Exception):
-        worker._send_daily_brief()
+        worker._send_daily_brief('15:00')
 
 
 def test_send_daily_brief_succeeds_when_telegram_send_succeeds(monkeypatch):
@@ -290,5 +290,42 @@ def test_send_daily_brief_succeeds_when_telegram_send_succeeds(monkeypatch):
     worker = NotifierWorker(PipelineContext(), storage=None)
     worker.tg = _FakeTelegram(result=True)
 
-    worker._send_daily_brief()  # 예외 없이 통과해야 함
+    worker._send_daily_brief('15:00')  # 예외 없이 통과해야 함
     assert worker.tg.sent_text is not None
+
+
+def test_two_brief_slots_are_independent(tmp_path):
+    """12시를 보내도 15시 슬롯은 따로 열린다."""
+    from src.report import gate
+    noon = datetime(2026, 9, 1, 12, 5)
+    close = datetime(2026, 9, 1, 15, 5)
+
+    assert gate.brief_due(noon, str(tmp_path)) == '12:00'
+    gate.mark_sent('12:00', noon, str(tmp_path))
+    assert gate.brief_due(noon, str(tmp_path)) is None
+    assert gate.brief_due(close, str(tmp_path)) == '15:00'
+
+
+def test_noon_brief_title_names_the_window():
+    msg = build_daily_brief(OK_BALANCE, OK_SIMS, datetime(2026, 9, 1, 12, 5), '12:00')
+    assert '12:00' in msg and '09:00~12:00' in msg
+
+
+def test_close_brief_title_is_unchanged():
+    msg = build_daily_brief(OK_BALANCE, OK_SIMS, datetime(2026, 9, 1, 15, 5), '15:00')
+    assert '15:00 마감 브리핑' in msg
+
+
+def test_ticker_count_respects_the_window(tmp_path):
+    """09:00~12:00 창이면 그 밖의 거래는 세지 않는다."""
+    from src.pipeline.daily_brief import _count_today_tickers
+    csv_path = tmp_path / 'hist.csv'
+    csv_path.write_text(
+        'timestamp,symbol\n'
+        '2026-09-01 09:30:00,AAA\n'
+        '2026-09-01 14:30:00,BBB\n',
+        encoding='utf-8')
+
+    assert _count_today_tickers(str(csv_path), '2026-09-01') == 2
+    assert _count_today_tickers(str(csv_path), '2026-09-01',
+                                since='09:00', until='12:00') == 1

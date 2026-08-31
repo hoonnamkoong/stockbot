@@ -64,11 +64,14 @@ class NotifierWorker(BaseWorker):
             self.log(f"발송 스킵 (이벤트: {self.ctx.github_event}, "
                      f"슬롯 없음: {self.ctx.now_kst.strftime('%H:%M')})")
 
-        # 2-1. 15:00 마감 브리핑 — 리포트와 **다른 슬롯이다.** 예전에는 should_notify()에
-        # 얹혀 있어서, 리포트를 11/14시로 옮기는 순간 브리핑이 통째로 죽었다.
-        if should_send_brief(self.ctx.now_kst, data_dir):
-            if self.safe_run(self._send_daily_brief, self._brief_fallback) is True:
-                report_gate.mark_sent(report_gate.BRIEF_SLOT, self.ctx.now_kst, data_dir)
+        # 2-1. 브리핑 — 리포트와 **다른 슬롯이다.** 12:00(오전 구간)과 15:00(마감)
+        # 둘이 서로 독립이므로, 보낸 슬롯을 그대로 닫아야 한다. 상수를 닫으면
+        # 12시를 보내고 15시가 사라진다.
+        brief_slot = should_send_brief(self.ctx.now_kst, data_dir)
+        if brief_slot:
+            if self.safe_run(self._send_daily_brief, self._brief_fallback,
+                             brief_slot) is True:
+                report_gate.mark_sent(brief_slot, self.ctx.now_kst, data_dir)
 
         # 3. reported_codes 상태 업데이트 (현재 수집 종목 추가)
         if slot:
@@ -154,28 +157,31 @@ class NotifierWorker(BaseWorker):
         except Exception:
             pass
 
-    def _send_daily_brief(self) -> bool:
-        """15:00 마감 브리핑을 별도 메시지로 발송. 성공했으면 True."""
+    def _send_daily_brief(self, slot: str) -> bool:
+        """브리핑을 별도 메시지로 발송. 성공했으면 True."""
         from src.trade.balance import get_balance
+        from src.pipeline.daily_brief import BRIEF_SPECS
 
         try:
             balance = get_balance()
         except Exception as e:
             balance = {'error': f'잔고 조회 예외: {e}', 'holdings': []}
 
-        sims = collect_sim_brief('data', self.ctx.now_kst.strftime('%Y-%m-%d'))
-        sent = self.tg.send_message(build_daily_brief(balance, sims, self.ctx.now_kst))
+        _, since, until = BRIEF_SPECS[slot]
+        sims = collect_sim_brief('data', self.ctx.now_kst.strftime('%Y-%m-%d'),
+                                 since, until)
+        sent = self.tg.send_message(
+            build_daily_brief(balance, sims, self.ctx.now_kst, slot))
         if not sent:
-            raise RuntimeError("마감 브리핑 텔레그램 발송 실패")
-        self.log("15:00 마감 브리핑 발송 완료")
+            raise RuntimeError(f"{slot} 브리핑 텔레그램 발송 실패")
+        self.log(f"{slot} 브리핑 발송 완료")
         return True
 
-    def _brief_fallback(self) -> None:
+    def _brief_fallback(self, slot: str = '') -> None:
         """브리핑 조립·발송 실패. 숫자를 지어내지 않고 실패만 알린다."""
         try:
             self.tg.send_message(
-                f"[{self.ctx.now_kst.strftime('%m/%d %H:%M')}] 마감 브리핑 생성 실패"
-            )
+                f"[{self.ctx.now_kst.strftime('%m/%d %H:%M')}] {slot} 브리핑 생성 실패")
         except Exception:
             pass
 

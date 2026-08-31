@@ -30,10 +30,10 @@ from datetime import datetime
 # 2026-08-09 합의. 바꾸면 리포트 회차가 조용히 달라지므로 테스트가 지킨다.
 REPORT_SLOTS = ('11:00', '14:00')
 
-# 15시 마감 브리핑(실전 계좌 잔고 + 심별 현황). 리포트와 **다른 물건**이라
-# 슬롯을 나눠 둔다. 예전에는 둘 다 should_notify()에 얹혀 있어서, 리포트를
-# 11/14시로 바꾸는 순간 브리핑이 통째로 죽는 결합이 있었다.
-BRIEF_SLOT = '15:00'
+# 2026-08-31: 11:00·14:00 리포트를 폐기하면서 브리핑을 둘로 늘렸다.
+# 12:00은 09:00~12:00 구간, 15:00은 하루 전체 마감이다. 슬롯마다 제목과
+# 집계 구간이 다르므로 brief_due는 bool이 아니라 **어느 슬롯인지**를 준다.
+BRIEF_SLOTS = ('12:00', '15:00')
 
 # 슬롯 시각으로부터 이 시간 안에만 보낸다. 11:40을 넘겨 보내면 그건 '11시
 # 리포트'가 아니다 — 늦은 리포트보다 없는 편이 낫다. 스크래핑 격자(10분)의
@@ -99,13 +99,13 @@ def due_slot(now_kst: datetime, data_dir: str | None = None) -> str | None:
     return _due(now_kst, REPORT_SLOTS, data_dir)
 
 
-def brief_due(now_kst: datetime, data_dir: str | None = None) -> bool:
-    """지금 15시 마감 브리핑을 보낼 차례인가.
+def brief_due(now_kst: datetime, data_dir: str | None = None) -> str | None:
+    """지금 열려 있는 브리핑 슬롯('12:00'/'15:00'), 없으면 None.
 
-    리포트 슬롯과 **독립이다.** 같은 상태 파일에 기록되지만 서로의 판정에
-    끼어들지 않는다 — 리포트를 두 번 다 보냈어도 브리핑은 따로 열린다.
+    리포트 슬롯과 **독립이다.** 두 브리핑끼리도 독립이다 — 12시를 보냈다는
+    사실이 15시 마감 브리핑을 막지 않는다.
     """
-    return _due(now_kst, (BRIEF_SLOT,), data_dir) is not None
+    return _due(now_kst, BRIEF_SLOTS, data_dir)
 
 
 def mark_sent(slot: str, now_kst: datetime, data_dir: str | None = None,

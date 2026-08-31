@@ -120,13 +120,13 @@ def test_brief_slot_is_not_a_report_slot(tmp_path):
 
 
 def test_brief_opens_at_fifteen(tmp_path):
-    assert gate.brief_due(_at(15, 0), str(tmp_path)) is True
-    assert gate.brief_due(_at(14, 59), str(tmp_path)) is False
+    assert gate.brief_due(_at(15, 0), str(tmp_path)) == '15:00'
+    assert gate.brief_due(_at(14, 59), str(tmp_path)) is None
 
 
 def test_brief_has_its_own_retry_window(tmp_path):
-    assert gate.brief_due(_at(15, 30), str(tmp_path)) is True
-    assert gate.brief_due(_at(15, 41), str(tmp_path)) is False
+    assert gate.brief_due(_at(15, 30), str(tmp_path)) == '15:00'
+    assert gate.brief_due(_at(15, 41), str(tmp_path)) is None
 
 
 def test_sending_the_report_does_not_close_the_brief(tmp_path):
@@ -134,14 +134,14 @@ def test_sending_the_report_does_not_close_the_brief(tmp_path):
     gate.mark_sent('11:00', _at(11, 2), d)
     gate.mark_sent('14:00', _at(14, 1), d)
 
-    assert gate.brief_due(_at(15, 5), d) is True
+    assert gate.brief_due(_at(15, 5), d) == '15:00'
 
 
 def test_brief_closes_after_it_is_sent(tmp_path):
     d = str(tmp_path)
-    gate.mark_sent(gate.BRIEF_SLOT, _at(15, 1), d)
+    gate.mark_sent('15:00', _at(15, 1), d)
 
-    assert gate.brief_due(_at(15, 20), d) is False
+    assert gate.brief_due(_at(15, 20), d) is None
 
 
 # ── 상수 계약 ───────────────────────────────────────────────────────

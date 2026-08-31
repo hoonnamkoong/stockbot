@@ -240,7 +240,14 @@ def run_pipeline(ctx: PipelineContext) -> None:
         storage.rebuild_reports_index(ctx.now_kst)
 
     # ── Stage 3.6: Sim7 신규 매수 ────────────────────────────────
-    # rank_and_recommendation이 final_picks에 역전파된 이후 실행
+    # [2026-08-31] **지금 이 블록은 절대 매수하지 않는다.**
+    # rank_and_recommendation을 채우던 유일한 곳이 advisor의 딥다이브 리포트
+    # 생성기였고, 그게 11:00·14:00 리포트와 함께 폐기됐다(커밋 705d0b891).
+    # 여기에 그 함수 이름을 그대로 적지 않는다 — tests/test_report_retired.py가
+    # src 전체를 grep해 부활을 막는 감시 테스트라 주석까지 걸린다.
+    # 이제 아무도 그 필드를 쓰지 않으므로 strong_picks는 항상 빈 목록이다.
+    # 다음 Task에서 심7 자체를 제거한다 — 그때까지 이 블록은 매 사이클
+    # "강력매수=0개"만 로그한다. 되살리려면 판정 소스부터 새로 있어야 한다.
     try:
         strong_picks = [
             p for p in final_picks

@@ -253,15 +253,18 @@ class TradeEngineWorker(BaseWorker):
         # 위해서다.** 매 사이클로 풀면 첫 사이클에 후보가 전부 소진돼
         # final_picks가 빈 채로 남고, 같은 슬롯에 기록되는 월별 리서치
         # 엑셀(orchestrator)과 선정 목록이 어긋난다.
-        hour = self.ctx.now_kst.hour
-        is_morning = hour < 12
-        session_name = "오전" if is_morning else "오후"
-
         from src.pipeline.daily_brief import should_send_brief
-        brief_open = should_send_brief(
+        brief_slot = should_send_brief(
             self.ctx.now_kst, getattr(self.ctx, '_report_data_dir', None))
 
-        if final_picks and brief_open:
+        if final_picks and brief_slot:
+            # 세션은 시계가 아니라 **슬롯**에서 나온다. 12:00 브리핑이 곧 오전
+            # 세션이다 — 그 브리핑이 요약하는 구간이 09:00~12:00이다.
+            # 예전처럼 `now_kst.hour < 12`로 재면 슬롯이 12:00부터 열리므로
+            # 오전이 영영 False가 되어 morning_reported_info가 다시는 안 쌓인다.
+            # 시각으로 재는 규칙은 슬롯이 움직일 때마다 같은 식으로 또 깨진다.
+            is_morning = brief_slot == '12:00'
+            session_name = "오전" if is_morning else "오후"
             self.log(f"[{session_name} 세션] 신규 선정 종목 상태 기록")
 
             # 당일 중복 선정 방지 리스트에 추가
@@ -287,7 +290,8 @@ class TradeEngineWorker(BaseWorker):
             
             self.storage.save_sync_state(sync_state)
         elif final_picks:
-            self.log(f"[{session_name} 세션] 브리핑 슬롯 아님 - 종목 상태 기록 생략")
+            # 세션 이름을 붙이지 않는다 — 슬롯이 안 열렸으면 어느 세션인지도 없다.
+            self.log("브리핑 슬롯 아님 - 종목 상태 기록 생략")
 
         # 6. 시뮬레이터 실행 (Registry에서 자동 로드; sim0_libero는 run_regime_stage()가 별도로 돔)
         self._run_simulators(candidates, exclude_sim_ids=paper_owned_elsewhere)

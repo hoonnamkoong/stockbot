@@ -219,7 +219,10 @@ class SyncState(BaseModel):
     stocks: dict = {}                 # [Legacy] 종목별 연속일수 등 보관
     reported_codes: list = []         # [Legacy] 전체 기간 중 보고된 적 있는 종목 코드 리스트
     daily_reported_info: list = []    # 당일 텔레그램으로 보고된 전체 종목 리스트 (rank 포함)
-    daily_deep_dive_codes: list = []  # 당일 상세 리포트(Deep-Dive)가 발송된 종목 코드 (중복 발송 방지용)
+    # 당일 이미 선정된 종목 코드 (같은 날 중복 선정 방지용).
+    # 2026-08-31 딥다이브 리포트 폐기 후에도 이름을 그대로 둔다 — 이 상태
+    # 파일은 db-data를 왕복하므로 키를 바꾸면 그날 기록이 통째로 날아간다.
+    daily_deep_dive_codes: list = []
     morning_reported_info: list = []  # 오전 세션(12시 이전) 텔레그램 보고 종목 (최대 9개)
     afternoon_reported_info: list = [] # 오후 세션(12시 이후) 텔레그램 보고 종목 (최대 9개)
     morning_complete: bool = False    # 오전 세션 리포팅 완료 여부

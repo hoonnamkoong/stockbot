@@ -155,3 +155,26 @@ def test_retry_window_covers_several_scrape_grids():
     """스크래핑 격자가 10분이므로 창이 그보다 충분히 넓어야 재시도가 성립한다."""
     from src.pipeline.scrape_gate import SCRAPE_INTERVAL_MIN
     assert gate.SLOT_WINDOW_MIN >= SCRAPE_INTERVAL_MIN * 3
+
+
+def test_mark_sent_writes_to_the_named_file(tmp_path):
+    """다른 파일명을 주면 기본 상태 파일을 건드리지 않는다."""
+    from src.report import gate
+    now = datetime(2026, 9, 1, 9, 5)
+
+    gate.mark_sent('09:00', now, str(tmp_path), filename='us_brief_gate_state.json')
+
+    assert (tmp_path / 'us_brief_gate_state.json').exists()
+    assert not (tmp_path / gate.STATE_FILENAME).exists()
+
+
+def test_due_reads_only_the_named_file(tmp_path):
+    """기본 파일에 09:00을 보냈다고 적어도, 다른 파일을 보는 판정은 열려 있다."""
+    from src.report import gate
+    now = datetime(2026, 9, 1, 9, 5)
+
+    gate.mark_sent('09:00', now, str(tmp_path))   # 기본 파일에 기록
+
+    assert gate._due(now, ('09:00',), str(tmp_path)) is None
+    assert gate._due(now, ('09:00',), str(tmp_path),
+                     filename='us_brief_gate_state.json') == '09:00'

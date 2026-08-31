@@ -46,8 +46,8 @@ DEFAULT_DATA_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
 
 
-def _state_path(data_dir: str | None) -> str:
-    return os.path.join(data_dir or DEFAULT_DATA_DIR, STATE_FILENAME)
+def _state_path(data_dir: str | None, filename: str = STATE_FILENAME) -> str:
+    return os.path.join(data_dir or DEFAULT_DATA_DIR, filename)
 
 
 def _slot_minutes(slot: str) -> int:
@@ -55,7 +55,7 @@ def _slot_minutes(slot: str) -> int:
     return int(h) * 60 + int(m)
 
 
-def _sent_today(now, data_dir: str | None) -> list[str]:
+def _sent_today(now, data_dir: str | None, filename: str = STATE_FILENAME) -> list[str]:
     """오늘 이미 보낸 슬롯들. 못 읽으면 빈 목록(=보내는 쪽)이다.
 
     **날짜로 갈라야 한다.** 이 상태는 db-data를 왕복하므로 컨테이너에는 어제
@@ -63,7 +63,7 @@ def _sent_today(now, data_dir: str | None) -> list[str]:
     통째로 사라진다.
     """
     try:
-        with open(_state_path(data_dir), 'r', encoding='utf-8') as f:
+        with open(_state_path(data_dir, filename), 'r', encoding='utf-8') as f:
             raw = json.load(f)
         if raw.get('date') != now.strftime('%Y-%m-%d'):
             return []
@@ -75,7 +75,8 @@ def _sent_today(now, data_dir: str | None) -> list[str]:
         return []
 
 
-def _due(now_kst: datetime, slots, data_dir: str | None) -> str | None:
+def _due(now_kst: datetime, slots, data_dir: str | None,
+         filename: str = STATE_FILENAME) -> str | None:
     """주어진 슬롯들 중 지금 열려 있는 것. 늦은 슬롯을 우선한다.
 
     두 슬롯이 동시에 열릴 수는 없다 — 창(40분)이 슬롯 간격(3시간)보다 짧다.
@@ -83,7 +84,7 @@ def _due(now_kst: datetime, slots, data_dir: str | None) -> str | None:
     3시간 지난 11시 리포트가 아니라 14시 리포트가 나가야 하기 때문이다.
     """
     now_min = now_kst.hour * 60 + now_kst.minute
-    sent = _sent_today(now_kst, data_dir)
+    sent = _sent_today(now_kst, data_dir, filename)
     for slot in sorted(slots, key=_slot_minutes, reverse=True):
         if slot in sent:
             continue
@@ -107,16 +108,17 @@ def brief_due(now_kst: datetime, data_dir: str | None = None) -> bool:
     return _due(now_kst, (BRIEF_SLOT,), data_dir) is not None
 
 
-def mark_sent(slot: str, now_kst: datetime, data_dir: str | None = None) -> None:
+def mark_sent(slot: str, now_kst: datetime, data_dir: str | None = None,
+              filename: str = STATE_FILENAME) -> None:
     """그 슬롯을 보냈다고 기록한다. **발송에 성공한 직후에만 부른다.**
 
     실패한 발송을 기록하면 그 회차가 통째로 사라진다 — 창이 아직 열려 있으면
     다음 스크래핑 사이클이 재시도할 수 있어야 한다(scrape_gate.mark_scraped와
     같은 이유로 순서를 뒤집으면 안 된다).
     """
-    path = _state_path(data_dir)
+    path = _state_path(data_dir, filename)
     os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-    sent = _sent_today(now_kst, data_dir)
+    sent = _sent_today(now_kst, data_dir, filename)
     if slot not in sent:
         sent.append(slot)
     with open(path, 'w', encoding='utf-8') as f:

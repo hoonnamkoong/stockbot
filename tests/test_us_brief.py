@@ -5,7 +5,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.pipeline.us_brief import (  # noqa: E402
-    build_us_brief, collect_us_sim_brief, overnight_window)
+    build_us_brief, collect_us_sim_brief, overnight_window, _profit_rate_from_state)
 
 NOW = datetime(2026, 9, 1, 9, 5)
 OK_SIMS = [
@@ -60,3 +60,55 @@ def test_collect_counts_only_the_overnight_window(tmp_path):
     sims = collect_us_sim_brief(str(tmp_path), NOW)
     row = next(s for s in sims if 'US Sim 2' in s['label'])
     assert row['ticker_count'] == 2
+
+
+def test_profit_rate_from_state_returns_none_when_file_not_found(tmp_path):
+    """파일이 없으면 None을 반환한다. 절대 0이 아니다."""
+    path = str(tmp_path / 'nonexistent.json')
+    result = _profit_rate_from_state(path)
+    assert result is None
+
+
+def test_profit_rate_from_state_returns_none_on_invalid_json(tmp_path):
+    """유효하지 않은 JSON이면 None을 반환한다. 절대 0이 아니다."""
+    state_file = tmp_path / 'state.json'
+    state_file.write_text('{ invalid json }', encoding='utf-8')
+    result = _profit_rate_from_state(str(state_file))
+    assert result is None
+
+
+def test_profit_rate_from_state_returns_none_when_initial_cash_missing(tmp_path):
+    """initial_cash가 없으면 None을 반환한다. 절대 0이 아니다."""
+    state_file = tmp_path / 'state.json'
+    state_file.write_text('{"cash": 10000, "portfolio": {}}', encoding='utf-8')
+    result = _profit_rate_from_state(str(state_file))
+    assert result is None
+
+
+def test_profit_rate_from_state_returns_none_when_initial_cash_zero(tmp_path):
+    """initial_cash가 0이면 None을 반환한다. 절대 0이 아니다."""
+    state_file = tmp_path / 'state.json'
+    state_file.write_text('{"initial_cash": 0, "cash": 10000, "portfolio": {}}', encoding='utf-8')
+    result = _profit_rate_from_state(str(state_file))
+    assert result is None
+
+
+def test_profit_rate_from_state_returns_none_when_initial_cash_negative(tmp_path):
+    """initial_cash가 음수면 None을 반환한다. 절대 0이 아니다."""
+    state_file = tmp_path / 'state.json'
+    state_file.write_text('{"initial_cash": -1000, "cash": 10000, "portfolio": {}}', encoding='utf-8')
+    result = _profit_rate_from_state(str(state_file))
+    assert result is None
+
+
+def test_collect_us_sim_brief_returns_none_on_missing_state_file(tmp_path):
+    """상태 파일이 없으면 collect_us_sim_brief가 None을 반환한다. 절대 0이 아니다."""
+    # 거래 이력만 만들고 상태 파일은 없음
+    (tmp_path / 'trade_history_sim_us2donchian.csv').write_text(
+        'timestamp,symbol\n'
+        '2026-08-31 22:31:41,AAPL\n',
+        encoding='utf-8')
+
+    sims = collect_us_sim_brief(str(tmp_path), NOW)
+    row = next(s for s in sims if 'US Sim 2' in s['label'])
+    assert row['profit_rate'] is None

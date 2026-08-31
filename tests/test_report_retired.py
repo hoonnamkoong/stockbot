@@ -18,6 +18,20 @@ def _grep(pattern: str) -> str:
     return r.stdout or ''
 
 
+def _grep_sim_plumbing(pattern: str) -> str:
+    # 심 부활 감시는 심이 실제로 배선되는 범위만 봐야 한다 — src/strategy,
+    # src/pipeline, src/data, scripts. 대상보다 넓게 훑는 감시는 대상과
+    # 무관한 코드를 인질로 잡는다: 2026-08-31에 이 grep이 src/app까지 훑다가
+    # Sim7과 무관하게 이름만 겹친 프런트엔드 변수(리베로 차트의 sim7Data 등)를
+    # 걸어서 관계없는 파일을 고치게 만든 사고가 있었다.
+    r = subprocess.run(
+        ['git', 'grep', '-n', pattern, '--',
+         'src/strategy', 'src/pipeline', 'src/data', 'scripts'],
+        cwd=ROOT, capture_output=True, text=True,
+        encoding='utf-8', errors='replace')
+    return r.stdout or ''
+
+
 def test_report_slots_are_gone():
     assert _grep('REPORT_SLOTS') == '', 'REPORT_SLOTS 참조가 남아 있다'
 
@@ -67,7 +81,7 @@ def test_monthly_research_excel_survives_and_keeps_its_cadence():
 
 
 def test_sim7_is_gone():
-    hits = [ln for ln in _grep('sim7').splitlines()]
+    hits = [ln for ln in _grep_sim_plumbing('sim7').splitlines()]
     assert hits == [], f'심7 참조가 남아 있다: {hits}'
 
 

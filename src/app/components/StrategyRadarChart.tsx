@@ -85,7 +85,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   );
 };
 
-const LiberoCalTooltip = ({ active, payload, label }: any) => {
+const Sim7Tooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
     <Card shadow="sm" padding="xs" radius="md" withBorder>
@@ -165,9 +165,9 @@ export default function StrategyRadarChart() {
   const [libero, setLibero] = useState<LiberoInfo | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [liberoCalData, setSim7Data] = useState<any[]>([]);
-  const [liberoCalLoading, setSim7Loading] = useState(true);
-  const [liberoCalHitRate, setSim7HitRate] = useState<{ hits: number; total: number; pct: number } | null>(null);
+  const [sim7Data, setSim7Data] = useState<any[]>([]);
+  const [sim7Loading, setSim7Loading] = useState(true);
+  const [sim7HitRate, setSim7HitRate] = useState<{ hits: number; total: number; pct: number } | null>(null);
   const [intradayData, setIntradayData] = useState<any[]>([]);
   const [intradayDate, setIntradayDate] = useState<string | null>(null);
 
@@ -209,7 +209,7 @@ export default function StrategyRadarChart() {
       }
     };
 
-    const fetchLiberoCal = async () => {
+    const fetchSim7 = async () => {
       setSim7Loading(true);
       try {
         const res = await fetch(`/api/simulation/libero-history?cb=${Date.now()}`);
@@ -236,7 +236,7 @@ export default function StrategyRadarChart() {
             const c = calMap[date];
             return {
               date: date.slice(5),
-              liberoScore: c?.libero_breadth ?? null,
+              sim7Score: c?.libero_breadth ?? null,
               marketBreadth: c?.actual_kospi_breadth ?? marketMap[date] ?? null,
               gap: c?.gap ?? null,
             };
@@ -259,7 +259,7 @@ export default function StrategyRadarChart() {
 
           merged = allDates.map(date => ({
             date: date.slice(5),
-            liberoScore: liberoMap[date] ?? null,
+            sim7Score: liberoMap[date] ?? null,
             marketBreadth: marketMap[date] ?? null,
             gap: (liberoMap[date] != null && marketMap[date] != null)
               ? parseFloat((liberoMap[date] - marketMap[date]).toFixed(1))
@@ -295,8 +295,8 @@ export default function StrategyRadarChart() {
 
         // 방향 적중률: 60이상=BULL, 40이하=BEAR, 사이=SIDEWAYS
         const zone = (v: number) => v >= 60 ? 'BULL' : v <= 40 ? 'BEAR' : 'SIDEWAYS';
-        const comparable = merged.filter(r => r.liberoScore !== null && r.marketBreadth !== null);
-        const hits = comparable.filter(r => zone(r.liberoScore!) === zone(r.marketBreadth!));
+        const comparable = merged.filter(r => r.sim7Score !== null && r.marketBreadth !== null);
+        const hits = comparable.filter(r => zone(r.sim7Score!) === zone(r.marketBreadth!));
         if (comparable.length > 0) {
           setSim7HitRate({ hits: hits.length, total: comparable.length, pct: Math.round(hits.length / comparable.length * 100) });
         }
@@ -308,7 +308,7 @@ export default function StrategyRadarChart() {
     };
 
     fetchStats();
-    fetchLiberoCal();
+    fetchSim7();
   }, []);
 
   const toggleSeries = (key: string) => {
@@ -488,7 +488,7 @@ export default function StrategyRadarChart() {
               <CartesianGrid stroke="#e9ecef" strokeDasharray="3 3" />
               <XAxis dataKey="t" tick={{ fontSize: 10 }} interval={0} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickCount={6} width={30} />
-              <Tooltip content={<LiberoCalTooltip />} />
+              <Tooltip content={<Sim7Tooltip />} />
               <ReferenceLine y={60} stroke="#2f9e44" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BULL', position: 'insideTopRight', fontSize: 9, fill: '#2f9e44' }} />
               <ReferenceLine y={40} stroke="#fa5252" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BEAR', position: 'insideBottomRight', fontSize: 9, fill: '#fa5252' }} />
               <Line type="monotone" dataKey="actual" name="실측 Breadth" stroke="#868e96" strokeWidth={2} dot={{ r: 3, fill: '#868e96' }} connectNulls />
@@ -504,12 +504,12 @@ export default function StrategyRadarChart() {
       <Group gap={6} mb={4}>
         <IconActivity size={18} color="#7950f2" />
         <Text size="sm" fw={700}>리베로 EOD 예측 vs KOSPI 실제 Breadth (최근 14 거래일)</Text>
-        {liberoCalHitRate && (
+        {sim7HitRate && (
           <Badge
-            color={liberoCalHitRate.pct >= 60 ? 'green' : liberoCalHitRate.pct >= 40 ? 'yellow' : 'red'}
+            color={sim7HitRate.pct >= 60 ? 'green' : sim7HitRate.pct >= 40 ? 'yellow' : 'red'}
             variant="light" size="sm"
           >
-            방향 적중 {liberoCalHitRate.hits}/{liberoCalHitRate.total}일 ({liberoCalHitRate.pct}%)
+            방향 적중 {sim7HitRate.hits}/{sim7HitRate.total}일 ({sim7HitRate.pct}%)
           </Badge>
         )}
       </Group>
@@ -519,14 +519,14 @@ export default function StrategyRadarChart() {
         · 각 점 위 숫자: 갭 (예측 − 실제, 보라=양수 / 빨강=음수) &nbsp;
         · 60 이상 = BULL, 40 이하 = BEAR
       </Text>
-      {liberoCalLoading ? (
+      {sim7Loading ? (
         <Group justify="center" p="lg"><Loader size="xs" /></Group>
-      ) : liberoCalData.length === 0 ? (
+      ) : sim7Data.length === 0 ? (
         <Text size="xs" c="dimmed" ta="center" p="lg">데이터가 아직 없습니다. 리베로가 실행되면 자동으로 채워집니다.</Text>
       ) : (
         <div style={{ height: 260 }}>
           <ResponsiveContainer>
-            <LineChart data={liberoCalData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+            <LineChart data={sim7Data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               {/* 배경 구역 */}
               <ReferenceArea y1={60} y2={100} fill="#2f9e44" fillOpacity={0.07} />
               <ReferenceArea y1={40} y2={60} fill="#f08c00" fillOpacity={0.07} />
@@ -534,20 +534,20 @@ export default function StrategyRadarChart() {
               <CartesianGrid stroke="#e9ecef" strokeDasharray="3 3" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickCount={6} width={30} />
-              <Tooltip content={<LiberoCalTooltip />} />
+              <Tooltip content={<Sim7Tooltip />} />
               <ReferenceLine y={0} stroke="#ced4da" strokeDasharray="2 2" strokeWidth={1} />
               <ReferenceLine y={60} stroke="#2f9e44" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BULL', position: 'insideTopRight', fontSize: 9, fill: '#2f9e44' }} />
               <ReferenceLine y={40} stroke="#fa5252" strokeDasharray="4 2" strokeWidth={1} label={{ value: 'BEAR', position: 'insideBottomRight', fontSize: 9, fill: '#fa5252' }} />
               <Line
                 type="monotone"
-                dataKey="liberoScore"
+                dataKey="sim7Score"
                 name="리베로 EOD 예측"
                 stroke="#7950f2"
                 strokeWidth={2}
                 dot={{ r: 3, fill: '#7950f2' }}
                 connectNulls
                 label={({ x, y, index }: any) => {
-                  const gap = liberoCalData[index]?.gap;
+                  const gap = sim7Data[index]?.gap;
                   if (gap == null) return <g />;
                   const color = gap > 0 ? '#7950f2' : gap < 0 ? '#fa5252' : '#868e96';
                   const text = gap > 0 ? `+${gap}` : `${gap}`;

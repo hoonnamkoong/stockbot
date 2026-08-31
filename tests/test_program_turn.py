@@ -183,7 +183,7 @@ from src.pipeline.workers.program_trader import _resolve_active_tag
 def test_normal_sim_tag_is_sim_id():
     """일반 심은 자기 id가 곧 태그다 — 턴 안에서 바뀌지 않는다."""
     assert _resolve_active_tag("sim5_sideways", {}) == "sim5_sideways"
-    assert _resolve_active_tag("sim7_report_follower", {"active_regime": "BULL"}) == "sim7_report_follower"
+    assert _resolve_active_tag("sim_risk", {"active_regime": "BULL"}) == "sim_risk"
 
 
 def test_sim10_tag_follows_active_regime():

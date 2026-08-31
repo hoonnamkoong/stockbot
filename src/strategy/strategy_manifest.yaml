@@ -199,22 +199,6 @@ simulators:
     tradeable: true
     needs_buzz: false  # 당일 등락률 상위 30 (KIS 자체 유니버스) — 실전 계좌 현재 선택 중
 
-  - id: "sim7_report_follower"
-    module: "src.strategy.simulators.sim7_report_follower"
-    class: "ReportFollowerSimulator"
-    description: "Sim7 리포트 팔로워 — 딥다이브 강력 매수 종목 자동 매수 + 트레일링 라이딩"
-    state_file: "sim_reportfollower_state.json"
-    csv_file: "trade_history_sim_reportfollower.csv"
-    label: "리포트 팔로워 (Sim 7)"
-    display_order: 70
-    ui_key: "sim7"
-    short_desc: "딥다이브 강력 매수 종목 자동 매수 · 트레일링 라이딩"
-    chart_group: 3
-    color: "pink"
-    active: true
-    tradeable: true
-    needs_buzz: true  # Stage 3.5 딥다이브 결과를 소비
-
   - id: "sim10_orchestrator"
     module: "src.strategy.simulators.sim10_orchestrator"
     class: "Sim10OrchestratorSimulator"

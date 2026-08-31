@@ -9,7 +9,8 @@
 그 손실 비율이 줄어든다.
   B. Sim7만 분모가 '잔여 현금'이라 매수마다 복리로 감쇠 (5번째 픽 = 첫 픽의 60%)
   C. 분모가 initial_cash 고정이라 수익금이 영구 유휴 현금으로 남음
-여기서 A/B/C의 재발을 각각 잠근다.
+여기서 A/B/C의 재발을 각각 잠근다. (B는 2026-08-31 심7 제거와 함께 그 회귀
+테스트도 같이 정리됐다 — 대상 코드가 없다.)
 """
 import os
 import sys
@@ -25,7 +26,6 @@ from src.strategy.simulators import (
     sim1_psych,
     sim5_sideways_swing,
     sim6_bear_hedge,
-    sim7_report_follower,
 )
 from src.strategy.simulators.sim4_bull_daytrading import decide_bull_daytrade
 from src.strategy.simulators.sim5_sideways_swing import SidewaysSwingSimulator, decide_sideways
@@ -59,8 +59,6 @@ CAPS = [
     ("Sim4-1 단타", sim4_bull_daytrading.POSITION_WEIGHT, sim4_bull_daytrading.MAX_HOLDINGS),
     ("Sim5 레인지", sim5_sideways_swing.POSITION_WEIGHT, sim5_sideways_swing.MAX_HOLDINGS),
     ("Sim6 인버스", sim6_bear_hedge.ENTRY_RATIO, sim6_bear_hedge.MAX_HOLDINGS),
-    ("Sim7 리포트", sim7_report_follower.ReportFollowerSimulator.WEIGHT_MAX,
-     sim7_report_follower.ReportFollowerSimulator.MAX_HOLDINGS),
 ]
 
 
@@ -140,16 +138,3 @@ def test_sim5_fills_to_95pct():
     spent = sum(o['quantity'] * o['price'] for o in buys)
     assert len(buys) == sim5_sideways_swing.MAX_HOLDINGS
     assert spent / NAV == pytest.approx(0.95, abs=0.01)
-
-
-# ---------------------------------------------------------------- 원인 B: Sim7 복리 감쇠
-def test_sim7_position_sizes_do_not_decay(tmp_path):
-    """잔여현금 기준이면 뒤로 갈수록 매수액이 줄어든다. NAV 기준이면 균등해야 한다."""
-    s = _sim(tmp_path, cls=sim7_report_follower.ReportFollowerSimulator)
-    picks = [{'code': f'P{i}', 'name': f'픽{i}', 'current_price': 1_000} for i in range(6)]
-    s.buy_from_report(picks, bull_score=100.0)  # weight = WEIGHT_MAX
-
-    costs = [p['quantity'] * p['avg_price'] for p in s.state['portfolio'].values()]
-    assert len(costs) == sim7_report_follower.ReportFollowerSimulator.MAX_HOLDINGS
-    assert max(costs) - min(costs) <= 1_000, f"매수액 감쇠 발생: {costs}"
-    assert sum(costs) / NAV == pytest.approx(0.95, abs=0.01)

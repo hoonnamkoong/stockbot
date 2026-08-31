@@ -29,25 +29,6 @@ def _status_of(item) -> str:
     return getattr(item, 'status', '활성')
 
 
-# 2026-08-27: 45.0 → 40.0. 그날 14시 슬롯에 딥다이브 강력매수가 2개 있었는데
-# bull_score 43.1로 미달해 통째로 스킵됐다. 40~45는 "약한 횡보"이고 리포트
-# 강력매수는 국면과 독립된 별도 신호라, 같은 약세를 두 번 세고 있었다.
-# 심의 비중 앵커(ReportFollowerSimulator.GATE=45)는 일부러 그대로 둔다 —
-# 40~45 구간은 최소 비중(WEIGHT_MIN)으로 클램프돼 가장 약한 확신에 가장
-# 작은 포지션이 붙는다.
-SIM7_BULL_SCORE_MIN = 40.0
-
-
-def sim7_should_buy(strong_picks: list, bull_score) -> bool:
-    """Stage 3.6 게이트 — '강력 매수'가 있고 장이 죽지 않았을 때만 산다.
-
-    bull_score가 None이면 사지 않는다. 예전에는 국면 파일 조회에 실패하면
-    50.0으로 폴백했고, 그 지어낸 점수가 45 게이트를 그대로 통과해 실제 매수가
-    나갔다. 모르는 것은 '보통 장'이 아니다.
-    """
-    return bool(strong_picks) and bull_score is not None and bull_score >= SIM7_BULL_SCORE_MIN
-
-
 def active_only(items: list) -> list:
     """추적 종목은 기록(엑셀·대시보드)용이다.
 
@@ -238,32 +219,6 @@ def run_pipeline(ctx: PipelineContext) -> None:
     if not final_picks:
         # [Bug 1 Fix] 신규 picks 없어도 reports.json 항상 재생성
         storage.rebuild_reports_index(ctx.now_kst)
-
-    # ── Stage 3.6: Sim7 신규 매수 ────────────────────────────────
-    # [2026-08-31] **지금 이 블록은 절대 매수하지 않는다.**
-    # rank_and_recommendation을 채우던 유일한 곳이 advisor의 딥다이브 리포트
-    # 생성기였고, 그게 11:00·14:00 리포트와 함께 폐기됐다(커밋 705d0b891).
-    # 여기에 그 함수 이름을 그대로 적지 않는다 — tests/test_report_retired.py가
-    # src 전체를 grep해 부활을 막는 감시 테스트라 주석까지 걸린다.
-    # 이제 아무도 그 필드를 쓰지 않으므로 strong_picks는 항상 빈 목록이다.
-    # 다음 Task에서 심7 자체를 제거한다 — 그때까지 이 블록은 매 사이클
-    # "강력매수=0개"만 로그한다. 되살리려면 판정 소스부터 새로 있어야 한다.
-    try:
-        strong_picks = [
-            p for p in final_picks
-            if '강력 매수' in (p.get('rank_and_recommendation') or '')
-        ]
-        _, bull_score = read_regime('data')
-
-        if sim7_should_buy(strong_picks, bull_score):
-            from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator
-            ctx.log(f"▶ Stage 3.6: Sim7 강력 매수 처리 ({len(strong_picks)}개 / bull_score={bull_score:.1f})")
-            ReportFollowerSimulator().buy_from_report(strong_picks, bull_score=bull_score)
-        else:
-            score_txt = '측정 불가' if bull_score is None else f'{bull_score:.1f}'
-            ctx.log(f"▶ Stage 3.6: Sim7 스킵 (강력매수={len(strong_picks)}개 / bull_score={score_txt})")
-    except Exception as _e:
-        ctx.log(f"[Warn] Stage 3.6 Sim7 실패: {_e}")
 
     # ── Stage 4: 브리핑 발송 + 최종 저장 ─────────────────────────
     ctx.log("▶ Stage 4: 브리핑 발송 + 저장")

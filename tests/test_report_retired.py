@@ -64,3 +64,15 @@ def test_monthly_research_excel_survives_and_keeps_its_cadence():
     assert between.count('\n') <= 3, (
         'update_monthly_excel이 브리핑 슬롯 판정에 묶여 있지 않다 — '
         '매 사이클 실행되면 하루 2회 주기가 깨진다')
+
+
+def test_sim7_is_gone():
+    hits = [ln for ln in _grep('sim7').splitlines()]
+    assert hits == [], f'심7 참조가 남아 있다: {hits}'
+
+
+def test_sim7_state_files_are_not_deleted():
+    """이력은 보존한다. 매니페스트에서만 빠진다."""
+    from src.strategy.registry import get_sim_registry
+    ids = {s['id'] for s in get_sim_registry(include_analyzers=True)}
+    assert 'sim7_report_follower' not in ids

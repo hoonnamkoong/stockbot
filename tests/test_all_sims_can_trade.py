@@ -175,18 +175,6 @@ def test_sim3_value_can_buy(tmp_path):
     assert len(s.state['portfolio']) == s.MAX_HOLDINGS
 
 
-def test_sim7_report_can_buy(tmp_path):
-    """심7은 후보가 아니라 **리포트 픽**에서 산다."""
-    from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator
-    s = _sim(ReportFollowerSimulator, tmp_path)
-    picks = [{'code': f'{i:06d}', 'name': f'픽{i}', 'price': 1000,
-              'signal': 'BUY', 'fact_score': 90} for i in range(s.MAX_HOLDINGS + 3)]
-
-    s.buy_from_report(picks, bull_score=80.0)
-
-    assert len(s.state['portfolio']) == s.MAX_HOLDINGS
-
-
 # ── 심10 오케스트레이터 (국면별 위임) ────────────────────────────────
 
 @pytest.mark.parametrize('regime, maker', [('SIDEWAYS', _box), ('BULL', _momentum)])

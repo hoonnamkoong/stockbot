@@ -218,10 +218,12 @@ class TradeEngineWorker(BaseWorker):
         except Exception as e:
             self.log_error(f"신호 관측 기록 실패(무시하고 계속): {e}")
 
-        # 3. 중복 방지: 당일 이미 딥다이브가 나간 종목 제외
+        # 3. 중복 방지: 당일 이미 선정된 종목 제외
+        # 필드명(daily_deep_dive_codes)은 딥다이브 시절 이름 그대로다 — 상태
+        # 파일이 db-data를 왕복하므로 이름을 바꾸면 그날 기록이 통째로 날아간다.
         deep_dived = sync_state.daily_deep_dive_codes
 
-        # BUY/WATCH 시그널 중 오늘 딥다이브 안 나간 종목을 전부 모은다 — 순서는
+        # BUY/WATCH 시그널 중 오늘 아직 안 뽑힌 종목을 전부 모은다 — 순서는
         # 안 본다. 상위 5개는 "먼저 만난 순"이 아니라 fact_score·tick_power
         # 순위 결합(rank_top, pick_features.py)으로 뽑는다.
         eligible = []
@@ -238,38 +240,34 @@ class TradeEngineWorker(BaseWorker):
         from src.strategy.pick_features import rank_top
         final_picks = rank_top(eligible, n=5)
 
-        # 4. 실전 계좌 매도 후보 선정 (정각 텔레그램 타이밍에만)
+        # 4. 매도 추천 후보는 더 이상 뽑지 않는다.
+        # 이 값의 소비자는 딥다이브 리포트 하나뿐이었다(2026-08-31 리포트 폐기).
+        # 소비자가 없는데 남겨두면 슬롯마다 잔고 조회 + Gemini 호출이 그대로
+        # 나간다. 반환 자리는 유지한다 — 호출부가 3-튜플을 푼다.
         sell_candidate = None
-        if self.ctx.should_notify():
-            try:
-                from src.strategy.advisor import StrategyAdvisor
-                from src.trade.balance import get_balance
-                advisor = StrategyAdvisor()
-                balance = get_balance()
-                if not balance.get('error'):
-                    holdings = balance.get('holdings', [])
-                    # 보유 종목 중 오늘 딥다이브 안 나간 것만 대상으로 선정
-                    potential_sells = [h for h in holdings if h['code'] not in deep_dived]
-                    sell_candidate = advisor.select_sell_candidate(potential_sells)
-                    if sell_candidate:
-                        self.log(f"매도 추천 후보 선정: {sell_candidate['name']}")
-            except Exception as e:
-                self.log_error(f"매도 후보 선정 실패: {e}")
 
-        # 5. 신규 보고 종목 상태 기록 - 정각 텔레그램 타이밍에만 수행
+        # 5. 신규 선정 종목 상태 기록 - 브리핑 슬롯에만 수행
+        #
+        # 예전 게이트는 리포트 슬롯(should_notify)이었다. 리포트가 폐기됐으므로
+        # 브리핑 슬롯으로 옮긴다 — **하루 2회라는 주기를 그대로 유지하기
+        # 위해서다.** 매 사이클로 풀면 첫 사이클에 후보가 전부 소진돼
+        # final_picks가 빈 채로 남고, 같은 슬롯에 기록되는 월별 리서치
+        # 엑셀(orchestrator)과 선정 목록이 어긋난다.
         hour = self.ctx.now_kst.hour
         is_morning = hour < 12
         session_name = "오전" if is_morning else "오후"
 
-        if (final_picks or sell_candidate) and self.ctx.should_notify():
-            self.log(f"[{session_name} 세션] 신규 보고 대상 상태 기록 (Deep-Dive)")
-            
-            # 딥다이브 중복 방지 리스트에 추가
+        from src.pipeline.daily_brief import should_send_brief
+        brief_open = should_send_brief(
+            self.ctx.now_kst, getattr(self.ctx, '_report_data_dir', None))
+
+        if final_picks and brief_open:
+            self.log(f"[{session_name} 세션] 신규 선정 종목 상태 기록")
+
+            # 당일 중복 선정 방지 리스트에 추가
             for p in final_picks:
                 if p['code'] not in sync_state.daily_deep_dive_codes:
                     sync_state.daily_deep_dive_codes.append(p['code'])
-            if sell_candidate and sell_candidate['code'] not in sync_state.daily_deep_dive_codes:
-                sync_state.daily_deep_dive_codes.append(sell_candidate['code'])
             
             # 세션별 일반 보고 리스트에도 추가 (기존 대시보드 호환)
             new_items = [{'code': p['code'], 'name': p['name'], 'rank': p.get('rank', 0)} for p in final_picks]
@@ -288,8 +286,8 @@ class TradeEngineWorker(BaseWorker):
                 sync_state.afternoon_complete = total_session >= 9
             
             self.storage.save_sync_state(sync_state)
-        elif final_picks or sell_candidate:
-            self.log(f"[{session_name} 세션] 정각 아님 - 종목 상태 기록 생략")
+        elif final_picks:
+            self.log(f"[{session_name} 세션] 브리핑 슬롯 아님 - 종목 상태 기록 생략")
 
         # 6. 시뮬레이터 실행 (Registry에서 자동 로드; sim0_libero는 run_regime_stage()가 별도로 돔)
         self._run_simulators(candidates, exclude_sim_ids=paper_owned_elsewhere)

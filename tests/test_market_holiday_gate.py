@@ -177,16 +177,18 @@ def test_pipeline_stops_without_warning_on_holiday(monkeypatch):
     assert sent == []
 
 
-def test_warning_bypasses_should_notify(monkeypatch):
-    """경고는 should_notify()의 정각 제한을 타지 않는다.
+def test_warning_bypasses_the_send_slot_gate(monkeypatch):
+    """경고는 발송 슬롯 제한을 타지 않는다.
 
-    15/30/45분 런에서 침묵하면 장애를 놓친다.
+    15/30/45분 런에서 침묵하면 장애를 놓친다. 예전 tripwire는
+    PipelineContext.should_notify()였는데 2026-08-31 리포트 폐기로 사라졌다 —
+    남은 발송 판정(브리핑 슬롯)은 전부 gate._due를 거치므로 그쪽에 건다.
     """
     from src.pipeline import orchestrator
 
-    monkeypatch.setattr(PipelineContext, 'should_notify',
-                        lambda self: (_ for _ in ()).throw(
-                            AssertionError("경고는 should_notify를 호출하면 안 된다")))
+    monkeypatch.setattr('src.report.gate._due',
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("경고는 발송 슬롯을 물어보면 안 된다")))
 
     messages = []
 

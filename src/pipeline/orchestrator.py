@@ -224,31 +224,16 @@ def run_pipeline(ctx: PipelineContext) -> None:
             skip_program_trading=not scraper_owns_trading,
             paper_owned_elsewhere=paper_owned_elsewhere)
 
-    # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
-    deep_dive_report = ""
-    if ctx.should_notify():
-        # [2026-08-11] 상세 리포트 대상: 추천 상위 5개(fact_score·tick_power
-        # 순위 결합) + 매도 후보 1개. trade_engine.rank_top()이 이미 5개로
-        # 잘라 넘기므로 여기서는 그 값을 그대로 쓴다.
-        if final_picks or sell_candidate:
-            ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 (추천:{len(final_picks)}개, 매도:{1 if sell_candidate else 0}개)")
-            deep_dive_report = analyzer_worker.generate_deep_dive(final_picks, candidates, sell_candidate=sell_candidate)
-            # 월별 리서치 엑셀에도 기록
-            if final_picks:
-                storage.update_monthly_excel(final_picks, ctx.now_kst)
-        else:
-            # 오늘 이미 보고된 종목들만 있는 경우
-            daily_info = sync_state.daily_reported_info
-            if simulation_results and any(r.get('signal') in ['BUY', 'WATCH'] for r in simulation_results):
-                names_str = ", ".join(item['name'] for item in daily_info)
-                dashboard_url = "https://stockbot-phi.vercel.app/api/download/excel"
-                deep_dive_report = (
-                    f"[안내] 이번 회차의 모든 종목은 오늘 이미 보고되었습니다.\n"
-                    f"오늘 보고 종목: {names_str}\n\n"
-                    f"리포트 다운로드: {dashboard_url}"
-                )
-    else:
-        ctx.log("▶ Stage 3.5: 정각 발송 타이밍 아님 (딥다이브 생성 생략)")
+    # ── 월별 리서치 엑셀 ─────────────────────────────────────────
+    # 예전에는 Stage 3.5(딥다이브) 안에 중첩돼 있었다. 리포트를 폐기하면서
+    # 이것까지 같이 죽으면 2026-08-31에 "살아있는 산출물이라 유지"로 결정한
+    # reports/monthly_research_*.xlsx가 조용히 멈춘다.
+    # 발동 조건을 브리핑 슬롯으로 옮겨 **하루 2회라는 기존 주기를 유지한다** —
+    # 매 사이클로 옮기면 행 수가 수십 배가 되어 성격이 달라진다.
+    from src.pipeline.daily_brief import should_send_brief
+    if final_picks and should_send_brief(ctx.now_kst,
+                                         getattr(ctx, '_report_data_dir', None)):
+        storage.update_monthly_excel(final_picks, ctx.now_kst)
 
     if not final_picks:
         # [Bug 1 Fix] 신규 picks 없어도 reports.json 항상 재생성
@@ -273,17 +258,15 @@ def run_pipeline(ctx: PipelineContext) -> None:
     except Exception as _e:
         ctx.log(f"[Warn] Stage 3.6 Sim7 실패: {_e}")
 
-    # ── Stage 4: 텔레그램 발송 + 최종 저장 ───────────────────────
-    ctx.log("▶ Stage 4: 리포트 발송 + 저장")
+    # ── Stage 4: 브리핑 발송 + 최종 저장 ─────────────────────────
+    ctx.log("▶ Stage 4: 브리핑 발송 + 저장")
     # 최신 sync_state 재로드 (Stage 3에서 업데이트됐을 수 있음)
     sync_state, _ = storage.load_sync_state(ctx.today_str)
-    # 추적 종목은 5일/3일 누적 보드(_aggregate_multi_day), 텔레그램 종목 수,
-    # reported_codes에 섞이면 안 된다. 이 인자가 그 넷의 유일한 입구다.
+    # 추적 종목은 5일/3일 누적 보드(_aggregate_multi_day)에 섞이면 안 된다.
+    # 이 인자가 그 보드의 유일한 입구다.
     NotifierWorker(ctx, storage).run(
         all_stocks=active_only(candidates),
         simulation_results=simulation_results,
-        final_picks=final_picks,
-        deep_dive_report=deep_dive_report,
         sync_state=sync_state,
     )
 

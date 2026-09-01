@@ -143,13 +143,27 @@ def _cache_issued_minutes_ago(minutes):
             "expires_at": (issued + tm.timedelta(hours=24)).isoformat()}
 
 
-def test_형제_런이_방금_발급했으면_성공으로_본다(monkeypatch):
+def test_형제_런이_방금_발급했으면_성공으로_본다(tmp_path, monkeypatch):
+    """같은 초에 도착한 형제 런의 기록은 **읽는 순서**로만 보인다.
+
+    첫 읽기(발급 시도 전)에는 저장소가 비어 있고, 형제가 그 사이에 쓴다.
+    그래서 발급 거부 뒤 **다시 읽어야** 보인다 — 발급 앞의 레이트 가드는
+    이 경우를 잡지 못한다(잡을 수가 없다). 두 판정은 겹치지 않는다.
+    """
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
-    monkeypatch.setattr(tm, "load_token_cache", lambda: _cache_issued_minutes_ago(1))
+
+    reads = []
+
+    def fake_load():
+        reads.append(1)
+        return None if len(reads) == 1 else _cache_issued_minutes_ago(0)
+
+    monkeypatch.setattr(tm, "load_token_cache", fake_load)
     monkeypatch.setattr(tm, "issue_new_token", lambda: None)   # EGW00133
-    monkeypatch.setattr(tm, "save_token_cache", lambda t: None)
 
     assert tm.manage() is True
+    assert len(reads) == 2, "발급 거부 뒤 저장소를 다시 읽지 않았다"
 
 
 def test_오래된_토큰은_발급실패를_덮지_않는다(monkeypatch):
@@ -187,3 +201,57 @@ def test_형제_런_경로에서도_로컬_캐시를_남긴다(tmp_path, monkeyp
     import json
     written = json.loads((tmp_path / "data" / "kis_token_cache.json").read_text(encoding="utf-8"))
     assert written["access_token"] == cache["access_token"]
+
+
+# ── 강제 갱신 레이트 가드 ──────────────────────────────────────────
+# force의 유일한 정당한 용도는 장 전 하루 1회 선발급이다. 트리거가 한 번
+# 어긋나자(07시대 라우팅) 2분마다 발급됐다 — 2026-09-02 07:00~07:50 26회.
+# 그때 발급과 트리거 버그 사이에 있던 유일한 방어가 다른 언어·다른 레이어의
+# 라우팅 함수(Vercel TS)였다. 돈 경로의 방어는 돈 경로 옆에 둔다.
+
+def test_강제갱신이어도_방금_발급했으면_다시_발급하지_않는다(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
+    cache = _cache_issued_minutes_ago(2)
+    monkeypatch.setattr(tm, "load_token_cache", lambda: cache)
+
+    called = []
+    monkeypatch.setattr(tm, "issue_new_token", lambda: called.append(1))
+
+    assert tm.manage() is True
+    assert called == [], "간격 안인데 KIS에 발급을 요청했다"
+
+
+def test_강제갱신은_간격이_지나면_발급한다(tmp_path, monkeypatch):
+    """가드가 하루 한 번의 장 전 선발급까지 막으면 안 된다."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
+    old = _cache_issued_minutes_ago(tm.FORCE_ISSUE_MIN_INTERVAL_MIN + 1)
+    monkeypatch.setattr(tm, "load_token_cache", lambda: old)
+
+    called = []
+    monkeypatch.setattr(tm, "issue_new_token",
+                        lambda: called.append(1) or {"access_token": "new"})
+    monkeypatch.setattr(tm, "save_token_cache", lambda t: None)
+
+    with pytest.raises(SystemExit):   # force 성공은 sys.exit(0)로 끝난다
+        tm.manage()
+    assert called == [1]
+
+
+def test_만료된_토큰은_간격과_무관하게_발급한다(tmp_path, monkeypatch):
+    """가드는 **유효한** 토큰이 있을 때만 막는다 — 진짜 필요한 발급은 안 막는다."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
+    expired = _cache_issued_minutes_ago(2)
+    expired["expires_at"] = "2000-01-01T00:00:00+09:00"   # 방금 발급됐지만 만료
+    monkeypatch.setattr(tm, "load_token_cache", lambda: expired)
+
+    called = []
+    monkeypatch.setattr(tm, "issue_new_token",
+                        lambda: called.append(1) or {"access_token": "new"})
+    monkeypatch.setattr(tm, "save_token_cache", lambda t: None)
+
+    with pytest.raises(SystemExit):
+        tm.manage()
+    assert called == [1]

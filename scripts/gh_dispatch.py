@@ -101,6 +101,49 @@ def ran_since(wf: str, since, log=print) -> bool | None:
     return False
 
 
+def should_skip(runs: list[dict], now, since, max_attempts: int = 6,
+                cooldown_min: int = 25) -> tuple[bool, str]:
+    """태스커가 2분마다 때리는 창에서 "지금 깨울까"를 정한다. (생략할까, 이유).
+
+    `since` 이후에 시작한 런만 본다 — 그 앞의 런은 다른 창의 것이라 없는 것과 같다.
+
+    2026-09-01 하루에 세 번 고쳐진 판정이라 한 곳에 모았다:
+      - **성공한 런이 있을 때만** '이미 돌았다'로 본다. 시작 시각만 보던 시절,
+        KIS 타임아웃으로 죽은 EOD 배치가 **자기 재시도를 스스로 막았다.**
+      - 실패에는 간격을 둔다. 간격이 없으면 상한을 장애 초반 몇 분에 소진하고
+        그 뒤 회복해도 다시 안 깨운다.
+      - 상한에 닿으면 멈추고 사람을 부른다. 태스커가 2분마다 들어오므로 상한이
+        없으면 지속 장애에서 수십 번 dispatch한다.
+    **상한과 간격은 같이 있어야 의미가 있다.**
+
+    `conclusion`이 success도 None도 아니면 시도로 센다(cancelled 포함) — EOD에서
+    쓰던 판정을 그대로 옮긴 것이다.
+    """
+    import datetime as _dt
+
+    def _started(r):
+        return _dt.datetime.fromisoformat(r['created_at'].replace('Z', '+00:00'))
+
+    window = [r for r in runs if _started(r) >= since]
+
+    if any(r.get('conclusion') == 'success' for r in window):
+        return True, '창 안에 성공한 런이 있다'
+    if any(r.get('status') in ('queued', 'in_progress') for r in window):
+        return True, '지금 돌고 있다'
+
+    failed = [r for r in window if r.get('conclusion') not in (None, 'success')]
+    if len(failed) >= max_attempts:
+        # 조용히 멈추면 안 된다 — 산출물이 없는 채로 다음 세션에 들어간다.
+        return True, f'{len(failed)}회 실패 — 상한({max_attempts}) 도달, 사람이 봐야 한다'
+    if failed:
+        waited = (now - max(_started(r) for r in failed)).total_seconds() / 60
+        if waited < cooldown_min:
+            return True, (f'직전 실패로부터 {waited:.0f}분 — '
+                          f'{cooldown_min}분 간격을 둔다')
+        return False, f'{len(failed)}회 실패, {waited:.0f}분 경과 — 재시도한다'
+    return False, '창 안에 런이 없다'
+
+
 def dispatch(wf: str, log=print) -> bool:
     tok = token()
     if not tok:

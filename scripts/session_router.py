@@ -3,7 +3,7 @@
 
     python3 scripts/session_router.py >> "$GITHUB_OUTPUT"
 
-태스커는 09:00~06:00 KST에 2분 간격으로 trading.yml **하나만** 부른다. 그 창의
+태스커는 09:00~08:00 KST에 2분 간격으로 trading.yml **하나만** 부른다. 그 창의
 절반 이상은 어느 장도 아니므로(15:50~22:30 KST), 이 스텝은 pip install 앞에
 놓여 장 밖 트리거를 checkout만 하고 끝내야 한다. 그래서 표준 라이브러리만 쓴다
 — tests/test_session_router.py가 그 제약을 지킨다.
@@ -15,7 +15,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.session_gate import (  # noqa: E402
-    kr_audit_window, kr_eod_window, kr_session_open, us_session_open)
+    kr_audit_window, kr_eod_window, kr_session_open, premarket_window,
+    us_session_open, us_watchlist_window)
 
 _KST = dt.timezone(dt.timedelta(hours=9))
 
@@ -27,7 +28,10 @@ def decide(now_utc: dt.datetime | None = None) -> dict[str, bool]:
     return {'kr': kr_session_open(now_kst),
             'us': us_session_open(now_utc),
             'eod': kr_eod_window(now_kst),
-            'audit': kr_audit_window(now_kst)}
+            'audit': kr_audit_window(now_kst),
+            # 2026-09-01: 이 둘은 네이티브 cron 전용이라 +3~11시간씩 밀렸다.
+            'watchlist': us_watchlist_window(now_kst),
+            'premarket': premarket_window(now_kst)}
 
 
 def render() -> str:

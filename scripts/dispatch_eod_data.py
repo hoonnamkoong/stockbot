@@ -29,52 +29,23 @@ _KST = dt.timezone(dt.timedelta(hours=9))
 _KR_CLOSE_HHMM = (15, 30)
 
 
-# 실패한 배치를 몇 번까지 다시 깨울지. 태스커가 창(16:00~23:00) 안에서 2분마다
-# 들어오므로 상한이 없으면 지속 장애 시 수백 번 디스패치한다.
+# 재시도 상한과 간격. 판정 자체는 gh_dispatch.should_skip에 있다 —
+# us_eod_watchlist·premarket도 같은 판정을 쓰므로 세 벌로 복사하지 않는다.
 _MAX_ATTEMPTS = 6
-
-# 재시도 사이에 두는 간격. 2026-09-01의 외부 장애는 몇 시간짜리였는데, 간격이
-# 없으면 상한 6회를 12분 만에 소진하고 그 뒤 회복해도 다시 안 깨운다.
-# **상한과 간격은 같이 있어야 의미가 있다** — 상한만 있으면 장애 초반에
-# 다 써버리고, 간격만 있으면 밤새 깨운다.
 _RETRY_COOLDOWN_MIN = 25
 
 
 def should_skip(runs: list[dict], now_kst: dt.datetime) -> tuple[bool, str]:
-    """(생략할까, 이유). 오늘 마감 이후의 런만 본다.
+    """(생략할까, 이유). **오늘 마감 이후**의 런만 본다.
 
-    **성공한 런이 있을 때만 '이미 돌았다'로 본다.** 예전에는 시작 시각만 보고
-    판단해서, 2026-09-01에 KIS 타임아웃으로 죽은 EOD 배치가 **자기 재시도를
-    스스로 막았다.** 그날 심9-1·심11의 다음 세션 감시목록이 안 만들어졌고,
-    그건 두 심이 다음 날을 통째로 잃는다는 뜻이다.
-
-    다만 무한 재시도는 안 된다 — 태스커가 2분마다 들어오므로 지속 장애에서
-    수십 번 깨우게 된다. 실패 횟수에 상한을 둔다.
+    창 시작(16:00)이 아니라 마감(15:30)을 기준으로 삼는다 — 장중에 돈 런은
+    eod_data.yml의 게이트에 막혀 종가를 안 쓰므로 '돌았다'로 치면 안 된다.
     """
     close = now_kst.replace(hour=_KR_CLOSE_HHMM[0], minute=_KR_CLOSE_HHMM[1],
                             second=0, microsecond=0)
-    today = [r for r in runs
-             if dt.datetime.fromisoformat(
-                 r['created_at'].replace('Z', '+00:00')).astimezone(_KST) >= close]
-
-    if any(r.get('conclusion') == 'success' for r in today):
-        return True, '오늘 성공한 런이 있다'
-    if any(r.get('status') in ('queued', 'in_progress') for r in today):
-        return True, '지금 돌고 있다'
-
-    failed = [r for r in today if r.get('conclusion') not in (None, 'success')]
-    if len(failed) >= _MAX_ATTEMPTS:
-        # 여기서 조용히 멈추면 안 된다 — 감시목록이 없는 채로 다음 세션에 들어간다.
-        return True, f'오늘 {len(failed)}회 실패 — 상한({_MAX_ATTEMPTS}) 도달, 사람이 봐야 한다'
-    if failed:
-        newest = max(dt.datetime.fromisoformat(r['created_at'].replace('Z', '+00:00'))
-                     for r in failed)
-        waited = (now_kst - newest.astimezone(_KST)).total_seconds() / 60
-        if waited < _RETRY_COOLDOWN_MIN:
-            return True, (f'직전 실패로부터 {waited:.0f}분 — '
-                          f'{_RETRY_COOLDOWN_MIN}분 간격을 둔다')
-        return False, f'오늘 {len(failed)}회 실패, {waited:.0f}분 경과 — 재시도한다'
-    return False, '오늘 마감 뒤 런이 없다'
+    return gh.should_skip(runs, now_kst, close,
+                          max_attempts=_MAX_ATTEMPTS,
+                          cooldown_min=_RETRY_COOLDOWN_MIN)
 
 
 def already_ran(created_ats: list[str], now_kst: dt.datetime) -> bool:

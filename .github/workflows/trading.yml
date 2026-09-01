@@ -104,6 +104,33 @@ jobs:
       #
       # 창(09:00~09:30 KST)에 2분마다 트리거가 오지만 dispatch_data_audit.py가
       # "오늘 이미 돌았나"를 먼저 봐서 하루 한 번만 나간다.
+      # 미국장 마감 뒤 워치리스트 배치를 깨운다. 이 워크플로는 태스커 체인 밖의
+      # 네이티브 cron(22:00 UTC) 전용이었고, 실측 지연이 +29분에서 +3~8시간으로
+      # 벌어졌다. 그 지연이 2026-09-01에 배치를 scraper 창 안으로 밀어 넣어
+      # 워치리스트가 되돌려지는 사고를 만들었다.
+      #
+      # 창(07:00~15:00 KST, 화~토)에 2분마다 트리거가 오지만 실제 dispatch는
+      # dispatch_us_eod_watchlist.py가 정한다 — 성공했으면 생략, 실패면 25분
+      # 간격으로 재시도, 상한 6회.
+      - name: Wake US watchlist batch
+        if: steps.route.outputs.watchlist == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python3 scripts/dispatch_us_eod_watchlist.py
+
+      # 프리마켓·미국지수 적재도 같은 이유로 깨운다(cron 22:20 UTC, 실측 최대
+      # +7시간 50분). 여기서는 지연이 곧 결손이다 — 국내 개장을 넘겨 도착하면
+      # 그날 프리마켓 판단에 못 쓴다.
+      - name: Wake premarket batch
+        if: steps.route.outputs.premarket == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python3 scripts/dispatch_premarket_data.py
+
       - name: Wake data freshness audit
         if: steps.route.outputs.audit == 'true'
         continue-on-error: true

@@ -87,3 +87,57 @@ def test_us_est_경계():
 def test_us_주말은_닫힌다():
     assert us_session_open(_utc(2026, 8, 29, 15, 0)) is False  # 토
     assert us_session_open(_utc(2026, 8, 30, 15, 0)) is False  # 일
+
+
+# ── cron 지연을 피해 태스커로 옮긴 두 창 (2026-09-01) ────────────────
+# us_eod_watchlist(22:00 UTC)·premarket_data(22:20 UTC)는 태스커 체인 밖의
+# 네이티브 cron 전용이었다. 실측 지연이 +29분에서 +3~11시간으로 벌어졌고,
+# 그 지연이 워치리스트 배치를 scraper 창 안으로 밀어 넣어 2026-09-01 사고가 났다.
+#
+# 두 cron 시각(07:00·07:20 KST)은 옛 태스커 창(09:00~06:00)의 사각지대였다.
+# 창을 08:00까지 늘리면서 이 두 창이 그 안에 들어온다.
+
+from src.session_gate import premarket_window, us_watchlist_window  # noqa: E402
+
+
+def test_워치리스트_창은_미국_마감_뒤_아침에_열린다():
+    # 화요일 07:00 KST = 월요일 22:00 UTC — 기존 cron과 같은 시각
+    assert us_watchlist_window(_kst(2026, 9, 1, 7, 0)) is True
+    assert us_watchlist_window(_kst(2026, 9, 1, 6, 59)) is False
+
+
+def test_워치리스트_창은_오후까지_열려_있다():
+    """07:00~08:00만 주면 1시간뿐이라 몇 시간짜리 장애를 못 버틴다 — EOD 창에서
+    이미 겪은 실패다. 태스커가 09:00에 다시 열리므로 15:00까지 두면 재시도
+    기회가 충분하고, 그래도 미국 개장(22:30 KST)보다 한참 이르다."""
+    assert us_watchlist_window(_kst(2026, 9, 1, 14, 59)) is True
+    assert us_watchlist_window(_kst(2026, 9, 1, 15, 0)) is False
+
+
+def test_워치리스트_창은_토요일_아침까지_있다():
+    """금요일 미국 마감(토 05:00~06:00 KST) 뒤에도 만들어야 다음 월요일 세션을
+    잃지 않는다. 태스커 프로파일이 월~토인 이유와 같다."""
+    assert us_watchlist_window(_kst(2026, 9, 5, 7, 0)) is True     # 토
+
+
+def test_워치리스트_창은_월요일_아침에는_닫혀_있다():
+    """월요일 07:00 KST = 일요일 22:00 UTC — 미국장이 없던 날의 다음 아침이다."""
+    assert us_watchlist_window(_kst(2026, 8, 31, 7, 0)) is False   # 월
+    assert us_watchlist_window(_kst(2026, 9, 6, 7, 0)) is False    # 일
+
+
+def test_프리마켓_창은_국내_개장_전에_열린다():
+    assert premarket_window(_kst(2026, 9, 1, 7, 20)) is True
+    assert premarket_window(_kst(2026, 9, 1, 7, 19)) is False
+
+
+def test_프리마켓_창은_개장_뒤에도_잠시_열려_있다():
+    """개장 전이 이상적이지만, investor_flows.csv는 심13이 장중에 읽는다 —
+    늦더라도 채우는 편이 빈 것보다 낫다."""
+    assert premarket_window(_kst(2026, 9, 1, 11, 59)) is True
+    assert premarket_window(_kst(2026, 9, 1, 12, 0)) is False
+
+
+def test_프리마켓_창은_평일만():
+    assert premarket_window(_kst(2026, 9, 5, 7, 30)) is False      # 토
+    assert premarket_window(_kst(2026, 9, 6, 7, 30)) is False      # 일

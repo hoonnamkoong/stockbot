@@ -14,6 +14,12 @@ from .base_simulator import BaseSimulator, ensure_csv_header, get_kst_now, CSV_H
 import csv
 
 
+# US 심 초기자본의 단일 원천. **통화가 다르다**(USD) — 국내의
+# DEFAULT_INITIAL_CASH(원)와 섞으면 안 된다. 이 값도 2026-09-01까지 US 심 3곳에
+# 각각 박혀 있었고, 국내에서 같은 형태가 사고를 낸 적이 있어 함께 정리한다.
+US_DEFAULT_INITIAL_CASH = 20_000
+
+
 class USBaseSimulator(BaseSimulator):
     BUY_FEE_RATE = 0.0
     SELL_FEE_RATE = 0.0

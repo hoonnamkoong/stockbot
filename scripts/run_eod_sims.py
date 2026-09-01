@@ -230,7 +230,10 @@ def _run_sim9_1(path: str) -> int:
     # 항상 None을 주고, registry는 yaml에 의존해 EOD 워크플로의 최소 의존성
     # (requests·beautifulsoup4)을 넘어선다.
     from src.strategy.simulators.sim9_1_donchian import DonchianBreakoutSimulator
-    sim = DonchianBreakoutSimulator(initial_cash=3_000_000)
+    # 인자를 명시하지 않는다. 여기서 숫자를 적으면 **이 심만** 다른 초기자본으로
+    # 돌아 대시보드와 텔레그램이 서로 다른 수익률을 말한다. 심의 기본값이
+    # DEFAULT_INITIAL_CASH를 가리키므로 그냥 비워 두는 것이 단일 원천이다.
+    sim = DonchianBreakoutSimulator()
     before = len(sim.state.get('portfolio', {}))
     stats = run_donchian(sim, candidates)
     after = len(sim.state.get('portfolio', {}))

@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator, get_kst_date
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH, log_funnel
 
 _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
@@ -278,7 +278,7 @@ class RegimeDualSimulator(BaseSimulator):
     - 페이퍼 관찰 단계(tradeable: false) — 백테스트 미검증, 임계값은 리서치 분위수
       경계의 근사치다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("RegimeDual", initial_cash)
 
     def get_universe(self):
@@ -327,29 +327,8 @@ class RegimeDualSimulator(BaseSimulator):
         funnel = []
         orders = decide_sim12(self._view(current_prices), candidates, current_prices,
                               regime, funnel=funnel)
-        self._log_funnel(candidates, funnel, orders, regime)
+        log_funnel('Sim12', candidates, funnel, orders, regime=regime, diag_id='sim12')
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
-    @staticmethod
-    def _log_funnel(candidates, funnel, orders, regime) -> None:
-        """어느 국면에서 어느 게이트에 막혔는지 남긴다 — 심6·심9와 같은 방식
-        (sim_diag)으로 db-data에 남아야 다음 사이클 이후에도 확인 가능하다."""
-        try:
-            from collections import Counter
-            if not funnel and not orders:
-                return
-            try:
-                from src.data import sim_diag
-                sim_diag.append('sim12', [dict(f, decision='skip') for f in funnel]
-                                + [dict(code=o.get('code'), reason='entry', decision='entry')
-                                   for o in orders], log=lambda *_: None)
-            except Exception:
-                pass
-            c = Counter(f['reason'] for f in funnel)
-            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            buy_count = len([o for o in orders if o['action'] == 'BUY'])
-            print(f"[Sim12 깔때기] 국면={regime} 후보 {len(candidates)} → 매수 {buy_count} | 탈락: {parts}")
-        except Exception as e:
-            print(f'[Sim12 깔때기] 기록 실패(무시): {e}')

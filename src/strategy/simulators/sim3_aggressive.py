@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 from datetime import datetime
 
 class AggressiveSimulator(BaseSimulator):
@@ -9,7 +9,7 @@ class AggressiveSimulator(BaseSimulator):
     - Runner: 대량 매도 후 남은 물량은 전일 종가 대비 -5% 하락 시 전량 매도
     - Wide Stop: -7%
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Aggressive", initial_cash) # 파일명: sim_aggressive_state.json
 
     def run(self, candidates, current_prices=None):

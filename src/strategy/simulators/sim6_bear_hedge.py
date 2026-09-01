@@ -1,5 +1,5 @@
 from ..regime_state import read_regime
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, log_funnel
 
 # base 순수 헬퍼 재사용
 _parse_change_rate = BaseSimulator.parse_change_rate
@@ -124,7 +124,7 @@ class BearHedgeSimulator(BaseSimulator):
       비 BEAR면 보유분을 전량 청산한다. 순수 함수 decide_sim6 자체는 국면을 보지 않으며,
       Sim10도 BEAR 국면에서 같은 함수를 재사용한다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Bear", initial_cash)
 
     def get_universe(self):
@@ -154,7 +154,7 @@ class BearHedgeSimulator(BaseSimulator):
         if regime == "BEAR":
             funnel = []
             orders = decide_sim6(self._view(current_prices), candidates, current_prices, funnel=funnel)
-            self._log_funnel(candidates, funnel, orders)
+            log_funnel('Sim6', candidates, funnel, orders, diag_id='sim6')
         else:
             # 비(非)하락장: 인버스 매수 금지 + 보유분 전량 청산(국면 이탈)
             orders = [{'action': 'SELL', 'code': code, 'price': current_prices.get(code, 0),
@@ -166,36 +166,3 @@ class BearHedgeSimulator(BaseSimulator):
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
-    @staticmethod
-    def _log_funnel(candidates, funnel, orders) -> None:
-        """BEAR 국면인데도 매수가 안 될 때 어느 게이트가 막았는지 남긴다.
-
-        유니버스가 1종목(KODEX 인버스)뿐이라 탈락 분포가 곧 그날의 답이다 —
-        `below_ma`뿐이면 MA5 필터가, `daily_down`뿐이면 "당일 상승" 조건이
-        원인으로 확정된다. print는 Actions 로그에만 남아 며칠 뒤엔 못 찾으므로
-        sim1·sim9와 같은 방식으로 파일에도 남긴다(sim_diag).
-
-        진단이 심을 죽이면 안 되니 통째로 삼킨다.
-        """
-        try:
-            from collections import Counter
-            if not funnel and not orders:
-                return
-            try:
-                from src.data import sim_diag
-                sim_diag.append('sim6', [dict(f, decision='skip') for f in funnel]
-                                + [dict(code=o.get('code'), reason='entry', decision='entry')
-                                   for o in orders], log=lambda *_: None)
-            except Exception:
-                pass
-            c = Counter(f['reason'] for f in funnel)
-            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            print(f"[Sim6 깔때기] 후보 {len(candidates)} → 매수 {len(orders)} | 탈락: {parts}")
-            for f in funnel[:5]:
-                if 'change_rate' in f:
-                    print(f"   {f['code']} 탈락={f['reason']} 가격={f.get('price', 0)} "
-                          f"MA5={f.get('ma', 0)} 등락률={f.get('change_rate', 0):+.2f}%")
-                else:
-                    print(f"   {f['code']} 탈락={f['reason']}")
-        except Exception as e:
-            print(f'[Sim6 깔때기] 기록 실패(무시): {e}')

@@ -46,7 +46,7 @@ EOD 배치(scripts/run_eod_sim_us.py)가 이미 유니버스 전 종목의 avg_d
 import json
 import os
 
-from .us_base_simulator import USBaseSimulator
+from .us_base_simulator import USBaseSimulator, US_DEFAULT_INITIAL_CASH
 from .us_calendar import us_trading_date
 
 TOP_N = 20            # 워치리스트에 남길 상위 종목 수(보유 5 + 이탈 여유)
@@ -173,7 +173,7 @@ def decide_us_liquidity(view, candidates, current_prices, sched=None):
 class USLiquidityBaselineSimulator(USBaseSimulator):
     """[US Sim3] 유동성 상위 보유 — 기준선 심. 상세 배경은 모듈 docstring."""
 
-    def __init__(self, initial_cash=20000):
+    def __init__(self, initial_cash=US_DEFAULT_INITIAL_CASH):
         super().__init__("Us3Liquidity", initial_cash)
 
     def get_universe(self):

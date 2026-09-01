@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -192,7 +192,7 @@ class GapFadeSimulator(BaseSimulator):
       상위(자체 유니버스)로 옮겼다(위 get_universe() 참고). 진입 창(14:30~15:20)에
       스크래퍼가 10분마다 도는 것은 확인됐다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("GapFade", initial_cash)
 
     def get_universe(self):
@@ -217,48 +217,8 @@ class GapFadeSimulator(BaseSimulator):
         funnel = []
         orders = decide_gap_fade(self._view(current_prices), candidates, current_prices,
                                  funnel=funnel)
-        self._log_funnel(candidates, funnel, orders)
+        log_funnel('Sim9', candidates, funnel, orders, diag_id='sim9')
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
-    @staticmethod
-    def _log_funnel(candidates, funnel, orders) -> None:
-        """게이트별 탈락 분포를 한 줄로 남긴다.
-
-        이 심은 배포 이래 매수가 0건인데 로그에 아무것도 없어서, "신호가 없는
-        날"과 "구조적으로 못 사는 심"이 구분되지 않았다. 의심은 유니버스
-        (KOSPI 상승률 상위 50)와 진입 조건이 서로 밀어낸다는 것이다 — 갭 +7%
-        후 되밀림 -6%면 당일 등락률이 +0.6% 이하라 상승률 상위에 남기 어렵다.
-        추측으로 유니버스를 바꾸지 않고 먼저 센다.
-
-        `gap` 탈락이 후보 전량이면 유니버스 문제가 확정된다. gap을 통과하는
-        종목이 매일 몇 개씩 나오는데 뒤 게이트에서 죽으면 원인은 다른 데 있다.
-
-        진단이 심을 죽이면 안 된다 — 통째로 삼킨다.
-        """
-        try:
-            from collections import Counter
-            if not funnel and not orders:
-                return
-            # 파일로도 남긴다. print는 Actions 로그에만 남아 며칠 뒤엔 못 찾는다 —
-            # 심1이 `sim1_diag_*.csv`로 남기는 것과 같은 이유다(2026-08-17).
-            # 이 심은 진입 창이 14:30~15:20뿐이라 "그 창에 후보가 조건에 닿았는가"를
-            # 사후에 확인할 방법이 이것밖에 없다.
-            try:
-                from src.data import sim_diag
-                sim_diag.append('sim9', [dict(f, decision='skip') for f in funnel]
-                                + [dict(code=o.get('code'), reason='entry', decision='entry')
-                                   for o in orders], log=lambda *_: None)
-            except Exception:
-                pass
-            c = Counter(f['reason'] for f in funnel)
-            passed_gap = [f for f in funnel if f['reason'] not in ('held_or_cooldown',
-                                                                  'no_ohlc', 'amount', 'gap')]
-            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            print(f"[Sim9 깔때기] 후보 {len(candidates)} → 매수 {len(orders)} | 탈락: {parts}")
-            for f in passed_gap[:5]:
-                print(f"   갭통과 {f['code']}: gap={f.get('gap', 0):+.1f}% "
-                      f"intra={f.get('intra', 0):+.1f}% 탈락={f['reason']}")
-        except Exception as e:
-            print(f'[Sim9 깔때기] 기록 실패(무시): {e}')

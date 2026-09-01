@@ -22,6 +22,79 @@ def get_kst_date():
     return get_kst_now().date()
 
 
+# 심 초기자본의 **단일 원천**이다. 2026-09-01까지 이 값이 파이썬 16곳
+# (각 심의 __init__ 기본값)과 TS 4곳에 각각 박혀 있었고, 기반 클래스의
+# 기본값만 5,000,000으로 달랐다 — 새 심이 인자를 빠뜨리면 조용히 500만이 됐다.
+#
+# 분모가 갈리면 대시보드와 텔레그램이 다른 수익률을 말한다. 그 사고는 이미
+# 한 번 났다(리셋 예수금 200만 전환 때). TS는 이 값을 생성물로 받는다
+# — scripts/gen_sim_registry.py가 여기서 읽어 SIM_INITIAL_CASH로 내보낸다.
+DEFAULT_INITIAL_CASH = 3_000_000
+
+
+def log_funnel(label, candidates, funnel, orders=None, *,
+               buys=None, seen=None, regime=None, diag_id=None,
+               details=None, early_exit_breaks=True) -> None:
+    """"후보 N → 매수 B | 탈락: 이유별 분포"를 한 줄로. **모든 심의 유일한 형식.**
+
+    2026-09-01까지 이 로직이 심마다 사본으로 있었다(여섯 벌). 사본이 갈리면
+    같은 사고를 여섯 번 고쳐야 하고, 실제로 같은
+    `if held >= MAX_HOLDINGS: break`가 다섯 심에서 다섯 번 다 기록을 빠뜨렸다.
+
+    인자로 흡수한 심별 차이:
+      regime    국면을 함께 찍는 심(12·13)
+      diag_id   한 줄 로그로 부족해 파일에도 남기는 심(6·9·12·13).
+                Actions 로그는 며칠 뒤 사라지므로 db-data에 남겨야 소급된다.
+      seen      루프가 실제로 들여다본 후보 수. 조기종료가 있으면 후보 수와
+                다르고, 그 차이는 '평가 안 함'이지 '설명 못 함'이 아니다.
+      details   심 고유의 추가 줄(예: 심3의 저평가 탈락 상세)
+      early_exit_breaks
+                max_holdings에서 `break`하는 심은 뒤를 안 보지만(심5·9-1·11 등),
+                `continue`하는 심(심8)은 끝까지 본다. 후자에서 미설명 경고를
+                꺼버리면 게이트가 가장 많은 심에서 감시가 사라진다.
+
+    **진단이 심을 죽이면 안 되므로 통째로 삼킨다.** 네트워크는 쓰지 않는다.
+    """
+    try:
+        from collections import Counter
+        orders = orders or []
+        if buys is None:
+            buys = sum(1 for o in orders if o.get('action') == 'BUY')
+        n = len(candidates)
+        if not n and not funnel:
+            return
+
+        if diag_id:
+            try:
+                from src.data import sim_diag
+                sim_diag.append(
+                    diag_id,
+                    [dict(f, decision='skip') for f in funnel]
+                    + [dict(code=o.get('code'), reason='entry', decision='entry')
+                       for o in orders if o.get('action') == 'BUY'],
+                    log=lambda *_: None)
+            except Exception:
+                pass
+
+        head = f'[{label} 깔때기]' + (f' 국면={regime}' if regime else '')
+        if not funnel:
+            print(f'{head} ⚠️ 후보 {n}인데 탈락 기록이 없다(매수 {buys})')
+            return
+
+        parts = ', '.join(f'{k} {v}' for k, v in
+                          Counter(f['reason'] for f in funnel).most_common())
+        examined = n if seen is None else seen
+        gap = examined - buys - len(funnel)
+        skip_warn = early_exit_breaks and any(
+            f.get('reason') == 'max_holdings' for f in funnel)
+        mark = '' if (gap == 0 or skip_warn) else f' | ⚠️ 미설명 {gap}'
+        print(f'{head} 후보 {n} → 매수 {buys} | 탈락: {parts}{mark}')
+        for line in (details or []):
+            print(f'   {line}')
+    except Exception:
+        pass
+
+
 def initial_state(cash):
     """리셋 직후의 상태 shape. **이 함수가 정본이다.**
 
@@ -108,7 +181,7 @@ class BaseSimulator:
     IS_ANALYZER = False      # True면 매매하지 않는 분석기(리베로). reset 시 자본 부여 제외
     IS_EOD = False           # True면 장중 10분 루프에서 제외하고 마감 후 1회만 실행(일봉 전략)
 
-    def __init__(self, name, initial_cash=5000000):
+    def __init__(self, name, initial_cash=DEFAULT_INITIAL_CASH):
         self.name = name
         self.initial_cash = initial_cash
         self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data')

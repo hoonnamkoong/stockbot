@@ -12,7 +12,7 @@ EOD 배치(scripts/run_eod_sim_us.py)가 추세 템플릿+실적 가속+VCP 압�
 import json
 import os
 
-from .us_base_simulator import USBaseSimulator
+from .us_base_simulator import USBaseSimulator, US_DEFAULT_INITIAL_CASH
 from .us_calendar import us_trading_date, next_us_trading_date  # noqa: F401
 from .base_simulator import BaseSimulator
 
@@ -207,7 +207,7 @@ def decide_us_minervini(view, candidates, current_prices):
 class USMinerviniSimulator(USBaseSimulator):
     """[US Sim1] 미너비니 추세형 — 국내 Sim11 이식. 상세 배경은 위 모듈 docstring."""
 
-    def __init__(self, initial_cash=20000):
+    def __init__(self, initial_cash=US_DEFAULT_INITIAL_CASH):
         super().__init__("Us1Minervini", initial_cash)
 
     def get_universe(self):

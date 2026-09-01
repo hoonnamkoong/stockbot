@@ -1,6 +1,6 @@
 from src.data import hype_dict, sim_diag
 
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 
 _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
@@ -362,7 +362,7 @@ class PsychDivergenceSimulator(BaseSimulator):
     - 사이징은 전 심 통일값(NAV×15%, 최대 6종목). 이전에는 NAV/10에 보유
       상한이 없어 Sim1만 통일에서 빠져 있었다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Psych", initial_cash)
 
     def run(self, candidates, current_prices=None):

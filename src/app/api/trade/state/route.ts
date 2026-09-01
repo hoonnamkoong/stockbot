@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { SIM_INITIAL_CASH } from '@/lib/sim-registry.generated';
 
 /**
  * [V8.9.9] 시뮬레이터 상태 동기화 API (Remote DB Version)
@@ -30,10 +31,10 @@ export async function GET(request: Request) {
             success: false,
             message: "State file not found, returning default",
             state: {
-                cash: 3000000,
+                cash: SIM_INITIAL_CASH,
                 portfolio: {},
                 history: [],
-                initial_cash: 3000000
+                initial_cash: SIM_INITIAL_CASH
             }
         });
     }

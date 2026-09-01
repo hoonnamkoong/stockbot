@@ -9,7 +9,11 @@
  */
 
 /** 심 전체가 300만으로 출발한다는 동일조건. 파이썬 쪽 상수와 짝이다. */
-export const SIM_INITIAL_CASH = 3_000_000;
+// 원천은 파이썬(base_simulator.DEFAULT_INITIAL_CASH)이고 생성물이 나른다.
+// 여기서 다시 선언하면 리셋 금액을 바꿀 때 한쪽만 따라간다.
+// 재수출만 하면 이 파일 안에서는 못 쓴다 — import도 함께 둔다.
+import { SIM_INITIAL_CASH } from './sim-registry.generated.ts';
+export { SIM_INITIAL_CASH };
 
 export type SimHolding = {
   code: string; name: string; qty: number;

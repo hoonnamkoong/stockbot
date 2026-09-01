@@ -43,39 +43,43 @@ SIM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # 탈락 사유를 남기는 호출로 인정하는 이름들. 심마다 헬퍼 이름이 다르다.
 _LOGGERS = {'_fn', '_diag', 'log_diag', 'record_decision'}
 
-# 후보 루프로 보는 이터레이터 이름 조각. 청산 루프(portfolio_codes)는 대상이
-# 아니다 — 여기서 세는 것은 "왜 이 후보를 안 샀는가"뿐이다.
-_CANDIDATE_HINTS = ('candidates', 'stocks', 'universe', 'picks', 'ranked', 'rows')
+# 매수 루프를 **이름이 아니라 하는 일로** 찾는다. 본문 어딘가에서 매수를
+# 만드는 For 루프만 대상이다.
+#
+# 처음에는 이터레이터 이름(`candidates`·`stocks`·`rows`…)으로 골랐는데 두
+# 방향으로 틀렸다. 이름이 다른 매수 루프를 놓쳤고, 반대로 피처 계산 루프
+# (심8의 z-점수·관심도 집계)까지 끌어와 **갚아도 의미 없는 빚**을 만들었다.
+# 그 루프의 `continue`는 "후보를 버렸다"가 아니라 "이 행에 필드가 없다"이고,
+# 그 결과는 어차피 매수 루프에서 `no_investor_flow` 같은 이유로 다시 잡힌다.
+_BUY_MARKERS = ("'action': 'BUY'", '"action": "BUY"', 'self.buy(')
 
 # ── 래칫 ────────────────────────────────────────────────────────────
 # 파일명 → 기록 없이 후보를 탈락시키는 분기 수(2026-09-01 실측).
 # **줄이는 방향으로만 고친다.** 0이 되면 항목째로 지운다.
 KNOWN_UNLOGGED = {
-    'sim11_minervini.py': 4,
-    'sim12_regime_dual.py': 1,
-    'sim1_original.py': 2,
-    'sim1_psych.py': 4,
-    'sim2_conservative.py': 2,
+    'sim1_psych.py': 3,
     'sim2_spillover.py': 4,
-    'sim3_aggressive.py': 2,
-    'sim4_bull_momentum.py': 6,
-    'sim5_sideways_swing.py': 4,
-    'sim8_accumulation.py': 12,
-    'sim9_1_donchian.py': 6,
+    'sim4_bull_momentum.py': 9,
     'us_sim1_minervini.py': 4,
-    'us_sim2_donchian.py': 5,
-    'us_sim3_liquidity.py': 1,
+    'us_sim2_donchian.py': 4,
+    'us_sim3_liquidity.py': 2,
 }
-# 2026-09-01: 실측 57개/14심.
-# 갚은 것 — sim3_risk(실전, 구멍 0)와, 다섯 심에 같은 모양으로 복제돼 있던
-# `if held >= MAX_HOLDINGS: break`(sim4-1·sim6·sim9·sim12·sim13). 같은 결함이
-# 다섯 파일에 있었다는 사실 자체가, 이 규칙이 리뷰가 아니라 CI에 있어야 하는
-# 이유다.
+# 2026-09-01 상환 이력: 57개/14심 → **26개/6심**.
 #
-# 숫자가 처음 센 것(43개/10심)보다 늘어난 것은 심이 나빠져서가 아니라
-# **검사가 정확해졌기 때문**이다. 첫 버전은 (a)규칙이 블록 밖으로 새어
-# 루프 맨 위의 `_fn` 하나가 아래 침묵을 전부 가렸고, 파일명 접두사 필터 탓에
-# 미국 심 3개를 통째로 안 봤다. 리뷰에서 잡혔다.
+# 갚은 심: sim3_risk(실전)·sim5·sim6·sim8·sim9·sim9-1·sim11·sim12·sim13·sim4-1.
+# 다섯 심에 같은 모양으로 복제돼 있던 `if held >= MAX_HOLDINGS: break`가
+# 다섯 곳 모두 기록이 없었다 — 같은 결함이 다섯 파일에 있었다는 사실 자체가,
+# 이 규칙이 리뷰가 아니라 CI에 있어야 하는 이유다. 로그 형식도 같은 이유로
+# base_simulator.log_funnel 하나로 모았다.
+#
+# 숫자가 중간에 오르내린 것은 심이 나빠져서가 아니라 **검사가 정확해졌기**
+# 때문이다. 세 번 고쳤고 셋 다 리뷰나 실측에서 잡혔다.
+#   1. "한 번 기록하면 그 뒤로 계속 기록됨"이 블록 밖으로 새어, 루프 맨 위의
+#      `_fn` 하나가 아래 침묵을 전부 가렸다(게이트가 스스로를 무력화).
+#   2. 파일명 접두사 필터가 미국 심 3개를 통째로 빠뜨렸고, 반대로 매니페스트에서
+#      빠진 죽은 심(sim1_original 등)까지 세어 갚을 수 없는 빚을 만들었다.
+#   3. 이터레이터 **이름**으로 매수 루프를 고르다 피처 계산 루프까지 끌어왔다.
+#      지금은 본문에 매수가 있는 루프만 본다.
 
 
 def _logs_somewhere(node) -> bool:
@@ -140,7 +144,20 @@ def _unlogged_exits(tree: ast.AST) -> list[int]:
             if isinstance(st, ast.If):
                 guard = _logs_somewhere(st.test) or _reads_logged_name(st.test, local_names)
                 for field in ('body', 'orelse'):
+                    # 파이썬은 **블록 스코프가 없다.** `if`/`else` 안에서 기록
+                    # 호출의 결과를 받은 이름은 그 뒤에서도 보인다. 심12의
+                    #   if regime == 'BULL': ok, r = _playbook1_entry(stock, funnel)
+                    #   else:               ok, r = _playbook2_entry(stock, funnel)
+                    #   if not ok: continue
+                    # 가 정확히 이 형태다. 안에서 정해진 이름을 부모로 올려주지
+                    # 않으면 정직하게 기록하는 심이 거짓 양성으로 걸린다.
                     scan_block(getattr(st, field), in_candidate_loop, guard, local_names)
+                for sub in ast.walk(st):
+                    if isinstance(sub, ast.Assign) and _logs_somewhere(sub):
+                        for t in sub.targets:
+                            for nm in ast.walk(t):
+                                if isinstance(nm, ast.Name):
+                                    local_names.add(nm.id)
             elif isinstance(st, (ast.For, ast.While)):
                 nested = in_candidate_loop or (isinstance(st, ast.For)
                                                and _is_candidate_loop(st))
@@ -170,17 +187,33 @@ def _unlogged_exits(tree: ast.AST) -> list[int]:
 
 
 def _is_candidate_loop(node) -> bool:
-    it = ast.unparse(node.iter) if isinstance(node, ast.For) else ''
-    return any(h in it for h in _CANDIDATE_HINTS)
+    """이 루프가 **매수를 만드는** 루프인가. 청산 루프·피처 루프는 아니다."""
+    if not isinstance(node, ast.For):
+        return False
+    body = '\n'.join(ast.unparse(st) for st in node.body)
+    return any(m in body for m in _BUY_MARKERS)
 
 
 def _sim_files() -> list[str]:
-    # `startswith('sim')`으로 거르면 us_sim1/2/3이 통째로 빠진다 — 미국 심도
-    # 후보를 버리고, 버린 이유가 없으면 똑같이 답을 못 한다.
-    skip = {'__init__.py', 'base_simulator.py', 'us_base_simulator.py',
-            'kr_calendar.py', 'us_calendar.py'}
-    return sorted(f for f in os.listdir(SIM_DIR)
-                  if f.endswith('.py') and f not in skip)
+    """**매니페스트에 등재된 심만** 본다(국내 + 미국).
+
+    파일명 접두사로 거르던 첫 버전은 두 방향으로 틀렸다. `startswith('sim')`은
+    us_sim1/2/3을 통째로 빠뜨렸고(미국 심도 후보를 버린다), 반대로 매니페스트에서
+    빠진 죽은 심 파일(sim1_original·sim2_conservative·sim3_aggressive — 마지막
+    거래가 2026년 4~5월이다)까지 세어 **갚을 수 없는 빚**을 만들었다.
+
+    돌지 않는 코드에 진단을 붙이는 건 일이 아니라 소음이다. 등재되는 순간
+    자동으로 감시 대상이 된다.
+    """
+    import yaml
+    mods = set()
+    for name in ('strategy_manifest.yaml', 'us_strategy_manifest.yaml'):
+        path = os.path.join(SIM_DIR, '..', name)
+        with open(path, encoding='utf-8') as f:
+            for entry in yaml.safe_load(f)['simulators']:
+                mods.add(entry['module'].rsplit('.', 1)[-1] + '.py')
+    return sorted(m for m in mods
+                  if os.path.exists(os.path.join(SIM_DIR, m)))
 
 
 def _measure() -> dict:
@@ -262,6 +295,7 @@ def run(self, candidates):
             continue
         if stock['b']:
             continue
+        orders.append({'action': 'BUY', 'code': stock['code']})
 '''
     gaps = _unlogged_exits(ast.parse(src))
     assert len(gaps) == 1, (
@@ -287,5 +321,6 @@ def run(self, candidates):
         if stock['c']:
             _fn(funnel, stock['code'], 'c')
             continue
+        orders.append({'action': 'BUY', 'code': stock['code']})
 '''
     assert _unlogged_exits(ast.parse(src)) == []

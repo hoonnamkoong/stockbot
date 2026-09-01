@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 
 
 class BullMomentumSimulator(BaseSimulator):
@@ -16,7 +16,7 @@ class BullMomentumSimulator(BaseSimulator):
     # 60을 그대로 쓴다.
     ADX_MAX = 60.0
 
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Bull", initial_cash)
 
     def get_universe(self):

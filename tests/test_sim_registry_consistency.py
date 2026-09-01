@@ -233,3 +233,72 @@ def test_registry_exposes_every_trading_sim():
     """전제 확인 — 매매심이 실제로 잡히는가(0개면 위 대조가 전부 무의미해진다)."""
     from src.strategy.registry import get_sim_registry
     assert len(get_sim_registry()) >= 10
+
+
+def test_initial_cash_has_one_source():
+    """심 초기자본은 파이썬이 원천이고 TS는 생성물로 받는다.
+
+    2026-09-01까지 이 값이 파이썬 16곳(각 심의 `__init__` 기본값)과 TS 4곳에
+    각각 박혀 있었고, **기반 클래스 기본값만 5,000,000으로 달랐다** — 새 심이
+    인자를 빠뜨리면 조용히 500만이 됐다.
+
+    분모가 갈리면 대시보드와 텔레그램이 다른 수익률을 말한다. 그 사고는 이미
+    한 번 났다(리셋 예수금 200만 전환).
+    """
+    import re
+    from src.strategy.simulators.base_simulator import DEFAULT_INITIAL_CASH
+
+    with open(GENERATED_TS, encoding='utf-8') as f:
+        ts = f.read()
+    m = re.search(r'export const SIM_INITIAL_CASH = (\d+);', ts)
+    assert m, '생성물에 SIM_INITIAL_CASH가 없다 — gen_sim_registry.py를 다시 돌릴 것'
+    assert int(m.group(1)) == DEFAULT_INITIAL_CASH, (
+        f'파이썬 {DEFAULT_INITIAL_CASH} vs 생성물 {m.group(1)} — 재생성 필요')
+
+
+def test_no_sim_declares_the_shared_initial_cash():
+    """국내 심이 공통 초기자본을 자기 파일에 다시 적으면 단일 원천이 깨진다.
+
+    다른 값을 쓰는 심은 정당하다 — 심0(리베로)은 0원(매매하지 않는 분석기),
+    미국 심은 20,000 **USD**로 통화 자체가 다르다. 그래서 "리터럴이 있으면
+    실패"가 아니라 "**공통값과 같은 리터럴**이 있으면 실패"로 잰다.
+    """
+    import glob
+    import re
+    from src.strategy.simulators.base_simulator import DEFAULT_INITIAL_CASH
+
+    bad = []
+    for path in glob.glob(os.path.join(ROOT, 'src', 'strategy', 'simulators', 'sim*.py')):
+        with open(path, encoding='utf-8') as f:
+            for i, line in enumerate(f, 1):
+                m = re.search(r'def __init__\(self, initial_cash=([0-9_]+)\)', line)
+                if m and int(m.group(1).replace('_', '')) == DEFAULT_INITIAL_CASH:
+                    bad.append(f'{os.path.basename(path)}:{i}')
+    assert not bad, (
+        '심이 초기자본 리터럴을 들고 있다. DEFAULT_INITIAL_CASH를 쓸 것: ' + ', '.join(bad))
+
+
+def test_ts_consumers_do_not_hardcode_initial_cash():
+    """대시보드가 자체 분모를 들면 파이썬에서 리셋 금액을 바꿔도 안 따라온다.
+
+    모의 포트폴리오(`portfolio_virtual.json`)의 예수금은 **다른 계좌**라
+    여기서 보지 않는다 — 섞으면 한쪽을 바꿀 때 다른 쪽이 끌려간다.
+    """
+    import glob
+    import re
+    watched = [
+        os.path.join(ROOT, 'src', 'lib', 'sim-card.ts'),
+        os.path.join(ROOT, 'src', 'app', 'api', 'simulation', 'stats', 'route.ts'),
+        os.path.join(ROOT, 'src', 'app', 'api', 'trade', 'state', 'route.ts'),
+        os.path.join(ROOT, 'src', 'app', 'trade', 'TradeClient.tsx'),
+    ]
+    bad = []
+    for path in watched:
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding='utf-8') as f:
+            for i, line in enumerate(f, 1):
+                if re.search(r'\b3_?000_?000\b', line):
+                    bad.append(f'{os.path.relpath(path, ROOT)}:{i}')
+    assert not bad, (
+        '심 초기자본이 TS에 다시 박혔다. SIM_INITIAL_CASH를 쓸 것: ' + ', '.join(bad))

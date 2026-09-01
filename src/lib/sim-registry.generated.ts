@@ -43,6 +43,9 @@ export const ANALYZERS: { id: string; stateFile: string }[] = [
   { id: 'sim0_libero', stateFile: 'sim_libero_state.json' },
 ];
 
+/** 심 초기자본. 원천은 파이썬 base_simulator.DEFAULT_INITIAL_CASH다. */
+export const SIM_INITIAL_CASH = 3000000;
+
 /** 매매 기록 CSV의 헤더. 파이썬 base_simulator.CSV_HEADER에서 생성됐다. */
 export const TRADE_CSV_HEADER = '\ufefftimestamp,symbol,action,price,quantity,total_amount,reason,roi,roi_amount\n';
 

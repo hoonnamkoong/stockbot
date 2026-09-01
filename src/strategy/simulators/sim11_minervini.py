@@ -1,7 +1,7 @@
 import json
 import os
 
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -29,6 +29,20 @@ CONTRACTION_RATIO = 0.7       # 최근 구간 변동폭이 이전 구간의 70% 
 WATCHLIST_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data', 'sim11_watchlist.json')
 
+
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심5·심6·심12와 같은 방식).
+
+    심11은 **감시목록이 유일한 입구**다(EOD 배치가 만든다). 그래서 0건일 때
+    가능한 원인이 셋이나 되는데 밖에서 구분이 안 됐다 — 감시목록이 비었는가,
+    목록은 있는데 pivot을 못 넘었는가, 이미 보유 중인가. 2026-08-31에 실제로
+    이 질문을 받고 상태 파일과 감시목록을 손으로 대조해서야 답했다
+    (엔트리가 GS 하나였고 그건 이미 보유 중이었다).
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
 
 def _sma(closes: list[float], window: int) -> float | None:
     """단순이동평균. 표본이 모자라면 None(지어내지 않는다)."""
@@ -169,7 +183,7 @@ def load_watchlist(date_str: str) -> dict[str, dict]:
     return entries if isinstance(entries, dict) else {}
 
 
-def decide_minervini(view, candidates, current_prices):
+def decide_minervini(view, candidates, current_prices, funnel=None):
     """[Sim11] 미너비니 SEPA/VCP 결정. 순수 함수. Order 리스트 반환.
 
     candidates는 get_universe()가 준 감시 목록(code, name, pivot_price, ma50)에
@@ -209,26 +223,52 @@ def decide_minervini(view, candidates, current_prices):
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len([c for c in portfolio if c not in sold])
     for stock in candidates:
-        if held >= MAX_HOLDINGS:
-            break
         code = stock.get('code')
-        if not code or code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+        if held >= MAX_HOLDINGS:
+            _fn(funnel, code, 'max_holdings', held=held)
+            break
+        if not code:
+            _fn(funnel, '_', 'no_code')
+            continue
+        if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _fn(funnel, code, 'held_or_cooldown')
             continue
 
-        price = float(stock.get('price', 0) or 0)
-        amount = float(stock.get('amount', 0) or 0)
+        raw_price, raw_amount = stock.get('price'), stock.get('amount')
+        # 필드 부재와 값 미달은 다른 고장이다 — 전자는 데이터 경로, 후자는 전략.
+        if raw_price is None:
+            _fn(funnel, code, 'no_price_field')
+            continue
+        if raw_amount is None:
+            _fn(funnel, code, 'no_amount_field')
+            continue
+        price = float(raw_price or 0)
+        amount = float(raw_amount or 0)
         pivot = stock.get('pivot_price')
-        if price <= 0 or pivot is None or amount < MIN_AMOUNT:
+        # 셋을 한 `if`로 묶으면 "안 샀다"만 남는다. 특히 `no_pivot`은 전략 미달이
+        # 아니라 **감시목록 결손**이라 성격이 다르다 — 이게 후보 전량이면 EOD
+        # 배치가 목록을 못 만든 것이고, 심을 고칠 게 아니라 배치를 봐야 한다.
+        if price <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+        if pivot is None:
+            _fn(funnel, code, 'no_pivot')
+            continue
+        if amount < MIN_AMOUNT:
+            _fn(funnel, code, 'amount', amount=amount)
             continue
         if price <= pivot:
+            _fn(funnel, code, 'below_pivot', price=price, pivot=pivot)
             continue
 
         qty = int(target_amount / price)
-        if qty > 0:
-            orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
-                           'price': price, 'quantity': qty, 'cooldown': None,
-                           'reason': f"[미너비니] 실시간 pivot 돌파 ({pivot:,.0f} 상회)"})
-            held += 1
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+            continue
+        orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
+                       'price': price, 'quantity': qty, 'cooldown': None,
+                       'reason': f"[미너비니] 실시간 pivot 돌파 ({pivot:,.0f} 상회)"})
+        held += 1
     return orders
 
 
@@ -265,7 +305,7 @@ class MinerviniTrendSimulator(BaseSimulator):
       확인: `KISDataProvider.get_daily_history`/`get_earnings_growth`.
     """
 
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Minervini", initial_cash)
 
     def get_universe(self):
@@ -280,7 +320,10 @@ class MinerviniTrendSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_minervini(self._view(current_prices), candidates, current_prices)
+        funnel = []
+        orders = decide_minervini(self._view(current_prices), candidates,
+                                  current_prices, funnel=funnel)
+        log_funnel('미너비니', candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

@@ -1,0 +1,64 @@
+name: Data Audit Backup Trigger (감사기 백업 발화)
+
+# **감지기가 환자와 심장을 공유하고 있었다.**
+#
+# 산출물 신선도 감사(data_audit.yml)는 "실패했나"가 아니라 "나와야 할 게
+# 나왔나"를 보는 마지막 그물이다. 그런데 그 발화 경로가 태스커(폰) →
+# trading.yml 하나뿐이었다 — 폰이 죽으면 감사기도 같이 죽고, **아무 실패도
+# 남지 않는다.** 실행 이력 0건은 어떤 실패 목록에도 안 뜬다.
+# 이 레포가 2026-08-27 us_trading에서 이미 겪은 모양이고, 그때 얻은 규칙이
+# "감지기는 감시 대상과 다른 발화 경로에"였다. data_audit만 그 규칙 밖에 있었다.
+#
+# [왜 cron인가] 이 레포의 cron은 못 믿는다 — 고빈도(us_trading, 18회/일)는
+# 통째로 드롭됐고 저빈도(eod/premarket/weekly)는 11~12시간씩 밀렸다.
+# 하지만 여기서 감시하는 조건은 **"하루 종일 조용하다"**라는 느린 조건이라
+# 늦게 와도 잡힌다. cron의 실패 모드(지각)가 이 용도에는 견딜 만하다 —
+# 30분 격자 매매에서 견딜 수 없었던 것과 다르다.
+# 그래도 cron이 통째로 안 뜨면 이 백업도 조용하다. 그건 못 막는다.
+#
+# [왜 data_audit.yml에 cron을 직접 안 붙였나] 붙이면 태스커가 살아 있는 날에도
+# 중복 감사가 돌아 같은 알림이 두 번 나간다(audit_data_freshness는 텔레그램을
+# 직접 부른다 — send_alert_once 쿨다운을 안 탄다). 그렇다고 워크플로 안에서
+# 건너뛰면 **아무것도 안 한 런이 초록으로 남아**, dispatch_data_audit.py의
+# "오늘 이미 돌았나"를 속인다 — 스킵과 미발화가 또 같은 모양이 된다.
+# 그래서 발화만 따로 뺀다. 판정은 dispatch_data_audit.py 하나에 그대로 둔다.
+on:
+  schedule:
+    # 04:00 UTC = 13:00 KST. 태스커 감사 창(09:00~09:30 KST)이 한참 지난 뒤라,
+    # 여기까지 안 돌았으면 태스커 경로가 죽은 것이다. 그날 안에 알림이 와야
+    # 손을 쓸 수 있으므로 장 마감 전으로 둔다.
+    - cron: '0 4 * * 1-5'
+  workflow_dispatch: {}
+
+concurrency:
+  group: data-audit-backup
+  cancel-in-progress: false
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # data_audit.yml을 dispatch하고, 그 전에 오늘 런 이력을 읽는다.
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # 새 판정을 만들지 않는다. trading.yml이 부르는 것과 **같은 스크립트**다 —
+      # "오늘 이미 돌았거나 확인 불가면 생략"이 그 안에 이미 있다.
+      - name: Wake data freshness audit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python3 scripts/dispatch_data_audit.py
+
+      # 실패 **연속당 1통**. 백업 경로가 조용히 죽으면 백업이 없는 것과 같다.
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: data_audit_backup.yml
+        run: python3 scripts/notify_workflow_failure.py

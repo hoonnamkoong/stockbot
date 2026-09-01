@@ -106,13 +106,28 @@ class SmartRiskSimulator(BaseSimulator):
         from src.data.sector_cache import SectorCache
         sector_cache = SectorCache()
         funnel = []
+        bought = 0
+        seen = 0
         target_amount = self.calc_nav(current_prices) * self.POSITION_WEIGHT
 
         for stock in candidates:
-            if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
+            seen += 1
             code = stock['code']
-            if code in self.state['portfolio'] or code in sold_today: continue
-            if self.is_in_cooldown(code): continue
+            # 2026-09-01: 아래 세 갈래가 기록 없이 빠져나가고 있었다. 그날 실전
+            # 매매가 0건이었는데 로그는 `후보 30 | 탈락: amount 17, not_cheap 5,
+            # adx 1`뿐이라 30개 중 23개만 설명됐다. 나머지 7개가 여기로 샜고,
+            # 그래서 "조건 미달이라 안 샀다"와 "배선이 죽었다"를 구분할 수 없었다.
+            # 보유 상한·보유중·쿨다운은 전부 **안 산 이유**다. 이유 없이 사라지면
+            # 그날 돈이 왜 안 움직였는지 아무도 답하지 못한다.
+            if len(self.state['portfolio']) >= self.MAX_HOLDINGS:
+                _fn(funnel, code, 'max_holdings', held=len(self.state['portfolio']))
+                break
+            if code in self.state['portfolio'] or code in sold_today:
+                _fn(funnel, code, 'held_or_sold_today')
+                continue
+            if self.is_in_cooldown(code):
+                _fn(funnel, code, 'cooldown')
+                continue
 
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))
@@ -162,29 +177,87 @@ class SmartRiskSimulator(BaseSimulator):
                 _fn(funnel, code, 'no_rebound'); continue
 
             qty = int(target_amount / price)
-            if qty > 0:
-                reason = (
-                    f"[가치페어] 업종 저평가 진입(TTM) "
-                    f"(PER {stock_per:.1f}x / 섹터 {avg_per:.1f}x, "
-                    f"PBR {stock_pbr:.2f}x / 섹터 {avg_pbr:.2f}x, "
-                    f"ADX {adx:.1f}, 섹터: {sector_name})"
-                )
-                self.buy(code, stock['name'], price, qty, reason=reason)
+            # 모든 게이트를 통과하고도 수량이 0이면 안 산다. 자금 부족이나 고가
+            # 종목에서 나는데, 기록이 없으면 "마지막 게이트까지 갔다가 돈이 모자라
+            # 못 샀다"가 "조건 미달"과 구분되지 않는다 — 전자는 예산 문제고
+            # 후자는 전략 문제다. 섞이면 엉뚱한 곳을 고치게 된다.
+            if qty <= 0:
+                _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+                continue
+            reason = (
+                f"[가치페어] 업종 저평가 진입(TTM) "
+                f"(PER {stock_per:.1f}x / 섹터 {avg_per:.1f}x, "
+                f"PBR {stock_pbr:.2f}x / 섹터 {avg_pbr:.2f}x, "
+                f"ADX {adx:.1f}, 섹터: {sector_name})"
+            )
+            if self.buy(code, stock['name'], price, qty, reason=reason):
+                bought += 1
+            else:
+                # buy()는 **현금 부족이면 False**다. 무조건 세면 "돈이 없어 못 산 것"이
+                # 매수로 기록되고, 깔때기 회계가 그만큼 맞아버려 구멍이 가려진다.
+                # 자금 부족은 실전에서 "왜 안 샀나"의 가장 흔한 답이라 더 위험하다.
+                _fn(funnel, code, 'insufficient_cash',
+                    need=qty * price, cash=self.state.get('cash', 0))
 
-        self._log_funnel(candidates, funnel)
+        self._log_funnel(candidates, funnel, bought, seen)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
     @staticmethod
-    def _log_funnel(candidates, funnel) -> None:
+    def funnel_accounting(candidates, funnel, bought, seen=None) -> tuple:
+        """(후보, 매수, 탈락, 미설명). 미설명이 0이 아니면 기록에 구멍이 있다.
+
+        2026-09-01에 이 수를 안 맞춰본 대가를 치렀다. 로그는 `후보 30 | 탈락:
+        amount 17, not_cheap 5, adx 1`이었고 30 ≠ 23인데 아무도 몰랐다. 그날
+        실전 매매가 0건이었는데 왜인지 답하려면 로그를 버리고 코드를 읽어야 했다.
+
+        **미설명은 항상 0이어야 한다.** 0이 아니면 어떤 갈래가 이유 없이 후보를
+        버리고 있다는 뜻이고, 그 갈래가 다음 사고의 자리다.
+        """
+        seen = len(candidates) if seen is None else seen
+        rejected = len(funnel)
+        # `seen`은 루프가 **실제로 들여다본** 후보 수다. 보유 상한으로 break하면
+        # 그 뒤는 아예 안 본 것이므로 seen < 후보 수가 되고, 그 차이는 정상이다.
+        #
+        # 처음에는 "funnel에 max_holdings가 있으면 미설명 0"으로 처리했는데
+        # 그건 **감시를 끄는 스위치를 감시 안에 둔 것**이었다 — 포트폴리오가 꽉
+        # 찬 날(흔하다)에는 진짜 구멍이 통째로 가려진다. 리뷰에서 잡혔다.
+        # 지어낸 보정이 아니라 실제로 센 수를 쓴다.
+        return len(candidates), bought, rejected, seen - bought - rejected
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, bought=0, seen=None) -> None:
         """게이트별 탈락 분포를 한 줄로. 진단이 심을 죽이면 안 되니 통째로 삼킨다."""
         try:
             from collections import Counter
-            if not funnel:
+            if not funnel and not candidates:
                 return
+            if not funnel:
+                # 후보가 있는데 기록이 하나도 없다 = 2026-09-01의 최악 형태.
+                # 여기서 조용히 return하면 그 사고가 로그에 아무 흔적도 안 남는다.
+                print(f"[Sim3 깔때기] ⚠️ 후보 {len(candidates)}인데 탈락 기록이 없다 "
+                      f"(매수 {bought}) — 어딘가가 이유 없이 후보를 버리고 있다")
+                return
+            n, b, rej, unexplained = SmartRiskSimulator.funnel_accounting(
+                candidates, funnel, bought, seen)
             c = Counter(f['reason'] for f in funnel)
             parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            print(f"[Sim3 깔때기] 후보 {len(candidates)} | 탈락: {parts}")
+            # 미설명이 0이 아니면 눈에 띄게 남긴다. 조용한 불일치가 이 사고의 형태였다.
+            gap = '' if unexplained == 0 else f" | ⚠️ 미설명 {unexplained}"
+            if unexplained:
+                # **여기서 텔레그램을 보내지 않는다.** `_log_funnel`은 심의
+                # run() 끝, 즉 실전 매매 사이클 안에서 불린다. send_alert_once는
+                # POST 타임아웃 10초 + 재시도로 최악 20초를 먹는데, 루프 예산은
+                # 85초다. 감시가 매매를 늦추면 감시가 사고가 된다.
+                #
+                # 대신 로그에 크게 남긴다. 사람 경로는 결과 감시
+                # (trade_outcome)가 루프 **밖에서** 맡는다 — 미설명이 0이 아닌
+                # 날은 대개 매매도 0건이라 그쪽에 걸린다. 완전히 겹치지는
+                # 않는다는 것은 알고 남기는 공백이다.
+                print(f"[Sim3 깔때기] ⚠️ 회계 불일치 — 후보 {n} ≠ 매수 {b} + "
+                      f"탈락 {rej} (미설명 {unexplained}). 후보가 이유 없이 "
+                      f"사라지고 있다.")
+            print(f"[Sim3 깔때기] 후보 {n} → 매수 {b} | 탈락: {parts}{gap}")
             # 저평가에서 걸린 종목은 실제 배수까지 남긴다 — 유니버스(고ROE)와
             # 조건(저평가)이 반대 방향인지 판단할 근거다.
             for f in [x for x in funnel if x['reason'] == 'not_cheap'][:3]:

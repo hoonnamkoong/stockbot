@@ -86,3 +86,118 @@ def test_funnel_reports_the_gate_that_blocked(capsys):
     out = capsys.readouterr().out
     assert '[Sim3 깔때기]' in out
     assert 'amount' in out
+
+
+# ── 깔때기 회계 불변식 (2026-09-01) ──────────────────────────────────
+#
+# 그날 실전 매매가 0건이었는데 로그는 이랬다:
+#     [Sim3 깔때기] 후보 30 | 탈락: amount 17, not_cheap 5, adx 1
+# 30 ≠ 23인데 아무도 몰랐다. 보유·쿨다운 갈래가 기록 없이 빠져나갔기 때문이다.
+# 수를 안 맞춰보면 구멍은 영원히 안 보인다.
+
+def _candidate(code, **kw):
+    base = {'code': code, 'name': code, 'price': 10_000,
+            'amount': 10_000_000_000, 'per_ttm': 1.0, 'pbr_ttm': 0.1,
+            'sector_name': '전기·전자', 'sparkline_price': [100] * 10}
+    base.update(kw)
+    return base
+
+
+def test_funnel_accounts_for_every_candidate():
+    """후보 = 매수 + 탈락. 남으면 어딘가가 이유 없이 후보를 버리고 있다."""
+    from src.strategy.simulators.sim3_risk import SmartRiskSimulator as S
+    cands = [_candidate(f'{i:06d}') for i in range(10)]
+    funnel = [{'code': c['code'], 'reason': 'amount'} for c in cands[:7]]
+    n, bought, rejected, unexplained = S.funnel_accounting(cands, funnel, bought=3)
+    assert (n, bought, rejected, unexplained) == (10, 3, 7, 0)
+
+
+def test_funnel_flags_the_2026_09_01_hole():
+    """그날의 로그를 그대로 재현하면 미설명이 잡혀야 한다.
+
+    후보 30, 기록된 탈락 23(amount 17 + not_cheap 5 + adx 1), 매수 0.
+    7개가 설명되지 않는다 — 이 수가 0이 아닌 것이 신호였다.
+    """
+    from src.strategy.simulators.sim3_risk import SmartRiskSimulator as S
+    cands = [_candidate(f'{i:06d}') for i in range(30)]
+    funnel = ([{'code': 'x', 'reason': 'amount'}] * 17
+              + [{'code': 'x', 'reason': 'not_cheap'}] * 5
+              + [{'code': 'x', 'reason': 'adx'}])
+    _, _, _, unexplained = S.funnel_accounting(cands, funnel, bought=0)
+    assert unexplained == 7, '2026-09-01의 구멍이 감지되지 않는다'
+
+
+def test_early_exit_is_not_reported_as_unexplained():
+    """보유 상한으로 끊긴 건 '평가 안 함'이지 '설명 못 함'이 아니다.
+
+    다만 그 판정은 **실제로 몇 개를 봤는지(seen)** 로만 해야 한다. 처음에는
+    "funnel에 max_holdings가 있으면 미설명 0"으로 했는데, 그건 포트폴리오가
+    꽉 찬 날마다 진짜 구멍을 통째로 가리는 스위치였다 — 감시를 끄는 스위치를
+    감시 안에 둔 셈이라 리뷰에서 잡혔다.
+    """
+    from src.strategy.simulators.sim3_risk import SmartRiskSimulator as S
+    cands = [_candidate(f'{i:06d}') for i in range(30)]
+    funnel = [{'code': '000001', 'reason': 'max_holdings', 'held': 5}]
+    # 첫 후보에서 끊겼으니 본 것은 1개다
+    _, _, _, unexplained = S.funnel_accounting(cands, funnel, bought=0, seen=1)
+    assert unexplained == 0
+
+
+def test_early_exit_still_reports_a_real_hole():
+    """조기종료가 있어도 그전에 조용히 사라진 후보는 잡혀야 한다.
+
+    max_holdings 한 줄이 미설명을 0으로 만들던 버전에서는 이게 통과했다.
+    """
+    from src.strategy.simulators.sim3_risk import SmartRiskSimulator as S
+    cands = [_candidate(f'{i:06d}') for i in range(30)]
+    # 10개를 봤는데 기록은 max_holdings 하나뿐 — 9개가 조용히 사라졌다
+    funnel = [{'code': '000010', 'reason': 'max_holdings', 'held': 5}]
+    _, _, _, unexplained = S.funnel_accounting(cands, funnel, bought=0, seen=10)
+    assert unexplained == 9, '조기종료 뒤에 숨은 구멍을 못 잡는다'
+
+
+def test_failed_buy_is_not_counted_as_a_purchase():
+    """buy()는 현금 부족이면 False다. 그걸 매수로 세면 회계가 맞아버려 구멍이 가려진다.
+
+    자금 부족은 실전에서 "왜 안 샀나"의 가장 흔한 답이라 더 위험하다.
+    """
+    # 실전에서 나는 형태: 대부분 투자돼 있고 현금만 바닥이다. NAV 기준 사이징은
+    # 살 수량을 크게 잡는데 정작 지불할 현금이 없다.
+    sim = _sim()
+    sim.state['cash'] = 1_000
+    sim.state['portfolio']['999999'] = {
+        'name': 'HELD', 'quantity': 300, 'avg_price': 10_000,
+        'peak_price': 10_000, 'entry_date': '2026-09-01', 'is_scaled_out': False}
+    captured = {}
+    sim._log_funnel = lambda c, f, b=0, s=None: captured.update(funnel=f, bought=b)
+    sim.run([_candidate('000001', sparkline_price=[100 + 3 * i for i in range(12)])],
+            current_prices={'999999': 10_000, '000001': 10_000})
+    assert captured['bought'] == 0, '실패한 매수가 매수로 집계됐다'
+    assert 'insufficient_cash' in [x['reason'] for x in captured['funnel']],         f"자금 부족이 기록되지 않았다: {[x['reason'] for x in captured['funnel']]}"
+
+
+def test_holdings_and_cooldown_are_recorded():
+    """오늘 실제로 샜던 두 갈래가 이제 이유를 남기는지 — 런타임으로 확인한다.
+
+    정적 검사(test_decision_logging_coverage)는 `_fn` 호출이 있는지만 본다.
+    실제로 그 값이 깔때기에 담기는지는 심을 돌려봐야 안다.
+    """
+    sim = _sim()
+    sim.state['portfolio']['000001'] = {
+        'name': 'A', 'quantity': 1, 'avg_price': 10_000,
+        'peak_price': 10_000, 'entry_date': '2026-09-01', 'is_scaled_out': False}
+    sim.state['cooldown_codes'] = {'000002': '2099-01-01'}
+
+    captured = {}
+    orig = sim._log_funnel
+
+    def spy(candidates, funnel, bought=0, seen=None):
+        captured['reasons'] = [f['reason'] for f in funnel]
+        return orig(candidates, funnel, bought, seen)
+
+    sim._log_funnel = spy
+    sim.run([_candidate('000001'), _candidate('000002')],
+            current_prices={'000001': 10_000})
+
+    assert 'held_or_sold_today' in captured['reasons'], '보유 종목이 기록 없이 사라진다'
+    assert 'cooldown' in captured['reasons'], '쿨다운 종목이 기록 없이 사라진다'

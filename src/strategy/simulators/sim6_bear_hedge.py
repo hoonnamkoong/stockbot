@@ -72,7 +72,12 @@ def decide_sim6(view, candidates, current_prices, funnel=None):
     # 2. 진입: 인버스 ETF가 상승 추세(현재가 > 이동평균 + 당일 상승)일 때만.
     held = len(portfolio) - len(sold)
     for stock in candidates:
+        # 보유 상한도 **안 산 이유**다. 2026-09-01에 실전 심이 이 갈래를 기록하지
+        # 않아 "후보 30 중 23만 설명되는" 로그가 나왔고, 그날 매매 0건의 원인을
+        # 소급 추론해야 했다. 여기서 끊기면 뒤 후보는 평가조차 안 되므로,
+        # 몇 개를 안 봤는지가 남아야 후보 수와 탈락 수의 합이 맞는다.
         if held >= MAX_HOLDINGS:
+            _fn(funnel, '_gate', 'max_holdings', held=held)
             break
         code = stock['code']
         if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):

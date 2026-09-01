@@ -141,3 +141,32 @@ def test_프리마켓_창은_개장_뒤에도_잠시_열려_있다():
 def test_프리마켓_창은_평일만():
     assert premarket_window(_kst(2026, 9, 5, 7, 30)) is False      # 토
     assert premarket_window(_kst(2026, 9, 6, 7, 30)) is False      # 일
+
+
+# ── 주간 리포트 (2026-09-02) ─────────────────────────────────────────
+# cron은 `0 9 * * 5`(금 09:00 UTC = 18:00 KST)인데 실측 지연이 +23분에서
+# **+11시간 27분**(08-28)까지 벌어졌다. 그날 리포트는 금요일 저녁이 아니라
+# 토요일 새벽 05:27에 도착했다.
+#
+# 이 시각은 옛 태스커 창(09:00~06:00) 안이라, 앞선 두 배치와 달리 프로파일
+# 변경 없이도 dispatch로 옮길 수 있다.
+
+from src.session_gate import weekly_report_window  # noqa: E402
+
+
+def test_주간리포트_창은_금요일_저녁에_열린다():
+    assert weekly_report_window(_kst(2026, 9, 4, 18, 0)) is True     # 금
+    assert weekly_report_window(_kst(2026, 9, 4, 17, 59)) is False
+
+
+def test_주간리포트_창은_그날_안에_닫힌다():
+    """자정을 넘기면 '금요일 리포트'가 아니게 된다. EOD 창과 같은 23:00 상한을
+    쓰면 다섯 시간이라 재시도 여유도 충분하다."""
+    assert weekly_report_window(_kst(2026, 9, 4, 22, 59)) is True
+    assert weekly_report_window(_kst(2026, 9, 4, 23, 0)) is False
+
+
+def test_주간리포트_창은_금요일만():
+    for day in (31, 1, 2, 3, 5, 6):          # 월·화·수·목·토·일
+        mo = 8 if day == 31 else 9
+        assert weekly_report_window(_kst(2026, mo, day, 19, 0)) is False, day

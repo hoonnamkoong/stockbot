@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.session_gate import (  # noqa: E402
     kr_audit_window, kr_eod_window, kr_session_open, premarket_window,
-    us_session_open, us_watchlist_window)
+    us_session_open, us_watchlist_window, weekly_report_window)
 
 _KST = dt.timezone(dt.timedelta(hours=9))
 
@@ -31,7 +31,8 @@ def decide(now_utc: dt.datetime | None = None) -> dict[str, bool]:
             'audit': kr_audit_window(now_kst),
             # 2026-09-01: 이 둘은 네이티브 cron 전용이라 +3~11시간씩 밀렸다.
             'watchlist': us_watchlist_window(now_kst),
-            'premarket': premarket_window(now_kst)}
+            'premarket': premarket_window(now_kst),
+            'weekly': weekly_report_window(now_kst)}
 
 
 def render() -> str:

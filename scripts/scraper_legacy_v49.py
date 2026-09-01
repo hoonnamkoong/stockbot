@@ -1,3 +1,18 @@
+"""[V49 롤백본 — 2026-08-31 기준 이 파일은 그대로 돌지 않는다]
+
+이 파일은 `scripts/scraper.py`로 복사해 이전 버전으로 되돌리기 위한 수동
+롤백 사본이다. 워크플로가 실행하지 않는다.
+
+**깨진 지점:** 595행의 `advisor.generate_deep_dive_report(detail_picks)`.
+2026-08-31에 11:00·14:00 리포트 슬롯을 폐기하면서 `StrategyAdvisor`에서
+그 메서드를 지웠다. 지금 이 파일을 복사해 실행하면 그 지점에서
+`AttributeError`로 죽는다.
+
+**복구하지 않는다.** 이 롤백이 되돌리는 대상이 바로 방금 폐기한 리포트
+그 자체다. 메서드를 되살리면 Gemini 딥다이브 비용이 조용히 다시 붙는다.
+장애 중에 이 파일이 필요해졌다면, 되살릴 것은 이 호출이 아니라 그 시점에
+정말 필요한 기능이 무엇인지부터 다시 정하는 쪽이다.
+"""
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd

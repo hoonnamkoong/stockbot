@@ -27,7 +27,7 @@ SIM_DIR = os.path.join(ROOT, 'src', 'strategy', 'simulators')
 GUARDED = (
     'base_simulator.py', 'sim0_libero.py', 'sim1_psych.py', 'sim2_spillover.py',
     'sim3_risk.py', 'sim4_bull_daytrading.py', 'sim4_bull_momentum.py',
-    'sim5_sideways_swing.py', 'sim6_bear_hedge.py', 'sim7_report_follower.py',
+    'sim5_sideways_swing.py', 'sim6_bear_hedge.py',
     'sim8_accumulation.py', 'sim9_gap_fade.py', 'sim9_1_donchian.py',
     'sim10_orchestrator.py',
 )

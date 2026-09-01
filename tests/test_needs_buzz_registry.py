@@ -25,7 +25,6 @@ EXPECTED_STATIC = {
     'sim5_sideways': True,
     'sim6_bear': False,
     'sim4_bull_daytrading': False,
-    'sim7_report_follower': True,
     'sim8_accumulation': False,
     'sim9_gap_fade': False,
     'sim9_1_donchian': True,
@@ -118,7 +117,6 @@ def test_buzz_needing_sims_never_appear():
         buzz_free = list_buzz_free_sim_ids(regime)
         assert 'sim_psych' not in buzz_free
         assert 'sim5_sideways' not in buzz_free
-        assert 'sim7_report_follower' not in buzz_free
 
 
 def test_static_buzz_free_sims_are_always_present_regardless_of_regime():

@@ -1,4 +1,4 @@
-"""리포트 발송 슬롯 게이트 — 하루 2회를 놓치지 않는다.
+"""발송 슬롯 게이트 — 브리핑 슬롯을 놓치지 않는다.
 
 ================================================================
 왜 분 창이 아니라 슬롯 상태인가
@@ -27,27 +27,32 @@ import json
 import os
 from datetime import datetime
 
-# 2026-08-09 합의. 바꾸면 리포트 회차가 조용히 달라지므로 테스트가 지킨다.
-REPORT_SLOTS = ('11:00', '14:00')
+# 2026-08-31: 11:00·14:00 리포트를 폐기하면서 브리핑을 둘로 늘렸다.
+# 12:00은 09:00~12:00 구간, 15:00은 하루 전체 마감이다. 슬롯마다 제목과
+# 집계 구간이 다르므로 brief_due는 bool이 아니라 **어느 슬롯인지**를 준다.
+BRIEF_SLOTS = ('12:00', '15:00')
 
-# 15시 마감 브리핑(실전 계좌 잔고 + 심별 현황). 리포트와 **다른 물건**이라
-# 슬롯을 나눠 둔다. 예전에는 둘 다 should_notify()에 얹혀 있어서, 리포트를
-# 11/14시로 바꾸는 순간 브리핑이 통째로 죽는 결합이 있었다.
-BRIEF_SLOT = '15:00'
-
-# 슬롯 시각으로부터 이 시간 안에만 보낸다. 11:40을 넘겨 보내면 그건 '11시
-# 리포트'가 아니다 — 늦은 리포트보다 없는 편이 낫다. 스크래핑 격자(10분)의
+# 슬롯 시각으로부터 이 시간 안에만 보낸다. 12:40을 넘겨 보내면 그건 '12시
+# 브리핑'이 아니다 — 늦은 브리핑보다 없는 편이 낫다. 스크래핑 격자(10분)의
 # 네 배라 재시도 기회가 네 번이다.
 SLOT_WINDOW_MIN = 40
 
 STATE_FILENAME = 'report_gate_state.json'
 
+# 미국장 마감 브리핑(09:00 KST). **상태 파일이 국내와 다르다.**
+# report_gate_state.json은 writer가 scraper.yml 하나라는 게 명시적 계약이고
+# tests/test_workflow_file_ownership.py가 그걸 강제한다. trading.yml이 같이 쓰면
+# 두 워크플로가 각자 런 시작 시점 사본을 db-data에 올려, 방금 닫은 슬롯이 다시
+# 열린다(lost update) — 09:00~09:40 창의 2분 간격 트리거 20번이 전부 브리핑을 보낸다.
+US_BRIEF_SLOT = '09:00'
+US_BRIEF_STATE_FILENAME = 'us_brief_gate_state.json'
+
 DEFAULT_DATA_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
 
 
-def _state_path(data_dir: str | None) -> str:
-    return os.path.join(data_dir or DEFAULT_DATA_DIR, STATE_FILENAME)
+def _state_path(data_dir: str | None, filename: str = STATE_FILENAME) -> str:
+    return os.path.join(data_dir or DEFAULT_DATA_DIR, filename)
 
 
 def _slot_minutes(slot: str) -> int:
@@ -55,7 +60,7 @@ def _slot_minutes(slot: str) -> int:
     return int(h) * 60 + int(m)
 
 
-def _sent_today(now, data_dir: str | None) -> list[str]:
+def _sent_today(now, data_dir: str | None, filename: str = STATE_FILENAME) -> list[str]:
     """오늘 이미 보낸 슬롯들. 못 읽으면 빈 목록(=보내는 쪽)이다.
 
     **날짜로 갈라야 한다.** 이 상태는 db-data를 왕복하므로 컨테이너에는 어제
@@ -63,7 +68,7 @@ def _sent_today(now, data_dir: str | None) -> list[str]:
     통째로 사라진다.
     """
     try:
-        with open(_state_path(data_dir), 'r', encoding='utf-8') as f:
+        with open(_state_path(data_dir, filename), 'r', encoding='utf-8') as f:
             raw = json.load(f)
         if raw.get('date') != now.strftime('%Y-%m-%d'):
             return []
@@ -75,15 +80,16 @@ def _sent_today(now, data_dir: str | None) -> list[str]:
         return []
 
 
-def _due(now_kst: datetime, slots, data_dir: str | None) -> str | None:
+def _due(now_kst: datetime, slots, data_dir: str | None,
+         filename: str = STATE_FILENAME) -> str | None:
     """주어진 슬롯들 중 지금 열려 있는 것. 늦은 슬롯을 우선한다.
 
     두 슬롯이 동시에 열릴 수는 없다 — 창(40분)이 슬롯 간격(3시간)보다 짧다.
-    그래도 늦은 쪽을 먼저 보는 이유는, 11시를 통째로 놓친 채 14시에 들어왔을 때
-    3시간 지난 11시 리포트가 아니라 14시 리포트가 나가야 하기 때문이다.
+    그래도 늦은 쪽을 먼저 보는 이유는, 12시를 통째로 놓친 채 15시에 들어왔을 때
+    3시간 지난 12시 브리핑이 아니라 15시 브리핑이 나가야 하기 때문이다.
     """
     now_min = now_kst.hour * 60 + now_kst.minute
-    sent = _sent_today(now_kst, data_dir)
+    sent = _sent_today(now_kst, data_dir, filename)
     for slot in sorted(slots, key=_slot_minutes, reverse=True):
         if slot in sent:
             continue
@@ -93,30 +99,36 @@ def _due(now_kst: datetime, slots, data_dir: str | None) -> str | None:
     return None
 
 
-def due_slot(now_kst: datetime, data_dir: str | None = None) -> str | None:
-    """지금 리포트를 보낼 차례인 슬롯. 없으면 None."""
-    return _due(now_kst, REPORT_SLOTS, data_dir)
+def brief_due(now_kst: datetime, data_dir: str | None = None) -> str | None:
+    """지금 열려 있는 브리핑 슬롯('12:00'/'15:00'), 없으면 None.
 
-
-def brief_due(now_kst: datetime, data_dir: str | None = None) -> bool:
-    """지금 15시 마감 브리핑을 보낼 차례인가.
-
-    리포트 슬롯과 **독립이다.** 같은 상태 파일에 기록되지만 서로의 판정에
-    끼어들지 않는다 — 리포트를 두 번 다 보냈어도 브리핑은 따로 열린다.
+    두 브리핑은 서로 독립이다 — 12시를 보냈다는 사실이 15시 마감 브리핑을
+    막지 않는다.
     """
-    return _due(now_kst, (BRIEF_SLOT,), data_dir) is not None
+    return _due(now_kst, BRIEF_SLOTS, data_dir)
 
 
-def mark_sent(slot: str, now_kst: datetime, data_dir: str | None = None) -> None:
+def us_brief_due(now_kst: datetime, data_dir: str | None = None) -> bool:
+    """지금 미국장 마감 브리핑을 보낼 차례인가. 국내 슬롯과 완전히 독립이다.
+
+    상태 파일이 다르므로(US_BRIEF_STATE_FILENAME) 국내 브리핑을 보냈는지 여부가
+    이 판정에 끼어들지 않는다. 그 반대도 마찬가지다.
+    """
+    return _due(now_kst, (US_BRIEF_SLOT,), data_dir,
+                filename=US_BRIEF_STATE_FILENAME) is not None
+
+
+def mark_sent(slot: str, now_kst: datetime, data_dir: str | None = None,
+              filename: str = STATE_FILENAME) -> None:
     """그 슬롯을 보냈다고 기록한다. **발송에 성공한 직후에만 부른다.**
 
     실패한 발송을 기록하면 그 회차가 통째로 사라진다 — 창이 아직 열려 있으면
     다음 스크래핑 사이클이 재시도할 수 있어야 한다(scrape_gate.mark_scraped와
     같은 이유로 순서를 뒤집으면 안 된다).
     """
-    path = _state_path(data_dir)
+    path = _state_path(data_dir, filename)
     os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-    sent = _sent_today(now_kst, data_dir)
+    sent = _sent_today(now_kst, data_dir, filename)
     if slot not in sent:
         sent.append(slot)
     with open(path, 'w', encoding='utf-8') as f:

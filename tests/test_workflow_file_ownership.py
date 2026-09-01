@@ -203,3 +203,116 @@ def test_scraper_does_not_deploy_money_files():
     for pat in ('rank_state.json', 'money_'):
         assert any(pat in line for line in skipped), (
             f'{pat}가 scraper.yml 배포 제외에 없다')
+
+
+# ── 미국장 마감 브리핑(09:00 KST) 슬롯 상태 ──────────────────────────
+
+def test_us_brief_gate_state_is_not_a_regime_file():
+    """브리핑 게이트는 국면 파일이 아니다 — 국면 목록에 얹으면 안 된다.
+
+    `_write_deploy_manifest`는 `regime_output_files()`를 `include_regime`
+    (=그 사이클에 국면을 갱신했는가)일 때만 매니페스트에 넣는다. 국면 갱신은
+    10분 격자이고 브리핑 창은 40분·2분 간격(20 트리거)이라, 브리핑을 보낸
+    사이클이 마침 국면도 갱신한 사이클일 확률은 5분의 1이다. 나머지에서는
+    게이트 상태가 db-data에 도달하지 못해 다음 트리거가 '아직 안 보냈다'로
+    읽고 브리핑이 반복 발송된다 — 이 배선이 막으려던 실패를 이 배선이 만든다.
+    """
+    from src.report.gate import US_BRIEF_STATE_FILENAME
+    import scripts.trade_loop as trade_loop
+
+    now = __import__('datetime').datetime(2026, 9, 1, 9, 5)
+    assert US_BRIEF_STATE_FILENAME not in trade_loop.regime_output_files(now)
+
+
+def test_trading_deploys_the_us_brief_gate_state_on_a_send_only_cycle(tmp_path, monkeypatch):
+    """국면·매매·순위가 전부 없고 브리핑만 보낸 사이클에서도 올라가야 한다.
+
+    db-data를 왕복하지 못하면 매 런이 새 컨테이너라 '아직 안 보냈다'로 읽고
+    09:00~09:40 창의 20번 트리거가 전부 브리핑을 보낸다.
+    """
+    from src.report.gate import US_BRIEF_STATE_FILENAME
+    import scripts.trade_loop as trade_loop
+
+    monkeypatch.chdir(tmp_path)
+    now = __import__('datetime').datetime(2026, 9, 1, 9, 5)
+    trade_loop._write_deploy_manifest(None, log=lambda *_: None, now=now,
+                                      include_us_brief=True)
+
+    written = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(encoding='utf-8')
+    assert US_BRIEF_STATE_FILENAME in written.split()
+
+
+def test_scraper_excludes_the_us_brief_gate_state():
+    """국내 리포트 게이트와 **반대 방향**의 소유권이다.
+
+    report_gate_state.json은 scraper.yml이 배포하고 trading.yml이 안 한다.
+    us_brief_gate_state.json은 그 반대다 — 그래서 scraper.yml의 `data/*.json`
+    루프가 이 파일을 명시적으로 건너뛰어야 한다. 안 그러면 스크래퍼가 런 시작
+    시점 사본을 올려 trading.yml이 방금 닫은 슬롯이 다시 열린다.
+    """
+    from src.report.gate import US_BRIEF_STATE_FILENAME
+    deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
+    skipped = {line for line in deploy.splitlines() if 'continue' in line}
+    patterns = [p.strip() for line in skipped
+                for p in line.strip().split(')', 1)[0].split('|')]
+    assert any(fnmatch.fnmatch(US_BRIEF_STATE_FILENAME, p) for p in patterns), (
+        f'{US_BRIEF_STATE_FILENAME}이 scraper.yml 배포 제외 목록에 없다 — '
+        f'writer가 둘이 되어 09:00~09:40에 브리핑이 반복 발송된다.')
+
+
+# ── premarket_data.yml intraday 잡: gzip 커밋 ─────────────────────────
+
+def _intraday_commit_step() -> str:
+    """intraday 잡의 **커밋 스텝만** 잘라낸다.
+
+    같은 잡의 `Restore universe (db-data)`는 db-data를 읽는 게 맞다(유니버스는
+    거기 있다). 잡 전체를 훑으면 그 정상 참조까지 걸리므로 스텝 단위로 자른다.
+    """
+    intraday = _text('premarket_data.yml').split('  intraday:', 1)[1]
+    step = intraday.split('- name: 커밋 (intraday-data)', 1)[1]
+    return step.split('- name: Notify on failure', 1)[0]
+
+
+def test_intraday_is_committed_compressed():
+    """원시 CSV는 100MB 한도를 넘는다(2026-08-31 실측 115.14MB).
+
+    첫 실행에서 push가 거부됐고, rebase 재시도는 크기를 안 바꾸므로 3회가
+    전부 같은 이유로 죽었다.
+    """
+    step = _intraday_commit_step()
+    assert 'gzip' in step, 'intraday 커밋이 압축하지 않는다'
+    assert 'rt_intraday_*.csv.gz' in step
+
+
+def test_intraday_fails_loudly_when_still_too_large():
+    """압축 후에도 한도를 넘으면 조용히 잘리지 않고 실패해야 한다."""
+    assert '104857600' in _intraday_commit_step(), '압축 후 크기 검사가 없다'
+
+
+def test_intraday_archive_never_lands_on_db_data():
+    """장중 아카이브는 **db-data에 쌓으면 안 된다.**
+
+    세션당 ~14MB가 보존정책 없이 누적되는데, trading.yml은 2분마다
+    `git fetch --depth 1 origin db-data`를 하고 잡 타임아웃이 3분이다(주문 락
+    리스 4분보다 일부러 짧다). 몇 주면 클론만으로 예산을 먹고 주문 루프
+    한가운데서 타임아웃 → 리스가 만료될 때까지 살아 있는 런이 생긴다.
+    누군가 이 커밋을 db-data로 되돌리면 여기서 걸려야 한다.
+    """
+    # 주석에는 'db-data'가 나온다(왜 분리했는지를 적은 문단이다). 실행되는
+    # 줄만 본다.
+    code = ' '.join(ln for ln in _intraday_commit_step().splitlines()
+                    if not ln.strip().startswith('#'))
+    assert 'db-data' not in code, (
+        'intraday 아카이브가 db-data를 향하고 있다 — 매매 핫 패스의 클론이 '
+        '무한히 무거워져 주문 루프가 타임아웃한다.')
+    assert 'intraday-data' in code, 'intraday 아카이브의 대상 브랜치가 없다'
+
+
+def test_intraday_branch_is_created_as_orphan_when_missing():
+    """intraday-data는 아직 없다. db-data/main에서 갈라내면 그 트리를 통째로
+    끌고 오므로 분리한 의미가 사라진다 — 고아 브랜치여야 한다."""
+    step = _intraday_commit_step()
+    assert 'git -C intraday_repo init' in step, (
+        'intraday-data가 없을 때의 생성 경로가 없다 — 첫 실행이 클론 실패로 죽는다.')
+    assert '--orphan' not in step, (
+        'checkout --orphan은 기존 워킹트리를 물고 온다. 빈 init이어야 한다.')

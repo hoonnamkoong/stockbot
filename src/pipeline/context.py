@@ -134,32 +134,6 @@ class PipelineContext:
             self.log(f"[휴장 판정] {self.today_str} 개장={result}")
         return result
 
-    def report_slot(self) -> str | None:
-        """지금 리포트를 보낼 차례인 슬롯('11:00'/'14:00'), 아니면 None.
-
-        판정은 src/report/gate.py에 있다 — 네트워크 없는 순수 함수라 시각과 상태
-        파일만 바꿔가며 테스트한다.
-        """
-        from src.report.gate import due_slot
-        return due_slot(self.now_kst, getattr(self, '_report_data_dir', None))
-
-    def should_notify(self) -> bool:
-        """텔레그램 리포트를 보낼 차례인가.
-
-        [2026-08-09] 판정을 **분 창에서 슬롯 상태로** 바꿨다. 예전에는 "파이썬
-        시작 분이 0~2인가" 하나였는데, 그 값은 디스패치 + 큐 대기 + 셋업(약 50초)
-        뒤의 시각이라 런마다 흔들린다. 08-07에 격자가 밀리면서 정각 리포트가 하루
-        7회에서 3회로 줄었다 — 57% 누락인데 워크플로는 초록색이었다.
-
-        하루 2회(11:00·14:00)가 되면 한 번 놓치는 게 50% 손실이다. 슬롯 상태로
-        재면 40분 창 안의 네 번의 스크래핑 중 하나만 잡히면 된다.
-
-        push 이벤트는 여전히 발송하지 않는다.
-        """
-        if self.github_event == 'push':
-            return False
-        return self.report_slot() is not None
-
     def is_market_hours(self) -> bool:
         """장중 시간대(09:00~15:50)에 해당하는지 확인합니다.
 

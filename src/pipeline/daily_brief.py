@@ -1,4 +1,4 @@
-"""15:00 마감 브리핑 메시지 조립.
+"""국내 브리핑(12:00 오전 / 15:00 마감) 메시지 조립.
 
 계산식은 대시보드(TradeClient.tsx renderRealPortfolioSection)와 동일하다.
 텔레그램과 웹이 다른 수를 말하면 둘 다 못 믿게 된다.
@@ -48,8 +48,8 @@ def _account_block(balance: dict) -> list[str]:
     ]
 
 
-def _sim_block(sims: list[dict]) -> list[str]:
-    lines = ['🤖 심별 현황 (수익률 / 금일 거래)']
+def _sim_block(sims: list[dict], window_label: str = '금일') -> list[str]:
+    lines = [f'🤖 심별 현황 (누적 수익률 / {window_label} 거래)']
     for s in sims:
         rate = s.get('profit_rate')
         rate_str = '측정 불가' if rate is None else _signed_pct(rate)
@@ -57,13 +57,21 @@ def _sim_block(sims: list[dict]) -> list[str]:
     return lines
 
 
-def build_daily_brief(balance: dict, sims: list[dict], now_kst: datetime) -> str:
-    """마감 브리핑 본문. 순수 함수 — I/O 없음."""
+# 슬롯별 (제목, 집계 시작, 집계 끝). 끝이 None이면 하루 전체다.
+BRIEF_SPECS = {
+    '12:00': ('12:00 오전 브리핑 (09:00~12:00)', '09:00', '12:00'),
+    '15:00': ('15:00 마감 브리핑', None, None),
+}
+
+
+def build_daily_brief(balance: dict, sims: list[dict], now_kst: datetime, slot: str) -> str:
+    """브리핑 본문. 순수 함수 — I/O 없음."""
+    title, _, _ = BRIEF_SPECS[slot]
     day = f"{now_kst.strftime('%m/%d')} ({_WEEKDAY_KR[now_kst.weekday()]})"
-    parts = [f"📅 15:00 마감 브리핑  {day}", '']
+    parts = [f"📅 {title}  {day}", '']
     parts += _account_block(balance)
     parts += ['']
-    parts += _sim_block(sims)
+    parts += _sim_block(sims, '오전' if slot == '12:00' else '금일')
     return '\n'.join(parts)
 
 
@@ -116,14 +124,28 @@ def _profit_rate_from_state(path: str):
         return None
 
 
-def _count_today_tickers(path: str, today_str: str) -> int:
-    """오늘 매매한 종목 수(중복 제거). 파일이 없으면 거래가 없었다는 뜻이므로 0."""
+def _count_today_tickers(path: str, today_str: str,
+                         since: str | None = None, until: str | None = None) -> int:
+    """오늘 매매한 종목 수(중복 제거). 파일이 없으면 거래가 없었다는 뜻이므로 0.
+
+    since/until은 'HH:MM' 문자열이다. 둘 다 없으면 하루 전체를 센다.
+    timestamp 형식은 'YYYY-MM-DD HH:MM:SS'로 고정이다.
+    """
     try:
         with open(path, 'r', encoding='utf-8-sig') as f:
-            return len({
-                row['symbol'] for row in csv.DictReader(f)
-                if (row.get('timestamp') or '').startswith(today_str) and row.get('symbol')
-            })
+            out = set()
+            for row in csv.DictReader(f):
+                ts = row.get('timestamp') or ''
+                code = row.get('symbol')
+                if not code or not ts.startswith(today_str):
+                    continue
+                hhmm = ts[11:16]
+                if since and hhmm < since:
+                    continue
+                if until and hhmm >= until:
+                    continue
+                out.add(code)
+            return len(out)
     except FileNotFoundError:
         return 0
     except Exception as e:
@@ -131,20 +153,26 @@ def _count_today_tickers(path: str, today_str: str) -> int:
         return 0
 
 
-def collect_sim_brief(data_dir: str, today_str: str) -> list[dict]:
-    """9개 심의 (표시명, 수익률, 금일 거래 종목 수)를 모은다."""
+def collect_sim_brief(data_dir: str, today_str: str,
+                      since: str | None = None, until: str | None = None) -> list[dict]:
+    """심별 (표시명, 수익률, 거래 종목 수)를 모은다.
+
+    수익률은 since/until과 무관하게 **현재 시점 누적**이다. 상태 파일에 구간
+    시작 시점 스냅샷이 없어 구간 수익률은 만들 수 없다 — 지어내지 않는다.
+    """
     return [
         {
             'label': label,
             'profit_rate': _profit_rate_from_state(os.path.join(data_dir, state_file)),
-            'ticker_count': _count_today_tickers(os.path.join(data_dir, csv_file), today_str),
+            'ticker_count': _count_today_tickers(
+                os.path.join(data_dir, csv_file), today_str, since, until),
         }
         for label, state_file, csv_file in SIM_BRIEF_TARGETS
     ]
 
 
-def should_send_brief(now_kst, data_dir=None) -> bool:
-    """15시 마감 브리핑을 보낼 차례인가.
+def should_send_brief(now_kst, data_dir=None) -> str | None:
+    """지금 열려 있는 브리핑 슬롯('12:00'/'15:00'), 없으면 None.
 
     [2026-08-09] 예전에는 `should_notify() and hour == 15`였다. 리포트 게이트에
     얹혀 있었다는 뜻인데, 리포트를 하루 2회(11:00·14:00)로 옮기는 순간 **브리핑이

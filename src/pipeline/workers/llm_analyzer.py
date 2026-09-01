@@ -3,7 +3,6 @@
 =======================================================
 실제 advisor 인터페이스:
   - StrategyAdvisor.analyze_batch_discovery(list[dict]) → dict
-  - StrategyAdvisor.generate_deep_dive_report(list[dict]) → str
   - analyzer.analyze_discussion_trend(list[dict]) → (DataFrame, _)
   - analyzer.save_data(df, ...) → None
 """
@@ -25,7 +24,7 @@ def analyze_batch(candidates: list[dict]) -> dict:
 
 class LLMAnalyzerWorker(BaseWorker):
     """
-    Stage 2: Gemini AI 배치 분석 + 딥다이브 리포트 생성.
+    Stage 2: Gemini AI 배치 분석.
     API 한도 초과(429) 또는 타임아웃 시 규칙 기반 Fallback 자동 전환.
     """
 
@@ -185,35 +184,3 @@ class LLMAnalyzerWorker(BaseWorker):
 
         self.log("규칙 기반 Fallback 완료")
         return candidates
-
-    def generate_deep_dive(self, final_picks: list[dict], all_candidates: list[dict], sell_candidate: dict = None) -> str:
-        """딥다이브 리포트 생성. 실패 시 빈 문자열 반환."""
-        if not final_picks and not sell_candidate:
-            return ""
-        try:
-            time.sleep(2)
-            from src.strategy.advisor import StrategyAdvisor
-            advisor = StrategyAdvisor()
-            
-            # 1. 추천 종목 풀 데이터 구성
-            detail_picks = []
-            for p in final_picks:
-                full = next((c for c in all_candidates if c['code'] == p['code']), p).copy()
-                full['rank'] = p.get('rank')
-                detail_picks.append(full)
-                
-            # 2. 리포트 생성 (추천 2개 + 매도 1개)
-            report_str = advisor.generate_deep_dive_report(detail_picks, sell_candidate=sell_candidate)
-            
-            # 3. 상세 텍스트 및 추천 등급 백필
-            for p in final_picks:
-                dp = next((c for c in detail_picks if c['code'] == p['code']), None)
-                if dp:
-                    if 'deep_dive_text' in dp:
-                        p['deep_dive_text'] = dp['deep_dive_text']
-                    if 'rank_and_recommendation' in dp:
-                        p['rank_and_recommendation'] = dp['rank_and_recommendation']
-            return report_str
-        except Exception as e:
-            self.log_error(f"딥다이브 리포트 생성 실패: {e}")
-            return ""

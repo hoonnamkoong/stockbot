@@ -29,25 +29,6 @@ def _status_of(item) -> str:
     return getattr(item, 'status', '활성')
 
 
-# 2026-08-27: 45.0 → 40.0. 그날 14시 슬롯에 딥다이브 강력매수가 2개 있었는데
-# bull_score 43.1로 미달해 통째로 스킵됐다. 40~45는 "약한 횡보"이고 리포트
-# 강력매수는 국면과 독립된 별도 신호라, 같은 약세를 두 번 세고 있었다.
-# 심의 비중 앵커(ReportFollowerSimulator.GATE=45)는 일부러 그대로 둔다 —
-# 40~45 구간은 최소 비중(WEIGHT_MIN)으로 클램프돼 가장 약한 확신에 가장
-# 작은 포지션이 붙는다.
-SIM7_BULL_SCORE_MIN = 40.0
-
-
-def sim7_should_buy(strong_picks: list, bull_score) -> bool:
-    """Stage 3.6 게이트 — '강력 매수'가 있고 장이 죽지 않았을 때만 산다.
-
-    bull_score가 None이면 사지 않는다. 예전에는 국면 파일 조회에 실패하면
-    50.0으로 폴백했고, 그 지어낸 점수가 45 게이트를 그대로 통과해 실제 매수가
-    나갔다. 모르는 것은 '보통 장'이 아니다.
-    """
-    return bool(strong_picks) and bull_score is not None and bull_score >= SIM7_BULL_SCORE_MIN
-
-
 def active_only(items: list) -> list:
     """추적 종목은 기록(엑셀·대시보드)용이다.
 
@@ -219,71 +200,37 @@ def run_pipeline(ctx: PipelineContext) -> None:
     # 캐시가 갈리고, sim0_libero를 다시 도는 실수를 하기도 쉽다).
     with ctx.stage("Stage 3: 전략 판단 + 시뮬레이터"):
         sync_state, _ = storage.load_sync_state(ctx.today_str)
-        final_picks, simulation_results, sell_candidate = trade_worker.run(
+        # 3번째 자리(sell_candidate)는 2026-08-31 리포트 폐기로 항상 None이다.
+        # trade_engine의 3-튜플 반환은 다른 호출부·테스트가 의존하므로 유지한다.
+        final_picks, simulation_results, _ = trade_worker.run(
             active_only(stocks), sync_state,
             skip_program_trading=not scraper_owns_trading,
             paper_owned_elsewhere=paper_owned_elsewhere)
 
-    # ── Stage 3.5: 딥다이브 리포트 생성 ──────────────────────────
-    deep_dive_report = ""
-    if ctx.should_notify():
-        # [2026-08-11] 상세 리포트 대상: 추천 상위 5개(fact_score·tick_power
-        # 순위 결합) + 매도 후보 1개. trade_engine.rank_top()이 이미 5개로
-        # 잘라 넘기므로 여기서는 그 값을 그대로 쓴다.
-        if final_picks or sell_candidate:
-            ctx.log(f"▶ Stage 3.5: 딥다이브 리포트 생성 (추천:{len(final_picks)}개, 매도:{1 if sell_candidate else 0}개)")
-            deep_dive_report = analyzer_worker.generate_deep_dive(final_picks, candidates, sell_candidate=sell_candidate)
-            # 월별 리서치 엑셀에도 기록
-            if final_picks:
-                storage.update_monthly_excel(final_picks, ctx.now_kst)
-        else:
-            # 오늘 이미 보고된 종목들만 있는 경우
-            daily_info = sync_state.daily_reported_info
-            if simulation_results and any(r.get('signal') in ['BUY', 'WATCH'] for r in simulation_results):
-                names_str = ", ".join(item['name'] for item in daily_info)
-                dashboard_url = "https://stockbot-phi.vercel.app/api/download/excel"
-                deep_dive_report = (
-                    f"[안내] 이번 회차의 모든 종목은 오늘 이미 보고되었습니다.\n"
-                    f"오늘 보고 종목: {names_str}\n\n"
-                    f"리포트 다운로드: {dashboard_url}"
-                )
-    else:
-        ctx.log("▶ Stage 3.5: 정각 발송 타이밍 아님 (딥다이브 생성 생략)")
+    # ── 월별 리서치 엑셀 ─────────────────────────────────────────
+    # 예전에는 Stage 3.5(딥다이브) 안에 중첩돼 있었다. 리포트를 폐기하면서
+    # 이것까지 같이 죽으면 2026-08-31에 "살아있는 산출물이라 유지"로 결정한
+    # reports/monthly_research_*.xlsx가 조용히 멈춘다.
+    # 발동 조건을 브리핑 슬롯으로 옮겨 **하루 2회라는 기존 주기를 유지한다** —
+    # 매 사이클로 옮기면 행 수가 수십 배가 되어 성격이 달라진다.
+    from src.pipeline.daily_brief import should_send_brief
+    if final_picks and should_send_brief(ctx.now_kst,
+                                         getattr(ctx, '_report_data_dir', None)):
+        storage.update_monthly_excel(final_picks, ctx.now_kst)
 
     if not final_picks:
         # [Bug 1 Fix] 신규 picks 없어도 reports.json 항상 재생성
         storage.rebuild_reports_index(ctx.now_kst)
 
-    # ── Stage 3.6: Sim7 신규 매수 ────────────────────────────────
-    # rank_and_recommendation이 final_picks에 역전파된 이후 실행
-    try:
-        strong_picks = [
-            p for p in final_picks
-            if '강력 매수' in (p.get('rank_and_recommendation') or '')
-        ]
-        _, bull_score = read_regime('data')
-
-        if sim7_should_buy(strong_picks, bull_score):
-            from src.strategy.simulators.sim7_report_follower import ReportFollowerSimulator
-            ctx.log(f"▶ Stage 3.6: Sim7 강력 매수 처리 ({len(strong_picks)}개 / bull_score={bull_score:.1f})")
-            ReportFollowerSimulator().buy_from_report(strong_picks, bull_score=bull_score)
-        else:
-            score_txt = '측정 불가' if bull_score is None else f'{bull_score:.1f}'
-            ctx.log(f"▶ Stage 3.6: Sim7 스킵 (강력매수={len(strong_picks)}개 / bull_score={score_txt})")
-    except Exception as _e:
-        ctx.log(f"[Warn] Stage 3.6 Sim7 실패: {_e}")
-
-    # ── Stage 4: 텔레그램 발송 + 최종 저장 ───────────────────────
-    ctx.log("▶ Stage 4: 리포트 발송 + 저장")
+    # ── Stage 4: 브리핑 발송 + 최종 저장 ─────────────────────────
+    ctx.log("▶ Stage 4: 브리핑 발송 + 저장")
     # 최신 sync_state 재로드 (Stage 3에서 업데이트됐을 수 있음)
     sync_state, _ = storage.load_sync_state(ctx.today_str)
-    # 추적 종목은 5일/3일 누적 보드(_aggregate_multi_day), 텔레그램 종목 수,
-    # reported_codes에 섞이면 안 된다. 이 인자가 그 넷의 유일한 입구다.
+    # 추적 종목은 5일/3일 누적 보드(_aggregate_multi_day)에 섞이면 안 된다.
+    # 이 인자가 그 보드의 유일한 입구다.
     NotifierWorker(ctx, storage).run(
         all_stocks=active_only(candidates),
         simulation_results=simulation_results,
-        final_picks=final_picks,
-        deep_dive_report=deep_dive_report,
         sync_state=sync_state,
     )
 

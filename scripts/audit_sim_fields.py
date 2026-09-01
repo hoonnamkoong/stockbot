@@ -31,7 +31,7 @@ FIELD_RE = re.compile(r"(?:stock|s|cand|c|item)\.get\(\s*['\"]([a-z_0-9]+)['\"]"
 PORTFOLIO_KEYS = {'avg_price', 'entry_date', 'buy_date', 'peak_price', 'pyramided',
                   'is_scaled_out', 'partial_sold_date', 'quantity', 'name'}
 # 심0은 후보가 아니라 국면 관측치를 읽는다.
-SKIP_SIMS = {'sim0_libero', 'sim10_orchestrator', 'sim7_report_follower'}
+SKIP_SIMS = {'sim0_libero', 'sim10_orchestrator'}
 # 심이 **스스로 조회해 채우는** 필드. 보강이 안 넣는 게 정상이다.
 SELF_FILLED = {('sim3_risk', 'per_ttm'), ('sim3_risk', 'pbr_ttm')}
 # 없는 게 **정상이고 코드가 대비하고 있는** 필드. 근거를 같이 적는다.

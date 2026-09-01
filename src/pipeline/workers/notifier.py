@@ -2,8 +2,6 @@
 [V50.1] Stage 4 Worker: 텔레그램 알림 + 최종 저장 (NotifierWorker)
 =======================================================
 실제 TelegramManager 인터페이스:
-  - send_dashboard_link()
-  - send_market_report(market_name, list)
   - send_message(text)
   - send_no_data_alert(threshold)
 """
@@ -23,7 +21,7 @@ from src.report import gate as report_gate
 class NotifierWorker(BaseWorker):
     """
     Stage 4: 텔레그램 발송 + 최종 데이터 저장.
-    발송 조건 판단은 PipelineContext.should_notify()에 위임합니다.
+    발송 조건 판단은 daily_brief.should_send_brief()에 위임합니다.
     """
 
     def __init__(self, ctx: PipelineContext, storage: StorageManager):
@@ -35,8 +33,6 @@ class NotifierWorker(BaseWorker):
         self,
         all_stocks: list,           # list[dict] (candidates)
         simulation_results: list,   # engine.execute_simulation 결과
-        final_picks: list,          # 이번 턴 신규 보고 종목 (dict 목록)
-        deep_dive_report: str,
         sync_state: SyncState,
     ) -> None:
         """
@@ -46,136 +42,49 @@ class NotifierWorker(BaseWorker):
         # 1. 멀티데이 집계 저장
         self._aggregate_multi_day(all_stocks)
 
-        # 슬롯 판정은 **런당 한 번만** 한다. 발송 직후에 슬롯을 닫으므로, 아래에서
-        # should_notify()를 다시 물으면 False가 되어 reported_codes 갱신이 조용히
-        # 건너뛰어진다. 잡아 쓰고 맨 마지막에 닫는다.
-        slot = self.ctx.report_slot() if self.ctx.should_notify() else None
+        # 2. 브리핑 — 12:00(오전 구간)과 15:00(마감) 둘이 서로 독립이므로,
+        # 보낸 슬롯을 그대로 닫아야 한다. 상수를 닫으면 12시를 보내고 15시가
+        # 사라진다.
+        #
+        # 닫는 것은 **발송에 성공했을 때만이다.** 실패를 '보냈다'로 적으면 그날
+        # 회차가 통째로 사라진다 — 창(40분)이 아직 열려 있으면 다음 스크래핑
+        # 사이클이 재시도할 수 있어야 한다(scrape_gate.mark_scraped와 같은 이유).
         data_dir = getattr(self.ctx, '_report_data_dir', None)
+        brief_slot = should_send_brief(self.ctx.now_kst, data_dir)
+        if brief_slot:
+            if self.safe_run(self._send_daily_brief, self._brief_fallback,
+                             brief_slot) is True:
+                report_gate.mark_sent(brief_slot, self.ctx.now_kst, data_dir)
 
-        # 2. 텔레그램 발송 (슬롯이 열려 있을 때만)
-        sent_ok = False
-        if slot:
-            sent_ok = self.safe_run(
-                self._send_report,
-                self._send_fallback_summary,
-                all_stocks, final_picks, deep_dive_report, sync_state
-            ) is True
-        else:
-            self.log(f"발송 스킵 (이벤트: {self.ctx.github_event}, "
-                     f"슬롯 없음: {self.ctx.now_kst.strftime('%H:%M')})")
-
-        # 2-1. 15:00 마감 브리핑 — 리포트와 **다른 슬롯이다.** 예전에는 should_notify()에
-        # 얹혀 있어서, 리포트를 11/14시로 옮기는 순간 브리핑이 통째로 죽었다.
-        if should_send_brief(self.ctx.now_kst, data_dir):
-            if self.safe_run(self._send_daily_brief, self._brief_fallback) is True:
-                report_gate.mark_sent(report_gate.BRIEF_SLOT, self.ctx.now_kst, data_dir)
-
-        # 3. reported_codes 상태 업데이트 (현재 수집 종목 추가)
-        if slot:
-            reported = sync_state.reported_codes
-            for s in all_stocks:
-                if s.get('code') and s['code'] not in reported:
-                    reported.append(s['code'])
-            self.storage.save_sync_state(sync_state)
-
-        # 4. 실거래 예약 주문 처리
+        # 3. 실거래 예약 주문 처리
         if self.ctx.is_market_hours():
             self._run_trade_executor()
 
-        # 5. 슬롯 닫기 — **발송에 성공했을 때만.** 실패를 '보냈다'로 적으면 그날
-        # 회차가 통째로 사라진다. 창(40분)이 아직 열려 있으면 다음 스크래핑
-        # 사이클이 재시도할 수 있어야 한다(scrape_gate.mark_scraped와 같은 이유).
-        if slot and sent_ok:
-            report_gate.mark_sent(slot, self.ctx.now_kst, data_dir)
-            self.log(f"{slot} 리포트 발송 완료 — 슬롯을 닫습니다")
-
-    def _send_report(
-        self,
-        all_stocks: list,
-        final_picks: list,
-        report: str,
-        sync_state: SyncState,
-    ) -> bool:
-        """실제 TelegramManager 메서드로 리포트 발송. 끝까지 갔으면 True.
-
-        반환값으로 슬롯을 닫을지 정한다 — safe_run은 fallback으로 넘어가도 값을
-        돌려주므로, 여기서 True를 명시하지 않으면 실패와 성공을 구분할 수 없다.
-        """
-        # 대시보드 링크 먼저 발송
-        self.tg.send_dashboard_link()
-
-        kospi = [s for s in all_stocks if s.get('market') == 'KOSPI']
-        kosdaq = [s for s in all_stocks if s.get('market') == 'KOSDAQ']
-
-        if kospi:
-            self.tg.send_market_report("KOSPI 실시간 어텐션", kospi)
-        if kosdaq:
-            self.tg.send_market_report("KOSDAQ 실시간 어텐션", kosdaq)
-
-        if report:
-            # 딥다이브 본문(advisor.generate_deep_dive_report)에는 HTML 태그가
-            # 하나도 없다. 내용은 Gemini 응답·뉴스 제목·토론 요약을 그대로 담아
-            # 'M&A' 같은 문자가 섞이므로, HTML로 보내면 파서가 거부한다.
-            self.tg.send_message(report, parse_mode=None)
-            self.log(f"딥다이브 리포트 발송 완료 ({len(final_picks)}개 종목)")
-        else:
-            self.log("시뮬레이션 결과만 발송 완료")
-
-        # 9개 완성 시 순위 정렬 알림 발송
-        is_morning = self.ctx.now_kst.hour < 12
-        session_complete = sync_state.morning_complete if is_morning else sync_state.afternoon_complete
-        
-        if session_complete:
-            try:
-                # 해당 세션의 리스트 가져오기
-                reported = sync_state.morning_reported_info if is_morning else sync_state.afternoon_reported_info
-                session_name = "오전" if is_morning else "오후"
-                
-                lines = [f"📋 *오늘의 추천 종목 ({session_name} {len(reported)}개 완성)*\n"]
-                # 랭크 순서대로 상위 9개 출력
-                for i, item in enumerate(reported[:9], 1):
-                    lines.append(f"  {i}위. {item.get('name', '?')}")
-                
-                lines.append(f"\n📊 분석 리포트: https://stockbot-phi.vercel.app/research")
-                self.tg.send_message("\n".join(lines))
-                self.log(f"{session_name} 9개 완성 순위 알림 발송")
-            except Exception as e:
-                self.log_error(f"순위 알림 발송 실패: {e}")
-
-        return True
-
-    def _send_fallback_summary(self, all_stocks, final_picks, report, sync_state) -> None:
-        """텔레그램 발송 실패 시 최소한의 정보만 발송."""
-        try:
-            self.tg.send_message(
-                f"[{self.ctx.now_kst.strftime('%m/%d %H:%M')}] 리포트 발송 중 오류\n"
-                f"수집 종목: {len(all_stocks)}개 / 보고 대상: {len(final_picks)}개"
-            )
-        except Exception:
-            pass
-
-    def _send_daily_brief(self) -> bool:
-        """15:00 마감 브리핑을 별도 메시지로 발송. 성공했으면 True."""
+    def _send_daily_brief(self, slot: str) -> bool:
+        """브리핑을 별도 메시지로 발송. 성공했으면 True."""
         from src.trade.balance import get_balance
+        from src.pipeline.daily_brief import BRIEF_SPECS
 
         try:
             balance = get_balance()
         except Exception as e:
             balance = {'error': f'잔고 조회 예외: {e}', 'holdings': []}
 
-        sims = collect_sim_brief('data', self.ctx.now_kst.strftime('%Y-%m-%d'))
-        sent = self.tg.send_message(build_daily_brief(balance, sims, self.ctx.now_kst))
+        _, since, until = BRIEF_SPECS[slot]
+        sims = collect_sim_brief('data', self.ctx.now_kst.strftime('%Y-%m-%d'),
+                                 since, until)
+        sent = self.tg.send_message(
+            build_daily_brief(balance, sims, self.ctx.now_kst, slot))
         if not sent:
-            raise RuntimeError("마감 브리핑 텔레그램 발송 실패")
-        self.log("15:00 마감 브리핑 발송 완료")
+            raise RuntimeError(f"{slot} 브리핑 텔레그램 발송 실패")
+        self.log(f"{slot} 브리핑 발송 완료")
         return True
 
-    def _brief_fallback(self) -> None:
+    def _brief_fallback(self, slot: str = '') -> None:
         """브리핑 조립·발송 실패. 숫자를 지어내지 않고 실패만 알린다."""
         try:
             self.tg.send_message(
-                f"[{self.ctx.now_kst.strftime('%m/%d %H:%M')}] 마감 브리핑 생성 실패"
-            )
+                f"[{self.ctx.now_kst.strftime('%m/%d %H:%M')}] {slot} 브리핑 생성 실패")
         except Exception:
             pass
 

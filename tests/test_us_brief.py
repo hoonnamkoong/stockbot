@@ -112,3 +112,29 @@ def test_collect_us_sim_brief_returns_none_on_missing_state_file(tmp_path):
     sims = collect_us_sim_brief(str(tmp_path), NOW)
     row = next(s for s in sims if 'US Sim 2' in s['label'])
     assert row['profit_rate'] is None
+
+
+# ── 09:00 슬롯 게이트 ────────────────────────────────────────────────
+
+def test_us_slot_does_not_touch_the_kr_gate_state(tmp_path):
+    """writer가 하나여야 한다. 미국 브리핑이 국내 상태 파일을 건드리면
+    scraper.yml이 방금 닫은 슬롯이 다시 열린다."""
+    from src.report import gate
+    now = datetime(2026, 9, 1, 9, 5)
+
+    assert gate.us_brief_due(now, str(tmp_path)) is True
+    gate.mark_sent(gate.US_BRIEF_SLOT, now, str(tmp_path),
+                   filename=gate.US_BRIEF_STATE_FILENAME)
+
+    assert gate.us_brief_due(now, str(tmp_path)) is False
+    assert not (tmp_path / gate.STATE_FILENAME).exists()
+    # 국내 브리핑 판정은 영향을 받지 않는다
+    assert gate.brief_due(datetime(2026, 9, 1, 12, 5), str(tmp_path)) == '12:00'
+
+
+def test_us_slot_window_is_40_minutes(tmp_path):
+    """창은 국내 슬롯과 같은 40분이다. 09:41은 이미 늦은 브리핑이다."""
+    from src.report import gate
+    assert gate.us_brief_due(datetime(2026, 9, 1, 9, 39), str(tmp_path)) is True
+    assert gate.us_brief_due(datetime(2026, 9, 1, 9, 41), str(tmp_path)) is False
+    assert gate.us_brief_due(datetime(2026, 9, 1, 8, 59), str(tmp_path)) is False

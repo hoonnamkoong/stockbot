@@ -296,9 +296,53 @@ def regime_output_files(now) -> list[str]:
     return out
 
 
+def us_brief_output_files() -> list[str]:
+    """미국장 마감 브리핑(09:00 KST)이 쓰는 파일(data/ 기준 상대 이름).
+
+    **국면 목록에 얹지 않는다.** `regime_output_files`는 `include_regime`
+    (=그 사이클에 국면을 갱신했는가)일 때만 매니페스트에 들어간다. 국면 갱신은
+    10분 격자인데 브리핑 창은 40분·2분 간격(트리거 20번)이라, 브리핑을 보낸
+    사이클이 마침 국면도 갱신한 사이클일 확률이 5분의 1이다. 나머지에서는
+    게이트 상태가 db-data에 도달하지 못해 다음 트리거가 "아직 안 보냈다"로
+    읽고 브리핑이 반복 발송된다 — 배선이 막으려던 실패를 배선이 만든다.
+    """
+    from src.report.gate import US_BRIEF_STATE_FILENAME
+    return [US_BRIEF_STATE_FILENAME]
+
+
+def _send_us_brief_if_due(now_kst, log=print) -> bool:
+    """09:00 KST 미국장 마감 브리핑. 보냈으면 True.
+
+    반환값이 배포 매니페스트를 연다 — 슬롯 상태가 db-data를 왕복하지 못하면
+    다음 트리거가 다시 보낸다.
+
+    **실패해도 매매 루프를 멈추지 않는다.** 이 루프에는 실전 주문이 흐른다.
+    그리고 발송에 **성공한 직후에만** 슬롯을 닫는다 — 실패를 '보냈다'로 적으면
+    그날 회차가 통째로 사라진다(mark_sent 주석과 같은 이유).
+    """
+    from src.report import gate
+    if not gate.us_brief_due(now_kst, 'data'):
+        return False
+    try:
+        from src.pipeline.us_brief import build_us_brief, collect_us_sim_brief
+        from src.telegram_manager import TelegramManager
+
+        sims = collect_us_sim_brief('data', now_kst)
+        if TelegramManager().send_message(build_us_brief(sims, now_kst)):
+            gate.mark_sent(gate.US_BRIEF_SLOT, now_kst, 'data',
+                           filename=gate.US_BRIEF_STATE_FILENAME)
+            log('[USBrief] 미국장 마감 브리핑 발송 완료 — 슬롯을 닫습니다')
+            return True
+        log('[USBrief] 텔레그램 발송 실패 — 슬롯을 열어 둡니다(다음 틱 재시도)')
+    except Exception as e:
+        log(f'[USBrief] 브리핑 실패: {type(e).__name__}: {e}')
+    return False
+
+
 def _write_deploy_manifest(sim_id: str | None, log=print,
                            now=None,
                            include_regime: bool = False,
+                           include_us_brief: bool = False,
                            include_money=None,
                            include_alerts: bool = False,
                            extra_sim_ids: set[str] | None = None) -> None:
@@ -324,6 +368,8 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
         names = []
         if include_regime:
             names += regime_output_files(now)
+        if include_us_brief:
+            names += us_brief_output_files()
         if include_money is not None:
             names += money_output_files(include_money)
         if include_alerts:
@@ -531,12 +577,19 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     # 알림 쿨다운도 이 런이 기록했으면 함께 올린다. 예전에는 휴장 판정 실패 분기
     # 에서만 올렸는데, program_prep_over_budget(쿨다운 60분)은 정상 경로에서 나므로
     # 그쪽 억제가 통째로 무력화돼 2분마다 발송됐다.
+    # ── 미국장 마감 브리핑 (09:00 KST, 런당 1회) ───────────────────
+    # 매매 뒤에 둔다. 브리핑은 읽기만 하지만 KIS 유량과 루프 예산을 매매가 먼저
+    # 써야 한다 — 페이퍼 요약이 실전 주문을 밀어내면 안 된다.
+    us_brief_sent = _send_us_brief_if_due(ctx.now_kst, ctx.log)
+
     alerts_written = alerts.state_was_written()
-    if traded_sim_id or regime_refreshed or money_at or alerts_written or buzz_free_ran:
+    if (traded_sim_id or regime_refreshed or money_at or alerts_written
+            or buzz_free_ran or us_brief_sent):
         # 배포 목록의 월별 파일명은 **기록한 시각**에서 나와야 한다. 런 시작 시각을
         # 쓰면 월 경계를 넘어간 런에서 방금 쓴 파일이 아니라 지난달 파일을 올린다.
         _write_deploy_manifest(traded_sim_id, ctx.log, now=ctx.now_kst,
                                include_regime=regime_refreshed,
+                               include_us_brief=us_brief_sent,
                                include_money=money_at,
                                include_alerts=alerts_written,
                                extra_sim_ids=buzz_free_ran)

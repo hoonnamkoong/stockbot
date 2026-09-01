@@ -39,6 +39,14 @@ SLOT_WINDOW_MIN = 40
 
 STATE_FILENAME = 'report_gate_state.json'
 
+# 미국장 마감 브리핑(09:00 KST). **상태 파일이 국내와 다르다.**
+# report_gate_state.json은 writer가 scraper.yml 하나라는 게 명시적 계약이고
+# tests/test_workflow_file_ownership.py가 그걸 강제한다. trading.yml이 같이 쓰면
+# 두 워크플로가 각자 런 시작 시점 사본을 db-data에 올려, 방금 닫은 슬롯이 다시
+# 열린다(lost update) — 09:00~09:40 창의 2분 간격 트리거 20번이 전부 브리핑을 보낸다.
+US_BRIEF_SLOT = '09:00'
+US_BRIEF_STATE_FILENAME = 'us_brief_gate_state.json'
+
 DEFAULT_DATA_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
 
@@ -98,6 +106,16 @@ def brief_due(now_kst: datetime, data_dir: str | None = None) -> str | None:
     막지 않는다.
     """
     return _due(now_kst, BRIEF_SLOTS, data_dir)
+
+
+def us_brief_due(now_kst: datetime, data_dir: str | None = None) -> bool:
+    """지금 미국장 마감 브리핑을 보낼 차례인가. 국내 슬롯과 완전히 독립이다.
+
+    상태 파일이 다르므로(US_BRIEF_STATE_FILENAME) 국내 브리핑을 보냈는지 여부가
+    이 판정에 끼어들지 않는다. 그 반대도 마찬가지다.
+    """
+    return _due(now_kst, (US_BRIEF_SLOT,), data_dir,
+                filename=US_BRIEF_STATE_FILENAME) is not None
 
 
 def mark_sent(slot: str, now_kst: datetime, data_dir: str | None = None,

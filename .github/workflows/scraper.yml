@@ -183,6 +183,10 @@ jobs:
             case "$(basename "$f")" in
               kis_token_cache.json|token.json|kis_token.json|token_result.json|portfolio.json|order_history.json|order_status.json|history.json|program_positions.json|program_trading.json) continue ;;
               sim_libero_state.json|regime_gate_state.json) continue ;;
+              # 미국장 마감 브리핑(09:00 KST) 슬롯 — writer는 trading.yml이다.
+              # 여기서 올리면 런 시작 시점 사본이 덮어써서 방금 닫은 슬롯이 다시
+              # 열리고, 09:00~09:40 창의 트리거 20번이 전부 브리핑을 보낸다.
+              us_brief_gate_state.json) continue ;;
               # 순위 스냅샷도 trading.yml이 유일 writer다. 되돌리면 직전 스냅샷이
               # 사라져 매 사이클이 warmup이 되고 delta가 영원히 빈다.
               rank_state.json) continue ;;

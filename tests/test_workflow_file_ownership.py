@@ -203,3 +203,58 @@ def test_scraper_does_not_deploy_money_files():
     for pat in ('rank_state.json', 'money_'):
         assert any(pat in line for line in skipped), (
             f'{pat}가 scraper.yml 배포 제외에 없다')
+
+
+# ── 미국장 마감 브리핑(09:00 KST) 슬롯 상태 ──────────────────────────
+
+def test_us_brief_gate_state_is_not_a_regime_file():
+    """브리핑 게이트는 국면 파일이 아니다 — 국면 목록에 얹으면 안 된다.
+
+    `_write_deploy_manifest`는 `regime_output_files()`를 `include_regime`
+    (=그 사이클에 국면을 갱신했는가)일 때만 매니페스트에 넣는다. 국면 갱신은
+    10분 격자이고 브리핑 창은 40분·2분 간격(20 트리거)이라, 브리핑을 보낸
+    사이클이 마침 국면도 갱신한 사이클일 확률은 5분의 1이다. 나머지에서는
+    게이트 상태가 db-data에 도달하지 못해 다음 트리거가 '아직 안 보냈다'로
+    읽고 브리핑이 반복 발송된다 — 이 배선이 막으려던 실패를 이 배선이 만든다.
+    """
+    from src.report.gate import US_BRIEF_STATE_FILENAME
+    import scripts.trade_loop as trade_loop
+
+    now = __import__('datetime').datetime(2026, 9, 1, 9, 5)
+    assert US_BRIEF_STATE_FILENAME not in trade_loop.regime_output_files(now)
+
+
+def test_trading_deploys_the_us_brief_gate_state_on_a_send_only_cycle(tmp_path, monkeypatch):
+    """국면·매매·순위가 전부 없고 브리핑만 보낸 사이클에서도 올라가야 한다.
+
+    db-data를 왕복하지 못하면 매 런이 새 컨테이너라 '아직 안 보냈다'로 읽고
+    09:00~09:40 창의 20번 트리거가 전부 브리핑을 보낸다.
+    """
+    from src.report.gate import US_BRIEF_STATE_FILENAME
+    import scripts.trade_loop as trade_loop
+
+    monkeypatch.chdir(tmp_path)
+    now = __import__('datetime').datetime(2026, 9, 1, 9, 5)
+    trade_loop._write_deploy_manifest(None, log=lambda *_: None, now=now,
+                                      include_us_brief=True)
+
+    written = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(encoding='utf-8')
+    assert US_BRIEF_STATE_FILENAME in written.split()
+
+
+def test_scraper_excludes_the_us_brief_gate_state():
+    """국내 리포트 게이트와 **반대 방향**의 소유권이다.
+
+    report_gate_state.json은 scraper.yml이 배포하고 trading.yml이 안 한다.
+    us_brief_gate_state.json은 그 반대다 — 그래서 scraper.yml의 `data/*.json`
+    루프가 이 파일을 명시적으로 건너뛰어야 한다. 안 그러면 스크래퍼가 런 시작
+    시점 사본을 올려 trading.yml이 방금 닫은 슬롯이 다시 열린다.
+    """
+    from src.report.gate import US_BRIEF_STATE_FILENAME
+    deploy = _text('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
+    skipped = {line for line in deploy.splitlines() if 'continue' in line}
+    patterns = [p.strip() for line in skipped
+                for p in line.strip().split(')', 1)[0].split('|')]
+    assert any(fnmatch.fnmatch(US_BRIEF_STATE_FILENAME, p) for p in patterns), (
+        f'{US_BRIEF_STATE_FILENAME}이 scraper.yml 배포 제외 목록에 없다 — '
+        f'writer가 둘이 되어 09:00~09:40에 브리핑이 반복 발송된다.')

@@ -1,6 +1,6 @@
 from datetime import date
 
-from .base_simulator import BaseSimulator, get_kst_date, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_date
 
 
 
@@ -245,22 +245,18 @@ class SmartRiskSimulator(BaseSimulator):
             # 미설명이 0이 아니면 눈에 띄게 남긴다. 조용한 불일치가 이 사고의 형태였다.
             gap = '' if unexplained == 0 else f" | ⚠️ 미설명 {unexplained}"
             if unexplained:
-                # 로그만으로는 아무도 안 본다. 미설명은 **항상 0이어야 하므로**
-                # 0이 아닌 순간이 곧 버그이고, 거짓 경보가 날 수 없다.
-                try:
-                    from src import alerts
-                    alerts.send_alert_once(
-                        'sim3_funnel_hole',
-                        '\n'.join([
-                            '<b>실전 심 깔때기 불일치</b>', '',
-                            f'후보 {n} → 매수 {b} + 탈락 {rej}, 미설명 {unexplained}.',
-                            '후보가 이유 없이 사라지고 있습니다 — 그날 매매가 '
-                            '0건이면 원인을 로그로 추적할 수 없습니다.',
-                            f'탈락 분포: {parts}',
-                        ]),
-                        now=get_kst_now(), cooldown_min=360)
-                except Exception:
-                    pass
+                # **여기서 텔레그램을 보내지 않는다.** `_log_funnel`은 심의
+                # run() 끝, 즉 실전 매매 사이클 안에서 불린다. send_alert_once는
+                # POST 타임아웃 10초 + 재시도로 최악 20초를 먹는데, 루프 예산은
+                # 85초다. 감시가 매매를 늦추면 감시가 사고가 된다.
+                #
+                # 대신 로그에 크게 남긴다. 사람 경로는 결과 감시
+                # (trade_outcome)가 루프 **밖에서** 맡는다 — 미설명이 0이 아닌
+                # 날은 대개 매매도 0건이라 그쪽에 걸린다. 완전히 겹치지는
+                # 않는다는 것은 알고 남기는 공백이다.
+                print(f"[Sim3 깔때기] ⚠️ 회계 불일치 — 후보 {n} ≠ 매수 {b} + "
+                      f"탈락 {rej} (미설명 {unexplained}). 후보가 이유 없이 "
+                      f"사라지고 있다.")
             print(f"[Sim3 깔때기] 후보 {n} → 매수 {b} | 탈락: {parts}{gap}")
             # 저평가에서 걸린 종목은 실제 배수까지 남긴다 — 유니버스(고ROE)와
             # 조건(저평가)이 반대 방향인지 판단할 근거다.

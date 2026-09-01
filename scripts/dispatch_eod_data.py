@@ -29,9 +29,15 @@ _KST = dt.timezone(dt.timedelta(hours=9))
 _KR_CLOSE_HHMM = (15, 30)
 
 
-# 실패한 배치를 몇 번까지 다시 깨울지. 태스커가 창(16:00~17:00) 안에서 2분마다
-# 들어오므로 상한이 없으면 지속 장애 시 30번 디스패치한다.
-_MAX_ATTEMPTS = 3
+# 실패한 배치를 몇 번까지 다시 깨울지. 태스커가 창(16:00~23:00) 안에서 2분마다
+# 들어오므로 상한이 없으면 지속 장애 시 수백 번 디스패치한다.
+_MAX_ATTEMPTS = 6
+
+# 재시도 사이에 두는 간격. 2026-09-01의 외부 장애는 몇 시간짜리였는데, 간격이
+# 없으면 상한 6회를 12분 만에 소진하고 그 뒤 회복해도 다시 안 깨운다.
+# **상한과 간격은 같이 있어야 의미가 있다** — 상한만 있으면 장애 초반에
+# 다 써버리고, 간격만 있으면 밤새 깨운다.
+_RETRY_COOLDOWN_MIN = 25
 
 
 def should_skip(runs: list[dict], now_kst: dt.datetime) -> tuple[bool, str]:
@@ -61,7 +67,13 @@ def should_skip(runs: list[dict], now_kst: dt.datetime) -> tuple[bool, str]:
         # 여기서 조용히 멈추면 안 된다 — 감시목록이 없는 채로 다음 세션에 들어간다.
         return True, f'오늘 {len(failed)}회 실패 — 상한({_MAX_ATTEMPTS}) 도달, 사람이 봐야 한다'
     if failed:
-        return False, f'오늘 {len(failed)}회 실패 — 재시도한다'
+        newest = max(dt.datetime.fromisoformat(r['created_at'].replace('Z', '+00:00'))
+                     for r in failed)
+        waited = (now_kst - newest.astimezone(_KST)).total_seconds() / 60
+        if waited < _RETRY_COOLDOWN_MIN:
+            return True, (f'직전 실패로부터 {waited:.0f}분 — '
+                          f'{_RETRY_COOLDOWN_MIN}분 간격을 둔다')
+        return False, f'오늘 {len(failed)}회 실패, {waited:.0f}분 경과 — 재시도한다'
     return False, '오늘 마감 뒤 런이 없다'
 
 

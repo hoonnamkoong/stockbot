@@ -20,7 +20,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from scripts.dispatch_eod_data import _MAX_ATTEMPTS, should_skip  # noqa: E402
+from scripts.dispatch_eod_data import (  # noqa: E402
+    _MAX_ATTEMPTS, _RETRY_COOLDOWN_MIN, should_skip)
 
 _KST = dt.timezone(dt.timedelta(hours=9))
 NOW = dt.datetime(2026, 9, 1, 16, 30, tzinfo=_KST)
@@ -53,14 +54,33 @@ def test_in_progress_means_skip():
 
 
 def test_retry_is_bounded():
-    """태스커가 2분마다 들어온다 — 상한이 없으면 지속 장애에서 30번 깨운다."""
-    runs = [_run((16, i), 'failure') for i in range(0, _MAX_ATTEMPTS * 5, 5)]
+    """태스커가 2분마다 들어온다 — 상한이 없으면 지속 장애에서 수백 번 깨운다."""
+    runs = [_run((16, 0), 'failure')] * _MAX_ATTEMPTS
     skip, why = should_skip(runs, NOW)
     assert skip and '상한' in why and '사람이 봐야' in why
 
 
+def test_retries_are_spaced_out():
+    """상한과 간격은 같이 있어야 한다.
+
+    2026-09-01의 외부 장애는 몇 시간짜리였다. 간격이 없으면 상한 6회를 12분
+    만에 소진하고, 그 뒤 KIS가 회복해도 다시 안 깨운다.
+    """
+    just_failed = dt.datetime(2026, 9, 1, 16, 20, tzinfo=_KST)
+    skip, why = should_skip([_run((16, 10), 'failure')], just_failed)
+    assert skip and '간격' in why, f'간격 없이 바로 재시도한다: {why}'
+
+
+def test_retry_after_the_cooldown():
+    later = dt.datetime(2026, 9, 1, 16, 10, tzinfo=_KST) + dt.timedelta(
+        minutes=_RETRY_COOLDOWN_MIN + 1)
+    skip, why = should_skip([_run((16, 10), 'failure')], later)
+    assert not skip and '재시도' in why
+
+
 def test_one_below_the_cap_still_retries():
-    runs = [_run((16, i), 'failure') for i in range(0, (_MAX_ATTEMPTS - 1) * 5, 5)]
+    """상한 직전이어도, 간격만 지났으면 다시 깨운다."""
+    runs = [_run((16, 0), 'failure')] * (_MAX_ATTEMPTS - 1)
     assert should_skip(runs, NOW)[0] is False
 
 
@@ -85,3 +105,18 @@ def test_cancelled_counts_as_a_failed_attempt():
     """취소도 산출물을 안 남긴다. 성공이 아닌 것은 전부 재시도 대상이다."""
     skip, _ = should_skip([_run((16, 0), 'cancelled')], NOW)
     assert skip is False
+
+
+def test_window_is_wide_enough_to_outlast_an_outage():
+    """창이 1시간이면 몇 시간짜리 외부 장애를 못 버틴다.
+
+    2026-09-01이 그랬다 — 16:00 실패, 16:46 재시도도 실패, 17:00에 창이 닫혔다.
+    그 하루를 놓치면 심9-1·심11이 다음 세션을 통째로 잃는다.
+    """
+    from src.session_gate import kr_eod_window
+    naive = lambda h, m: dt.datetime(2026, 9, 1, h, m)
+    assert kr_eod_window(naive(16, 0)) is True
+    assert kr_eod_window(naive(20, 0)) is True, '저녁까지 재시도할 수 있어야 한다'
+    assert kr_eod_window(naive(22, 59)) is True
+    assert kr_eod_window(naive(23, 0)) is False
+    assert kr_eod_window(naive(15, 59)) is False, '마감 전에는 종가가 없다'

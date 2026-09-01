@@ -190,6 +190,12 @@ jobs:
               # 순위 스냅샷도 trading.yml이 유일 writer다. 되돌리면 직전 스냅샷이
               # 사라져 매 사이클이 warmup이 되고 delta가 영원히 빈다.
               rank_state.json) continue ;;
+              # [소유권] US 워치리스트·유니버스의 writer는 us_eod_watchlist.yml이다.
+              # 2026-09-01: 배치가 10:14에 워치리스트를 20260901로 갱신했는데 이
+              # cp가 10:17에 런 시작 시점 사본(20260831)으로 되돌렸다. load_watchlist는
+              # 날짜 불일치에 fail-closed라 US 심 3개가 그 세션 내내 후보 0이었고,
+              # 결손 알림이 2분마다 나갔다. 두 워크플로 모두 초록이었다.
+              sim_us*_watchlist.json|us_universe.json) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done

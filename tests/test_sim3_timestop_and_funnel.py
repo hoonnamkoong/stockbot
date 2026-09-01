@@ -86,3 +86,81 @@ def test_funnel_reports_the_gate_that_blocked(capsys):
     out = capsys.readouterr().out
     assert '[Sim3 깔때기]' in out
     assert 'amount' in out
+
+
+# ── 깔때기 회계 불변식 (2026-09-01) ──────────────────────────────────
+#
+# 그날 실전 매매가 0건이었는데 로그는 이랬다:
+#     [Sim3 깔때기] 후보 30 | 탈락: amount 17, not_cheap 5, adx 1
+# 30 ≠ 23인데 아무도 몰랐다. 보유·쿨다운 갈래가 기록 없이 빠져나갔기 때문이다.
+# 수를 안 맞춰보면 구멍은 영원히 안 보인다.
+
+def _candidate(code, **kw):
+    base = {'code': code, 'name': code, 'price': 10_000,
+            'amount': 10_000_000_000, 'per_ttm': 1.0, 'pbr_ttm': 0.1,
+            'sector_name': '전기·전자', 'sparkline_price': [100] * 10}
+    base.update(kw)
+    return base
+
+
+def test_funnel_accounts_for_every_candidate():
+    """후보 = 매수 + 탈락. 남으면 어딘가가 이유 없이 후보를 버리고 있다."""
+    from src.strategy.simulators.sim3_risk import SmartRiskSimulator as S
+    cands = [_candidate(f'{i:06d}') for i in range(10)]
+    funnel = [{'code': c['code'], 'reason': 'amount'} for c in cands[:7]]
+    n, bought, rejected, unexplained = S.funnel_accounting(cands, funnel, bought=3)
+    assert (n, bought, rejected, unexplained) == (10, 3, 7, 0)
+
+
+def test_funnel_flags_the_2026_09_01_hole():
+    """그날의 로그를 그대로 재현하면 미설명이 잡혀야 한다.
+
+    후보 30, 기록된 탈락 23(amount 17 + not_cheap 5 + adx 1), 매수 0.
+    7개가 설명되지 않는다 — 이 수가 0이 아닌 것이 신호였다.
+    """
+    from src.strategy.simulators.sim3_risk import SmartRiskSimulator as S
+    cands = [_candidate(f'{i:06d}') for i in range(30)]
+    funnel = ([{'code': 'x', 'reason': 'amount'}] * 17
+              + [{'code': 'x', 'reason': 'not_cheap'}] * 5
+              + [{'code': 'x', 'reason': 'adx'}])
+    _, _, _, unexplained = S.funnel_accounting(cands, funnel, bought=0)
+    assert unexplained == 7, '2026-09-01의 구멍이 감지되지 않는다'
+
+
+def test_early_exit_is_not_reported_as_unexplained():
+    """보유 상한으로 끊긴 건 '평가 안 함'이지 '설명 못 함'이 아니다.
+
+    둘을 뭉치면 정상 조기종료마다 경고가 뜨고, 그러면 경고를 아무도 안 본다.
+    """
+    from src.strategy.simulators.sim3_risk import SmartRiskSimulator as S
+    cands = [_candidate(f'{i:06d}') for i in range(30)]
+    funnel = [{'code': '000001', 'reason': 'max_holdings', 'held': 5}]
+    _, _, _, unexplained = S.funnel_accounting(cands, funnel, bought=0)
+    assert unexplained == 0
+
+
+def test_holdings_and_cooldown_are_recorded():
+    """오늘 실제로 샜던 두 갈래가 이제 이유를 남기는지 — 런타임으로 확인한다.
+
+    정적 검사(test_decision_logging_coverage)는 `_fn` 호출이 있는지만 본다.
+    실제로 그 값이 깔때기에 담기는지는 심을 돌려봐야 안다.
+    """
+    sim = _sim()
+    sim.state['portfolio']['000001'] = {
+        'name': 'A', 'quantity': 1, 'avg_price': 10_000,
+        'peak_price': 10_000, 'entry_date': '2026-09-01', 'is_scaled_out': False}
+    sim.state['cooldown_codes'] = {'000002': '2099-01-01'}
+
+    captured = {}
+    orig = sim._log_funnel
+
+    def spy(candidates, funnel, bought=0):
+        captured['reasons'] = [f['reason'] for f in funnel]
+        return orig(candidates, funnel, bought)
+
+    sim._log_funnel = spy
+    sim.run([_candidate('000001'), _candidate('000002')],
+            current_prices={'000001': 10_000})
+
+    assert 'held_or_sold_today' in captured['reasons'], '보유 종목이 기록 없이 사라진다'
+    assert 'cooldown' in captured['reasons'], '쿨다운 종목이 기록 없이 사라진다'

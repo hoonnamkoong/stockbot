@@ -106,13 +106,26 @@ class SmartRiskSimulator(BaseSimulator):
         from src.data.sector_cache import SectorCache
         sector_cache = SectorCache()
         funnel = []
+        bought = 0
         target_amount = self.calc_nav(current_prices) * self.POSITION_WEIGHT
 
         for stock in candidates:
-            if len(self.state['portfolio']) >= self.MAX_HOLDINGS: break
             code = stock['code']
-            if code in self.state['portfolio'] or code in sold_today: continue
-            if self.is_in_cooldown(code): continue
+            # 2026-09-01: 아래 세 갈래가 기록 없이 빠져나가고 있었다. 그날 실전
+            # 매매가 0건이었는데 로그는 `후보 30 | 탈락: amount 17, not_cheap 5,
+            # adx 1`뿐이라 30개 중 23개만 설명됐다. 나머지 7개가 여기로 샜고,
+            # 그래서 "조건 미달이라 안 샀다"와 "배선이 죽었다"를 구분할 수 없었다.
+            # 보유 상한·보유중·쿨다운은 전부 **안 산 이유**다. 이유 없이 사라지면
+            # 그날 돈이 왜 안 움직였는지 아무도 답하지 못한다.
+            if len(self.state['portfolio']) >= self.MAX_HOLDINGS:
+                _fn(funnel, code, 'max_holdings', held=len(self.state['portfolio']))
+                break
+            if code in self.state['portfolio'] or code in sold_today:
+                _fn(funnel, code, 'held_or_sold_today')
+                continue
+            if self.is_in_cooldown(code):
+                _fn(funnel, code, 'cooldown')
+                continue
 
             price = float(stock.get('price', 0))
             amount = float(stock.get('amount', 0))
@@ -162,6 +175,13 @@ class SmartRiskSimulator(BaseSimulator):
                 _fn(funnel, code, 'no_rebound'); continue
 
             qty = int(target_amount / price)
+            # 모든 게이트를 통과하고도 수량이 0이면 안 산다. 자금 부족이나 고가
+            # 종목에서 나는데, 기록이 없으면 "마지막 게이트까지 갔다가 돈이 모자라
+            # 못 샀다"가 "조건 미달"과 구분되지 않는다 — 전자는 예산 문제고
+            # 후자는 전략 문제다. 섞이면 엉뚱한 곳을 고치게 된다.
+            if qty <= 0:
+                _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+                continue
             if qty > 0:
                 reason = (
                     f"[가치페어] 업종 저평가 진입(TTM) "
@@ -170,21 +190,45 @@ class SmartRiskSimulator(BaseSimulator):
                     f"ADX {adx:.1f}, 섹터: {sector_name})"
                 )
                 self.buy(code, stock['name'], price, qty, reason=reason)
+                bought += 1
 
-        self._log_funnel(candidates, funnel)
+        self._log_funnel(candidates, funnel, bought)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
     @staticmethod
-    def _log_funnel(candidates, funnel) -> None:
+    def funnel_accounting(candidates, funnel, bought) -> tuple:
+        """(후보, 매수, 탈락, 미설명). 미설명이 0이 아니면 기록에 구멍이 있다.
+
+        2026-09-01에 이 수를 안 맞춰본 대가를 치렀다. 로그는 `후보 30 | 탈락:
+        amount 17, not_cheap 5, adx 1`이었고 30 ≠ 23인데 아무도 몰랐다. 그날
+        실전 매매가 0건이었는데 왜인지 답하려면 로그를 버리고 코드를 읽어야 했다.
+
+        **미설명은 항상 0이어야 한다.** 0이 아니면 어떤 갈래가 이유 없이 후보를
+        버리고 있다는 뜻이고, 그 갈래가 다음 사고의 자리다.
+        """
+        rejected = len(funnel)
+        leftover = len(candidates) - bought - rejected
+        # 보유 상한에 걸려 `break`했으면 남은 후보는 **평가를 안 한 것**이지
+        # 설명을 못 하는 게 아니다. 둘을 뭉치면 정상 조기종료마다 경고가 떠서
+        # 아무도 경고를 안 보게 된다 — 경고의 가치는 희소성에서 온다.
+        early_exit = any(f.get('reason') == 'max_holdings' for f in funnel)
+        return len(candidates), bought, rejected, (0 if early_exit else leftover)
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, bought=0) -> None:
         """게이트별 탈락 분포를 한 줄로. 진단이 심을 죽이면 안 되니 통째로 삼킨다."""
         try:
             from collections import Counter
             if not funnel:
                 return
+            n, b, rej, unexplained = SmartRiskSimulator.funnel_accounting(
+                candidates, funnel, bought)
             c = Counter(f['reason'] for f in funnel)
             parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            print(f"[Sim3 깔때기] 후보 {len(candidates)} | 탈락: {parts}")
+            # 미설명이 0이 아니면 눈에 띄게 남긴다. 조용한 불일치가 이 사고의 형태였다.
+            gap = '' if unexplained == 0 else f" | ⚠️ 미설명 {unexplained}"
+            print(f"[Sim3 깔때기] 후보 {n} → 매수 {b} | 탈락: {parts}{gap}")
             # 저평가에서 걸린 종목은 실제 배수까지 남긴다 — 유니버스(고ROE)와
             # 조건(저평가)이 반대 방향인지 판단할 근거다.
             for f in [x for x in funnel if x['reason'] == 'not_cheap'][:3]:

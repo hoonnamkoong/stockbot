@@ -26,7 +26,7 @@ import os
 
 from .us_base_simulator import USBaseSimulator, US_DEFAULT_INITIAL_CASH
 from .us_calendar import us_trading_date
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, log_funnel
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -53,6 +53,18 @@ WATCHLIST_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data',
     'sim_us2_donchian_watchlist.json')
 
+
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(국내 심과 같은 방식).
+
+    미국 심은 감시목록(EOD 배치 산출)이 유일한 입구라, 0건일 때 "목록이 안
+    왔다"와 "왔는데 조건 미달"이 밖에서 구분되지 않았다. 국내에서 같은 형태로
+    2주 장애를 놓친 적이 있다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
 
 def _clean(closes):
     return [c for c in (closes or []) if c and c > 0]
@@ -160,7 +172,7 @@ def load_watchlist(date_str: str) -> dict[str, dict]:
     return entries if isinstance(entries, dict) else {}
 
 
-def decide_us_donchian(view, candidates, current_prices):
+def decide_us_donchian(view, candidates, current_prices, funnel=None):
     """[US Sim2] 돈치안 채널 돌파 결정. 순수 함수. Order 리스트 반환.
 
     국내 decide_donchian과 동일 구조 — range_history(원시 종가 배열) 대신
@@ -208,27 +220,48 @@ def decide_us_donchian(view, candidates, current_prices):
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len([c for c in portfolio if c not in sold])
     for stock in candidates:
-        if held >= MAX_HOLDINGS:
-            break
         code = stock.get('code')
-        if not code or code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+        if held >= MAX_HOLDINGS:
+            _fn(funnel, code, 'max_holdings', held=held)
+            break
+        if not code:
+            _fn(funnel, '_', 'no_code')
+            continue
+        if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _fn(funnel, code, 'held_or_cooldown')
             continue
         price = float(stock.get('price', 0) or 0)
         avg_dollar_volume = stock.get('avg_dollar_volume')
         ch_hi = stock.get('channel_high')
-        if price <= 0 or ch_hi is None or avg_dollar_volume is None or avg_dollar_volume < MIN_AMOUNT:
+        # 채널 상단·거래대금 부재는 **감시목록 결손**이지 전략 미달이 아니다.
+        if price <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+        if ch_hi is None:
+            _fn(funnel, code, 'no_channel_high')
+            continue
+        if avg_dollar_volume is None:
+            _fn(funnel, code, 'no_dollar_volume')
+            continue
+        if avg_dollar_volume < MIN_AMOUNT:
+            _fn(funnel, code, 'amount', adv=avg_dollar_volume)
             continue
         av = zamt.get(code)
         if av is None or av <= 0:
+            _fn(funnel, code, 'no_amount_surge', zamt=av)
             continue
 
-        if price > ch_hi:
-            qty = int(target_amount / price)
-            if qty > 0:
-                orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
-                               'price': price, 'quantity': qty, 'cooldown': None,
-                               'reason': f"[US돈치안] {CHANNEL_DAYS}일 채널 돌파 (${ch_hi:,.2f} 상회, 거래대금z {av:+.1f})"})
-                held += 1
+        if price <= ch_hi:
+            _fn(funnel, code, 'below_channel_high', price=price, high=ch_hi)
+            continue
+        qty = int(target_amount / price)
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+            continue
+        orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
+                       'price': price, 'quantity': qty, 'cooldown': None,
+                       'reason': f"[US돈치안] {CHANNEL_DAYS}일 채널 돌파 (${ch_hi:,.2f} 상회, 거래대금z {av:+.1f})"})
+        held += 1
     return orders
 
 
@@ -251,7 +284,11 @@ class USDonchianSimulator(USBaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_us_donchian(self._view(current_prices), candidates, current_prices)
+        funnel = []
+
+        orders = decide_us_donchian(self._view(current_prices), candidates, current_prices, funnel=funnel)
+
+        log_funnel('US돈치안', candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

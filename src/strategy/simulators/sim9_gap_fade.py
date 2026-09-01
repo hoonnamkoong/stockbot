@@ -104,6 +104,10 @@ def decide_gap_fade(view, candidates, current_prices, now=None, funnel=None):
     # 상한 15:20: 동시호가가 시작되면 이 가격으로 체결할 수 없다. 15:33 런에서 사는
     # 백테스트는 체결 불가능한 거래를 세는 것이라 상한이 없으면 결과가 거짓이 된다.
     if not (ENTRY_AFTER_MIN <= mins < ENTRY_BEFORE_MIN):
+        # 창 밖이면 후보를 보지도 않는다. 기록 없이 return하면 로그가
+        # "후보 N인데 탈락 기록이 없다"로 찍혀, 정상 스킵이 배선 고장처럼 보인다.
+        _skip(funnel, '_gate', 'outside_entry_window', mins=mins,
+            window=f'{ENTRY_AFTER_MIN}~{ENTRY_BEFORE_MIN}')
         return orders
 
     target_amount = view['nav'] * POSITION_WEIGHT

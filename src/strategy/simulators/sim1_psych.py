@@ -237,6 +237,10 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
     for stock in candidates:
         code = stock.get('code')
         if not code:
+            # 코드 없는 행은 전략 미달이 아니라 **입력 형식 이상**이다.
+            # 조용히 버리면 후보 수와 진단 행 수가 어긋나는데 아무도 모른다.
+            diags.append({'code': '', 'name': stock.get('name', ''),
+                          'decision': 'skip', 'reason': 'no_code'})
             continue
         f = feat.get(code, {})
         price = float(stock.get('price', 0) or 0)

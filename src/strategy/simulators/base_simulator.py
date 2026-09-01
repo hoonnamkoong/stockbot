@@ -32,35 +32,65 @@ def get_kst_date():
 DEFAULT_INITIAL_CASH = 3_000_000
 
 
-def log_funnel(label: str, candidates, funnel, orders=None, buys=None) -> None:
-    """"후보 N → 매수 B | 탈락: 이유별 분포"를 한 줄로.
+def log_funnel(label, candidates, funnel, orders=None, *,
+               buys=None, seen=None, regime=None, diag_id=None,
+               details=None, early_exit_breaks=True) -> None:
+    """"후보 N → 매수 B | 탈락: 이유별 분포"를 한 줄로. **모든 심의 유일한 형식.**
 
-    **공용으로 둔다.** 2026-09-01에 같은 `if held >= MAX_HOLDINGS: break`가
-    다섯 심에 복제돼 있고 다섯 곳 모두 기록이 빠진 걸 봤다. 로그 형식도
-    복붙하면 같은 결함이 같은 수만큼 생긴다.
+    2026-09-01까지 이 로직이 심마다 사본으로 있었다(여섯 벌). 사본이 갈리면
+    같은 사고를 여섯 번 고쳐야 하고, 실제로 같은
+    `if held >= MAX_HOLDINGS: break`가 다섯 심에서 다섯 번 다 기록을 빠뜨렸다.
 
-    `후보 = 매수 + 탈락`이 안 맞으면 어딘가가 이유 없이 후보를 버리는 것이다.
-    보유 상한으로 조기종료한 경우는 '평가 안 함'이라 경고에서 뺀다 — 정상
-    상황마다 경고가 뜨면 아무도 경고를 안 본다.
+    인자로 흡수한 심별 차이:
+      regime    국면을 함께 찍는 심(12·13)
+      diag_id   한 줄 로그로 부족해 파일에도 남기는 심(6·9·12·13).
+                Actions 로그는 며칠 뒤 사라지므로 db-data에 남겨야 소급된다.
+      seen      루프가 실제로 들여다본 후보 수. 조기종료가 있으면 후보 수와
+                다르고, 그 차이는 '평가 안 함'이지 '설명 못 함'이 아니다.
+      details   심 고유의 추가 줄(예: 심3의 저평가 탈락 상세)
+      early_exit_breaks
+                max_holdings에서 `break`하는 심은 뒤를 안 보지만(심5·9-1·11 등),
+                `continue`하는 심(심8)은 끝까지 본다. 후자에서 미설명 경고를
+                꺼버리면 게이트가 가장 많은 심에서 감시가 사라진다.
 
-    진단이 심을 죽이면 안 되니 통째로 삼킨다.
+    **진단이 심을 죽이면 안 되므로 통째로 삼킨다.** 네트워크는 쓰지 않는다.
     """
     try:
         from collections import Counter
+        orders = orders or []
         if buys is None:
-            buys = sum(1 for o in (orders or []) if o.get('action') == 'BUY')
+            buys = sum(1 for o in orders if o.get('action') == 'BUY')
         n = len(candidates)
         if not n and not funnel:
             return
+
+        if diag_id:
+            try:
+                from src.data import sim_diag
+                sim_diag.append(
+                    diag_id,
+                    [dict(f, decision='skip') for f in funnel]
+                    + [dict(code=o.get('code'), reason='entry', decision='entry')
+                       for o in orders if o.get('action') == 'BUY'],
+                    log=lambda *_: None)
+            except Exception:
+                pass
+
+        head = f'[{label} 깔때기]' + (f' 국면={regime}' if regime else '')
         if not funnel:
-            print(f'[{label} 깔때기] ⚠️ 후보 {n}인데 탈락 기록이 없다(매수 {buys})')
+            print(f'{head} ⚠️ 후보 {n}인데 탈락 기록이 없다(매수 {buys})')
             return
+
         parts = ', '.join(f'{k} {v}' for k, v in
                           Counter(f['reason'] for f in funnel).most_common())
-        early = any(f.get('reason') == 'max_holdings' for f in funnel)
-        gap = n - buys - len(funnel)
-        mark = '' if (gap == 0 or early) else f' | ⚠️ 미설명 {gap}'
-        print(f'[{label} 깔때기] 후보 {n} → 매수 {buys} | 탈락: {parts}{mark}')
+        examined = n if seen is None else seen
+        gap = examined - buys - len(funnel)
+        skip_warn = early_exit_breaks and any(
+            f.get('reason') == 'max_holdings' for f in funnel)
+        mark = '' if (gap == 0 or skip_warn) else f' | ⚠️ 미설명 {gap}'
+        print(f'{head} 후보 {n} → 매수 {buys} | 탈락: {parts}{mark}')
+        for line in (details or []):
+            print(f'   {line}')
     except Exception:
         pass
 

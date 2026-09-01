@@ -243,8 +243,16 @@ def decide_accumulation(view, candidates, current_prices, funnel=None):
         if code in sold or _cooldown_active(view['cooldown_codes'], code):
             _fn(funnel, code, 'sold_or_cooldown')
             continue
-        price = float(stock.get('price', 0) or 0)
-        amount = float(stock.get('amount', 0) or 0)
+        raw_price, raw_amount = stock.get('price'), stock.get('amount')
+        # 필드 부재와 값 미달은 다른 고장이다 — 전자는 데이터 경로, 후자는 전략.
+        if raw_price is None:
+            _fn(funnel, code, 'no_price_field')
+            continue
+        if raw_amount is None:
+            _fn(funnel, code, 'no_amount_field')
+            continue
+        price = float(raw_price or 0)
+        amount = float(raw_amount or 0)
         near = _nearness(stock)
         iv = info.get(code)
         # 넷을 한 `if`로 묶으면 "안 샀다"만 남는다. 특히 `near`/`iv`가 None인 건
@@ -349,7 +357,10 @@ class AccumulationSimulator(BaseSimulator):
         view['buzz_attention'], view['buzz_median'] = crowd_reference(self.data_dir)
         funnel = []
         orders = decide_accumulation(view, candidates, current_prices, funnel=funnel)
-        log_funnel('선행매집', candidates, funnel, orders)
+        # 심8은 max_holdings에서 `continue`라 뒤 후보도 끝까지 본다. break 심과
+        # 같이 취급해 미설명 경고를 끄면, 포트폴리오가 찬 날마다 게이트가 가장
+        # 많은 심에서 감시가 통째로 사라진다.
+        log_funnel('선행매집', candidates, funnel, orders, early_exit_breaks=False)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

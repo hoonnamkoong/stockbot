@@ -1,7 +1,7 @@
 import json
 import os
 
-from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -234,8 +234,16 @@ def decide_minervini(view, candidates, current_prices, funnel=None):
             _fn(funnel, code, 'held_or_cooldown')
             continue
 
-        price = float(stock.get('price', 0) or 0)
-        amount = float(stock.get('amount', 0) or 0)
+        raw_price, raw_amount = stock.get('price'), stock.get('amount')
+        # 필드 부재와 값 미달은 다른 고장이다 — 전자는 데이터 경로, 후자는 전략.
+        if raw_price is None:
+            _fn(funnel, code, 'no_price_field')
+            continue
+        if raw_amount is None:
+            _fn(funnel, code, 'no_amount_field')
+            continue
+        price = float(raw_price or 0)
+        amount = float(raw_amount or 0)
         pivot = stock.get('pivot_price')
         # 셋을 한 `if`로 묶으면 "안 샀다"만 남는다. 특히 `no_pivot`은 전략 미달이
         # 아니라 **감시목록 결손**이라 성격이 다르다 — 이게 후보 전량이면 EOD
@@ -315,35 +323,7 @@ class MinerviniTrendSimulator(BaseSimulator):
         funnel = []
         orders = decide_minervini(self._view(current_prices), candidates,
                                   current_prices, funnel=funnel)
-        self._log_funnel(candidates, funnel, orders)
+        log_funnel('미너비니', candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
-
-    @staticmethod
-    def _log_funnel(candidates, funnel, orders) -> None:
-        """어느 게이트가 막았는지 한 줄로. 진단이 심을 죽이면 안 되니 삼킨다.
-
-        심11은 감시목록이 유일한 입구라, `후보 0`과 `no_pivot 전량`이 각각
-        다른 고장을 뜻한다 — 전자는 목록 자체가 안 왔고, 후자는 목록은 왔는데
-        엔트리에 pivot이 없다(EOD 배치 산출 형식이 바뀐 경우).
-        """
-        try:
-            from collections import Counter
-            buys = sum(1 for o in orders if o.get('action') == 'BUY')
-            if not candidates:
-                print('[미너비니 깔때기] 후보 0 — 감시목록이 비었거나 도달하지 않았다')
-                return
-            if not funnel:
-                print(f'[미너비니 깔때기] ⚠️ 후보 {len(candidates)}인데 탈락 기록이 '
-                      f'없다(매수 {buys})')
-                return
-            parts = ', '.join(f'{k} {v}' for k, v in
-                              Counter(f['reason'] for f in funnel).most_common())
-            early_exit = any(f.get('reason') == 'max_holdings' for f in funnel)
-            gap = len(candidates) - buys - len(funnel)
-            mark = '' if (gap == 0 or early_exit) else f' | ⚠️ 미설명 {gap}'
-            print(f'[미너비니 깔때기] 후보 {len(candidates)} → 매수 {buys} | '
-                  f'탈락: {parts}{mark}')
-        except Exception:
-            pass

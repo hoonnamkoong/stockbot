@@ -128,8 +128,16 @@ def decide_donchian(view, candidates, current_prices, funnel=None):
         if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
             _fn(funnel, code, 'held_or_cooldown')
             continue
-        price = float(stock.get('price', 0) or 0)
-        amount = float(stock.get('amount', 0) or 0)
+        raw_price, raw_amount = stock.get('price'), stock.get('amount')
+        # 필드 부재와 값 미달은 다른 고장이다 — 전자는 데이터 경로, 후자는 전략.
+        if raw_price is None:
+            _fn(funnel, code, 'no_price_field')
+            continue
+        if raw_amount is None:
+            _fn(funnel, code, 'no_amount_field')
+            continue
+        price = float(raw_price or 0)
+        amount = float(raw_amount or 0)
         if price <= 0:
             _fn(funnel, code, 'no_price')
             continue

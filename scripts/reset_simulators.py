@@ -12,8 +12,12 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from src.strategy.registry import get_active_simulators
+from src.strategy.simulators.base_simulator import DEFAULT_INITIAL_CASH
 
-INITIAL_CASH = 3_000_000
+# 리셋이 상태 파일에 적는 initial_cash는 **대시보드가 수익률의 분모로 쓰는 값**이다.
+# 여기에 숫자를 다시 적으면 파이썬에서 금액을 바꿔도 리셋된 심만 옛 분모로
+# 남는다 — 그 사고는 이미 한 번 났다(리셋 예수금 200만 전환).
+INITIAL_CASH = DEFAULT_INITIAL_CASH
 
 
 def reset_simulators():

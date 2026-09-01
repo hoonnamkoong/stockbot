@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH, log_funnel
 from datetime import datetime
 
 # base의 순수 헬퍼(Task 3에서 @staticmethod로 전환됨)를 재사용 — 중복 정의 없음.
@@ -183,35 +183,8 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
         funnel = []
         orders = decide_bull_daytrade(self._view(current_prices), candidates,
                                       current_prices, funnel=funnel)
-        self._log_funnel(candidates, funnel, orders)
+        log_funnel('Sim4-1', candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
-    @staticmethod
-    def _log_funnel(candidates, funnel, orders) -> None:
-        """게이트별 탈락 분포. 이 심은 실전 계좌가 실제로 돌리는 심이라,
-        여기서 못 사면 그날 매매가 통째로 없다.
-
-        2026-08-14: 체결강도 게이트를 고쳐 30종목 중 25~27개가 통과하는데도
-        하루 종일 `주문 없음`이었다. 뒤 게이트 다섯이 한 `if`로 묶여 있어
-        무엇이 막는지 알 수 없었다.
-
-        진단이 심을 죽이면 안 되니 통째로 삼킨다.
-        """
-        try:
-            from collections import Counter
-            if not funnel and not orders:
-                return
-            c = Counter(f['reason'] for f in funnel)
-            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            print(f"[Sim4-1 깔때기] 후보 {len(candidates)} → 매수 {len(orders)} | 탈락: {parts}")
-            # ADX까지 통과한(=셋업이 살아 있는) 종목이 어디서 죽는지 본다.
-            deep = [f for f in funnel
-                    if f['reason'] in ('period', 'daily_down', 'tick', 'no_inst', 'qty_zero')]
-            for f in deep[:5]:
-                print(f"   {f['code']} 탈락={f['reason']} "
-                      f"ADX={f.get('adx', 0):.1f} 기간={f.get('period', 0):.1f}% "
-                      f"당일={f.get('daily', 0):.1f}% 체결강도={f.get('tick', 0)}")
-        except Exception as e:
-            print(f'[Sim4-1 깔때기] 기록 실패(무시): {e}')

@@ -1,6 +1,6 @@
 from datetime import date
 
-from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH, log_funnel
 
 
 
@@ -199,7 +199,14 @@ class SmartRiskSimulator(BaseSimulator):
                 _fn(funnel, code, 'insufficient_cash',
                     need=qty * price, cash=self.state.get('cash', 0))
 
-        self._log_funnel(candidates, funnel, bought, seen)
+        # 저평가 탈락은 실제 배수까지 남긴다 — 유니버스(고ROE)와 조건(저평가)이
+        # 반대 방향인지 판단할 근거다.
+        details = [
+            f"저평가탈락 {f['code']}({f.get('sector', '')}): "
+            f"PER {f.get('per', 0):.1f}/{f.get('avg_per', 0):.1f} "
+            f"PBR {f.get('pbr', 0):.2f}/{f.get('avg_pbr', 0):.2f}"
+            for f in funnel if f['reason'] == 'not_cheap'][:3]
+        log_funnel('Sim3', candidates, funnel, buys=bought, seen=seen, details=details)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
@@ -224,45 +231,3 @@ class SmartRiskSimulator(BaseSimulator):
         # 찬 날(흔하다)에는 진짜 구멍이 통째로 가려진다. 리뷰에서 잡혔다.
         # 지어낸 보정이 아니라 실제로 센 수를 쓴다.
         return len(candidates), bought, rejected, seen - bought - rejected
-
-    @staticmethod
-    def _log_funnel(candidates, funnel, bought=0, seen=None) -> None:
-        """게이트별 탈락 분포를 한 줄로. 진단이 심을 죽이면 안 되니 통째로 삼킨다."""
-        try:
-            from collections import Counter
-            if not funnel and not candidates:
-                return
-            if not funnel:
-                # 후보가 있는데 기록이 하나도 없다 = 2026-09-01의 최악 형태.
-                # 여기서 조용히 return하면 그 사고가 로그에 아무 흔적도 안 남는다.
-                print(f"[Sim3 깔때기] ⚠️ 후보 {len(candidates)}인데 탈락 기록이 없다 "
-                      f"(매수 {bought}) — 어딘가가 이유 없이 후보를 버리고 있다")
-                return
-            n, b, rej, unexplained = SmartRiskSimulator.funnel_accounting(
-                candidates, funnel, bought, seen)
-            c = Counter(f['reason'] for f in funnel)
-            parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
-            # 미설명이 0이 아니면 눈에 띄게 남긴다. 조용한 불일치가 이 사고의 형태였다.
-            gap = '' if unexplained == 0 else f" | ⚠️ 미설명 {unexplained}"
-            if unexplained:
-                # **여기서 텔레그램을 보내지 않는다.** `_log_funnel`은 심의
-                # run() 끝, 즉 실전 매매 사이클 안에서 불린다. send_alert_once는
-                # POST 타임아웃 10초 + 재시도로 최악 20초를 먹는데, 루프 예산은
-                # 85초다. 감시가 매매를 늦추면 감시가 사고가 된다.
-                #
-                # 대신 로그에 크게 남긴다. 사람 경로는 결과 감시
-                # (trade_outcome)가 루프 **밖에서** 맡는다 — 미설명이 0이 아닌
-                # 날은 대개 매매도 0건이라 그쪽에 걸린다. 완전히 겹치지는
-                # 않는다는 것은 알고 남기는 공백이다.
-                print(f"[Sim3 깔때기] ⚠️ 회계 불일치 — 후보 {n} ≠ 매수 {b} + "
-                      f"탈락 {rej} (미설명 {unexplained}). 후보가 이유 없이 "
-                      f"사라지고 있다.")
-            print(f"[Sim3 깔때기] 후보 {n} → 매수 {b} | 탈락: {parts}{gap}")
-            # 저평가에서 걸린 종목은 실제 배수까지 남긴다 — 유니버스(고ROE)와
-            # 조건(저평가)이 반대 방향인지 판단할 근거다.
-            for f in [x for x in funnel if x['reason'] == 'not_cheap'][:3]:
-                print(f"   저평가탈락 {f['code']}({f.get('sector', '')}): "
-                      f"PER {f.get('per', 0):.1f}/{f.get('avg_per', 0):.1f} "
-                      f"PBR {f.get('pbr', 0):.2f}/{f.get('avg_pbr', 0):.2f}")
-        except Exception as e:
-            print(f'[Sim3 깔때기] 기록 실패(무시): {e}')

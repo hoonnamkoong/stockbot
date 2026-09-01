@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 
 # base 순수 헬퍼(Task 3 @staticmethod) 재사용
 _parse_change_rate = BaseSimulator.parse_change_rate
@@ -101,8 +101,19 @@ def decide_sideways(view, candidates, current_prices, funnel=None):
         if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
             _fn(funnel, code, 'held_or_cooldown')
             continue
-        price = float(stock.get('price', 0))
-        amount = float(stock.get('amount', 0))
+        raw_price, raw_amount = stock.get('price'), stock.get('amount')
+        # **필드 부재와 값 미달을 가른다.** `stock.get('amount', 0)`으로 읽으면
+        # 키가 없는 것이 "거래대금 0원"이 되어 `탈락: amount 99`로 찍힌다 —
+        # "유동성 부족 99종목"으로 읽히지만 진실은 "그 필드가 오지 않았다"다.
+        # 심5가 배포 이래 0건이던 사고가 정확히 이 형태였다(2026-08-17 확인).
+        if raw_price is None:
+            _fn(funnel, code, 'no_price_field')
+            continue
+        if raw_amount is None:
+            _fn(funnel, code, 'no_amount_field')
+            continue
+        price = float(raw_price or 0)
+        amount = float(raw_amount or 0)
         if price <= 0:
             _fn(funnel, code, 'no_price')
             continue
@@ -205,34 +216,7 @@ class SidewaysSwingSimulator(BaseSimulator):
         funnel = []
         orders = decide_sideways(self._view(current_prices), candidates,
                                  current_prices, funnel=funnel)
-        self._log_funnel(candidates, funnel, orders)
+        log_funnel('레인지', candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
-
-    @staticmethod
-    def _log_funnel(candidates, funnel, orders) -> None:
-        """어느 게이트가 막았는지 한 줄로. 진단이 심을 죽이면 안 되니 삼킨다.
-
-        `후보 = 매수 + 탈락`이 안 맞으면 어딘가가 이유 없이 후보를 버리는
-        것이다 — 2026-09-01에 실전 심이 정확히 그 상태였고, 그날 매매가 왜
-        0건인지 로그로 답할 수 없었다.
-        """
-        try:
-            from collections import Counter
-            buys = sum(1 for o in orders if o.get('action') == 'BUY')
-            if not funnel and not candidates:
-                return
-            if not funnel:
-                print(f"[레인지 깔때기] ⚠️ 후보 {len(candidates)}인데 탈락 기록이 "
-                      f"없다(매수 {buys})")
-                return
-            parts = ', '.join(f'{k} {v}' for k, v in
-                              Counter(f['reason'] for f in funnel).most_common())
-            early_exit = any(f.get('reason') == 'max_holdings' for f in funnel)
-            gap = len(candidates) - buys - len(funnel)
-            mark = '' if (gap == 0 or early_exit) else f' | ⚠️ 미설명 {gap}'
-            print(f"[레인지 깔때기] 후보 {len(candidates)} → 매수 {buys} | "
-                  f"탈락: {parts}{mark}")
-        except Exception:
-            pass

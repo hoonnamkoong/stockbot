@@ -169,9 +169,14 @@ def test_failed_buy_is_not_counted_as_a_purchase():
         'name': 'HELD', 'quantity': 300, 'avg_price': 10_000,
         'peak_price': 10_000, 'entry_date': '2026-09-01', 'is_scaled_out': False}
     captured = {}
-    sim._log_funnel = lambda c, f, b=0, s=None: captured.update(funnel=f, bought=b)
-    sim.run([_candidate('000001', sparkline_price=[100 + 3 * i for i in range(12)])],
-            current_prices={'999999': 10_000, '000001': 10_000})
+    import src.strategy.simulators.sim3_risk as m
+    monkey = lambda *a, **k: captured.update(funnel=a[2], bought=k.get('buys', 0))
+    orig, m.log_funnel = m.log_funnel, monkey
+    try:
+        sim.run([_candidate('000001', sparkline_price=[100 + 3 * i for i in range(12)])],
+                current_prices={'999999': 10_000, '000001': 10_000})
+    finally:
+        m.log_funnel = orig
     assert captured['bought'] == 0, '실패한 매수가 매수로 집계됐다'
     assert 'insufficient_cash' in [x['reason'] for x in captured['funnel']],         f"자금 부족이 기록되지 않았다: {[x['reason'] for x in captured['funnel']]}"
 
@@ -188,16 +193,16 @@ def test_holdings_and_cooldown_are_recorded():
         'peak_price': 10_000, 'entry_date': '2026-09-01', 'is_scaled_out': False}
     sim.state['cooldown_codes'] = {'000002': '2099-01-01'}
 
+    # 심 안에 로그 사본이 없다 — 공용 base_simulator.log_funnel을 가로챈다.
     captured = {}
-    orig = sim._log_funnel
-
-    def spy(candidates, funnel, bought=0, seen=None):
-        captured['reasons'] = [f['reason'] for f in funnel]
-        return orig(candidates, funnel, bought, seen)
-
-    sim._log_funnel = spy
-    sim.run([_candidate('000001'), _candidate('000002')],
-            current_prices={'000001': 10_000})
+    import src.strategy.simulators.sim3_risk as m
+    monkey = lambda *a, **k: captured.update(reasons=[f['reason'] for f in a[2]])
+    orig, m.log_funnel = m.log_funnel, monkey
+    try:
+        sim.run([_candidate('000001'), _candidate('000002')],
+                current_prices={'000001': 10_000})
+    finally:
+        m.log_funnel = orig
 
     assert 'held_or_sold_today' in captured['reasons'], '보유 종목이 기록 없이 사라진다'
     assert 'cooldown' in captured['reasons'], '쿨다운 종목이 기록 없이 사라진다'

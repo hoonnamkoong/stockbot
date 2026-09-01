@@ -43,7 +43,7 @@ def test_어제_런은_오늘_치가_아니다():
 
 
 def test_런이_없으면_부른다():
-    with mock.patch.object(d.gh, 'list_run_times', return_value=[]), \
+    with mock.patch.object(d.gh, 'list_runs', return_value=[]), \
          mock.patch.object(d.gh, 'dispatch', return_value=True) as post:
         assert d.dispatch_eod_data(now_utc=_kst(2026, 8, 28, 16, 10).astimezone(dt.timezone.utc),
                                    log=lambda *_: None) == 'dispatched'
@@ -51,7 +51,11 @@ def test_런이_없으면_부른다():
 
 
 def test_이미_돌았으면_생략한다():
-    with mock.patch.object(d.gh, 'list_run_times', return_value=['2026-08-28T06:45:00Z']), \
+    # 2026-09-01: **성공한** 런만 '이미 돌았다'로 본다. 시작 시각만 보던 시절
+    # 실패한 런이 자기 재시도를 막아 감시목록이 하루 통째로 비었다.
+    ok = [{'created_at': '2026-08-28T06:45:00Z', 'status': 'completed',
+           'conclusion': 'success'}]
+    with mock.patch.object(d.gh, 'list_runs', return_value=ok), \
          mock.patch.object(d.gh, 'dispatch') as post:
         assert d.dispatch_eod_data(now_utc=_kst(2026, 8, 28, 16, 10).astimezone(dt.timezone.utc),
                                    log=lambda *_: None) == 'skipped'
@@ -61,7 +65,7 @@ def test_이미_돌았으면_생략한다():
 def test_조회_실패면_부르지_않는다():
     """중복 EOD 런은 db-data push에서 서로 밟는다. 놓친 배치는 장중 루프의
     eod_batch_stale 알림이 잡는다 — 그쪽이 이미 있다."""
-    with mock.patch.object(d.gh, 'list_run_times', return_value=None), \
+    with mock.patch.object(d.gh, 'list_runs', return_value=None), \
          mock.patch.object(d.gh, 'dispatch') as post:
         assert d.dispatch_eod_data(now_utc=_kst(2026, 8, 28, 16, 10).astimezone(dt.timezone.utc),
                                    log=lambda *_: None) == 'skipped'

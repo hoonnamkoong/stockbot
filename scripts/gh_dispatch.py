@@ -68,6 +68,27 @@ def list_run_times(wf: str, per_page: int = 100, log=print) -> list[str] | None:
         return None
 
 
+def list_runs(wf: str, per_page: int = 100, log=print) -> list[dict] | None:
+    """최근 런의 (created_at, status, conclusion). 조회 실패는 None.
+
+    `list_run_times`는 시작 시각만 준다. 그래서 그것만 보는 호출자는 **실패한
+    런과 성공한 런을 구분하지 못한다** — 2026-09-01에 EOD 배치가 KIS 타임아웃으로
+    죽었는데, "오늘 런이 있다"는 이유로 남은 창에서 재시도가 통째로 막혔다.
+    이 레포가 반복해서 겪은 "실패와 성공이 밖에서 같은 모양"의 또 한 사례다.
+    """
+    tok = token()
+    if not tok:
+        return None
+    url = _BASE.format(repo=repo(), wf=wf) + f'/runs?per_page={per_page}'
+    try:
+        return [{'created_at': r['created_at'], 'status': r.get('status'),
+                 'conclusion': r.get('conclusion')}
+                for r in _get_json(url, tok).get('workflow_runs', [])]
+    except (error.URLError, OSError, ValueError, KeyError) as e:
+        log(f'[Dispatch] {wf} 런 목록 조회 실패: {e}')
+        return None
+
+
 def ran_since(wf: str, since, log=print) -> bool | None:
     """since(tz 있는 datetime) 이후에 시작한 런이 있는가. 조회 실패는 None."""
     import datetime as _dt

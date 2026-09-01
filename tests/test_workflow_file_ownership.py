@@ -262,18 +262,57 @@ def test_scraper_excludes_the_us_brief_gate_state():
 
 # ── premarket_data.yml intraday 잡: gzip 커밋 ─────────────────────────
 
+def _intraday_commit_step() -> str:
+    """intraday 잡의 **커밋 스텝만** 잘라낸다.
+
+    같은 잡의 `Restore universe (db-data)`는 db-data를 읽는 게 맞다(유니버스는
+    거기 있다). 잡 전체를 훑으면 그 정상 참조까지 걸리므로 스텝 단위로 자른다.
+    """
+    intraday = _text('premarket_data.yml').split('  intraday:', 1)[1]
+    step = intraday.split('- name: 커밋 (intraday-data)', 1)[1]
+    return step.split('- name: Notify on failure', 1)[0]
+
+
 def test_intraday_is_committed_compressed():
     """원시 CSV는 100MB 한도를 넘는다(2026-08-31 실측 115.14MB).
 
     첫 실행에서 push가 거부됐고, rebase 재시도는 크기를 안 바꾸므로 3회가
     전부 같은 이유로 죽었다.
     """
-    intraday = _text('premarket_data.yml').split('  intraday:', 1)[1]
-    assert 'gzip' in intraday, 'intraday 커밋이 압축하지 않는다'
-    assert 'rt_intraday_*.csv.gz' in intraday or '.csv.gz' in intraday
+    step = _intraday_commit_step()
+    assert 'gzip' in step, 'intraday 커밋이 압축하지 않는다'
+    assert 'rt_intraday_*.csv.gz' in step
 
 
 def test_intraday_fails_loudly_when_still_too_large():
     """압축 후에도 한도를 넘으면 조용히 잘리지 않고 실패해야 한다."""
-    intraday = _text('premarket_data.yml').split('  intraday:', 1)[1]
-    assert '104857600' in intraday, '압축 후 크기 검사가 없다'
+    assert '104857600' in _intraday_commit_step(), '압축 후 크기 검사가 없다'
+
+
+def test_intraday_archive_never_lands_on_db_data():
+    """장중 아카이브는 **db-data에 쌓으면 안 된다.**
+
+    세션당 ~14MB가 보존정책 없이 누적되는데, trading.yml은 2분마다
+    `git fetch --depth 1 origin db-data`를 하고 잡 타임아웃이 3분이다(주문 락
+    리스 4분보다 일부러 짧다). 몇 주면 클론만으로 예산을 먹고 주문 루프
+    한가운데서 타임아웃 → 리스가 만료될 때까지 살아 있는 런이 생긴다.
+    누군가 이 커밋을 db-data로 되돌리면 여기서 걸려야 한다.
+    """
+    # 주석에는 'db-data'가 나온다(왜 분리했는지를 적은 문단이다). 실행되는
+    # 줄만 본다.
+    code = ' '.join(ln for ln in _intraday_commit_step().splitlines()
+                    if not ln.strip().startswith('#'))
+    assert 'db-data' not in code, (
+        'intraday 아카이브가 db-data를 향하고 있다 — 매매 핫 패스의 클론이 '
+        '무한히 무거워져 주문 루프가 타임아웃한다.')
+    assert 'intraday-data' in code, 'intraday 아카이브의 대상 브랜치가 없다'
+
+
+def test_intraday_branch_is_created_as_orphan_when_missing():
+    """intraday-data는 아직 없다. db-data/main에서 갈라내면 그 트리를 통째로
+    끌고 오므로 분리한 의미가 사라진다 — 고아 브랜치여야 한다."""
+    step = _intraday_commit_step()
+    assert 'git -C intraday_repo init' in step, (
+        'intraday-data가 없을 때의 생성 경로가 없다 — 첫 실행이 클론 실패로 죽는다.')
+    assert '--orphan' not in step, (
+        'checkout --orphan은 기존 워킹트리를 물고 온다. 빈 init이어야 한다.')

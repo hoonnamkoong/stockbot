@@ -37,7 +37,14 @@ KR_AUDIT_CLOSE_HHMM = (9, 30)
 # 트리거 몇 개가 유실돼도 하루 한 번은 걸리도록 1시간을 준다. 실제 중복 방지는
 # scripts/dispatch_eod_data.py의 '오늘 마감 뒤 런이 있나'가 한다.
 KR_EOD_OPEN_HHMM = (16, 0)
-KR_EOD_CLOSE_HHMM = (17, 0)
+# 2026-09-01: 17:00 → 23:00. 그날 16:00 EOD가 KIS 연결 타임아웃으로 죽었고,
+# 재시도도 같은 이유로 죽었다. 창이 1시간뿐이라 **몇 시간짜리 외부 장애를 못
+# 버틴다** — 그 한 시간을 놓치면 심9-1·심11이 다음 세션을 통째로 잃는다.
+#
+# 늦게 도는 것은 무해하다: eod_data.yml 자체가 장중(UTC < 06:30)이면 수집을
+# 건너뛰는 게이트를 갖고 있고, 태스커 창은 06:00 KST까지 열려 있다. 23:00까지면
+# 다음 09:00보다 열 시간 앞선다.
+KR_EOD_CLOSE_HHMM = (23, 0)
 
 # 미국 정규장. zoneinfo가 서머타임을 자동 반영하므로 ET로 적는다.
 US_OPEN_HHMM = (9, 30)
@@ -64,7 +71,12 @@ def kr_audit_window(now_kst: dt.datetime | None = None) -> bool:
 
 
 def kr_eod_window(now_kst: dt.datetime | None = None) -> bool:
-    """평일 16:00~17:00 KST인가 — 장 마감 뒤 EOD 배치를 깨우는 창."""
+    """평일 16:00~23:00 KST인가 — 장 마감 뒤 EOD 배치를 깨우는 창.
+
+    창 안에서 매 트리거(2분)마다 판정하지만 실제 dispatch는
+    scripts/dispatch_eod_data.py가 정한다 — 성공했으면 생략, 돌고 있으면 생략,
+    실패했으면 간격을 두고 재시도, 상한에 닿으면 사람을 부른다.
+    """
     if now_kst is None:
         now_kst = dt.datetime.now(_KST).replace(tzinfo=None)
     if now_kst.weekday() >= 5:

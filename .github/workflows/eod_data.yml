@@ -34,6 +34,15 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    # 2026-09-01: 이 워크플로만 타임아웃이 없었다(GitHub 기본값 6시간).
+    # 그날 KIS 연결이 러너에서 타임아웃 나면서 런이 25분 넘게 매달렸고,
+    # **매달린 런이 그날의 재시도를 통째로 막았다** — dispatch_eod_data가
+    # `in_progress`를 "지금 돌고 있다"로 보고 생략하기 때문이다.
+    # 재시도 창(16:00~23:00)이 아무리 넓어도 앞 런이 안 죽으면 소용없다.
+    #
+    # 20분: 정상 수집은 3~5분이다. 100종목 × KIS 조회라 여유를 두되,
+    # 재시도 간격(25분)보다 짧아야 다음 트리거가 이어받는다.
+    timeout-minutes: 20
     env:
       PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul

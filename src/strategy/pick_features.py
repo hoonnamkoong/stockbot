@@ -8,9 +8,9 @@ Design: ~/.gstack/projects/hoonnamkoong-stockbot/Hoon_DT-main-design-20260811-22
 단일 리스트라, 새 컬럼을 얹으면 모든 심의 이번 달 진단 CSV가 통째로
 `_v1`로 회전한다(Sim1-1 설계에서 확인된 함정) — Constraints 참고.
 
-2단계 범위: Stage 3 후보 전수 관측 로깅까지. `rank_and_recommendation`
-(딥다이브 산출물, Stage 3.5)과의 조인은 별도 증분(Open Question 3의
-as-of 조인 방식 확정 후)이다 — 여기서는 아직 하지 않는다.
+2단계 범위: Stage 3 후보 전수 관측 로깅까지. 원래 계획했던 조인 대상
+(`rank_and_recommendation`, 구 Stage 3.5 딥다이브 산출물)은 2026-08-31
+리포트 폐기와 함께 사라졌다 — 조인할 상대가 없으므로 그 증분은 없다.
 
 [2026-08-11] 사용자가 로그 축적을 기다리지 않고 선정 랭킹 적용을 앞당기기로
 결정 — `rank_top()`이 그 배선이다. 원값을 안 더한다: fact_score(0~1)와

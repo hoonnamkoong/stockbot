@@ -200,7 +200,9 @@ def run_pipeline(ctx: PipelineContext) -> None:
     # 캐시가 갈리고, sim0_libero를 다시 도는 실수를 하기도 쉽다).
     with ctx.stage("Stage 3: 전략 판단 + 시뮬레이터"):
         sync_state, _ = storage.load_sync_state(ctx.today_str)
-        final_picks, simulation_results, sell_candidate = trade_worker.run(
+        # 3번째 자리(sell_candidate)는 2026-08-31 리포트 폐기로 항상 None이다.
+        # trade_engine의 3-튜플 반환은 다른 호출부·테스트가 의존하므로 유지한다.
+        final_picks, simulation_results, _ = trade_worker.run(
             active_only(stocks), sync_state,
             skip_program_trading=not scraper_owns_trading,
             paper_owned_elsewhere=paper_owned_elsewhere)

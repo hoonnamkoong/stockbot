@@ -156,7 +156,7 @@ class TradeEngineWorker(BaseWorker):
         paper_owned_elsewhere: set[str] | None = None,
     ) -> tuple[list, list, dict]:
         """
-        전략 판단과 딥다이브 대상 선정을 수행합니다.
+        전략 판단과 선정 종목(final_picks) 산출을 수행합니다.
 
         skip_program_trading: 이번 사이클의 실전 주문을 다른 워크플로(trading.yml)가
         낸다면 True. 원장 락·중복가드가 막아주긴 하지만, 불필요한 GitHub API
@@ -232,8 +232,8 @@ class TradeEngineWorker(BaseWorker):
                 # candidates에서 풀 데이터 가져오기
                 full = next((c for c in candidates if c['code'] == r['code']), r).copy()
                 full['signal'] = r.get('signal', 'WATCH')
-                # 엔진 판단 근거(DART/공시 거부 등 포함) — 계산은 되는데 지금까지
-                # final_picks에 전달되지 않아 딥다이브 리포트에서 안 보이고 있었다.
+                # 엔진 판단 근거(DART/공시 거부 등 포함)를 final_picks까지 실어
+                # 보낸다. 월별 리서치 엑셀이 이 값을 그대로 적는다.
                 full['reason'] = r.get('reason', '')
                 eligible.append(full)
 

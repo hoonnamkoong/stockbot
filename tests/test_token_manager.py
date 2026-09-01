@@ -167,3 +167,23 @@ def test_토큰이_아예_없으면_실패다(monkeypatch):
     monkeypatch.setattr(tm, "issue_new_token", lambda: None)
 
     assert tm.manage() is False
+
+
+def test_형제_런_경로에서도_로컬_캐시를_남긴다(tmp_path, monkeypatch):
+    """발급이 거부돼도 성공으로 처리한다면, 뒤 스텝이 쓸 로컬 캐시는 있어야 한다.
+
+    2026-09-01 22:06Z 런: 발급 거부 → 형제 런 판정으로 성공 → 그런데
+    data/kis_token_cache.json이 없어 다음 스텝이 죽었다
+    (`[MarketCalendar] 갱신 실패: KIS 토큰 캐시가 없다`).
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FORCE_TOKEN_REFRESH", "true")
+    cache = _cache_issued_minutes_ago(1)
+    monkeypatch.setattr(tm, "load_token_cache", lambda: cache)
+    monkeypatch.setattr(tm, "issue_new_token", lambda: None)   # EGW00133
+
+    assert tm.manage() is True
+
+    import json
+    written = json.loads((tmp_path / "data" / "kis_token_cache.json").read_text(encoding="utf-8"))
+    assert written["access_token"] == cache["access_token"]

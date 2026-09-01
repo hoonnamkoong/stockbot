@@ -207,8 +207,19 @@ def is_token_valid(cache):
         pass
     return False
 
+def _write_local_cache(cache):
+    """뒤 스텝(auth.py, update_market_calendar.py)이 읽는 로컬 파일에 남긴다."""
+    try:
+        os.makedirs('data', exist_ok=True)
+        with open(TOKEN_CACHE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(cache, f, indent=2, ensure_ascii=False)
+        print(f"[TokenManager] * 로컬 캐시 업데이트: {TOKEN_CACHE_PATH}")
+    except Exception as e:
+        print(f"[TokenManager] ⚠️ 로컬 캐시 저장 실패 (무시): {e}")
+
+
 def _token_issued_recently(window_min=SIBLING_ISSUE_WINDOW_MIN):
-    """저장소에 window_min분 이내에 발급된 **유효한** 토큰이 있는가.
+    """저장소에 window_min분 이내에 발급된 **유효한** 토큰이 있으면 그 캐시를 반환.
 
     '아직 안 만료됨'이 아니라 '방금 발급됨'을 본다. 만료 전이기만 하면 성공으로
     봐주면 진짜 발급 실패가 조용해진다.
@@ -217,17 +228,19 @@ def _token_issued_recently(window_min=SIBLING_ISSUE_WINDOW_MIN):
     try:
         cache = load_token_cache()
     except TokenSourceUnavailable:
-        return False
+        return None
     if not is_token_valid(cache):
-        return False
+        return None
     try:
         issued = datetime.fromisoformat(
             str(cache.get('issued_at', '')).replace('Z', '+00:00'))
     except ValueError:
-        return False
+        return None
     if issued.tzinfo is None:
         issued = issued.replace(tzinfo=timezone(timedelta(hours=9)))
-    return get_current_kst_time() - issued <= timedelta(minutes=window_min)
+    if get_current_kst_time() - issued <= timedelta(minutes=window_min):
+        return cache
+    return None
 
 
 def manage():
@@ -246,13 +259,7 @@ def manage():
     if not force_refresh and is_token_valid(cache):
         print("[TokenManager] * 기존 토큰이 아직 유효합니다. (발급 스킵)")
         # [Fix] Run Scraper 단계에서 auth.py가 로컬 파일을 먼저 읽도록 항상 로컬에 저장
-        try:
-            os.makedirs('data', exist_ok=True)
-            with open(TOKEN_CACHE_PATH, 'w', encoding='utf-8') as f:
-                json.dump(cache, f, indent=2, ensure_ascii=False)
-            print(f"[TokenManager] * 로컬 캐시 업데이트: {TOKEN_CACHE_PATH}")
-        except Exception as e:
-            print(f"[TokenManager] ⚠️ 로컬 캐시 저장 실패 (무시): {e}")
+        _write_local_cache(cache)
         return True
     
     # 토큰 발급 시도
@@ -267,9 +274,13 @@ def manage():
     # 발급이 거부됐다. 같은 초에 들어온 형제 런이 방금 발급했을 수 있다 —
     # 그 경우 이 런의 목적은 이미 달성됐고, 실패로 두면 중복 트리거마다 빨간 런이
     # 남아 진짜 장애와 섞인다.
-    if _token_issued_recently():
+    sibling = _token_issued_recently()
+    if sibling:
         print("[TokenManager] * 발급은 거부됐지만 저장소에 방금 발급된 토큰이 "
               "있습니다 — 동시 트리거로 봅니다.")
+        # 성공으로 처리하는 이상 뒤 스텝이 읽을 로컬 캐시도 있어야 한다.
+        # 없으면 update_market_calendar가 "토큰 캐시가 없다"로 죽는다(09-01 22:06Z).
+        _write_local_cache(sibling)
         return True
 
     print("[TokenManager] ❌ 토큰 관리 실패")

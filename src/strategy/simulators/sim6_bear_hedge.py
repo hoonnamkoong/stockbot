@@ -1,5 +1,5 @@
 from ..regime_state import read_regime
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 
 # base 순수 헬퍼 재사용
 _parse_change_rate = BaseSimulator.parse_change_rate
@@ -124,7 +124,7 @@ class BearHedgeSimulator(BaseSimulator):
       비 BEAR면 보유분을 전량 청산한다. 순수 함수 decide_sim6 자체는 국면을 보지 않으며,
       Sim10도 BEAR 국면에서 같은 함수를 재사용한다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Bear", initial_cash)
 
     def get_universe(self):

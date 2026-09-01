@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator, get_kst_date
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH
 
 _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
@@ -278,7 +278,7 @@ class RegimeDualSimulator(BaseSimulator):
     - 페이퍼 관찰 단계(tradeable: false) — 백테스트 미검증, 임계값은 리서치 분위수
       경계의 근사치다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("RegimeDual", initial_cash)
 
     def get_universe(self):

@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 from datetime import datetime
 
 class ConservativeSimulator(BaseSimulator):
@@ -9,7 +9,7 @@ class ConservativeSimulator(BaseSimulator):
     - Hard Stop: -3%
     - Trailing Stop: 수익 +5% 돌파 후 고점 대비 -2% 하락 시 익절
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Conservative", initial_cash) # 파일명: sim_conservative_state.json
 
     def run(self, candidates, current_prices=None):

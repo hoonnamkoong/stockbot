@@ -1,7 +1,7 @@
 import json
 import os
 
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -265,7 +265,7 @@ class MinerviniTrendSimulator(BaseSimulator):
       확인: `KISDataProvider.get_daily_history`/`get_earnings_growth`.
     """
 
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Minervini", initial_cash)
 
     def get_universe(self):

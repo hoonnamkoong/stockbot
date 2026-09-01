@@ -19,7 +19,7 @@ import {
 import axios from 'axios';
 import { signOut } from 'next-auth/react';
 import { buildPriceMap, summarizeAccount, summarizeProgram, summarizeTurn } from '@/lib/real-account-summary';
-import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
+import { SIM_REGISTRY, SIM_INITIAL_CASH } from '@/lib/sim-registry.generated';
 import PortfolioTable from './PortfolioTable';
 import TradeHistoryTable from './TradeHistoryTable';
 import SimCard from './SimCard';
@@ -90,7 +90,7 @@ function TradeContent() {
     const [bulkActionType, setBulkActionType] = useState<{ type: 'immediate' | 'reservation' } | null>(null);
 
     // 시뮬레이터 리셋
-    const [resetCash, setResetCash] = useState<number | ''>(3000000);
+    const [resetCash, setResetCash] = useState<number | ''>(SIM_INITIAL_CASH);
     const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
     const [resetBusy, setResetBusy] = useState(false);
 

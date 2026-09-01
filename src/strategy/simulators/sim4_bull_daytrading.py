@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator, get_kst_date
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH
 from datetime import datetime
 
 # base의 순수 헬퍼(Task 3에서 @staticmethod로 전환됨)를 재사용 — 중복 정의 없음.
@@ -166,7 +166,7 @@ class BullMomentumDayTradingSimulator(BaseSimulator):
     - 청산: 분할 익절 (+5% 절반 / +10% 전량) + 타이트 손절/강제청산
     - 불타기 없음. 빠른 회전율 목표.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("BullDayTrade", initial_cash)
 
     def get_universe(self):

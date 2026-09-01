@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
 
 # base 순수 헬퍼(Task 3 @staticmethod) 재사용
 _parse_change_rate = BaseSimulator.parse_change_rate
@@ -131,7 +131,7 @@ class SidewaysSwingSimulator(BaseSimulator):
             고정 익절 없음 → 상단 돌파 시 승자를 계속 라이딩.
     - 데이터: range_history는 5일 sparkline_price와 별개 필드(파리티 위해 양 환경 동일 채움).
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Sideways", initial_cash)
 
     def get_universe(self):

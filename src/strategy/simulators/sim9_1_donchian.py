@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -160,7 +160,7 @@ class DonchianBreakoutSimulator(BaseSimulator):
     """
     IS_EOD = True
 
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Donchian", initial_cash)
 
     def run(self, candidates, current_prices=None):

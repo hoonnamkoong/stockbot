@@ -1,6 +1,6 @@
 import os
 
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -288,7 +288,7 @@ class AccumulationSimulator(BaseSimulator):
     - ⚠ 백테스트 없음(tradeable: false). 월별 엑셀에 52주·수급추정 컬럼이 없어
       과거 검증이 불가능하다. 페이퍼로 돌려 데이터를 쌓는 것이 현재 유일한 검증 경로다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Accumulation", initial_cash)
 
     def get_universe(self):

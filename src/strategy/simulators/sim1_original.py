@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
 
 class OriginalSimulator(BaseSimulator):
     """
@@ -6,7 +6,7 @@ class OriginalSimulator(BaseSimulator):
     - 3M 초기화 후 개시
     - 1/N 동일 비중 (10개 슬롯)
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Original", initial_cash) # 파일명: sim_original_state.json
 
     def run(self, candidates, current_prices=None):

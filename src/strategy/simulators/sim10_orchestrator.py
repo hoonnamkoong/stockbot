@@ -1,5 +1,5 @@
 from ..regime_state import read_regime
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
 from .sim4_bull_daytrading import decide_bull_daytrade
 from .sim5_sideways_swing import decide_sideways
 from .sim6_bear_hedge import decide_sim6, INVERSE_UNIVERSE
@@ -12,7 +12,7 @@ class Sim10OrchestratorSimulator(BaseSimulator):
     자체 종목 선정을 하지 않는다. 300만원 독립 운용.
     """
 
-    def __init__(self, initial_cash=3_000_000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("orchestrator", initial_cash)
 
     @classmethod

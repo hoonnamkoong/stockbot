@@ -22,6 +22,16 @@ def get_kst_date():
     return get_kst_now().date()
 
 
+# 심 초기자본의 **단일 원천**이다. 2026-09-01까지 이 값이 파이썬 16곳
+# (각 심의 __init__ 기본값)과 TS 4곳에 각각 박혀 있었고, 기반 클래스의
+# 기본값만 5,000,000으로 달랐다 — 새 심이 인자를 빠뜨리면 조용히 500만이 됐다.
+#
+# 분모가 갈리면 대시보드와 텔레그램이 다른 수익률을 말한다. 그 사고는 이미
+# 한 번 났다(리셋 예수금 200만 전환 때). TS는 이 값을 생성물로 받는다
+# — scripts/gen_sim_registry.py가 여기서 읽어 SIM_INITIAL_CASH로 내보낸다.
+DEFAULT_INITIAL_CASH = 3_000_000
+
+
 def initial_state(cash):
     """리셋 직후의 상태 shape. **이 함수가 정본이다.**
 
@@ -108,7 +118,7 @@ class BaseSimulator:
     IS_ANALYZER = False      # True면 매매하지 않는 분석기(리베로). reset 시 자본 부여 제외
     IS_EOD = False           # True면 장중 10분 루프에서 제외하고 마감 후 1회만 실행(일봉 전략)
 
-    def __init__(self, name, initial_cash=5000000):
+    def __init__(self, name, initial_cash=DEFAULT_INITIAL_CASH):
         self.name = name
         self.initial_cash = initial_cash
         self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data')

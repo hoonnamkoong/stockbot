@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -192,7 +192,7 @@ class GapFadeSimulator(BaseSimulator):
       상위(자체 유니버스)로 옮겼다(위 get_universe() 참고). 진입 창(14:30~15:20)에
       스크래퍼가 10분마다 도는 것은 확인됐다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("GapFade", initial_cash)
 
     def get_universe(self):

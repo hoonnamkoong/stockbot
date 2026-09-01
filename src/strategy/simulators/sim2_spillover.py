@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator, get_kst_now
+from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
 from datetime import datetime
 
 # 사이징은 전 매매심 공통 규격이다(NAV×15% × 최대 6종목 = 90% 투입).
@@ -13,7 +13,7 @@ class SectorSpilloverSimulator(BaseSimulator):
     - 과거 섹터 전이형에서 변경됨.
     - 기관/외국인 수급과 감정 발산(Divergence) 지표를 융합하여 선도 진입.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Spillover", initial_cash)
 
     def get_universe(self):

@@ -1,6 +1,6 @@
 from datetime import date
 
-from .base_simulator import BaseSimulator, get_kst_date
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH
 
 
 
@@ -31,7 +31,7 @@ class SmartRiskSimulator(BaseSimulator):
     MAX_HOLDINGS = 5
     POSITION_WEIGHT = 0.19  # 종목당 NAV 대비 비중 (0.19 × 5 = 최대 95% 투입)
 
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Risk", initial_cash)
 
     def get_universe(self):

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SIM_REGISTRY, ANALYZERS } from '@/lib/sim-registry.generated';
+import { SIM_REGISTRY, ANALYZERS, SIM_INITIAL_CASH } from '@/lib/sim-registry.generated';
 import { createBucketCache, dbDataUrl } from '@/lib/db-data';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +38,7 @@ const loadStats = createBucketCache(async () => {
 
             const liveCash = state.cash || 0;
             const totalAsset = liveCash + portfolioValue;
-            const initialCash = state.initial_cash || 3000000;
+            const initialCash = state.initial_cash || SIM_INITIAL_CASH;
             const profit = totalAsset - initialCash;
             const returnRate = initialCash > 0 ? (profit / initialCash) * 100 : 0;
 

@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator, get_kst_date
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH
 
 _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
@@ -224,7 +224,7 @@ class ThemeCascadeSimulator(BaseSimulator):
       32~43건), 실전 신뢰도 아님. Sim4-1과 신호 일부(ADX)가 겹치지만 유니버스와
       게이트 구조가 달라 별개 후보로 다룬다.
     """
-    def __init__(self, initial_cash=3000000):
+    def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("ThemeCascade", initial_cash)
 
     def get_universe(self):

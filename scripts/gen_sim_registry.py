@@ -21,7 +21,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.strategy.registry import get_sim_registry  # noqa: E402
-from src.strategy.simulators.base_simulator import CSV_HEADER, initial_state  # noqa: E402
+from src.strategy.simulators.base_simulator import (  # noqa: E402
+    CSV_HEADER, DEFAULT_INITIAL_CASH, initial_state)
 
 OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'lib', 'sim-registry.generated.ts')
 
@@ -138,6 +139,22 @@ def _reset_state_ts() -> str:
     )
 
 
+def _initial_cash_ts() -> str:
+    """base_simulator.DEFAULT_INITIAL_CASH를 TS 상수로 옮긴다.
+
+    2026-09-01까지 이 값이 파이썬 16곳(각 심의 __init__ 기본값)과 TS 4곳에
+    각각 박혀 있었고, 기반 클래스 기본값만 5,000,000으로 달랐다.
+
+    분모가 갈리면 대시보드와 텔레그램이 **다른 수익률**을 말한다. 그 사고는
+    이미 한 번 났다(리셋 예수금 200만 전환). CSV 헤더를 여기서 생성하는 것과
+    같은 이유다 — 손으로 적으면 한쪽만 바뀐다.
+    """
+    return (
+        '/** 심 초기자본. 원천은 파이썬 base_simulator.DEFAULT_INITIAL_CASH다. */\n'
+        f'export const SIM_INITIAL_CASH = {DEFAULT_INITIAL_CASH};'
+    )
+
+
 def _csv_header_ts() -> str:
     """base_simulator.CSV_HEADER를 TS 상수로 옮긴다.
 
@@ -182,6 +199,9 @@ def build() -> str:
     for s in analyzers:
         lines.append(f"  {{ id: {_ts(s['id'])}, stateFile: {_ts(s['state_file'])} }},")
     lines.append('];')
+
+    lines.append('')
+    lines.append(_initial_cash_ts())
 
     lines.append('')
     lines.append(_csv_header_ts())

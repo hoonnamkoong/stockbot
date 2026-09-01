@@ -24,7 +24,7 @@ MAX_WATCHLIST개로 한 번 더 자른다(위에서 우려한 타임아웃이 �
 import json
 import os
 
-from .us_base_simulator import USBaseSimulator
+from .us_base_simulator import USBaseSimulator, US_DEFAULT_INITIAL_CASH
 from .us_calendar import us_trading_date
 from .base_simulator import BaseSimulator
 
@@ -235,7 +235,7 @@ def decide_us_donchian(view, candidates, current_prices):
 class USDonchianSimulator(USBaseSimulator):
     """[US Sim2] 돈치안 채널 돌파 — 국내 Sim9-1 이식. 상세 배경은 위 모듈 docstring."""
 
-    def __init__(self, initial_cash=20000):
+    def __init__(self, initial_cash=US_DEFAULT_INITIAL_CASH):
         super().__init__("Us2Donchian", initial_cash)
 
     def get_universe(self):

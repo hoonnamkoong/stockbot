@@ -78,6 +78,18 @@ TASKER_SLEEP_HHMM = (8, 0)
 PREMARKET_OPEN_HHMM = (7, 20)
 PREMARKET_CLOSE_HHMM = (12, 0)
 
+# 주간 리포트(weekly_report.yml)를 깨우는 창. cron은 `0 9 * * 5`(금 09:00 UTC =
+# 18:00 KST)인데 실측 지연이 +23분에서 **+11시간 27분**(08-28)까지 벌어졌다 —
+# 그날 리포트는 금요일 저녁이 아니라 토요일 새벽 05:27에 도착했다.
+#
+# 상한 23:00은 EOD 창과 같다. 자정을 넘기면 '금요일 리포트'가 아니게 되고,
+# 다섯 시간이면 재시도 여유도 넉넉하다.
+#
+# 앞선 두 배치(워치리스트·프리마켓)와 달리 이 시각은 **옛 태스커 창 안**이라,
+# 프로파일을 늘리지 않아도 이 배선은 곧바로 동작한다.
+WEEKLY_REPORT_OPEN_HHMM = (18, 0)
+WEEKLY_REPORT_CLOSE_HHMM = (23, 0)
+
 # 미국 정규장. zoneinfo가 서머타임을 자동 반영하므로 ET로 적는다.
 US_OPEN_HHMM = (9, 30)
 US_CLOSE_HHMM = (16, 0)
@@ -158,5 +170,17 @@ def premarket_window(now_kst: dt.datetime | None = None) -> bool:
         return False
     hhmm = (now_kst.hour, now_kst.minute)
     if not PREMARKET_OPEN_HHMM <= hhmm < PREMARKET_CLOSE_HHMM:
+        return False
+    return tasker_awake(hhmm)
+
+
+def weekly_report_window(now_kst: dt.datetime | None = None) -> bool:
+    """금요일 18:00~23:00 KST인가 — 주간 리포트를 깨우는 창."""
+    if now_kst is None:
+        now_kst = dt.datetime.now(_KST).replace(tzinfo=None)
+    if now_kst.weekday() != 4:               # 금(4)
+        return False
+    hhmm = (now_kst.hour, now_kst.minute)
+    if not WEEKLY_REPORT_OPEN_HHMM <= hhmm < WEEKLY_REPORT_CLOSE_HHMM:
         return False
     return tasker_awake(hhmm)

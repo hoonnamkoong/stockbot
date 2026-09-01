@@ -28,14 +28,14 @@ def test_국내장중에는_kr과_두_배치창이_함께_참():
     # 2026-08-27(목) 01:00 UTC = 10:00 KST
     assert session_router.decide(_utc(2026, 8, 27, 1, 0)) == {
         'kr': True, 'us': False, 'eod': False, 'audit': False,
-        'watchlist': True, 'premarket': True}
+        'watchlist': True, 'premarket': True, 'weekly': False}
 
 
 def test_미국장중이면_us만_참():
     # 2026-08-27(목) 15:00 UTC = 11:00 EDT / 다음날 00:00 KST
     assert session_router.decide(_utc(2026, 8, 27, 15, 0)) == {
         'kr': False, 'us': True, 'eod': False, 'audit': False,
-        'watchlist': False, 'premarket': False}
+        'watchlist': False, 'premarket': False, 'weekly': False}
 
 
 def test_둘_다_아니면_둘_다_거짓():
@@ -45,7 +45,7 @@ def test_둘_다_아니면_둘_다_거짓():
     # eod=True가 됐다(2026-09-01).
     assert session_router.decide(_utc(2026, 8, 27, 21, 0)) == {
         'kr': False, 'us': False, 'eod': False, 'audit': False,
-        'watchlist': False, 'premarket': False}
+        'watchlist': False, 'premarket': False, 'weekly': False}
 
 
 def test_저녁에도_eod_창은_열려_있다():
@@ -64,14 +64,14 @@ def test_개장_직후는_kr과_audit이_함께_참():
     # 2026-08-27(목) 00:10 UTC = 09:10 KST
     assert session_router.decide(_utc(2026, 8, 27, 0, 10)) == {
         'kr': True, 'us': False, 'eod': False, 'audit': True,
-        'watchlist': True, 'premarket': True}
+        'watchlist': True, 'premarket': True, 'weekly': False}
 
 
 def test_마감_직후는_eod만_참():
     # 2026-08-27(목) 07:10 UTC = 16:10 KST
     assert session_router.decide(_utc(2026, 8, 27, 7, 10)) == {
         'kr': False, 'us': False, 'eod': True, 'audit': False,
-        'watchlist': False, 'premarket': False}
+        'watchlist': False, 'premarket': False, 'weekly': False}
 
 
 def test_출력은_github_output_형식():
@@ -90,7 +90,7 @@ def test_표준_라이브러리만_import한다():
             f'base={{m for m in sys.modules if m.split(".")[0] in {heavy}}}; '
             'import scripts.session_router, scripts.dispatch_us_trading, '
             'scripts.dispatch_eod_data, scripts.dispatch_us_eod_watchlist, '
-            'scripts.dispatch_premarket_data; '
+            'scripts.dispatch_premarket_data, scripts.dispatch_weekly_report; '
             f'now={{m for m in sys.modules if m.split(".")[0] in {heavy}}}; '
             'print(",".join(sorted(now - base)))')
     out = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
@@ -161,7 +161,7 @@ def test_소스의_태스커_상수가_이_파일의_실제_설정과_일치한�
     assert sg.TASKER_SLEEP_HHMM == TASKER_TO
 
 
-def test_trading_yml이_두_배치를_실제로_깨운다():
+def test_trading_yml이_세_배치를_실제로_깨운다():
     """라우터가 창을 열어도 워크플로에 스텝이 없으면 아무 일도 안 일어난다.
 
     이 레포는 그 실패를 이미 겪었다 — 오프틱 매매를 위임한 워크플로가 실재하지
@@ -174,7 +174,8 @@ def test_trading_yml이_두_배치를_실제로_깨운다():
     with open(wf, encoding='utf-8') as f:
         text = f.read()
     for out, script in (('watchlist', 'dispatch_us_eod_watchlist.py'),
-                        ('premarket', 'dispatch_premarket_data.py')):
+                        ('premarket', 'dispatch_premarket_data.py'),
+                        ('weekly', 'dispatch_weekly_report.py')):
         assert f"steps.route.outputs.{out} == 'true'" in text, (
             f'trading.yml이 {out} 출력을 안 읽는다 — 창이 열려도 발화가 없다')
         # 파일 어딘가에 이름이 있는 것으로는 부족하다 — 주석에도 적혀 있어서

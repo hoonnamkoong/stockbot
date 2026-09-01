@@ -131,6 +131,17 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: python3 scripts/dispatch_premarket_data.py
 
+      # 주간 리포트(금 18:00 KST)도 같은 이유로 깨운다. cron 실측 지연이 +23분에서
+      # +11시간 27분(08-28)까지 벌어졌고, 그날 리포트는 토요일 새벽에 도착했다.
+      # 이 시각은 옛 태스커 창 안이라 프로파일 변경 없이도 동작한다.
+      - name: Wake weekly report
+        if: steps.route.outputs.weekly == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python3 scripts/dispatch_weekly_report.py
+
       - name: Wake data freshness audit
         if: steps.route.outputs.audit == 'true'
         continue-on-error: true

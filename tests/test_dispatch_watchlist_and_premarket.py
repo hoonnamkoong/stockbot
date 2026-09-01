@@ -18,6 +18,7 @@ import pytest
 
 from scripts import dispatch_premarket_data as pm
 from scripts import dispatch_us_eod_watchlist as wl
+from scripts import dispatch_weekly_report as wr
 
 _KST = dt.timezone(dt.timedelta(hours=9))
 
@@ -31,6 +32,8 @@ def _utc_of(y, mo, d, h, mi):
 CASES = [
     pytest.param(wl, 'dispatch_us_eod_watchlist', _utc_of(2026, 9, 1, 7, 30), id='watchlist'),
     pytest.param(pm, 'dispatch_premarket_data', _utc_of(2026, 9, 1, 7, 30), id='premarket'),
+    # 주간 리포트는 금요일 18:00~23:00 KST 창이다(2026-09-04는 금).
+    pytest.param(wr, 'dispatch_weekly_report', _utc_of(2026, 9, 4, 18, 30), id='weekly'),
 ]
 
 
@@ -44,7 +47,7 @@ def test_창_안에_런이_없으면_부른다(mod, fn, now):
 
 @pytest.mark.parametrize('mod,fn,now', CASES)
 def test_성공한_런이_있으면_생략한다(mod, fn, now):
-    ok = [{'created_at': _utc_of(2026, 9, 1, 7, 25).strftime('%Y-%m-%dT%H:%M:%SZ'),
+    ok = [{'created_at': (now - dt.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%SZ'),
            'status': 'completed', 'conclusion': 'success'}]
     with mock.patch.object(mod.gh, 'list_runs', return_value=ok), \
          mock.patch.object(mod.gh, 'dispatch') as post:
@@ -55,9 +58,9 @@ def test_성공한_런이_있으면_생략한다(mod, fn, now):
 @pytest.mark.parametrize('mod,fn,now', CASES)
 def test_실패한_런은_간격이_지나면_재시도한다(mod, fn, now):
     """cron 백업이 07:00에 떠서 죽었으면, 태스커가 그걸 이어받아야 한다."""
-    bad = [{'created_at': _utc_of(2026, 9, 1, 7, 25).strftime('%Y-%m-%dT%H:%M:%SZ'),
+    bad = [{'created_at': (now - dt.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%SZ'),
             'status': 'completed', 'conclusion': 'failure'}]
-    later = _utc_of(2026, 9, 1, 7, 55)         # 30분 뒤 — 간격(25분) 지났다
+    later = now + dt.timedelta(minutes=25)     # 실패로부터 30분 — 간격(25분) 지났다
     with mock.patch.object(mod.gh, 'list_runs', return_value=bad), \
          mock.patch.object(mod.gh, 'dispatch', return_value=True) as post:
         assert getattr(mod, fn)(now_utc=later, log=lambda *_: None) == 'dispatched'
@@ -77,7 +80,7 @@ def test_조회_실패면_부르지_않는다(mod, fn, now):
 @pytest.mark.parametrize('mod,fn,now', CASES)
 def test_어제_런은_오늘_치가_아니다(mod, fn, now):
     """`since`가 오늘 창 시작이라, 어제 성공한 런이 오늘 발화를 막으면 안 된다."""
-    old = [{'created_at': _utc_of(2026, 8, 31, 7, 25).strftime('%Y-%m-%dT%H:%M:%SZ'),
+    old = [{'created_at': (now - dt.timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'),
             'status': 'completed', 'conclusion': 'success'}]
     with mock.patch.object(mod.gh, 'list_runs', return_value=old), \
          mock.patch.object(mod.gh, 'dispatch', return_value=True) as post:
@@ -85,7 +88,9 @@ def test_어제_런은_오늘_치가_아니다(mod, fn, now):
     post.assert_called_once()
 
 
-def test_두_스크립트가_서로_다른_워크플로를_부른다():
+def test_세_스크립트가_서로_다른_워크플로를_부른다():
     """복사해 만들었으므로 워크플로 이름을 안 바꾸는 실수가 가장 흔하다."""
     assert wl._WORKFLOW == 'us_eod_watchlist.yml'
     assert pm._WORKFLOW == 'premarket_data.yml'
+    assert wr._WORKFLOW == 'weekly_report.yml'
+    assert len({wl._WORKFLOW, pm._WORKFLOW, wr._WORKFLOW}) == 3

@@ -310,6 +310,55 @@ def us_brief_output_files() -> list[str]:
     return [US_BRIEF_STATE_FILENAME]
 
 
+def _check_readiness(ctx) -> None:
+    """개장 직후 1회, 주문을 내지 않고 "쏠 수는 있는 상태인가"만 본다.
+
+    이걸 통과해두면 그날 매매가 0건이어도 **전략 문제로 좁혀진다.** 통과하지
+    못하면 0건은 사고다. 2026-09-01에는 이 구분이 없어서 로그를 뒤지고 코드를
+    읽어야 했다.
+
+    창은 09:00~09:10. 그 안에 2분 간격으로 다섯 번 들어오지만 알림은
+    `send_alert_once` 쿨다운이 하루 한 통으로 억제한다. 로그에는 매번 남긴다 —
+    스킵과 미발화가 같은 모양이면 안 된다.
+    """
+    hhmm = ctx.now_kst.strftime('%H:%M')
+    if not ('09:00' <= hhmm <= '09:10'):
+        return
+    try:
+        from src.pipeline import readiness
+        ok, msg = readiness.evaluate(readiness.collect(ctx.log))
+        ctx.log(f'[준비상태] {"OK" if ok else "실패"} — {msg.splitlines()[0]}')
+        if not ok:
+            alerts.send_alert_once('trade_readiness', msg, now=ctx.now_kst,
+                                   cooldown_min=360, log=ctx.log)
+    except Exception as e:
+        ctx.log(f'[준비상태] 점검 실패(무시하고 계속): {type(e).__name__}: {e}')
+
+
+def _warn_if_no_trades(ctx) -> None:
+    """14시를 넘겼는데 전 심 합계 매매가 0건이면 사람을 부른다.
+
+    개별 심의 0건은 정상이라 알리지 않는다. 열몇 개 심이 서로 다른 전략으로
+    돌면서 단 한 건도 없는 것이 비정상이다.
+
+    **매매 루프를 절대 막지 않는다.** 이 루프에는 실전 주문이 흐르고, 감시가
+    매매를 죽이면 감시가 사고가 된다. 그래서 통째로 삼킨다.
+
+    반복 발송은 `send_alert_once`의 쿨다운이 막는다 — 2분마다 도는 경로라
+    억제가 없으면 하루 수십 통이 나가고, 도배는 침묵과 같다.
+    """
+    try:
+        from src.pipeline.trade_outcome import count_trades_by_sim, outcome_verdict
+
+        counts = count_trades_by_sim('data', ctx.now_kst.strftime('%Y-%m-%d'))
+        msg = outcome_verdict(counts, ctx.now_kst.strftime('%H:%M'))
+        if msg:
+            alerts.send_alert_once('no_trades_today', msg, now=ctx.now_kst,
+                                   cooldown_min=180, log=ctx.log)
+    except Exception as e:
+        ctx.log(f'[결과감시] 판정 실패(무시하고 계속): {type(e).__name__}: {e}')
+
+
 def _send_us_brief_if_due(now_kst, log=print) -> bool:
     """09:00 KST 미국장 마감 브리핑. 보냈으면 True.
 
@@ -580,6 +629,16 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     # 알림 쿨다운도 이 런이 기록했으면 함께 올린다. 예전에는 휴장 판정 실패 분기
     # 에서만 올렸는데, program_prep_over_budget(쿨다운 60분)은 정상 경로에서 나므로
     # 그쪽 억제가 통째로 무력화돼 2분마다 발송됐다.
+    # ── 결과 감시: 오늘 아무도 안 샀는가 ───────────────────────────
+    # 워크플로가 초록이고 입력 산출물이 전부 최신인데도 매매가 0건일 수 있다.
+    # 2026-09-01이 그랬고, 시스템은 아무 말도 하지 않았다 — 감시하던 10개가
+    # 전부 입력·중간물이고 결과는 하나도 없었기 때문이다.
+    _warn_if_no_trades(ctx)
+
+    # ── 준비상태 점검 (개장 직후 1회, 주문 없음) ───────────────────
+    # "안 살 이유가 있었다"와 "살 수 없는 상태였다"를 개장 직후에 가른다.
+    _check_readiness(ctx)
+
     # ── 미국장 마감 브리핑 (09:00 KST, 런당 1회) ───────────────────
     # 매매 뒤에 둔다. 브리핑은 읽기만 하지만 KIS 유량과 루프 예산을 매매가 먼저
     # 써야 한다 — 페이퍼 요약이 실전 주문을 밀어내면 안 된다.

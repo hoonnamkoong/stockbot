@@ -37,13 +37,27 @@ let tokenExpiry: number = 0;
 const TOKEN_CACHE_PATH = path.join(process.cwd(), 'data', 'kis_token_cache.json');
 
 // --- Authentication Helpers (Global) ---
-const parseExpiry = (v: any): number => {
-    if (typeof v === 'number') return v; 
-    if (typeof v === 'string') return new Date(v).getTime(); 
+export const parseExpiry = (v: any): number => {
+    // 숫자는 **밀리초**로 본다. epoch '초'가 들어오면 Date.now()와 1000배
+    // 어긋나 언제나 '만료'로 읽히고, 그러면 매 런이 토큰을 새로 발급받는다.
+    // KIS는 1일 1회 제한이라 그 순간 그날 매매가 통째로 잠긴다.
+    if (typeof v === 'number') return v < 1e12 ? v * 1000 : v;
+    if (typeof v === 'string') {
+        // 오프셋(`+09:00`/`Z`)이 없는 문자열은 **KST로 읽는다.**
+        // 이 캐시는 파이썬이 쓰고 TS가 읽는 언어 간 계약인데, 파이썬 쪽
+        // (src/trade/auth.py:30-31)은 naive 값을 KST로 간주하도록 명시적으로
+        // 방어하고 있다. TS는 `new Date(v)`라 **실행 환경의 로컬 시간**으로
+        // 읽었다 — Vercel은 UTC이므로 같은 문자열을 9시간 다르게 해석한다.
+        // 지금 형식에는 오프셋이 있어 드러나지 않지만, 생산자가 한 번만
+        // 형식을 바꾸면 토큰이 9시간 더 살아 있는 것으로 보이고 그 사이
+        // 모든 호출이 401로 죽는다.
+        const naive = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(v);
+        return new Date(naive ? `${v.replace(' ', 'T')}+09:00` : v).getTime();
+    }
     return 0;
 };
 
-const isTokenValid = (cache: any): boolean => {
+export const isTokenValid = (cache: any): boolean => {
     if (!cache?.access_token) return false;
     const expiresMs = parseExpiry(cache.expires_at);
     const now = Date.now();

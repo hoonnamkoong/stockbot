@@ -1,4 +1,5 @@
-from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
+from .base_simulator import (BaseSimulator, get_kst_now,
+                             DEFAULT_INITIAL_CASH, log_funnel)
 from datetime import datetime
 
 # 사이징은 전 매매심 공통 규격이다(NAV×15% × 최대 6종목 = 90% 투입).
@@ -6,6 +7,18 @@ from datetime import datetime
 # (NAV의 1.2%)까지 마르자 신호가 와도 매수가 조용히 실패했다.
 MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19
+
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(전 심 공통 방식).
+
+    심2는 MFHS2 점수 60점이 유일한 관문인데, 그 앞의 유동성·쿨다운에서 걸린
+    후보와 점수 미달로 걸린 후보가 로그에서 구분되지 않았다. 둘은 고치는 곳이
+    다르다 — 전자는 유니버스, 후자는 임계값이다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
 
 class SectorSpilloverSimulator(BaseSimulator):
     """
@@ -110,27 +123,58 @@ class SectorSpilloverSimulator(BaseSimulator):
         target_amount = self.calc_nav(current_prices) * POSITION_WEIGHT
         held = len(self.state['portfolio']) - len(sold_today)
 
+        funnel = []
+        bought = 0
         for stock in candidates:
-            if held >= MAX_HOLDINGS: break
             code = stock['code']
-            if code in self.state['portfolio'] or code in sold_today: continue
+            if held >= MAX_HOLDINGS:
+                _fn(funnel, code, 'max_holdings', held=held)
+                break
+            if code in self.state['portfolio'] or code in sold_today:
+                _fn(funnel, code, 'held_or_sold_today')
+                continue
+            if self.is_in_cooldown(code):
+                _fn(funnel, code, 'cooldown')
+                continue
 
-            if self.is_in_cooldown(code): continue
-
-            price = float(stock.get('price', 0))
-            amount = float(stock.get('amount', 0))
-            if amount < 1_000_000_000 or price <= 0: continue # 거래대금 10억 미만 패스
+            # 필드 부재와 값 미달을 가른다 — `get(k, 0)`으로 읽으면 키 없음이
+            # "거래대금 0원"이 되어 유동성 미달로 잘못 읽힌다.
+            raw_price, raw_amount = stock.get('price'), stock.get('amount')
+            if raw_price is None:
+                _fn(funnel, code, 'no_price_field')
+                continue
+            if raw_amount is None:
+                _fn(funnel, code, 'no_amount_field')
+                continue
+            price = float(raw_price or 0)
+            amount = float(raw_amount or 0)
+            if price <= 0:
+                _fn(funnel, code, 'no_price')
+                continue
+            if amount < 1_000_000_000:  # 거래대금 10억 미만 패스
+                _fn(funnel, code, 'amount', amount=amount)
+                continue
 
             # MFHS2 통합 스코어 계산 (KIS 데이터 우선, 폴백은 base 메서드)
             score = self._mfhs2_score_kis(stock, current_month)
 
             # 진입 결정: 60점 이상이면 매수 (이전 40점 → 수급 신호 강도 상향)
-            if score >= 60:
-                qty = int(target_amount / price)
-                if qty > 0 and self.buy(code, stock['name'], price, qty,
-                                        reason=f"[MFHS2] 다중 필터 수급 동승 (Score: {score}/100)"):
-                    held += 1
+            if score < 60:
+                _fn(funnel, code, 'score_low', score=score)
+                continue
+            qty = int(target_amount / price)
+            if qty <= 0:
+                _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+                continue
+            if self.buy(code, stock['name'], price, qty,
+                        reason=f"[MFHS2] 다중 필터 수급 동승 (Score: {score}/100)"):
+                held += 1
+                bought += 1
+            else:
+                _fn(funnel, code, 'insufficient_cash',
+                    need=qty * price, cash=self.state.get('cash', 0))
 
+        log_funnel('MFHS2', candidates, funnel, buys=bought)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 

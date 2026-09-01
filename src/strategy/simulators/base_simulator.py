@@ -78,7 +78,12 @@ def log_funnel(label, candidates, funnel, orders=None, *,
 
         head = f'[{label} 깔때기]' + (f' 국면={regime}' if regime else '')
         if not funnel:
-            print(f'{head} ⚠️ 후보 {n}인데 탈락 기록이 없다(매수 {buys})')
+            # 전량 매수했으면 탈락 기록이 없는 게 맞다. 그때도 경고하면
+            # 정상 상황에 경고가 뜨고, 상시 뜨는 경고는 아무도 안 본다.
+            if buys >= n:
+                print(f'{head} 후보 {n} → 매수 {buys} (전량 진입)')
+            else:
+                print(f'{head} ⚠️ 후보 {n}인데 탈락 기록이 없다(매수 {buys})')
             return
 
         parts = ', '.join(f'{k} {v}' for k, v in

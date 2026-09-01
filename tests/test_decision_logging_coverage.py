@@ -43,6 +43,15 @@ SIM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # 탈락 사유를 남기는 호출로 인정하는 이름들. 심마다 헬퍼 이름이 다르다.
 _LOGGERS = {'_fn', '_diag', 'log_diag', 'record_decision'}
 
+# 기록 장부로 인정하는 변수명. 헬퍼에 넘기거나(`_avoid(stock, funnel)`)
+# 직접 append하는(`diags.append(d)`) 두 형태를 모두 인정한다.
+#
+# 심1-1은 깔때기 대신 진단 dict를 `diags`에 쌓는다 — 남기는 정보는 오히려 더
+# 많은데, 이름만 보고 "기록 안 함"으로 몰면 **정직한 심이 거짓 양성으로 걸린다.**
+# 그러면 사람들이 형식적으로 `_fn`을 끼워 넣어 통과시키고, 남은 숫자가 남은
+# 빚을 뜻하지 않게 된다.
+_LEDGERS = {'funnel', 'diags'}
+
 # 매수 루프를 **이름이 아니라 하는 일로** 찾는다. 본문 어딘가에서 매수를
 # 만드는 For 루프만 대상이다.
 #
@@ -56,30 +65,32 @@ _BUY_MARKERS = ("'action': 'BUY'", '"action": "BUY"', 'self.buy(')
 # ── 래칫 ────────────────────────────────────────────────────────────
 # 파일명 → 기록 없이 후보를 탈락시키는 분기 수(2026-09-01 실측).
 # **줄이는 방향으로만 고친다.** 0이 되면 항목째로 지운다.
-KNOWN_UNLOGGED = {
-    'sim1_psych.py': 3,
-    'sim2_spillover.py': 4,
-    'sim4_bull_momentum.py': 9,
-    'us_sim1_minervini.py': 4,
-    'us_sim2_donchian.py': 4,
-    'us_sim3_liquidity.py': 2,
-}
-# 2026-09-01 상환 이력: 57개/14심 → **26개/6심**.
+KNOWN_UNLOGGED: dict[str, int] = {}
+# ── 2026-09-01: 빚을 다 갚았다. 57개/14심 → **0**. ──────────────────
 #
-# 갚은 심: sim3_risk(실전)·sim5·sim6·sim8·sim9·sim9-1·sim11·sim12·sim13·sim4-1.
-# 다섯 심에 같은 모양으로 복제돼 있던 `if held >= MAX_HOLDINGS: break`가
-# 다섯 곳 모두 기록이 없었다 — 같은 결함이 다섯 파일에 있었다는 사실 자체가,
-# 이 규칙이 리뷰가 아니라 CI에 있어야 하는 이유다. 로그 형식도 같은 이유로
-# base_simulator.log_funnel 하나로 모았다.
+# 이 사전이 비어 있다는 것은 "**등재된 모든 심이, 후보를 버릴 때마다 이유를
+# 남긴다**"는 뜻이다. 다시 채워지는 순간은 누군가 기록 없는 분기를 새로
+# 넣었을 때뿐이고, 그때 CI가 막는다.
 #
-# 숫자가 중간에 오르내린 것은 심이 나빠져서가 아니라 **검사가 정확해졌기**
-# 때문이다. 세 번 고쳤고 셋 다 리뷰나 실측에서 잡혔다.
-#   1. "한 번 기록하면 그 뒤로 계속 기록됨"이 블록 밖으로 새어, 루프 맨 위의
-#      `_fn` 하나가 아래 침묵을 전부 가렸다(게이트가 스스로를 무력화).
-#   2. 파일명 접두사 필터가 미국 심 3개를 통째로 빠뜨렸고, 반대로 매니페스트에서
-#      빠진 죽은 심(sim1_original 등)까지 세어 갚을 수 없는 빚을 만들었다.
-#   3. 이터레이터 **이름**으로 매수 루프를 고르다 피처 계산 루프까지 끌어왔다.
-#      지금은 본문에 매수가 있는 루프만 본다.
+# 상환 순서: sim3_risk(실전 먼저) → sim4-1·sim6·sim9·sim12·sim13(복제된
+# `if held >= MAX_HOLDINGS: break`) → sim5·sim8·sim9-1·sim11 → sim2·sim1-1 →
+# us_sim1·2·3 → sim4(진입 + 불타기 두 장부).
+#
+# 게이트 자체를 **다섯 번** 고쳤고 전부 리뷰나 실측이 잡았다. 숫자가 중간에
+# 오르내린 것은 심이 나빠져서가 아니라 검사가 정확해졌기 때문이다.
+#   1. "한 번 기록하면 계속 기록됨"이 블록 밖으로 새어, 루프 맨 위의 `_fn`
+#      하나가 아래 침묵을 전부 가렸다 — 게이트가 스스로를 무력화했다.
+#   2. 파일명 접두사 필터가 미국 심 3개를 빠뜨렸고, 반대로 매니페스트에서 빠진
+#      죽은 심까지 세어 갚을 수 없는 빚을 만들었다. 이제 등재 심만 본다.
+#   3. 매수 루프를 이터레이터 **이름**으로 고르다 피처 계산 루프까지 끌어왔다.
+#      이제 본문에 매수가 있는 루프만 본다.
+#   4. `While`을 안 봤다. 후보를 while로 도는 심이 생기면 통째로 감시 밖이었다.
+#   5. `diags.append(d)`로 기록하는 심1-1을 "기록 안 함"으로 몰았다 — 정직한
+#      심을 거짓 양성으로 잡으면, 사람들이 형식적으로 `_fn`을 끼워 넣어 통과
+#      시키고 남은 숫자가 남은 빚을 뜻하지 않게 된다.
+#
+# **숫자 0보다 중요한 것은 test_every_trading_sim_has_a_detected_buy_loop다.**
+# 탐지가 실패하면 구멍 수도 0이 되는데 그건 "깨끗"이 아니라 "안 보고 있다"다.
 
 
 def _logs_somewhere(node) -> bool:
@@ -100,7 +111,11 @@ def _logs_somewhere(node) -> bool:
         if name in _LOGGERS:
             return True
         passed = list(sub.args) + [k.value for k in sub.keywords]
-        if any(isinstance(a, ast.Name) and a.id == 'funnel' for a in passed):
+        if any(isinstance(a, ast.Name) and a.id in _LEDGERS for a in passed):
+            return True
+        # `diags.append(d)` — 장부에 직접 쌓는 형태
+        if (isinstance(fn, ast.Attribute) and fn.attr == 'append'
+                and isinstance(fn.value, ast.Name) and fn.value.id in _LEDGERS):
             return True
     return False
 
@@ -187,11 +202,22 @@ def _unlogged_exits(tree: ast.AST) -> list[int]:
 
 
 def _is_candidate_loop(node) -> bool:
-    """이 루프가 **매수를 만드는** 루프인가. 청산 루프·피처 루프는 아니다."""
-    if not isinstance(node, ast.For):
+    """이 루프가 **매수를 만드는** 루프인가. 청산 루프·피처 루프는 아니다.
+
+    `while`도 본다. 처음에는 `For`만 봐서, 후보를 `while`로 도는 심이 생기면
+    통째로 감시 밖이 됐다 — 탐지기의 사각은 조용하다.
+    """
+    if not isinstance(node, (ast.For, ast.While)):
         return False
     body = '\n'.join(ast.unparse(st) for st in node.body)
     return any(m in body for m in _BUY_MARKERS)
+
+
+# 매수 루프가 없는 것이 **정상인** 심. 여기 없는데 탐지가 안 되면 실패한다.
+NO_BUY_LOOP = {
+    'sim0_libero.py': '분석기 — 국면만 판정하고 매매하지 않는다',
+    'sim10_orchestrator.py': '오케스트레이터 — 하위 전략에 위임한다(자기 매수 루프가 없다)',
+}
 
 
 def _sim_files() -> list[str]:
@@ -324,3 +350,45 @@ def run(self, candidates):
         orders.append({'action': 'BUY', 'code': stock['code']})
 '''
     assert _unlogged_exits(ast.parse(src)) == []
+
+
+def test_every_trading_sim_has_a_detected_buy_loop():
+    """탐지 실패를 **조용하지 않게** 만든다.
+
+    이 게이트는 "본문에 매수가 있는 For/While"로 매수 루프를 찾는다. 그런데
+    누군가 `orders.append(_mk_buy(stock))`처럼 헬퍼로 주문을 만들거나,
+    후보를 먼저 고르고 루프 밖에서 주문을 조립하도록 바꾸면 **그 심의 매수
+    루프가 탐지에서 사라진다.** 그러면 구멍 수가 0으로 떨어지는데, 그건
+    "깨끗하다"가 아니라 "안 보고 있다"다 — 게이트가 조용히 무력해진 것이고,
+    숫자만 보면 오히려 좋아진 것처럼 보인다.
+
+    그래서 탐지 자체를 단언한다. 탐지기가 못 따라가면 CI가 멈추고, 사람이
+    탐지기를 고치거나 여기 예외를 적으면서 **이유를 남기게** 된다.
+    """
+    missing = []
+    for fn in _sim_files():
+        if fn in NO_BUY_LOOP:
+            continue
+        with open(os.path.join(SIM_DIR, fn), encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+        if not any(_is_candidate_loop(n) for n in ast.walk(tree)):
+            missing.append(fn)
+    assert not missing, (
+        '매수 루프를 못 찾은 심이 있다. 구멍 0은 "깨끗"이 아니라 "미측정"이다. '
+        '탐지기(_BUY_MARKERS)를 고치거나, 매매하지 않는 심이면 NO_BUY_LOOP에 '
+        '이유와 함께 적을 것: ' + ', '.join(missing))
+
+
+def test_no_buy_loop_list_is_not_stale():
+    """매매를 시작한 심이 예외 목록에 남아 있으면 감시에서 빠진다."""
+    stale = []
+    for fn in NO_BUY_LOOP:
+        path = os.path.join(SIM_DIR, fn)
+        if not os.path.exists(path):
+            stale.append(f'{fn}(파일 없음)')
+            continue
+        with open(path, encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+        if any(_is_candidate_loop(n) for n in ast.walk(tree)):
+            stale.append(f'{fn}(이제 매수 루프가 있다)')
+    assert not stale, 'NO_BUY_LOOP가 낡았다: ' + ', '.join(stale)

@@ -46,6 +46,7 @@ EOD 배치(scripts/run_eod_sim_us.py)가 이미 유니버스 전 종목의 avg_d
 import json
 import os
 
+from .base_simulator import log_funnel
 from .us_base_simulator import USBaseSimulator, US_DEFAULT_INITIAL_CASH
 from .us_calendar import us_trading_date
 
@@ -58,6 +59,18 @@ WATCHLIST_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data',
     'sim_us3_liquidity_watchlist.json')
 
+
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(국내 심과 같은 방식).
+
+    미국 심은 감시목록(EOD 배치 산출)이 유일한 입구라, 0건일 때 "목록이 안
+    왔다"와 "왔는데 조건 미달"이 밖에서 구분되지 않았다. 국내에서 같은 형태로
+    2주 장애를 놓친 적이 있다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
 
 def build_watchlist(rows) -> dict:
     """rows: [(symbol, name, avg_dollar_volume)] → 상위 TOP_N 워치리스트.
@@ -110,7 +123,7 @@ def mark_rebalanced(sched: dict) -> dict:
     return sched
 
 
-def decide_us_liquidity(view, candidates, current_prices, sched=None):
+def decide_us_liquidity(view, candidates, current_prices, sched=None, funnel=None):
     """[US Sim3] 거래대금 상위 MAX_HOLDINGS 보유. 순수 함수. Order 리스트 반환.
 
     sched가 비어 있으면(첫 실행) 즉시 리밸런스한다. 그 외에는 elapsed가
@@ -155,13 +168,20 @@ def decide_us_liquidity(view, candidates, current_prices, sched=None):
                        'cooldown': None, 'mark_partial': False})
 
     # 2. 목표 중 미보유는 매수. 랭킹 외의 조건은 걸지 않는다(이 심의 정체성).
+    # 이 루프의 모집단은 target이다. 회계(후보 = 매수 + 탈락)가 맞으려면
+    # 호출부가 candidates가 아니라 이 수를 봐야 하므로 장부에 함께 싣는다.
+    if funnel is not None:
+        funnel.append({'code': '_population', 'reason': '_population',
+                       'n': len(target)})
     for rank, stock in enumerate(target, start=1):
         code = stock['code']
         if code in portfolio:
+            _fn(funnel, code, 'already_held')
             continue
         price = float(stock['price'])
         qty = int(budget / price)
         if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, budget=budget)
             continue
         adv = float(stock['avg_dollar_volume'])
         orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
@@ -190,9 +210,19 @@ class USLiquidityBaselineSimulator(USBaseSimulator):
         had_schedule = bool(sched)
         sched = advance_schedule(sched, us_trading_date())
 
+        funnel = []
         orders = decide_us_liquidity(self._view(current_prices), candidates,
                                      current_prices,
-                                     sched=sched if had_schedule else {})
+                                     sched=sched if had_schedule else {},
+                                     funnel=funnel)
+        # 이 심의 매수 루프는 `candidates`가 아니라 **랭킹으로 추린 target**을
+        # 돈다. 모집단을 잘못 넘기면 "후보 = 매수 + 탈락" 회계가 어긋나 미설명
+        # 경고가 상시 뜨고, 상시 뜨는 경고는 아무도 안 본다.
+        # decide가 실제로 본 수를 돌려받아 그대로 쓴다.
+        pop = next((f['n'] for f in funnel if f['reason'] == '_population'),
+                   len(candidates))
+        rows = [f for f in funnel if f['reason'] != '_population']
+        log_funnel('US유동성', range(pop), rows, orders)
         # 카운터는 **실제로 리밸런스한 뒤에만** 시작한다. 2026-08-26 프로덕션에서
         # 워치리스트가 없어 후보 0개로 돌던 런들이 카운터를 켜 버렸고, 그 다음
         # 런부터 had_schedule=True/elapsed<REBALANCE_DAYS라 보유 0종목인 채로

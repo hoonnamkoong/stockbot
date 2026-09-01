@@ -120,3 +120,25 @@ def test_window_is_wide_enough_to_outlast_an_outage():
     assert kr_eod_window(naive(22, 59)) is True
     assert kr_eod_window(naive(23, 0)) is False
     assert kr_eod_window(naive(15, 59)) is False, '마감 전에는 종가가 없다'
+
+
+def test_eod_job_has_a_timeout():
+    """매달린 런은 그날의 재시도를 통째로 막는다.
+
+    2026-09-01: KIS 연결이 러너에서 타임아웃 나면서 EOD 런이 25분 넘게
+    매달렸다. `should_skip`은 `in_progress`를 "지금 돌고 있다"로 보고 생략하므로,
+    재시도 창을 23:00까지 넓혀도 **앞 런이 안 죽으면 소용이 없다.**
+    이 워크플로만 타임아웃이 없었고 GitHub 기본값은 6시간이다.
+
+    재시도 간격(25분)보다 짧아야 다음 트리거가 이어받는다.
+    """
+    import re
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        '..', '.github', 'workflows', 'eod_data.yml')
+    with open(path, encoding='utf-8') as f:
+        text = f.read()
+    m = re.search(r'timeout-minutes:\s*(\d+)', text)
+    assert m, 'eod_data.yml에 잡 타임아웃이 없다 — 매달린 런이 재시도를 막는다'
+    assert int(m.group(1)) < _RETRY_COOLDOWN_MIN, (
+        f'타임아웃({m.group(1)}분)이 재시도 간격({_RETRY_COOLDOWN_MIN}분)보다 길다 — '
+        f'다음 트리거가 이어받지 못한다')

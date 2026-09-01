@@ -29,10 +29,27 @@ def overnight_window(now_kst: datetime) -> tuple[str, str]:
     """간밤 미국 세션의 (시작, 끝) — 'YYYY-MM-DD HH:MM' 두 개.
 
     미국 거래이력의 timestamp는 KST다(2026-08-31 22:31:41 = 개장 직후).
+
+    창 시작은 **직전 평일 22:00**이다(주말이면 금요일까지 되돌아간다). 전일
+    22:00으로 잡으면 두 곳에서 틀린다:
+      (a) 금요일 밤 세션(금 22:30~토 05:00 KST)은 토요일 09:00에 보고돼야 하는데
+          trading.yml이 kr_session_open으로 게이트해 토요일엔 런이 아예 없다 —
+          **매주 통째로 유실된다.**
+      (b) 월요일 09:00의 창(일 22:00~월 09:00)에는 미국 세션이 하나도 없어서
+          세 심 모두 '0종목'을 찍는다. 그건 '거래가 없었다'가 아니라 '세션이
+          없었다'인데 같은 0으로 뭉개진다 — 이 레포가 금지하는 조작이다.
+    월요일 창은 금 22:00~월 09:00이 되고 화~금은 종전과 같다. 평일만 세는
+    규칙은 us_calendar.next_us_trading_date와 동일하다.
+
+    **미국 공휴일은 판정하지 않는다** — 이 레포에 미국 휴장 달력이 없고, 없는
+    달력을 지어내지 않는다. 대신 브리핑 본문에 이 구간을 그대로 찍어서 독자가
+    '세션 없음'과 '거래 없음'을 직접 가를 수 있게 한다(build_us_brief).
     """
-    prev = (now_kst - timedelta(days=1)).strftime('%Y-%m-%d')
-    today = now_kst.strftime('%Y-%m-%d')
-    return f'{prev} {_WINDOW_START_HHMM}', f'{today} {_WINDOW_END_HHMM}'
+    start = now_kst - timedelta(days=1)
+    while start.weekday() >= 5:  # 토(5)·일(6)
+        start -= timedelta(days=1)
+    return (f"{start.strftime('%Y-%m-%d')} {_WINDOW_START_HHMM}",
+            f"{now_kst.strftime('%Y-%m-%d')} {_WINDOW_END_HHMM}")
 
 
 def _profit_rate_from_state(path: str):
@@ -92,7 +109,12 @@ def collect_us_sim_brief(data_dir: str, now_kst: datetime) -> list[dict]:
 def build_us_brief(sims: list[dict], now_kst: datetime) -> str:
     """마감 브리핑 본문. 순수 함수 — I/O 없음."""
     day = f"{now_kst.strftime('%m/%d')} ({_WEEKDAY_KR[now_kst.weekday()]})"
+    # 커버 구간을 본문에 적는다. 미국 공휴일 달력이 없어 휴장일에는 여전히
+    # '0종목'이 찍히는데, 구간이 같이 보이면 독자가 '세션이 없었다'와
+    # '거래가 없었다'를 가를 수 있다. 없는 달력을 지어내는 것보다 정직하다.
+    since, until = overnight_window(now_kst)
     lines = [f"🇺🇸 미국장 마감 브리핑  {day}", '',
+             f"🕒 대상 구간 {since} ~ {until} (KST)", '',
              '🤖 US 심별 현황 (누적 수익률 / 간밤 거래)']
     for s in sims:
         rate = s.get('profit_rate')

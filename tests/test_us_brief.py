@@ -41,10 +41,43 @@ def test_no_real_account_block():
     assert '예수금' not in msg
 
 
-def test_overnight_window_is_prev_2200_to_today_0900():
-    since, until = overnight_window(NOW)
+def test_overnight_window_midweek_starts_yesterday_2200():
+    """화~금은 전일 22:00 ~ 당일 09:00 그대로다."""
+    since, until = overnight_window(NOW)  # 2026-09-01 화요일
     assert since == '2026-08-31 22:00'
     assert until == '2026-09-01 09:00'
+
+
+def test_overnight_window_on_monday_reaches_back_to_friday():
+    """월요일 창은 **금요일 22:00**에서 시작한다.
+
+    전일(일요일) 22:00으로 잡으면 창에 미국 세션이 하나도 없어 세 심 모두
+    '0종목'을 찍는다 — '거래가 없었다'가 아니라 '세션이 없었다'인데 같은 0으로
+    뭉개진다. 그리고 금요일 밤 세션은 토요일에 런이 없어(kr_session_open=False)
+    매주 통째로 유실된다. 이 테스트는 그 두 결함을 동시에 잡는다.
+    """
+    monday = datetime(2026, 9, 7, 9, 5)
+    assert monday.weekday() == 0
+    since, until = overnight_window(monday)
+    assert since == '2026-09-04 22:00'   # 금요일
+    assert until == '2026-09-07 09:00'
+
+
+def test_overnight_window_counts_the_friday_night_session_on_monday():
+    """금요일 밤 22:31 체결이 월요일 창 안에 들어온다(문자열 비교 기준)."""
+    since, until = overnight_window(datetime(2026, 9, 7, 9, 5))
+    assert since <= '2026-09-04 22:31:41' < until
+
+
+def test_body_states_the_covered_window():
+    """0종목이 해석 가능하려면 어느 구간을 셌는지 본문에 있어야 한다.
+
+    미국 공휴일 달력이 이 레포에 없어 휴장일에는 여전히 0종목이 찍힌다.
+    구간을 함께 찍는 것이 없는 달력을 지어내지 않는 정직한 대안이다.
+    """
+    msg = build_us_brief(OK_SIMS, NOW)
+    assert '2026-08-31 22:00' in msg
+    assert '2026-09-01 09:00' in msg
 
 
 def test_collect_counts_only_the_overnight_window(tmp_path):

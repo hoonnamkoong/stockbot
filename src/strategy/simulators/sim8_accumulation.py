@@ -1,6 +1,6 @@
 import os
 
-from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, log_funnel
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -21,6 +21,19 @@ TRAIL_ARM_PCT = 5.0      # 고점이 +5% 도달 후
 TRAIL_CALLBACK_PCT = 3.0 # 고점 대비 -3% 하락 시 청산
 STOP_PCT = -5.0
 
+
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심5·심6·심12와 같은 방식).
+
+    심8은 게이트가 많고(유동성·근접도·수급·군중·매집/돌파 판정) 조건이 한
+    `if`에 뭉쳐 있어, 0건일 때 밖에서는 어느 단계에서 끊겼는지 알 수 없었다.
+    피처 계산 루프에서 조용히 빠지는 종목도 있어 "후보가 애초에 안 왔다"와
+    "왔는데 걸렸다"조차 구분되지 않았다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
 
 def _zmap(pairs):
     """[(code, value)] → {code: z}. 표본 부족·분산 0이면 빈 dict.
@@ -172,7 +185,7 @@ def _nearness(stock):
     return price / hi
 
 
-def decide_accumulation(view, candidates, current_prices):
+def decide_accumulation(view, candidates, current_prices, funnel=None):
     """[Sim8] 선행매집 결정. 순수 함수. Order 리스트 반환."""
     orders = []
     portfolio = view['portfolio']
@@ -228,14 +241,29 @@ def decide_accumulation(view, candidates, current_prices):
     for stock in candidates:
         code = stock['code']
         if code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _fn(funnel, code, 'sold_or_cooldown')
             continue
         price = float(stock.get('price', 0) or 0)
         amount = float(stock.get('amount', 0) or 0)
         near = _nearness(stock)
         iv = info.get(code)
-        if price <= 0 or amount < MIN_AMOUNT or near is None or iv is None:
+        # 넷을 한 `if`로 묶으면 "안 샀다"만 남는다. 특히 `near`/`iv`가 None인 건
+        # 전략 미달이 아니라 **입력 결손**(52주 정보·수급)이라 성격이 다르다 —
+        # 이게 후보 전량이면 심이 아니라 데이터 경로를 봐야 한다.
+        if price <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+        if amount < MIN_AMOUNT:
+            _fn(funnel, code, 'amount', amount=amount)
+            continue
+        if near is None:
+            _fn(funnel, code, 'no_52w_anchor')
+            continue
+        if iv is None:
+            _fn(funnel, code, 'no_investor_flow')
             continue
         if near < NEAR_FLOOR:
+            _fn(funnel, code, 'below_anchor', near=near)
             continue
 
         # 군중 미도달 = 버즈 관심이 유니버스 중앙값 미만(목록에 없으면 0).
@@ -246,21 +274,26 @@ def decide_accumulation(view, candidates, current_prices):
                     and crowd_absent)
         is_break = (near >= NEAR_BREAK and iv > 0 and av is not None and av > 0)
         if not (is_accum or is_break):
+            _fn(funnel, code, 'no_setup', near=near, info=iv,
+                crowd_absent=crowd_absent, zamt=av)
             continue
 
         if code in portfolio:
             # 이미 매집 단계에 들어간 종목의 돌파 매수(피라미딩).
             # 목표 비중까지 남은 만큼만 채운다 — 별도 상태 없이 2단을 강제한다.
             if not is_break:
+                _fn(funnel, code, 'held_awaiting_breakout')
                 continue
             cost = portfolio[code].get('quantity', 0) * portfolio[code].get('avg_price', 0)
             room = full - cost
             if room < half * 0.5:
+                _fn(funnel, code, 'no_room', room=room)
                 continue
             qty = int(room / price)
             label = "돌파 추가매수"
         else:
             if held >= MAX_HOLDINGS:
+                _fn(funnel, code, 'max_holdings', held=held)
                 continue
             qty = int(half / price)
             label = "매집 진입" if is_accum else "돌파 진입"
@@ -314,7 +347,9 @@ class AccumulationSimulator(BaseSimulator):
         # 군중축의 기준선은 후보 안에 없다 — 유니버스가 외인·기관 순매수 상위라
         # unique_posters가 애초에 붙지 않는다. 버즈 유니버스에서 따로 읽어 온다.
         view['buzz_attention'], view['buzz_median'] = crowd_reference(self.data_dir)
-        orders = decide_accumulation(view, candidates, current_prices)
+        funnel = []
+        orders = decide_accumulation(view, candidates, current_prices, funnel=funnel)
+        log_funnel('선행매집', candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

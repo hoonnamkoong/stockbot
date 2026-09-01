@@ -20,6 +20,19 @@ TIMEOUT_DAYS = 7          # 타임 스탑
 MIN_AMOUNT = 1_000_000_000
 
 
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심6·심12·심13과 같은 방식).
+
+    2026-08-31에 "심5가 어제 왜 0건이었나"에 답하지 못했다. 있던 계측은
+    `near_low_pcts` 하나뿐이라 **채널폭을 통과한 뒤**의 이야기만 알 수 있었고,
+    그 앞에서 걸린 후보(보유·쿨다운·유동성·채널 없음)는 흔적이 없었다.
+    그래서 "조건 미달"과 "후보가 애초에 안 왔다"가 구분되지 않았다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
+
 def _channel(range_history):
     """range_history(20일 종가) → (low, high, width_pct). 이력 부족 시 None."""
     hist = [h for h in (range_history or []) if h and h > 0]
@@ -31,7 +44,7 @@ def _channel(range_history):
     return low, high, (high - low) / low * 100
 
 
-def decide_sideways(view, candidates, current_prices):
+def decide_sideways(view, candidates, current_prices, funnel=None):
     """[Sim5] 레인지 저점 진입 + 트레일링 청산 결정. 순수 함수. Order 리스트 반환."""
     orders = []
     portfolio = view['portfolio']
@@ -81,36 +94,58 @@ def decide_sideways(view, candidates, current_prices):
     held = len(portfolio) - len(sold)
     near_low_pcts = []  # 채널폭 통과 후보의 '저점 대비 %' — 진단용(아래 참고)
     for stock in candidates:
-        if held >= MAX_HOLDINGS:
-            break
         code = stock['code']
+        if held >= MAX_HOLDINGS:
+            _fn(funnel, code, 'max_holdings', held=held)
+            break
         if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _fn(funnel, code, 'held_or_cooldown')
             continue
         price = float(stock.get('price', 0))
         amount = float(stock.get('amount', 0))
-        if price <= 0 or amount < MIN_AMOUNT:
+        if price <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+        if amount < MIN_AMOUNT:
+            _fn(funnel, code, 'amount', amount=amount)
             continue
         ch = _channel(stock.get('range_history'))
         if not ch:
+            # range_history가 없거나 짧다 = 채널을 못 만든다. 전략 미달이 아니라
+            # **입력 결손**이라 따로 센다 — 이게 후보 전량이면 배선 문제다.
+            _fn(funnel, code, 'no_channel')
             continue
         low, high, width_pct = ch
-        if width_pct >= MIN_WIDTH_PCT:
-            near_low_pcts.append((code, (price / low - 1) * 100))
+        # 조건 셋을 한 `if`로 묶으면 "안 샀다"만 남고 어느 게이트가 막았는지
+        # 사라진다. 심4-1이 같은 형태로 하루 종일 침묵했던 적이 있다.
+        if width_pct < MIN_WIDTH_PCT:
+            _fn(funnel, code, 'narrow_channel', width=width_pct)
+            continue
+        near_low_pcts.append((code, (price / low - 1) * 100))
+        if price > low * (1 + LOW_ZONE):
+            _fn(funnel, code, 'not_near_low', above_low_pct=(price / low - 1) * 100)
+            continue
         daily_change = _parse_change_rate(stock)
-        if (width_pct >= MIN_WIDTH_PCT
-                and price <= low * (1 + LOW_ZONE)
-                and daily_change > -2.0):
-            qty = int(target_amount / price)
-            if qty > 0:
-                orders.append({'action': 'BUY', 'code': code, 'name': stock['name'], 'price': price,
-                               'quantity': qty, 'cooldown': None,
-                               'reason': f"[레인지] 저점 매수 (채널폭 {width_pct:.1f}%, 저점 {low:.0f})"})
-                held += 1
+        if daily_change <= -2.0:
+            _fn(funnel, code, 'daily_crash', change=daily_change)
+            continue
+        qty = int(target_amount / price)
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+            continue
+        orders.append({'action': 'BUY', 'code': code, 'name': stock['name'], 'price': price,
+                       'quantity': qty, 'cooldown': None,
+                       'reason': f"[레인지] 저점 매수 (채널폭 {width_pct:.1f}%, 저점 {low:.0f})"})
+        held += 1
 
     # 진단(2026-08-05): 진입 신호가 며칠째 안 나오는 게 '저점 근처인데 다른 조건에
     # 걸리는지' 아니면 '애초에 저점 근처 후보가 없는지' 로그가 없어 구분이 안 됐다.
     # 버즈(인기·상승 종목) 후보와 저점진입 조건이 구조적으로 안 맞을 가능성(Sim9-1과
     # 같은 패턴)을 확인하기 위한 최소 계측 — 매수가 없을 때만 한 줄 남긴다.
+    #
+    # 2026-09-01: 이 계측은 **채널폭을 통과한 뒤**만 본다. 그 앞에서 걸린 후보는
+    # 흔적이 없어서 "심5가 어제 왜 0건이었나"에 답하지 못했다. 이제 깔때기가
+    # 전 구간을 세고, 아래 줄은 그중 '가장 아까웠던 후보'를 덧붙이는 역할만 한다.
     if not any(o['action'] == 'BUY' for o in orders) and near_low_pcts:
         code, pct = min(near_low_pcts, key=lambda x: x[1])
         print(f"[레인지] 진입 없음 — 채널폭 통과 {len(near_low_pcts)}개 중 "
@@ -167,7 +202,37 @@ class SidewaysSwingSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_sideways(self._view(current_prices), candidates, current_prices)
+        funnel = []
+        orders = decide_sideways(self._view(current_prices), candidates,
+                                 current_prices, funnel=funnel)
+        self._log_funnel(candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, orders) -> None:
+        """어느 게이트가 막았는지 한 줄로. 진단이 심을 죽이면 안 되니 삼킨다.
+
+        `후보 = 매수 + 탈락`이 안 맞으면 어딘가가 이유 없이 후보를 버리는
+        것이다 — 2026-09-01에 실전 심이 정확히 그 상태였고, 그날 매매가 왜
+        0건인지 로그로 답할 수 없었다.
+        """
+        try:
+            from collections import Counter
+            buys = sum(1 for o in orders if o.get('action') == 'BUY')
+            if not funnel and not candidates:
+                return
+            if not funnel:
+                print(f"[레인지 깔때기] ⚠️ 후보 {len(candidates)}인데 탈락 기록이 "
+                      f"없다(매수 {buys})")
+                return
+            parts = ', '.join(f'{k} {v}' for k, v in
+                              Counter(f['reason'] for f in funnel).most_common())
+            early_exit = any(f.get('reason') == 'max_holdings' for f in funnel)
+            gap = len(candidates) - buys - len(funnel)
+            mark = '' if (gap == 0 or early_exit) else f' | ⚠️ 미설명 {gap}'
+            print(f"[레인지 깔때기] 후보 {len(candidates)} → 매수 {buys} | "
+                  f"탈락: {parts}{mark}")
+        except Exception:
+            pass

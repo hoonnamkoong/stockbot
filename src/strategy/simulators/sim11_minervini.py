@@ -30,6 +30,20 @@ WATCHLIST_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data', 'sim11_watchlist.json')
 
 
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심5·심6·심12와 같은 방식).
+
+    심11은 **감시목록이 유일한 입구**다(EOD 배치가 만든다). 그래서 0건일 때
+    가능한 원인이 셋이나 되는데 밖에서 구분이 안 됐다 — 감시목록이 비었는가,
+    목록은 있는데 pivot을 못 넘었는가, 이미 보유 중인가. 2026-08-31에 실제로
+    이 질문을 받고 상태 파일과 감시목록을 손으로 대조해서야 답했다
+    (엔트리가 GS 하나였고 그건 이미 보유 중이었다).
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
+
 def _sma(closes: list[float], window: int) -> float | None:
     """단순이동평균. 표본이 모자라면 None(지어내지 않는다)."""
     if len(closes) < window:
@@ -169,7 +183,7 @@ def load_watchlist(date_str: str) -> dict[str, dict]:
     return entries if isinstance(entries, dict) else {}
 
 
-def decide_minervini(view, candidates, current_prices):
+def decide_minervini(view, candidates, current_prices, funnel=None):
     """[Sim11] 미너비니 SEPA/VCP 결정. 순수 함수. Order 리스트 반환.
 
     candidates는 get_universe()가 준 감시 목록(code, name, pivot_price, ma50)에
@@ -209,26 +223,44 @@ def decide_minervini(view, candidates, current_prices):
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len([c for c in portfolio if c not in sold])
     for stock in candidates:
-        if held >= MAX_HOLDINGS:
-            break
         code = stock.get('code')
-        if not code or code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+        if held >= MAX_HOLDINGS:
+            _fn(funnel, code, 'max_holdings', held=held)
+            break
+        if not code:
+            _fn(funnel, '_', 'no_code')
+            continue
+        if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _fn(funnel, code, 'held_or_cooldown')
             continue
 
         price = float(stock.get('price', 0) or 0)
         amount = float(stock.get('amount', 0) or 0)
         pivot = stock.get('pivot_price')
-        if price <= 0 or pivot is None or amount < MIN_AMOUNT:
+        # 셋을 한 `if`로 묶으면 "안 샀다"만 남는다. 특히 `no_pivot`은 전략 미달이
+        # 아니라 **감시목록 결손**이라 성격이 다르다 — 이게 후보 전량이면 EOD
+        # 배치가 목록을 못 만든 것이고, 심을 고칠 게 아니라 배치를 봐야 한다.
+        if price <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+        if pivot is None:
+            _fn(funnel, code, 'no_pivot')
+            continue
+        if amount < MIN_AMOUNT:
+            _fn(funnel, code, 'amount', amount=amount)
             continue
         if price <= pivot:
+            _fn(funnel, code, 'below_pivot', price=price, pivot=pivot)
             continue
 
         qty = int(target_amount / price)
-        if qty > 0:
-            orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
-                           'price': price, 'quantity': qty, 'cooldown': None,
-                           'reason': f"[미너비니] 실시간 pivot 돌파 ({pivot:,.0f} 상회)"})
-            held += 1
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+            continue
+        orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
+                       'price': price, 'quantity': qty, 'cooldown': None,
+                       'reason': f"[미너비니] 실시간 pivot 돌파 ({pivot:,.0f} 상회)"})
+        held += 1
     return orders
 
 
@@ -280,7 +312,38 @@ class MinerviniTrendSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_minervini(self._view(current_prices), candidates, current_prices)
+        funnel = []
+        orders = decide_minervini(self._view(current_prices), candidates,
+                                  current_prices, funnel=funnel)
+        self._log_funnel(candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
+
+    @staticmethod
+    def _log_funnel(candidates, funnel, orders) -> None:
+        """어느 게이트가 막았는지 한 줄로. 진단이 심을 죽이면 안 되니 삼킨다.
+
+        심11은 감시목록이 유일한 입구라, `후보 0`과 `no_pivot 전량`이 각각
+        다른 고장을 뜻한다 — 전자는 목록 자체가 안 왔고, 후자는 목록은 왔는데
+        엔트리에 pivot이 없다(EOD 배치 산출 형식이 바뀐 경우).
+        """
+        try:
+            from collections import Counter
+            buys = sum(1 for o in orders if o.get('action') == 'BUY')
+            if not candidates:
+                print('[미너비니 깔때기] 후보 0 — 감시목록이 비었거나 도달하지 않았다')
+                return
+            if not funnel:
+                print(f'[미너비니 깔때기] ⚠️ 후보 {len(candidates)}인데 탈락 기록이 '
+                      f'없다(매수 {buys})')
+                return
+            parts = ', '.join(f'{k} {v}' for k, v in
+                              Counter(f['reason'] for f in funnel).most_common())
+            early_exit = any(f.get('reason') == 'max_holdings' for f in funnel)
+            gap = len(candidates) - buys - len(funnel)
+            mark = '' if (gap == 0 or early_exit) else f' | ⚠️ 미설명 {gap}'
+            print(f'[미너비니 깔때기] 후보 {len(candidates)} → 매수 {buys} | '
+                  f'탈락: {parts}{mark}')
+        except Exception:
+            pass

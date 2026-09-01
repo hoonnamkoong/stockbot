@@ -1,4 +1,4 @@
-from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, log_funnel
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -11,6 +11,18 @@ ATR_STOP_MULT = 2.0      # 손절 = 진입가 - 2*ATR
 MIN_SAMPLE = 10          # 거래대금 횡단면 z 최소 표본. 미달이면 신호 없음(fail-closed)
 MIN_AMOUNT = 1_000_000_000
 
+
+
+def _fn(funnel, code, reason, **vals):
+    """왜 안 샀는지 한 줄 남긴다(심5·심6·심12와 같은 방식).
+
+    심9-1은 채널 이력(range_history)과 거래대금 급증(zamt) 두 입력에 모두
+    의존하는데, 둘 중 무엇이 없어서 0건인지 밖에서 구분되지 않았다.
+    입력 결손과 전략 미달은 고치는 곳이 다르다.
+    """
+    if funnel is None:
+        return
+    funnel.append({'code': code, 'reason': reason, **vals})
 
 def _clean(range_history):
     return [h for h in (range_history or []) if h and h > 0]
@@ -70,7 +82,7 @@ def _atr(hist):
     return sum(diffs) / len(diffs)
 
 
-def decide_donchian(view, candidates, current_prices):
+def decide_donchian(view, candidates, current_prices, funnel=None):
     """[Sim9-1] 돈치안 채널 돌파 결정. 순수 함수. Order 리스트 반환."""
     orders = []
     portfolio = view['portfolio']
@@ -109,30 +121,44 @@ def decide_donchian(view, candidates, current_prices):
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len([c for c in portfolio if c not in sold])
     for stock in candidates:
-        if held >= MAX_HOLDINGS:
-            break
         code = stock['code']
+        if held >= MAX_HOLDINGS:
+            _fn(funnel, code, 'max_holdings', held=held)
+            break
         if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
+            _fn(funnel, code, 'held_or_cooldown')
             continue
         price = float(stock.get('price', 0) or 0)
         amount = float(stock.get('amount', 0) or 0)
-        if price <= 0 or amount < MIN_AMOUNT:
+        if price <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+        if amount < MIN_AMOUNT:
+            _fn(funnel, code, 'amount', amount=amount)
             continue
         hist = _clean(stock.get('range_history'))
         if len(hist) < CHANNEL_DAYS:
+            # 채널을 못 만든다 = **입력 결손**이지 전략 미달이 아니다.
+            # 이게 후보 전량이면 심이 아니라 데이터 경로를 봐야 한다.
+            _fn(funnel, code, 'no_channel', days=len(hist))
             continue
         av = zamt.get(code)
         if av is None or av <= 0:
+            _fn(funnel, code, 'no_amount_surge', zamt=av)
             continue
 
         ch_hi = max(hist[-CHANNEL_DAYS:])
-        if price > ch_hi:
-            qty = int(target_amount / price)
-            if qty > 0:
-                orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
-                               'price': price, 'quantity': qty, 'cooldown': None,
-                               'reason': f"[돈치안] {CHANNEL_DAYS}일 채널 돌파 ({ch_hi:,.0f} 상회, 거래대금z {av:+.1f})"})
-                held += 1
+        if price <= ch_hi:
+            _fn(funnel, code, 'below_channel_high', price=price, high=ch_hi)
+            continue
+        qty = int(target_amount / price)
+        if qty <= 0:
+            _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
+            continue
+        orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code),
+                       'price': price, 'quantity': qty, 'cooldown': None,
+                       'reason': f"[돈치안] {CHANNEL_DAYS}일 채널 돌파 ({ch_hi:,.0f} 상회, 거래대금z {av:+.1f})"})
+        held += 1
     return orders
 
 
@@ -166,7 +192,10 @@ class DonchianBreakoutSimulator(BaseSimulator):
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        orders = decide_donchian(self._view(current_prices), candidates, current_prices)
+        funnel = []
+        orders = decide_donchian(self._view(current_prices), candidates,
+                                 current_prices, funnel=funnel)
+        log_funnel('돈치안', candidates, funnel, orders)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

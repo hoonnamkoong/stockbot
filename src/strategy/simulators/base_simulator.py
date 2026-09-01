@@ -32,6 +32,39 @@ def get_kst_date():
 DEFAULT_INITIAL_CASH = 3_000_000
 
 
+def log_funnel(label: str, candidates, funnel, orders=None, buys=None) -> None:
+    """"후보 N → 매수 B | 탈락: 이유별 분포"를 한 줄로.
+
+    **공용으로 둔다.** 2026-09-01에 같은 `if held >= MAX_HOLDINGS: break`가
+    다섯 심에 복제돼 있고 다섯 곳 모두 기록이 빠진 걸 봤다. 로그 형식도
+    복붙하면 같은 결함이 같은 수만큼 생긴다.
+
+    `후보 = 매수 + 탈락`이 안 맞으면 어딘가가 이유 없이 후보를 버리는 것이다.
+    보유 상한으로 조기종료한 경우는 '평가 안 함'이라 경고에서 뺀다 — 정상
+    상황마다 경고가 뜨면 아무도 경고를 안 본다.
+
+    진단이 심을 죽이면 안 되니 통째로 삼킨다.
+    """
+    try:
+        from collections import Counter
+        if buys is None:
+            buys = sum(1 for o in (orders or []) if o.get('action') == 'BUY')
+        n = len(candidates)
+        if not n and not funnel:
+            return
+        if not funnel:
+            print(f'[{label} 깔때기] ⚠️ 후보 {n}인데 탈락 기록이 없다(매수 {buys})')
+            return
+        parts = ', '.join(f'{k} {v}' for k, v in
+                          Counter(f['reason'] for f in funnel).most_common())
+        early = any(f.get('reason') == 'max_holdings' for f in funnel)
+        gap = n - buys - len(funnel)
+        mark = '' if (gap == 0 or early) else f' | ⚠️ 미설명 {gap}'
+        print(f'[{label} 깔때기] 후보 {n} → 매수 {buys} | 탈락: {parts}{mark}')
+    except Exception:
+        pass
+
+
 def initial_state(cash):
     """리셋 직후의 상태 shape. **이 함수가 정본이다.**
 

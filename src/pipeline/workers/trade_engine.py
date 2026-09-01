@@ -233,7 +233,11 @@ class TradeEngineWorker(BaseWorker):
                 full = next((c for c in candidates if c['code'] == r['code']), r).copy()
                 full['signal'] = r.get('signal', 'WATCH')
                 # 엔진 판단 근거(DART/공시 거부 등 포함)를 final_picks까지 실어
-                # 보낸다. 월별 리서치 엑셀이 이 값을 그대로 적는다.
+                # 보낸다. **지금은 읽는 곳이 없다** — 월별 리서치 엑셀
+                # (storage_manager.update_monthly_excel)에는 reason 컬럼이 없고,
+                # 랭킹의 engine_reason은 여기가 아니라 simulation_results에서
+                # 직접 가져온다(pick_features.py). 딥다이브 리포트가 유일한
+                # 소비자였고 2026-08-31에 폐기됐다. 값 자체는 무해하므로 남긴다.
                 full['reason'] = r.get('reason', '')
                 eligible.append(full)
 

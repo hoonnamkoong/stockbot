@@ -258,3 +258,22 @@ def test_scraper_excludes_the_us_brief_gate_state():
     assert any(fnmatch.fnmatch(US_BRIEF_STATE_FILENAME, p) for p in patterns), (
         f'{US_BRIEF_STATE_FILENAME}이 scraper.yml 배포 제외 목록에 없다 — '
         f'writer가 둘이 되어 09:00~09:40에 브리핑이 반복 발송된다.')
+
+
+# ── premarket_data.yml intraday 잡: gzip 커밋 ─────────────────────────
+
+def test_intraday_is_committed_compressed():
+    """원시 CSV는 100MB 한도를 넘는다(2026-08-31 실측 115.14MB).
+
+    첫 실행에서 push가 거부됐고, rebase 재시도는 크기를 안 바꾸므로 3회가
+    전부 같은 이유로 죽었다.
+    """
+    intraday = _text('premarket_data.yml').split('  intraday:', 1)[1]
+    assert 'gzip' in intraday, 'intraday 커밋이 압축하지 않는다'
+    assert 'rt_intraday_*.csv.gz' in intraday or '.csv.gz' in intraday
+
+
+def test_intraday_fails_loudly_when_still_too_large():
+    """압축 후에도 한도를 넘으면 조용히 잘리지 않고 실패해야 한다."""
+    intraday = _text('premarket_data.yml').split('  intraday:', 1)[1]
+    assert '104857600' in intraday, '압축 후 크기 검사가 없다'

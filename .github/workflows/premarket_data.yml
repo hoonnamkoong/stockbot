@@ -225,9 +225,24 @@ jobs:
           git clone --depth 1 --branch db-data "$repo_url" db_data_repo || {
             echo "[Deploy] db-data 클론 실패"; exit 1; }
           mkdir -p db_data_repo/data
-          # 여러 경로를 한 줄로 add 하면 하나만 없어도 전체가 실패한다(2026-08-05 사고).
+          # gzip으로 커밋한다. 원시 CSV는 100MB 한도를 넘는다 — 2026-08-31
+          # 첫 실행에서 115.14MB로 push가 거부됐다(체결 H0STCNT0 + 호가
+          # H0STASP0 2TR × 20종목 × 2시간반). rebase 재시도는 파일 크기를
+          # 바꾸지 않으므로 3회가 전부 같은 이유로 죽는다.
           for f in data/rt_intraday_*.csv; do
-            [ -e "$f" ] && cp "$f" db_data_repo/data/ || echo "없음: $f"
+            [ -e "$f" ] || { echo "없음: $f"; continue; }
+            gzip -9 -c "$f" > "db_data_repo/data/$(basename "$f").gz"
+          done
+          # 압축 후에도 한도를 넘으면 **명시적으로 실패한다.** 조용히 잘리거나
+          # push가 거부되는 것보다 낫다 — 실패 알림이 사람을 부른다.
+          for g in db_data_repo/data/rt_intraday_*.csv.gz; do
+            [ -e "$g" ] || continue
+            sz=$(stat -c%s "$g")
+            echo "[Deploy] $(basename "$g"): $((sz / 1024 / 1024))MB"
+            if [ "$sz" -gt 104857600 ]; then
+              echo "[Deploy] 압축 후에도 100MB 초과 — 수집 범위를 줄여야 한다"
+              exit 1
+            fi
           done
           cd db_data_repo
           git add -A data/

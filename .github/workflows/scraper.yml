@@ -196,6 +196,21 @@ jobs:
               # 날짜 불일치에 fail-closed라 US 심 3개가 그 세션 내내 후보 0이었고,
               # 결손 알림이 2분마다 나갔다. 두 워크플로 모두 초록이었다.
               sim_us*_watchlist.json|us_universe.json) continue ;;
+              # [소유권] 아래는 전부 **다른 워크플로가 유일 writer**다. 이 런은
+              # 시작할 때 db-data의 data/ 전체를 체크아웃하므로(위 Fetch 스텝),
+              # 제외하지 않으면 남의 산출물을 런 시작 시점 사본으로 되돌린다.
+              # tests/test_workflow_file_ownership.py가 워크플로 파일을 파싱해
+              # 이 목록의 누락을 자동으로 잡는다.
+              #   eod_data.yml — EOD 배치(심9-1·심11)
+              kospi_top100_close.csv|ohlcv_top100.csv|minute_*.csv) continue ;;
+              sim11_watchlist.json|sim_donchian_state.json|sim_donchian_log.json) continue ;;
+              trade_history_sim_donchian.csv) continue ;;
+              #   premarket_data.yml — 프리마켓·미국지수·수급
+              us_daily.csv|investor_flows.csv|nxt_*.csv) continue ;;
+              premarket_daily.csv|premarket_universe.csv|premarket_news_*.csv) continue ;;
+              rt_intraday_*.csv) continue ;;
+              #   us_trading.yml — US 심 상태·이력
+              sim_us*_state.json|trade_history_sim_us*.csv) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done

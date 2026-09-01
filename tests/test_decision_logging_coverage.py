@@ -45,13 +45,14 @@ _LOGGERS = {'_fn', '_diag', 'log_diag', 'record_decision'}
 
 # 후보 루프로 보는 이터레이터 이름 조각. 청산 루프(portfolio_codes)는 대상이
 # 아니다 — 여기서 세는 것은 "왜 이 후보를 안 샀는가"뿐이다.
-_CANDIDATE_HINTS = ('candidates', 'stocks', 'universe', 'picks')
+_CANDIDATE_HINTS = ('candidates', 'stocks', 'universe', 'picks', 'ranked', 'rows')
 
 # ── 래칫 ────────────────────────────────────────────────────────────
 # 파일명 → 기록 없이 후보를 탈락시키는 분기 수(2026-09-01 실측).
 # **줄이는 방향으로만 고친다.** 0이 되면 항목째로 지운다.
 KNOWN_UNLOGGED = {
     'sim11_minervini.py': 4,
+    'sim12_regime_dual.py': 1,
     'sim1_original.py': 2,
     'sim1_psych.py': 4,
     'sim2_conservative.py': 2,
@@ -59,14 +60,22 @@ KNOWN_UNLOGGED = {
     'sim3_aggressive.py': 2,
     'sim4_bull_momentum.py': 6,
     'sim5_sideways_swing.py': 4,
-    'sim8_accumulation.py': 9,
+    'sim8_accumulation.py': 12,
     'sim9_1_donchian.py': 6,
+    'us_sim1_minervini.py': 4,
+    'us_sim2_donchian.py': 5,
+    'us_sim3_liquidity.py': 1,
 }
-# 2026-09-01 1차 상환: 51개/16심 → 43개/10심.
-# 갚은 것 — sim3_risk(실전, 4개: 보유상한·보유중·쿨다운·수량0)와,
-# 다섯 심에 같은 모양으로 박혀 있던 `if held >= MAX_HOLDINGS: break`
-# (sim4-1·sim6·sim9·sim12·sim13). 같은 결함이 다섯 파일에 복제돼 있었다는
-# 사실 자체가, 이 규칙이 리뷰가 아니라 CI에 있어야 하는 이유다.
+# 2026-09-01: 실측 57개/14심.
+# 갚은 것 — sim3_risk(실전, 구멍 0)와, 다섯 심에 같은 모양으로 복제돼 있던
+# `if held >= MAX_HOLDINGS: break`(sim4-1·sim6·sim9·sim12·sim13). 같은 결함이
+# 다섯 파일에 있었다는 사실 자체가, 이 규칙이 리뷰가 아니라 CI에 있어야 하는
+# 이유다.
+#
+# 숫자가 처음 센 것(43개/10심)보다 늘어난 것은 심이 나빠져서가 아니라
+# **검사가 정확해졌기 때문**이다. 첫 버전은 (a)규칙이 블록 밖으로 새어
+# 루프 맨 위의 `_fn` 하나가 아래 침묵을 전부 가렸고, 파일명 접두사 필터 탓에
+# 미국 심 3개를 통째로 안 봤다. 리뷰에서 잡혔다.
 
 
 def _logs_somewhere(node) -> bool:
@@ -86,48 +95,77 @@ def _logs_somewhere(node) -> bool:
         name = fn.id if isinstance(fn, ast.Name) else getattr(fn, 'attr', '')
         if name in _LOGGERS:
             return True
-        if any(isinstance(a, ast.Name) and a.id == 'funnel' for a in sub.args):
+        passed = list(sub.args) + [k.value for k in sub.keywords]
+        if any(isinstance(a, ast.Name) and a.id == 'funnel' for a in passed):
             return True
     return False
+
+
+def _reads_logged_name(test, names: set) -> bool:
+    """조건식이 '기록 호출로 값이 정해진 변수'를 보는가.
+
+    `ok, reason = _playbook2_entry(stock, funnel)` 뒤의 `if not ok: continue`가
+    이 형태다 — 판정과 기록을 헬퍼가 함께 하고, 호출부는 결과만 본다.
+    """
+    return any(isinstance(n, ast.Name) and n.id in names for n in ast.walk(test))
 
 
 def _unlogged_exits(tree: ast.AST) -> list[int]:
     """후보 루프 안에서 기록 없이 빠져나가는 continue/break의 줄 번호."""
     out = []
 
-    def scan_block(body: list, in_candidate_loop: bool, logged_before: bool):
+    def scan_block(body: list, in_candidate_loop: bool, covered: bool, names: set):
         """한 statement 리스트를 훑는다.
 
-        `continue`/`break`가 기록됐다고 보는 세 가지 관용:
-          - 같은 블록의 **앞선 구문**이 기록한다 (`if 조건: _fn(...); continue`)
-          - 감싸는 `if`의 **조건식**이 기록한다 (`if _avoid(stock, funnel): continue`)
-          - 바깥 블록에서 이미 기록했다 (`ok, r = _entry(stock, funnel)` 뒤의
-            `if not ok: continue`)
-        셋 다 이 레포에 실재하는 형태다. 하나라도 놓치면 정직하게 기록하는 심이
-        거짓 양성으로 걸리고, 그러면 이 테스트를 아무도 안 믿게 된다.
+        `continue`/`break`가 기록됐다고 보는 세 가지 관용 — 셋 다 이 레포에
+        실재하는 형태다:
+          (a) **같은 블록의** 앞선 구문이 기록한다 (`if 조건: _fn(...); continue`)
+          (b) 감싸는 `if`의 조건식이 기록한다 (`if _avoid(stock, funnel): continue`)
+          (c) 감싸는 `if`의 조건식이, 기록 호출로 값이 정해진 변수를 본다
+              (`ok, r = _entry(stock, funnel)` 뒤의 `if not ok: continue`)
+
+        **(a)는 블록 밖으로 새 나가지 않는다.** 처음 만든 버전은 "한 번 기록하면
+        그 뒤로 계속 기록된 것"으로 봤는데, 그러면 루프 맨 위의 `_fn` 하나가
+        아래 모든 침묵을 가려버린다. 실제로 그 버전은 sim3_risk에 조용한
+        `continue`를 새로 넣어도 통과했다 — 검사가 스스로를 무력화한 것이고,
+        믿기는 하는데 못 잡는 게이트는 없느니만 못하다.
         """
-        logged_here = logged_before
-        for i, st in enumerate(body):
+        local_logged = False
+        local_names = set(names)
+        for st in body:
             if in_candidate_loop and isinstance(st, (ast.Continue, ast.Break)):
-                if not logged_here:
+                if not (covered or local_logged):
                     out.append(st.lineno)
-            # 중첩 블록으로 내려간다. `if`의 조건식이 기록하면 그 안은 기록된 것이다.
-            test_logs = _logs_somewhere(st.test) if isinstance(st, ast.If) else False
-            for field in ('body', 'orelse', 'finalbody'):
-                inner = getattr(st, field, None)
-                if isinstance(inner, list):
-                    nested = in_candidate_loop
-                    if isinstance(st, (ast.For, ast.While)):
-                        nested = in_candidate_loop or _is_candidate_loop(st)
-                    scan_block(inner, nested, logged_here or test_logs)
-            for handler in getattr(st, 'handlers', []):
-                scan_block(handler.body, in_candidate_loop, logged_here)
+
+            if isinstance(st, ast.If):
+                guard = _logs_somewhere(st.test) or _reads_logged_name(st.test, local_names)
+                for field in ('body', 'orelse'):
+                    scan_block(getattr(st, field), in_candidate_loop, guard, local_names)
+            elif isinstance(st, (ast.For, ast.While)):
+                nested = in_candidate_loop or (isinstance(st, ast.For)
+                                               and _is_candidate_loop(st))
+                for field in ('body', 'orelse'):
+                    scan_block(getattr(st, field), nested, False, local_names)
+            else:
+                for field in ('body', 'orelse', 'finalbody'):
+                    inner = getattr(st, field, None)
+                    if isinstance(inner, list):
+                        scan_block(inner, in_candidate_loop, covered, local_names)
+                for handler in getattr(st, 'handlers', []):
+                    scan_block(handler.body, in_candidate_loop, covered, local_names)
+
             if _logs_somewhere(st):
-                logged_here = True
+                local_logged = True
+                # 기록 호출의 결과를 받은 변수는 (c)의 근거가 된다
+                if isinstance(st, (ast.Assign, ast.AnnAssign)):
+                    for t in (st.targets if isinstance(st, ast.Assign) else [st.target]):
+                        for nm in ast.walk(t):
+                            if isinstance(nm, ast.Name):
+                                local_names.add(nm.id)
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.For, ast.While)) and _is_candidate_loop(node):
-            scan_block(node.body, True, False)
+            scan_block(node.body, True, False, set())
     return sorted(set(out))
 
 
@@ -137,8 +175,12 @@ def _is_candidate_loop(node) -> bool:
 
 
 def _sim_files() -> list[str]:
+    # `startswith('sim')`으로 거르면 us_sim1/2/3이 통째로 빠진다 — 미국 심도
+    # 후보를 버리고, 버린 이유가 없으면 똑같이 답을 못 한다.
+    skip = {'__init__.py', 'base_simulator.py', 'us_base_simulator.py',
+            'kr_calendar.py', 'us_calendar.py'}
     return sorted(f for f in os.listdir(SIM_DIR)
-                  if f.startswith('sim') and f.endswith('.py'))
+                  if f.endswith('.py') and f not in skip)
 
 
 def _measure() -> dict:
@@ -199,3 +241,51 @@ def test_real_money_sim_records_every_rejection():
     measured = _measure()
     assert 'sim3_risk.py' not in measured, (
         f"sim3_risk가 기록 없이 후보를 버린다 — 줄 {measured.get('sim3_risk.py')}")
+
+
+def test_the_gate_can_actually_fail():
+    """게이트가 스스로를 무력화하지 않는지 확인한다.
+
+    첫 버전은 "한 번 기록하면 그 뒤로 계속 기록된 것"으로 봤다. 그래서 루프 맨
+    위의 `_fn` 하나가 아래 모든 침묵을 가렸고, **sim3_risk에 조용한 continue를
+    새로 넣어도 통과했다.** 검사를 만든 그 커밋이 검사를 죽인 셈이다.
+
+    이 레포는 같은 형태의 사고를 이미 겪었다 — 2026-08-31에 필드 배선 감사기가
+    자기가 잡으라고 만들어진 바로 그 사례를 못 봤다. **진단 도구도 감사 대상이다.**
+    """
+    src = '''
+def run(self, candidates):
+    funnel = []
+    for stock in candidates:
+        if stock['a']:
+            _fn(funnel, stock['code'], 'a')
+            continue
+        if stock['b']:
+            continue
+'''
+    gaps = _unlogged_exits(ast.parse(src))
+    assert len(gaps) == 1, (
+        f'기록 있는 분기 뒤의 조용한 continue를 못 잡는다(찾은 것: {gaps}). '
+        f'이 게이트는 통과시키기만 하고 아무것도 막지 못한다.')
+
+
+def test_the_gate_does_not_cry_wolf():
+    """정직하게 기록하는 세 관용은 통과해야 한다.
+
+    거짓 양성이 나면 사람들이 `_fn`을 형식적으로 끼워 넣어 게이트를 통과시키고,
+    그러면 남은 숫자가 남은 빚을 뜻하지 않게 된다.
+    """
+    src = '''
+def run(self, candidates):
+    funnel = []
+    for stock in candidates:
+        if _avoid(stock, funnel):
+            continue
+        ok, reason = _entry(stock, funnel)
+        if not ok:
+            continue
+        if stock['c']:
+            _fn(funnel, stock['code'], 'c')
+            continue
+'''
+    assert _unlogged_exits(ast.parse(src)) == []

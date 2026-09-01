@@ -46,15 +46,23 @@ def evaluate(checks: dict) -> tuple:
     return False, '\n'.join(lines)
 
 
-def collect(log=print) -> dict:
+def collect(log=print, budget_sec: float = 20.0) -> dict:
     """실제 조회. 각 항목은 (통과여부, 상세) — 확인 불가는 `None`이다.
 
     항목 하나가 예외를 내도 나머지는 계속 본다. 첫 실패에서 멈추면 "토큰이
     죽었다"만 알고 "유니버스도 비었다"는 못 본다 — 사고는 겹쳐서 온다.
     """
+    import time
     checks = {}
+    started = time.monotonic()
 
     def _run(name, fn):
+        # 예산을 넘기면 남은 항목은 '확인 못 함'으로 남긴다. 이 점검은 매매
+        # 뒤에 돌지만, 잡 타임아웃(3분)을 넘기면 `Deploy state`가 통째로 스킵돼
+        # 심 상태와 알림 쿨다운 기록까지 날아간다 — 감시가 사고가 되는 자리다.
+        if time.monotonic() - started > budget_sec:
+            checks[name] = (None, f'시간 예산({budget_sec:.0f}초) 초과로 건너뜀')
+            return
         try:
             checks[name] = fn()
         except Exception as e:
@@ -70,7 +78,13 @@ def collect(log=print) -> dict:
         b = get_balance()
         if b.get('error'):
             return (False, b['error'])
-        return (True, f"예수금 {round(b.get('deposit', 0)):,}원")
+        dep = b.get('deposit')
+        if dep is None:
+            # `b.get('deposit', 0)`으로 찍으면 "필드가 없다"가 "예수금 0원"으로
+            # 보인다. 조회는 성공했는데 응답 형태가 바뀐 경우이고, 그건 정상이
+            # 아니다 — 이 레포가 금지하는 0 폴백이다.
+            return (None, '조회는 됐으나 예수금 필드가 없다(응답 형태 변경?)')
+        return (True, f'예수금 {round(dep):,}원')
 
     def _universe():
         from src.strategy.simulators.sim3_risk import SmartRiskSimulator

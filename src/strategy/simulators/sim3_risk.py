@@ -1,6 +1,6 @@
 from datetime import date
 
-from .base_simulator import BaseSimulator, get_kst_date
+from .base_simulator import BaseSimulator, get_kst_date, get_kst_now
 
 
 
@@ -107,9 +107,11 @@ class SmartRiskSimulator(BaseSimulator):
         sector_cache = SectorCache()
         funnel = []
         bought = 0
+        seen = 0
         target_amount = self.calc_nav(current_prices) * self.POSITION_WEIGHT
 
         for stock in candidates:
+            seen += 1
             code = stock['code']
             # 2026-09-01: 아래 세 갈래가 기록 없이 빠져나가고 있었다. 그날 실전
             # 매매가 0건이었는데 로그는 `후보 30 | 탈락: amount 17, not_cheap 5,
@@ -182,22 +184,27 @@ class SmartRiskSimulator(BaseSimulator):
             if qty <= 0:
                 _fn(funnel, code, 'qty_zero', price=price, target=target_amount)
                 continue
-            if qty > 0:
-                reason = (
-                    f"[가치페어] 업종 저평가 진입(TTM) "
-                    f"(PER {stock_per:.1f}x / 섹터 {avg_per:.1f}x, "
-                    f"PBR {stock_pbr:.2f}x / 섹터 {avg_pbr:.2f}x, "
-                    f"ADX {adx:.1f}, 섹터: {sector_name})"
-                )
-                self.buy(code, stock['name'], price, qty, reason=reason)
+            reason = (
+                f"[가치페어] 업종 저평가 진입(TTM) "
+                f"(PER {stock_per:.1f}x / 섹터 {avg_per:.1f}x, "
+                f"PBR {stock_pbr:.2f}x / 섹터 {avg_pbr:.2f}x, "
+                f"ADX {adx:.1f}, 섹터: {sector_name})"
+            )
+            if self.buy(code, stock['name'], price, qty, reason=reason):
                 bought += 1
+            else:
+                # buy()는 **현금 부족이면 False**다. 무조건 세면 "돈이 없어 못 산 것"이
+                # 매수로 기록되고, 깔때기 회계가 그만큼 맞아버려 구멍이 가려진다.
+                # 자금 부족은 실전에서 "왜 안 샀나"의 가장 흔한 답이라 더 위험하다.
+                _fn(funnel, code, 'insufficient_cash',
+                    need=qty * price, cash=self.state.get('cash', 0))
 
-        self._log_funnel(candidates, funnel, bought)
+        self._log_funnel(candidates, funnel, bought, seen)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
 
     @staticmethod
-    def funnel_accounting(candidates, funnel, bought) -> tuple:
+    def funnel_accounting(candidates, funnel, bought, seen=None) -> tuple:
         """(후보, 매수, 탈락, 미설명). 미설명이 0이 아니면 기록에 구멍이 있다.
 
         2026-09-01에 이 수를 안 맞춰본 대가를 치렀다. 로그는 `후보 30 | 탈락:
@@ -207,27 +214,53 @@ class SmartRiskSimulator(BaseSimulator):
         **미설명은 항상 0이어야 한다.** 0이 아니면 어떤 갈래가 이유 없이 후보를
         버리고 있다는 뜻이고, 그 갈래가 다음 사고의 자리다.
         """
+        seen = len(candidates) if seen is None else seen
         rejected = len(funnel)
-        leftover = len(candidates) - bought - rejected
-        # 보유 상한에 걸려 `break`했으면 남은 후보는 **평가를 안 한 것**이지
-        # 설명을 못 하는 게 아니다. 둘을 뭉치면 정상 조기종료마다 경고가 떠서
-        # 아무도 경고를 안 보게 된다 — 경고의 가치는 희소성에서 온다.
-        early_exit = any(f.get('reason') == 'max_holdings' for f in funnel)
-        return len(candidates), bought, rejected, (0 if early_exit else leftover)
+        # `seen`은 루프가 **실제로 들여다본** 후보 수다. 보유 상한으로 break하면
+        # 그 뒤는 아예 안 본 것이므로 seen < 후보 수가 되고, 그 차이는 정상이다.
+        #
+        # 처음에는 "funnel에 max_holdings가 있으면 미설명 0"으로 처리했는데
+        # 그건 **감시를 끄는 스위치를 감시 안에 둔 것**이었다 — 포트폴리오가 꽉
+        # 찬 날(흔하다)에는 진짜 구멍이 통째로 가려진다. 리뷰에서 잡혔다.
+        # 지어낸 보정이 아니라 실제로 센 수를 쓴다.
+        return len(candidates), bought, rejected, seen - bought - rejected
 
     @staticmethod
-    def _log_funnel(candidates, funnel, bought=0) -> None:
+    def _log_funnel(candidates, funnel, bought=0, seen=None) -> None:
         """게이트별 탈락 분포를 한 줄로. 진단이 심을 죽이면 안 되니 통째로 삼킨다."""
         try:
             from collections import Counter
+            if not funnel and not candidates:
+                return
             if not funnel:
+                # 후보가 있는데 기록이 하나도 없다 = 2026-09-01의 최악 형태.
+                # 여기서 조용히 return하면 그 사고가 로그에 아무 흔적도 안 남는다.
+                print(f"[Sim3 깔때기] ⚠️ 후보 {len(candidates)}인데 탈락 기록이 없다 "
+                      f"(매수 {bought}) — 어딘가가 이유 없이 후보를 버리고 있다")
                 return
             n, b, rej, unexplained = SmartRiskSimulator.funnel_accounting(
-                candidates, funnel, bought)
+                candidates, funnel, bought, seen)
             c = Counter(f['reason'] for f in funnel)
             parts = ', '.join(f'{k} {v}' for k, v in c.most_common())
             # 미설명이 0이 아니면 눈에 띄게 남긴다. 조용한 불일치가 이 사고의 형태였다.
             gap = '' if unexplained == 0 else f" | ⚠️ 미설명 {unexplained}"
+            if unexplained:
+                # 로그만으로는 아무도 안 본다. 미설명은 **항상 0이어야 하므로**
+                # 0이 아닌 순간이 곧 버그이고, 거짓 경보가 날 수 없다.
+                try:
+                    from src import alerts
+                    alerts.send_alert_once(
+                        'sim3_funnel_hole',
+                        '\n'.join([
+                            '<b>실전 심 깔때기 불일치</b>', '',
+                            f'후보 {n} → 매수 {b} + 탈락 {rej}, 미설명 {unexplained}.',
+                            '후보가 이유 없이 사라지고 있습니다 — 그날 매매가 '
+                            '0건이면 원인을 로그로 추적할 수 없습니다.',
+                            f'탈락 분포: {parts}',
+                        ]),
+                        now=get_kst_now(), cooldown_min=360)
+                except Exception:
+                    pass
             print(f"[Sim3 깔때기] 후보 {n} → 매수 {b} | 탈락: {parts}{gap}")
             # 저평가에서 걸린 종목은 실제 배수까지 남긴다 — 유니버스(고ROE)와
             # 조건(저평가)이 반대 방향인지 판단할 근거다.

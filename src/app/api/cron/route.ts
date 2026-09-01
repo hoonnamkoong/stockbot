@@ -60,7 +60,7 @@ export async function GET(request: Request) {
         // 어느 워크플로로 보낼지는 src/lib/cron-target.ts가 정한다.
         // 여기 인라인으로 두면 라우트를 node --test로 import할 수 없어 아무도
         // 검증하지 못한다 — 2026-08-07에 정확히 그 모양으로 하루를 잃었다.
-        const WORKFLOW_FILE = pickWorkflow(hour);
+        const WORKFLOW_FILE = pickWorkflow(hour, minute);
 
         console.log(`[Cron] Trigger received (${hour}:${minute.toString().padStart(2, '0')} KST). Dispatching ${WORKFLOW_FILE}...`);
 

@@ -320,10 +320,13 @@ def _send_us_brief_if_due(now_kst, log=print) -> bool:
     그리고 발송에 **성공한 직후에만** 슬롯을 닫는다 — 실패를 '보냈다'로 적으면
     그날 회차가 통째로 사라진다(mark_sent 주석과 같은 이유).
     """
-    from src.report import gate
-    if not gate.us_brief_due(now_kst, 'data'):
-        return False
+    # 게이트 판정까지 try 안에 둔다. `_due`는 지금은 예외를 안 내지만, 이 함수의
+    # 계약은 "무슨 일이 있어도 매매 루프를 멈추지 않는다"이므로 그 보장이 구현
+    # 세부에 기대면 안 된다 — 게이트가 나중에 바뀌면 조용히 거짓이 된다.
     try:
+        from src.report import gate
+        if not gate.us_brief_due(now_kst, 'data'):
+            return False
         from src.pipeline.us_brief import build_us_brief, collect_us_sim_brief
         from src.telegram_manager import TelegramManager
 

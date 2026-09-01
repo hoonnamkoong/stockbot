@@ -80,8 +80,12 @@ def log_funnel(label, candidates, funnel, orders=None, *,
         if not funnel:
             # 전량 매수했으면 탈락 기록이 없는 게 맞다. 그때도 경고하면
             # 정상 상황에 경고가 뜨고, 상시 뜨는 경고는 아무도 안 본다.
-            if buys >= n:
+            if buys == n:
                 print(f'{head} 후보 {n} → 매수 {buys} (전량 진입)')
+            elif buys > n:
+                # 모집단보다 많이 샀다 = 회계가 깨졌다(장부를 섞었거나 모집단을
+                # 잘못 넘겼다). `>=`로 두면 이걸 '전량 진입'으로 삼킨다.
+                print(f'{head} ⚠️ 후보 {n}인데 매수 {buys} — 회계가 깨졌다')
             else:
                 print(f'{head} ⚠️ 후보 {n}인데 탈락 기록이 없다(매수 {buys})')
             return
@@ -90,8 +94,11 @@ def log_funnel(label, candidates, funnel, orders=None, *,
                           Counter(f['reason'] for f in funnel).most_common())
         examined = n if seen is None else seen
         gap = examined - buys - len(funnel)
+        # `break`로 루프를 끊는 이유들. 그 뒤 후보는 '평가 안 함'이지
+        # '설명 못 함'이 아니다. 심마다 이름이 달라 목록으로 둔다.
+        _EARLY = {'max_holdings', 'below_rank_cutoff'}
         skip_warn = early_exit_breaks and any(
-            f.get('reason') == 'max_holdings' for f in funnel)
+            f.get('reason') in _EARLY for f in funnel)
         mark = '' if (gap == 0 or skip_warn) else f' | ⚠️ 미설명 {gap}'
         print(f'{head} 후보 {n} → 매수 {buys} | 탈락: {parts}{mark}')
         for line in (details or []):

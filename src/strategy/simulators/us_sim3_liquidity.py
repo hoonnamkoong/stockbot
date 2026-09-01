@@ -130,14 +130,34 @@ def decide_us_liquidity(view, candidates, current_prices, sched=None, funnel=Non
     REBALANCE_DAYS에 도달했을 때만 움직인다."""
     sched = sched or {}
     if sched and int(sched.get('elapsed', 0)) < REBALANCE_DAYS:
+        # 리밸런스 날이 아니면 후보를 보지도 않는다. 기록 없이 return하면 로그가
+        # "후보 20인데 탈락 기록이 없다"로 찍히는데, 이 심은 20거래일에 한 번만
+        # 움직이므로 **그 경고가 런의 95%에서 뜬다.** 상시 뜨는 경고는 아무도
+        # 안 본다 — 심9에서 같은 형태를 고친 것과 같은 이유다.
+        _fn(funnel, '_gate', 'not_rebalance_day',
+            elapsed=int(sched.get('elapsed', 0)), need=REBALANCE_DAYS)
         return []
 
     portfolio = view['portfolio']
-    ranked = sorted(
-        (s for s in candidates
-         if s.get('code') and float(s.get('price', 0) or 0) > 0
-         and s.get('avg_dollar_volume') is not None),
-        key=lambda s: -float(s['avg_dollar_volume']))
+    # **컴프리헨션으로 거르지 않는다.** 여기서 조용히 빠진 종목은 깔때기에도
+    # 안 남고 AST 게이트에도 안 잡힌다(게이트는 루프의 continue/break만 본다).
+    # 실측: 20종목 워치리스트에서 15개가 사라졌는데 로그는 "후보 5 → 매수 5
+    # (전량 진입)"으로 깨끗했다. 그중 5개는 avg_dollar_volume 결손 —
+    # 이 커밋이 us_sim1·2에는 no_dollar_volume 이유를 따로 만든 바로 그 고장이다.
+    usable = []
+    for s in candidates:
+        code = s.get('code')
+        if not code:
+            _fn(funnel, '_', 'no_code')
+            continue
+        if s.get('avg_dollar_volume') is None:
+            _fn(funnel, code, 'no_dollar_volume')
+            continue
+        if float(s.get('price', 0) or 0) <= 0:
+            _fn(funnel, code, 'no_price')
+            continue
+        usable.append(s)
+    ranked = sorted(usable, key=lambda s: -float(s['avg_dollar_volume']))
 
     # 목표 = 상위부터 훑되 '1주도 못 사는' 종목은 건너뛰고 다음 순위로 채운다.
     # 주가가 포지션 예산(NAV*POSITION_WEIGHT)보다 비싼 종목이 실제로 있다
@@ -148,9 +168,12 @@ def decide_us_liquidity(view, candidates, current_prices, sched=None, funnel=Non
     target = []
     for s in ranked:
         if len(target) >= MAX_HOLDINGS:
+            _fn(funnel, s['code'], 'below_rank_cutoff', cap=MAX_HOLDINGS)
             break
         if s['code'] in portfolio or int(budget / float(s['price'])) > 0:
             target.append(s)
+        else:
+            _fn(funnel, s['code'], 'unaffordable', price=s['price'], budget=budget)
     target_codes = {s['code'] for s in target}
 
     orders = []
@@ -168,11 +191,6 @@ def decide_us_liquidity(view, candidates, current_prices, sched=None, funnel=Non
                        'cooldown': None, 'mark_partial': False})
 
     # 2. 목표 중 미보유는 매수. 랭킹 외의 조건은 걸지 않는다(이 심의 정체성).
-    # 이 루프의 모집단은 target이다. 회계(후보 = 매수 + 탈락)가 맞으려면
-    # 호출부가 candidates가 아니라 이 수를 봐야 하므로 장부에 함께 싣는다.
-    if funnel is not None:
-        funnel.append({'code': '_population', 'reason': '_population',
-                       'n': len(target)})
     for rank, stock in enumerate(target, start=1):
         code = stock['code']
         if code in portfolio:
@@ -215,14 +233,10 @@ class USLiquidityBaselineSimulator(USBaseSimulator):
                                      current_prices,
                                      sched=sched if had_schedule else {},
                                      funnel=funnel)
-        # 이 심의 매수 루프는 `candidates`가 아니라 **랭킹으로 추린 target**을
-        # 돈다. 모집단을 잘못 넘기면 "후보 = 매수 + 탈락" 회계가 어긋나 미설명
-        # 경고가 상시 뜨고, 상시 뜨는 경고는 아무도 안 본다.
-        # decide가 실제로 본 수를 돌려받아 그대로 쓴다.
-        pop = next((f['n'] for f in funnel if f['reason'] == '_population'),
-                   len(candidates))
-        rows = [f for f in funnel if f['reason'] != '_population']
-        log_funnel('US유동성', range(pop), rows, orders)
+        # 이제 랭킹 전 탈락까지 전부 깔때기에 남으므로 모집단은 candidates다.
+        # 센티널 행으로 모집단을 실어 나르던 방식은 회계를 맞추는 대신
+        # **사라진 종목을 감췄다** — 수를 맞추는 것이 목적이 아니다.
+        log_funnel('US유동성', candidates, funnel, orders)
         # 카운터는 **실제로 리밸런스한 뒤에만** 시작한다. 2026-08-26 프로덕션에서
         # 워치리스트가 없어 후보 0개로 돌던 런들이 카운터를 켜 버렸고, 그 다음
         # 런부터 had_schedule=True/elapsed<REBALANCE_DAYS라 보유 0종목인 채로

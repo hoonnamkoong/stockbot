@@ -380,7 +380,27 @@ def test_every_trading_sim_has_a_detected_buy_loop():
 
 
 def test_no_buy_loop_list_is_not_stale():
-    """매매를 시작한 심이 예외 목록에 남아 있으면 감시에서 빠진다."""
+    """매매를 시작한 심이 예외 목록에 남아 있으면 감시에서 빠진다.
+
+    **이 목록은 도피 경로다.** 탐지가 깨진 심을 여기 넣으면 두 테스트가 모두
+    초록이 되면서 그 심이 래칫에서 통째로 빠진다 — CI는 좋은 이유와 나쁜
+    이유를 구분하지 못한다. 그래서 "매수 코드가 아예 없다"까지 함께 요구한다.
+    매매하는 심은 어떤 형태로든 `buy`가 소스에 나타나므로, 탐지만 깨진 심은
+    여기로 도망칠 수 없다.
+    """
+    weak = []
+    for fn in NO_BUY_LOOP:
+        path = os.path.join(SIM_DIR, fn)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding='utf-8') as f:
+            src = f.read()
+        if 'buy(' in src or "'BUY'" in src or '"BUY"' in src:
+            weak.append(fn)
+    assert not weak, (
+        'NO_BUY_LOOP에 매수 코드가 있는 심이 들어 있다 — 탐지가 깨진 것을 '
+        '예외로 덮은 것일 수 있다: ' + ', '.join(weak))
+
     stale = []
     for fn in NO_BUY_LOOP:
         path = os.path.join(SIM_DIR, fn)

@@ -190,6 +190,11 @@ jobs:
               # 순위 스냅샷도 trading.yml이 유일 writer다. 되돌리면 직전 스냅샷이
               # 사라져 매 사이클이 warmup이 되고 delta가 영원히 빈다.
               rank_state.json) continue ;;
+              # 쿨다운 기록은 **writer가 셋이다**(trading·scraper·us_trading).
+              # 통째로 밀면 그 사이 다른 워크플로가 적은 억제 기록이 사라진다 —
+              # 2026-09-02에 eod_batch_stale(쿨다운 480분)이 09:00 발송 → 09:02
+              # 억제 → 09:04 또 발송으로 나갔다. 아래에서 키별로 병합한다.
+              alert_dedup.json) continue ;;
               # [소유권] US 워치리스트·유니버스의 writer는 us_eod_watchlist.yml이다.
               # 2026-09-01: 배치가 10:14에 워치리스트를 20260901로 갱신했는데 이
               # cp가 10:17에 런 시작 시점 사본(20260831)으로 되돌렸다. load_watchlist는
@@ -214,6 +219,10 @@ jobs:
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done
+
+          # 쿨다운 기록만 덮어쓰기가 아니라 키별 병합으로 올린다.
+          python3 scripts/merge_alert_dedup.py db_data_repo/data/alert_dedup.json data/alert_dedup.json             || echo "[Deploy] 쿨다운 병합 실패 — 이번 사이클 억제가 밀릴 수 있다"
+
           # 실거래 CSV는 비공개 레포로만 (public 배포 제외)
           for f in data/*.csv; do
             if owned_by_trading "$(basename "$f")"; then continue; fi

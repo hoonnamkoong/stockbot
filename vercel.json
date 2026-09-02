@@ -4,5 +4,10 @@
       "path": "/api/stocks/refresh",
       "schedule": "0 0 1 * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "*-data": false
+    }
+  }
 }

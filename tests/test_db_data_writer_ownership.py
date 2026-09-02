@@ -34,6 +34,9 @@ SHARED_WRITERS = {
     # token_refresh.yml과 공유 writer라 제외하면 스크래퍼의 갱신이 안 나간다.
     'market_calendar.json': 'src/pipeline/context.py가 refresh_calendar를 부른다',
     # data_fetcher의 field_outage 알림이 이 런 안에서 쿨다운을 기록한다.
+    # writer가 셋이라 통짜 cp로는 서로를 지운다. 벌크 루프에서는 빼되
+    # scripts/merge_alert_dedup.py로 **키별 병합**해서 올린다 — 제외됐지만
+    # 도달한다. 아래 단언이 "제외 안 됨"이 아니라 "도달함"을 보는 이유다.
     'alert_dedup.json': 'src/pipeline/workers/data_fetcher.py가 send_alert_once를 쓴다',
 }
 
@@ -73,6 +76,11 @@ def db_data_writes(name: str) -> set[str]:
                 out.add(tok.split('data/', 1)[1])
             elif re.fullmatch(r'[A-Za-z0-9_.*-]+[.](json|csv)', tok):
                 out.add(tok)
+    # 병합 배선: `... db_data_repo/data/X data/X`. cp만 보던 시절 문법이 바뀌자
+    # us_trading의 쓰기가 7개에서 6개로 줄어 이 파일이 조용해질 뻔했다.
+    # 스크립트 이름이 아니라 **쓰기 대상 경로**를 본다 — 다음 도구가 와도 잡힌다.
+    for m in re.finditer(r'db_data_repo/data/([A-Za-z0-9_.*-]+)', s):
+        out.add(m.group(1))
     for m in re.finditer(r'git add\s+((?:data/[A-Za-z0-9_.*-]+\s*)+)', s):
         for tok in m.group(1).split():
             out.add(tok.split('data/', 1)[1])
@@ -136,10 +144,11 @@ def test_shared_writers_are_deliberately_not_excluded():
     확인해야 한다.
     """
     patterns = scraper_skip_patterns()
+    reached = db_data_writes('scraper.yml')
     for name, why in SHARED_WRITERS.items():
-        assert not _covered(name, patterns), (
-            f'{name}이 scraper.yml 배포 제외에 들어갔다 — {why}. '
-            f'스크래퍼가 쓴 값이 db-data에 도달하지 못한다.')
+        assert not _covered(name, patterns) or name in reached, (
+            f'{name}이 scraper.yml 배포 제외에 들어갔는데 다른 배선으로도 '
+            f'db-data에 안 올라간다 — {why}. 스크래퍼가 쓴 값이 도달하지 못한다.')
 
 
 def test_the_us_watchlists_are_the_case_this_file_was_written_for():

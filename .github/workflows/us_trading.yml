@@ -83,8 +83,9 @@ jobs:
           # 알림 쿨다운 상태. 이게 왕복하지 않으면 2분마다 새 컨테이너가 빈 상태로
           # 시작해 send_alert_once의 60분 쿨다운이 한 번도 적용되지 않는다 —
           # 2026-09-01에 워치리스트 결손 알림이 세션 내내 2분 간격으로 나갔다.
-          # KR장 시간과 겹치지 않아 scraper.yml과 동시에 쓰지 않는다.
-          cp data/alert_dedup.json db_data_repo/data/ 2>/dev/null || true
+          # KR장 시간과 겹치지 않지만, 덮어쓰면 KR 쪽 억제 기록을 이 런의 시작
+          # 사본으로 되돌린다. 셋 다 같은 규칙(키별 병합)으로 통일한다.
+          python3 scripts/merge_alert_dedup.py db_data_repo/data/alert_dedup.json data/alert_dedup.json             || echo "[Deploy] 쿨다운 병합 실패"
           cd db_data_repo
           git add -A data/
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi

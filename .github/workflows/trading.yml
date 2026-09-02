@@ -248,6 +248,11 @@ jobs:
           while IFS= read -r name; do
             [ -n "$name" ] || continue
             [ -f "data/$name" ] || continue
+            if [ "$name" = "alert_dedup.json" ]; then
+              # writer가 셋인 파일이라 덮어쓰면 남의 억제 기록을 지운다.
+              python3 scripts/merge_alert_dedup.py "db_data_repo/data/$name" "data/$name"                 && copied=$((copied+1))                 || echo "[Deploy] 쿨다운 병합 실패"
+              continue
+            fi
             cp "data/$name" "db_data_repo/data/" && copied=$((copied+1))
           done < data/.lite_deploy_manifest
           echo "[Deploy] 배포 파일 $copied개"

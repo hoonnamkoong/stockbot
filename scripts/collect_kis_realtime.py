@@ -161,6 +161,25 @@ async def collect(codes, tr_ids, out_path, until_hhmm, key):
         print(f'총 {n}건 저장 → {out_path}', flush=True)
 
 
+def window_state(now_hhmm: str, start_hhmm: str, until_hhmm: str) -> str:
+    """수집 창 판정: 'past'(이미 끝남) | 'wait'(시작 전) | 'go'(창 안).
+
+    이 판정이 대기 루프 **안**에 있던 탓에, 시작 시각을 이미 지나 깨어난 런에서는
+    한 번도 실행되지 않았다. GitHub cron이 몇 시간씩 미는 이 레포에서 그건
+    예외가 아니라 기본 경로였다 — 창이 닫힌 뒤 NXT 웹소켓에 붙고, KIS가 소켓을
+    닫고(ConnectionClosedError), 잡이 죽고, 그때마다 사람을 불렀다
+    (2026-08-17~09-02, premarket_data가 거의 매일 실패).
+
+    순수 함수로 뺀 이유: 이 판정이 argparse와 sleep 루프 안에 섞여 있어 아무도
+    테스트하지 않았다. 그래서 도달 불가가 된 것도 아무도 몰랐다.
+    """
+    if now_hhmm >= until_hhmm:
+        return 'past'
+    if start_hhmm and now_hhmm < start_hhmm:
+        return 'wait'
+    return 'go'
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--universe', help='code[,name] CSV. 없으면 --daily에서 자동 선정')
@@ -183,11 +202,18 @@ def main():
     print('유니버스:', ', '.join(f'{n or c}' for c, n in codes[:10]),
           f'… (총 {len(codes)})')
 
-    if a.start:
-        while dt.datetime.now().strftime('%H%M') < a.start:
-            if dt.datetime.now().strftime('%H%M') >= a.until:
-                print(f'이미 {a.until} 이후 — 수집 없이 종료', flush=True)
-                return 0
+    state = window_state(dt.datetime.now().strftime('%H%M'), a.start, a.until)
+    if state == 'past':
+        # 실패가 아니라 '할 일이 없음'이다. exit 1로 죽이면 cron이 밀린 날마다
+        # 사람을 부르는데, 정작 사람이 할 수 있는 일이 없다. 대신 판정을 로그에
+        # 남기고, "데이터가 안 나왔다"는 config/data_freshness.yaml의 신선도
+        # 감사가 따로 잡는다 — 실패 알림과 결손 감지는 다른 신호다.
+        print(f'이미 {a.until} 이후 — 수집 없이 종료 '
+              f'(현재 {dt.datetime.now().strftime("%H%M")})', flush=True)
+        return 0
+    if state == 'wait':
+        while window_state(dt.datetime.now().strftime('%H%M'),
+                           a.start, a.until) == 'wait':
             time.sleep(10)
         print(f'{a.start} 도달 — 수집 시작', flush=True)
 

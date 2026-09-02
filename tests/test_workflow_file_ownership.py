@@ -316,3 +316,28 @@ def test_intraday_branch_is_created_as_orphan_when_missing():
         'intraday-data가 없을 때의 생성 경로가 없다 — 첫 실행이 클론 실패로 죽는다.')
     assert '--orphan' not in step, (
         'checkout --orphan은 기존 워킹트리를 물고 온다. 빈 init이어야 한다.')
+
+
+def test_premarket_manages_its_own_kis_token():
+    """토큰의 유일한 발급자는 token_manager다(trading/eod_data/scraper 전부 동일).
+
+    premarket_data.yml만 이 스텝이 빠져 있었다. GH_PAT 없이 fetch_kis_history.py가
+    auth.get_access_token()을 부르면 비공개 레포 캐시를 못 읽어 매번 KIS에 직접
+    새 토큰을 발급했다 — token_refresh.yml과 겹치면 분당 1회 제한(EGW00133)에
+    걸려 한쪽이 거부되고, 그게 프리마켓이면 수집 전체가 실패했다(2026-09-02).
+    """
+    premarket = _text('premarket_data.yml')
+    assert 'python scripts/token_manager.py' in premarket, (
+        'premarket_data.yml이 token_manager를 안 부른다 — fetch_kis_history.py가 '
+        '자체적으로(가드 없이) 토큰을 발급하게 된다.')
+
+    manage_idx = premarket.index('python scripts/token_manager.py')
+    universe_idx = premarket.index('fetch_kis_history.py universe')
+    assert manage_idx < universe_idx, (
+        'token_manager 호출이 fetch_kis_history.py보다 뒤에 있다 — 로컬 캐시가 '
+        '준비되기 전에 auth.get_access_token()이 불린다.')
+
+    manage_step = premarket[manage_idx - 400:manage_idx]
+    assert 'GH_PAT' in manage_step, (
+        'Manage KIS Token 스텝에 GH_PAT가 없다 — 비공개 레포의 기존 토큰을 못 읽고 '
+        '매번 새로 발급하게 된다.')

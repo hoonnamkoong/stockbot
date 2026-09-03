@@ -29,6 +29,22 @@ COLUMNS = ['date', 'code', 'hhmm', 'price', 'volume']
 # 유량 제한에 걸리고, 그 실패는 조용히 빈 응답으로 돌아온다.
 CALL_GAP_SEC = 0.06
 
+# 이 수집의 벽시계 상한(초). **일은 종목 수에 비례하는데 잡 예산은 고정이다.**
+# 대상은 그날 순위 스냅샷에 오른 종목 전부라 세션이 길수록 늘고(실측 90종목 ×
+# 13앵커 = 1,170콜), KIS가 느려지면 콜당 최대 24.9초까지 간다
+# (3시도 × (연결 3초 + 읽기 5초) + 백오프). 상한이 없으면 잡 예산을 통째로 먹는다.
+#
+# 2026-09-01~02 EOD 배치가 정확히 그렇게 죽었다. 이 스텝이 20분 잡 타임아웃에
+# 걸리면서 **뒤에 있던 배포 스텝이 통째로 스킵됐다.** 심9-1·심11 계산은 이미
+# 끝나 있었는데(로그: '심11 감시 목록 갱신 … 날짜 20260903') db-data로 안 나가
+# 감시목록·종가 CSV가 두 세션 낡은 채였다 — 그 세션들은 매매 판단 자체가 없었다.
+# 잃은 것은 수집이 아니라 배포다. 그래서 이 스크립트는 자기 몫만 쓰고 비켜준다.
+#
+# `|| echo`로 감싸도 이건 못 막는다 — 0이 아닌 종료가 아니라 **끝나지 않는 것**이
+# 문제이기 때문이다. 예산이 끝나면 받은 데까지 저장하고 정상 종료한다. 분봉은
+# 당일치만 조회되므로 일부라도 남기는 것이 0보다 낫다.
+BUDGET_SEC = int(os.environ.get('MINUTE_BARS_BUDGET_SEC', '360'))
+
 
 def month_path(now, data_dir='data') -> str:
     return os.path.join(data_dir, f"minute_{now.strftime('%Y-%m')}.csv")
@@ -71,9 +87,17 @@ def main() -> None:
         print(f'[분봉] {date_str} 기존 {dropped}행 제거 — 이번 수집분으로 대체합니다')
     anchors = anchor_times()
     total, failed = 0, 0
-    for code in codes:
+    # 예산이 끝나 못 받은 종목 수. 0이면 끝까지 돌았다는 뜻이다.
+    left = 0
+    deadline = time.monotonic() + BUDGET_SEC
+    for i, code in enumerate(codes):
         batches = []
         for a in anchors:
+            # 앵커 사이에서 본다 — 종목 사이에서만 보면 느린 날 한 종목(13콜 ×
+            # 24.9초 = 5.4분)이 예산을 통째로 넘겨 상한이 상한이 아니게 된다.
+            if time.monotonic() >= deadline:
+                left = len(codes) - i
+                break
             try:
                 bars = p.get_minute_bars(code, a)
             except Exception as e:
@@ -87,12 +111,18 @@ def main() -> None:
             else:
                 batches.append(bars)
             time.sleep(CALL_GAP_SEC)
+        # 중단된 종목도 받은 앵커까지는 저장한다 — 버리면 그만큼이 영구 손실이다.
         n = append_bars(date_str, code, merge_bars(*batches), path)
         total += n
+        if left:
+            break
     # 결손을 조용히 넘기지 않는다 — 분봉이 비면 신호 검정 자체가 성립하지 않는데
     # 로그가 조용하면 '그날은 신호가 없었다'로 오독된다.
-    print(f'[분봉] {len(codes)}종목 / {total}행 저장 → {path}'
+    print(f'[분봉] {len(codes) - left}/{len(codes)}종목 / {total}행 저장 → {path}'
           + (f' (빈 응답·실패 {failed}콜)' if failed else ''))
+    if left:
+        print(f'[분봉] 예산 {BUDGET_SEC}초 소진 — {left}종목을 남기고 중단합니다. '
+              '뒤 스텝(배포)이 돌 수 있도록 여기서 비켜줍니다.')
 
     if total == 0:
         # 로그만으로는 부족하다. 이 잡은 `|| echo`로 감싸여 있어 워크플로가 초록색이고,
@@ -102,6 +132,15 @@ def main() -> None:
             f"{date_str} — 대상 {len(codes)}종목이 전부 빈 응답({failed}콜)입니다.\n"
             f"KIS 토큰 또는 유량을 확인하세요.\n"
             f"⚠️ 분봉은 당일치만 조회됩니다 — 이 하루의 가격 해상도는 복구할 수 없습니다.")
+    elif left:
+        # 중단도 결손이다. 로그만 남기면 '그날은 종목이 적었다'로 오독된다 —
+        # 이 스크립트가 비켜준 덕에 워크플로는 초록색이라 더더욱 그렇다.
+        alerts.send_alert(
+            f"<b>분봉 부분 수집</b>\n\n"
+            f"{date_str} — {len(codes)}종목 중 {len(codes) - left}종목만 받고 "
+            f"예산({BUDGET_SEC}초)이 끝났습니다.\n"
+            f"나머지 배포(감시목록·종가 CSV)는 정상 진행됩니다.\n"
+            f"⚠️ 분봉은 당일치만 조회됩니다 — 남은 {left}종목은 복구할 수 없습니다.")
 
 
 if __name__ == '__main__':

@@ -171,7 +171,17 @@ jobs:
             cp money_repo/data/minute_*.csv data/ 2>/dev/null || true
             rm -rf money_repo
           fi
-          PYTHONPATH=. python scripts/save_minute_bars.py || echo "[분봉] 실패 — 나머지 배포는 계속한다"
+          # `-u`: 09-02 사고 때 이 스텝의 로그가 **한 줄도 없었다**(파이프라인이라
+          # stdout이 블록 버퍼링). 어디서 멈췄는지 못 보고 스텝 소요시간 차이로
+          # 범인을 좁혀야 했다. 진행이 실시간으로 보이면 다음엔 로그가 말해준다.
+          #
+          # `timeout`: 진짜 상한은 스크립트 안의 예산(BUDGET_SEC=360)이다 —
+          # 거기서 멈춰야 받은 데까지 저장하고 알림도 나간다. 이 바깥 상한은
+          # 그 예산이 못 도는 경우(콜 하나가 영영 안 끝나는 회귀)에만 걸리도록
+          # 넉넉히 뒤에 둔다. `|| echo`는 끝나지 않는 것을 못 막는다 —
+          # 0이 아닌 종료만 잡기 때문이다.
+          PYTHONPATH=. timeout 480 python -u scripts/save_minute_bars.py \
+            || echo "[분봉] 실패 — 나머지 배포는 계속한다"
 
       - name: Deploy CSV to db-data
         if: steps.gate.outputs.run == 'true'

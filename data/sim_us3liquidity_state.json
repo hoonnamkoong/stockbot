@@ -8,7 +8,7 @@
       "quantity": 4,
       "avg_price": 938.84,
       "entry_date": "2026-08-27",
-      "peak_price": 986.44,
+      "peak_price": 994.18,
       "is_scaled_out": false
     },
     "NVDA": {
@@ -16,7 +16,7 @@
       "quantity": 18,
       "avg_price": 210.25,
       "entry_date": "2026-08-27",
-      "peak_price": 231.77,
+      "peak_price": 232.41,
       "is_scaled_out": false
     },
     "SNDK": {
@@ -24,7 +24,7 @@
       "quantity": 2,
       "avg_price": 1503.99,
       "entry_date": "2026-08-27",
-      "peak_price": 1623.43,
+      "peak_price": 1642.681,
       "is_scaled_out": false
     },
     "MSFT": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21089.075,
+  "peak_nav": 21136.092,
   "total_fees": 17.7648,
   "history": [
     20000
@@ -57,8 +57,8 @@
   },
   "raw_stats": {
     "cash": 2235.1949999999997,
-    "total_asset": 21089.075,
-    "profit_rate": 5.445375000000004,
+    "total_asset": 21136.092,
+    "profit_rate": 5.680460000000003,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -67,26 +67,26 @@
     "frequency": 0.5555555555555556,
     "total_fees": 17.7648,
     "current_prices": {
-      "TSM": 422.48,
-      "INTC": 92.989,
-      "MRVL": 213.67,
-      "LITE": 845.31,
-      "SNDK": 1623.43,
-      "CRM": 261.02,
-      "MU": 986.44,
-      "AMZN": 260.25,
-      "GOOGL": 341.685,
-      "NVDA": 231.77,
-      "MSFT": 507.68,
-      "AVGO": 358.0,
-      "NBIS": 213.01,
-      "AMD": 465.22,
-      "MRNA": 152.375,
-      "AAPL": 327.97,
-      "META": 608.6,
-      "GOOG": 338.22,
-      "PLTR": 179.82,
-      "TSLA": 359.395
+      "LITE": 853.5,
+      "INTC": 93.91,
+      "SNDK": 1642.681,
+      "MRNA": 147.258,
+      "MSFT": 505.845,
+      "GOOG": 338.33,
+      "META": 610.354,
+      "AAPL": 326.21,
+      "NBIS": 215.74,
+      "AMZN": 259.29,
+      "AVGO": 358.765,
+      "PLTR": 177.85,
+      "NVDA": 232.41,
+      "TSM": 422.65,
+      "GOOGL": 341.325,
+      "MRVL": 213.33,
+      "TSLA": 360.515,
+      "AMD": 467.5,
+      "CRM": 260.745,
+      "MU": 994.18
     }
   },
   "normalized_stats": {

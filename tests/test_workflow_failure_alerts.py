@@ -80,23 +80,27 @@ def test_런_이력을_읽을_권한이_있다():
                 f'{name}/{job_name}: actions 권한이 없어 런 이력을 못 읽는다')
 
 
-def test_eod_알림이_취소된_런도_잡는다():
-    """`if: failure()`는 타임아웃에 안 걸린다 — 타임아웃의 결론은 cancelled다.
+def test_알림이_취소된_런도_잡는다():
+    """`if: failure()`는 잡 타임아웃에 안 걸린다 — 타임아웃의 결론은 cancelled다.
 
-    2026-09-01~09-03 eod_data의 전 런이 20분 타임아웃에 잘렸는데 텔레그램은
-    한 통도 안 나갔다. 결국 알아챈 건 trade_loop의 eod_batch_stale이었다 —
-    감시 대상과 다른 발화 경로에 둔 감지기가 유일한 방어였다.
+    2026-09-01~09-03 eod_data의 전 런이 20분 타임아웃에 잘렸는데 텔레그램은 한 통도
+    안 나갔다. 같은 날 trading은 114런 중 6런(5.3%)이 3분 예산에 잘렸고, 그것도
+    조용했다 — 돈 경로다. 결국 알아챈 건 산출물 신선도를 재는 다른 감지기였다.
 
-    타임아웃이 있는 잡은 다른 워크플로에도 있다(2026-09-04 기준 9개). 여기서는
-    실제로 잘린 eod_data만 고친다 — 나머지는 별건이다.
+    `cancelled()`로는 부족하다. 그건 **워크플로** 취소를 보는 함수라 잡 타임아웃을
+    보장하지 못한다. 취소된 잡에서도 도는 것이 문서화된 건 `always()`뿐이고,
+    성공만 걸러내는 데 `job.status`를 쓴다.
+
+    도배 걱정은 원인을 먼저 없애서 푼다(#82 #84 #85). 대기 중 취소된 런은 스텝을
+    아예 실행하지 않으므로 여기서 알림이 나가지 않는다.
     """
-    _, wf = next((n, w) for n, w in _workflows() if n == 'eod_data.yml')
-    for job_name, job in wf['jobs'].items():
-        conds = [s.get('if') or '' for s in job['steps']
-                 if 'notify_workflow_failure.py' in (s.get('run') or '')]
-        assert conds, f'eod_data/{job_name}: 실패 알림 스텝이 없다'
-        for c in conds:
-            assert 'always()' in c and "job.status != 'success'" in c, (
-                f'eod_data/{job_name}: 알림 조건이 `{c}` — 잡 타임아웃에 안 걸린다. '
-                '사흘간 침묵한 이유가 이것이다. cancelled()는 워크플로 취소를 보는 '
-                '함수라 잡 타임아웃을 보장하지 못한다')
+    for name, wf in _workflows():
+        if name in EXEMPT:
+            continue
+        for job_name, job in wf['jobs'].items():
+            conds = [s.get('if') or '' for s in job['steps']
+                     if 'notify_workflow_failure.py' in (s.get('run') or '')]
+            assert conds, f'{name}/{job_name}: 실패 알림 스텝이 없다'
+            for c in conds:
+                assert 'always()' in c and "job.status != 'success'" in c, (
+                    f'{name}/{job_name}: 알림 조건이 `{c}` — 잡 타임아웃에 안 걸린다')

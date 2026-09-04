@@ -84,9 +84,16 @@ def test_scraper_is_not_wired_to_the_tasker_event_anymore():
 
 def test_both_workflows_notify_on_failure():
     """조용히 죽으면 안 된다. 매매는 돈이 걸려 있고, 스크래퍼는 죽어도 매매가
-    계속 돌기 때문에 오히려 알아채기 어렵다."""
+    계속 돌기 때문에 오히려 알아채기 어렵다.
+
+    조건 자체(`always() && job.status != 'success'`)는 전 워크플로 규칙으로
+    test_workflow_failure_alerts.py가 검사한다. 여기서는 이 둘에 알림 스텝이
+    있는지만 본다 — 예전에는 `if: failure()` 리터럴을 찾았는데, 그 조건은
+    잡 타임아웃(cancelled)을 못 잡아서 2026-09-04에 바뀌었다.
+    """
     for name in ('scraper.yml', 'trading.yml'):
-        assert 'if: failure()' in _text(name), f'{name}에 실패 알림이 없다'
+        assert 'notify_workflow_failure.py' in _text(name), (
+            f'{name}에 실패 알림이 없다')
 
 
 def test_trading_has_a_manual_holiday_bypass():

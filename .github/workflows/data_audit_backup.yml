@@ -55,7 +55,7 @@ jobs:
 
       # 실패 **연속당 1통**. 백업 경로가 조용히 죽으면 백업이 없는 것과 같다.
       - name: Notify on failure
-        if: failure()
+        if: always() && job.status != 'success'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

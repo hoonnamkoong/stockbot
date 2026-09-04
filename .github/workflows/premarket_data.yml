@@ -214,6 +214,16 @@ jobs:
           if [ -e data/premarket_universe.csv ]; then echo "ok=true" >> $GITHUB_OUTPUT
           else echo "ok=false" >> $GITHUB_OUTPUT; echo "유니버스 없음 — 휴장일이거나 앞 잡 실패"; fi
 
+      # collect 잡과 같은 이유다(59a129d5a). 이 잡도 collect_kis_realtime.py로
+      # KIS를 부르는데 GH_PAT도 token_manager도 없어서, auth.py가 비공개 레포
+      # 캐시를 못 읽고 매 런 새 토큰을 발급했다. 2026-09-04 실측 09:10 KST 발급이
+      # 이 잡이다 — collect만 고치면 절반만 막힌다.
+      - name: Manage KIS Token
+        if: steps.univ.outputs.ok == 'true'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python scripts/token_manager.py
+
       - name: 장중 체결+호가 적재 (09:00~11:30)
         if: steps.univ.outputs.ok == 'true'
         run: |

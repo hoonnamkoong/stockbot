@@ -43,6 +43,9 @@ jobs:
     # 20분: 정상 수집은 3~5분이다. 100종목 × KIS 조회라 여유를 두되,
     # 재시도 간격(25분)보다 짧아야 다음 트리거가 이어받는다.
     timeout-minutes: 20
+    # 분봉 잡이 같은 판정을 다시 하지 않게 게이트를 출력으로 올린다.
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
     env:
       PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul
@@ -148,31 +151,6 @@ jobs:
             echo "[EOD] db-data clone 실패 — 심 실행 건너뜀(백지 상태 매매 방지)"
           fi
 
-      # 당일 1분봉 저장. KIS 분봉은 **당일치만** 조회되므로 과거로 소급할 수 없다 —
-      # 그날 안에 받아두지 않으면 그 하루의 가격 해상도를 영영 잃는다.
-      # 신호(순위 차분)는 120초 격자인데 diag 가격은 10분 격자라, 이게 없으면
-      # 검정력이 구조적으로 나쁘다.
-      - name: Save minute bars (KIS)
-        if: steps.gate.outputs.run == 'true'
-        env:
-          # 이 스텝은 `|| echo`로 감싸여 있어 실패해도 워크플로가 초록색이다.
-          # 전량 결손(토큰 사망)은 그날치를 영구히 잃으므로 사람에게 가야 한다.
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
-          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
-          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
-          KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          mkdir -p data
-          if git clone --branch db-data --depth 1               https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git money_repo 2>/dev/null; then
-            cp money_repo/data/money_*.csv data/ 2>/dev/null || echo "[분봉] 순위 스냅샷 없음(최초 배포)"
-            cp money_repo/data/minute_*.csv data/ 2>/dev/null || true
-            rm -rf money_repo
-          fi
-          PYTHONPATH=. python scripts/save_minute_bars.py || echo "[분봉] 실패 — 나머지 배포는 계속한다"
-
       - name: Deploy CSV to db-data
         if: steps.gate.outputs.run == 'true'
         run: |
@@ -206,11 +184,6 @@ jobs:
                    sim11_watchlist.json; do
             [ -f "../data/$f" ] && cp "../data/$f" "data/$f" && git add "data/$f"
           done
-          # 1분봉. 위와 같은 이유로 별도 루프다 — 파일 하나가 없다고 심9-1 상태까지
-          # 같이 add에 실패하면 안 된다.
-          for f in ../data/minute_*.csv; do
-            [ -f "$f" ] && cp "$f" "data/$(basename "$f")" && git add "data/$(basename "$f")"
-          done
           if ! git diff --cached --quiet; then
             git commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')"
             git push origin db-data
@@ -219,11 +192,114 @@ jobs:
             echo "[KOSPI CSV] 변경사항 없음"
           fi
 
+      # 조건이 `failure()`가 아닌 이유: 잡 타임아웃의 결론은 cancelled인데
+      # `failure()`는 거기 안 걸린다. 2026-09-01~09-03 eod_data가 매일 20분
+      # 타임아웃에 잘렸는데 이 스텝은 매번 skipped였고 텔레그램은 한 통도 안
+      # 나갔다. `cancelled()`는 **워크플로** 취소를 보는 함수라 잡 타임아웃을
+      # 보장하지 못한다. `always()`는 취소된 잡에서도 도는 것이 문서화돼 있고,
+      # job.status로 성공만 걸러낸다.
+      #
       # 실패 **연속당 1통**이다. 런마다 보내면 지속 실패에 수백 통이 나가고,
       # 도배는 침묵과 같다 — scripts/notify_workflow_failure.py가 직전 완료 런의
       # 결과를 보고 억제한다. cancelled에는 걸리지 않는다(if: failure()).
       - name: Notify on failure
-        if: failure()
+        if: always() && job.status != 'success'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: eod_data.yml
+        run: python3 scripts/notify_workflow_failure.py
+
+  # 분봉은 collect의 재시도 예산(20분 < 재시도 간격 25분)에 들어갈 수 없다 —
+  # 2026-08-31 실측 30분 13초(211종목 × 앵커 13콜). 09-01에 같은 잡에 두고 20분
+  # 타임아웃을 걸었더니 매일 여기서 잘렸고, **뒤에 있던 배포까지 통째로 skipped**라
+  # 심9-1 상태와 심11 감시목록이 사흘간 db-data에 안 올라갔다. 잡을 나누면
+  # 감시목록 배포가 분봉에 인질로 잡히지 않는다.
+  #
+  # continue-on-error: 분봉은 이미 `|| echo`로 감싼 best-effort이고, 전량 결손은
+  # save_minute_bars.py가 직접 텔레그램으로 알린다. 이 잡의 실패로 런 전체가
+  # failure가 되면, 이미 배포된 감시목록을 두고 dispatcher가 최대 6번 재시도한다.
+  minute_bars:
+    needs: collect
+    if: needs.collect.outputs.run == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements-scraper.txt
+
+      # 토큰의 유일한 발급자는 token_manager다. 이 스텝이 없으면 러너에 캐시가 없어
+      # auth.py의 자가발급 안전망이 매 런 새 토큰을 발급한다.
+      - name: Manage KIS Token
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python scripts/token_manager.py
+
+      # 당일 1분봉 저장. KIS 분봉은 **당일치만** 조회되므로 과거로 소급할 수 없다 —
+      # 그날 안에 받아두지 않으면 그 하루의 가격 해상도를 영영 잃는다.
+      # 신호(순위 차분)는 120초 격자인데 diag 가격은 10분 격자라, 이게 없으면
+      # 검정력이 구조적으로 나쁘다.
+      - name: Save minute bars (KIS)
+        env:
+          # 이 스텝은 `|| echo`로 감싸여 있어 실패해도 워크플로가 초록색이다.
+          # 전량 결손(토큰 사망)은 그날치를 영구히 잃으므로 사람에게 가야 한다.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          mkdir -p data
+          if git clone --branch db-data --depth 1               https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git money_repo 2>/dev/null; then
+            cp money_repo/data/money_*.csv data/ 2>/dev/null || echo "[분봉] 순위 스냅샷 없음(최초 배포)"
+            cp money_repo/data/minute_*.csv data/ 2>/dev/null || true
+            rm -rf money_repo
+          fi
+          PYTHONPATH=. python scripts/save_minute_bars.py || echo "[분봉] 실패 — 나머지 배포는 계속한다"
+
+      - name: Deploy minute bars to db-data
+        run: |
+          if ! ls data/minute_*.csv >/dev/null 2>&1; then
+            echo "[분봉] 배포할 파일 없음 — 스킵"
+            exit 0
+          fi
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git clone --branch db-data --depth 1             https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_repo
+          # 파일별로 나눠서 add한다 — 한 줄로 묶으면 하나가 없을 때 전체가
+          # 원자적으로 실패한다(2026-08-05 심9-1 사고와 같은 모양).
+          for f in data/minute_*.csv; do
+            cp "$f" "db_repo/data/$(basename "$f")" && (cd db_repo && git add "data/$(basename "$f")")
+          done
+          cd db_repo
+          if ! git diff --cached --quiet; then
+            git commit -m "data: 1분봉 갱신 $(date +'%Y-%m-%d KST')"
+            git push origin db-data
+            echo "[분봉] db-data 배포 완료"
+          else
+            echo "[분봉] 변경사항 없음"
+          fi
+
+      - name: Notify on failure
+        if: always() && job.status != 'success'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

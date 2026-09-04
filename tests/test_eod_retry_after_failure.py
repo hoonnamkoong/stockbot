@@ -122,7 +122,15 @@ def test_window_is_wide_enough_to_outlast_an_outage():
     assert kr_eod_window(naive(15, 59)) is False, '마감 전에는 종가가 없다'
 
 
-def test_eod_job_has_a_timeout():
+def _eod_jobs() -> dict:
+    import yaml
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        '..', '.github', 'workflows', 'eod_data.yml')
+    with open(path, encoding='utf-8') as f:
+        return yaml.safe_load(f)['jobs']
+
+
+def test_eod_collect_job_timeout_fits_the_retry_interval():
     """매달린 런은 그날의 재시도를 통째로 막는다.
 
     2026-09-01: KIS 연결이 러너에서 타임아웃 나면서 EOD 런이 25분 넘게
@@ -130,15 +138,42 @@ def test_eod_job_has_a_timeout():
     재시도 창을 23:00까지 넓혀도 **앞 런이 안 죽으면 소용이 없다.**
     이 워크플로만 타임아웃이 없었고 GitHub 기본값은 6시간이다.
 
-    재시도 간격(25분)보다 짧아야 다음 트리거가 이어받는다.
+    재시도 간격(25분)보다 짧아야 다음 트리거가 이어받는다. 이 부등식은
+    **collect 잡에만** 건다 — 재시도로 되살릴 수 있는 산출물이 여기 있다.
     """
-    import re
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        '..', '.github', 'workflows', 'eod_data.yml')
-    with open(path, encoding='utf-8') as f:
-        text = f.read()
-    m = re.search(r'timeout-minutes:\s*(\d+)', text)
-    assert m, 'eod_data.yml에 잡 타임아웃이 없다 — 매달린 런이 재시도를 막는다'
-    assert int(m.group(1)) < _RETRY_COOLDOWN_MIN, (
-        f'타임아웃({m.group(1)}분)이 재시도 간격({_RETRY_COOLDOWN_MIN}분)보다 길다 — '
+    job = _eod_jobs()['collect']
+    t = job.get('timeout-minutes')
+    assert t, 'collect 잡에 타임아웃이 없다 — 매달린 런이 재시도를 막는다'
+    assert t < _RETRY_COOLDOWN_MIN, (
+        f'타임아웃({t}분)이 재시도 간격({_RETRY_COOLDOWN_MIN}분)보다 길다 — '
         f'다음 트리거가 이어받지 못한다')
+
+
+def test_minute_bars_lives_outside_the_collect_budget():
+    """분봉 수집은 collect의 재시도 예산 안에 들어갈 수 없다.
+
+    2026-08-31 마지막 성공 런 실측: 잡 전체 40분 15초 중 `Save minute bars`가
+    **30분 13초**(211종목 × 앵커 13콜). 09-01에 20분 타임아웃을 걸 때 이 스텝을
+    계산에서 뺐고("정상 수집은 3~5분"), 그날부터 09-03까지 전 런이 잘렸다.
+    잘린 자리가 분봉이라 **그 뒤의 배포가 통째로 skipped** — 심9-1 상태와
+    심11 감시목록이 사흘간 db-data에 안 올라갔다.
+
+    분봉을 별도 잡에 두면 감시목록 배포가 분봉에 인질로 잡히지 않는다.
+    """
+    jobs = _eod_jobs()
+
+    def _runs_minute_bars(job):
+        return any('save_minute_bars.py' in (st.get('run') or '')
+                   for st in job.get('steps') or [])
+
+    assert not _runs_minute_bars(jobs['collect']), (
+        'collect 잡이 분봉을 수집한다 — 실측 30분이라 20분 예산에 안 들어가고, '
+        '뒤따르는 배포까지 같이 잘린다')
+    owners = [n for n, j in jobs.items() if _runs_minute_bars(j)]
+    assert owners, '분봉을 수집하는 잡이 없다'
+    for n in owners:
+        t = jobs[n].get('timeout-minutes')
+        assert t and t >= 40, (
+            f'{n} 잡 타임아웃({t}분)이 실측 30분 + 여유에 못 미친다')
+
+

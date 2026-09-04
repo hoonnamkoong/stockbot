@@ -37,7 +37,12 @@ def test_모든_잡이_실패하면_사람을_부른다():
         if name in EXEMPT:
             continue
         for job_name, job in wf['jobs'].items():
-            alerts = [s for s in job['steps'] if s.get('if') == 'failure()']
+            # `failure()`는 잡 타임아웃(cancelled)에 안 걸린다. eod_data는
+            # 그 구멍으로 사흘을 침묵했고 `always() && job.status != 'success'`로
+            # 바꿨다. 둘 다 "성공이 아니면 부른다"의 표현이라 함께 받는다.
+            alerts = [s for s in job['steps']
+                      if 'failure()' in (s.get('if') or '')
+                      or "job.status != 'success'" in (s.get('if') or '')]
             assert alerts, f'{name}/{job_name}: 실패해도 아무도 안 부른다'
             for s in alerts:
                 assert 'notify_workflow_failure.py' in (s.get('run') or ''), (
@@ -73,3 +78,25 @@ def test_런_이력을_읽을_권한이_있다():
                 continue        # 블록이 없으면 기본 토큰 권한을 따른다
             assert perms.get('actions') in ('read', 'write'), (
                 f'{name}/{job_name}: actions 권한이 없어 런 이력을 못 읽는다')
+
+
+def test_eod_알림이_취소된_런도_잡는다():
+    """`if: failure()`는 타임아웃에 안 걸린다 — 타임아웃의 결론은 cancelled다.
+
+    2026-09-01~09-03 eod_data의 전 런이 20분 타임아웃에 잘렸는데 텔레그램은
+    한 통도 안 나갔다. 결국 알아챈 건 trade_loop의 eod_batch_stale이었다 —
+    감시 대상과 다른 발화 경로에 둔 감지기가 유일한 방어였다.
+
+    타임아웃이 있는 잡은 다른 워크플로에도 있다(2026-09-04 기준 9개). 여기서는
+    실제로 잘린 eod_data만 고친다 — 나머지는 별건이다.
+    """
+    _, wf = next((n, w) for n, w in _workflows() if n == 'eod_data.yml')
+    for job_name, job in wf['jobs'].items():
+        conds = [s.get('if') or '' for s in job['steps']
+                 if 'notify_workflow_failure.py' in (s.get('run') or '')]
+        assert conds, f'eod_data/{job_name}: 실패 알림 스텝이 없다'
+        for c in conds:
+            assert 'always()' in c and "job.status != 'success'" in c, (
+                f'eod_data/{job_name}: 알림 조건이 `{c}` — 잡 타임아웃에 안 걸린다. '
+                '사흘간 침묵한 이유가 이것이다. cancelled()는 워크플로 취소를 보는 '
+                '함수라 잡 타임아웃을 보장하지 못한다')

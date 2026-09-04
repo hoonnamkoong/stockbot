@@ -51,3 +51,31 @@ def test_start가_없으면_기다리지_않는다():
 def test_start가_없어도_창이_닫혔으면_붙지_않는다():
     """대기 여부와 무관하게, 지난 창에 접속하는 건 언제나 실패한다."""
     assert window_state('0931', '', '0850') == 'past'
+
+
+def test_창이_닫혔으면_유니버스가_비어도_실패가_아니다(tmp_path, monkeypatch):
+    """가드가 유니버스 판정 **뒤**에 있으면, 늦게 깨어난 런은 그 앞에서 죽는다.
+
+    2026-09-03의 창 가드는 웹소켓 접속만 막았다. 그런데 늦게 깨어난 런은
+    유니버스도 비어 있기 십상이라(그날 앞 스텝이 못 돌았거나 개장 전이라),
+    `유니버스가 비었다` → exit 1이 먼저 나면서 여전히 사람을 불렀다.
+    할 일이 없다는 판정이 무엇보다 먼저 와야 한다.
+    """
+    import types
+    import datetime as _dt
+
+    import collect_kis_realtime as cr
+
+    empty = tmp_path / 'universe.csv'
+    empty.write_text('code,name\n', encoding='utf-8')
+
+    class _Now:
+        @staticmethod
+        def now():
+            return _dt.datetime(2026, 9, 4, 9, 31)
+
+    monkeypatch.setattr(cr, 'dt', types.SimpleNamespace(datetime=_Now, date=_dt.date))
+    monkeypatch.setattr(sys, 'argv',
+                        ['collect_kis_realtime.py', '--universe', str(empty),
+                         '--start', '0800', '--until', '0850'])
+    assert cr.main() == 0, '창이 닫힌 뒤 깨어난 런은 조용히 끝나야 한다'

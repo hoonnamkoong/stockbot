@@ -8,7 +8,7 @@
       "quantity": 4,
       "avg_price": 938.84,
       "entry_date": "2026-08-27",
-      "peak_price": 969.08,
+      "peak_price": 976.275,
       "is_scaled_out": false
     },
     "NVDA": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 20851.04,
+  "peak_nav": 20983.635000000002,
   "total_fees": 17.7648,
   "history": [
     20000
@@ -52,47 +52,47 @@
   "daily_trades": [],
   "cooldown_codes": {},
   "rebalance": {
-    "elapsed": 4,
-    "last_seen": "20260903"
+    "elapsed": 5,
+    "last_seen": "20260904"
   },
   "raw_stats": {
     "cash": 2235.1949999999997,
-    "total_asset": 20792.295,
-    "profit_rate": 3.961474999999991,
+    "total_asset": 20983.635000000002,
+    "profit_rate": 4.91817500000001,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
-    "mdd": 0.281736546474433,
+    "mdd": 0.0,
     "turnover": 0.8882399999999999,
     "frequency": 0.5555555555555556,
     "total_fees": 17.7648,
     "current_prices": {
-      "PLTR": 182.345,
-      "GOOG": 338.955,
-      "AAPL": 328.0,
-      "AMZN": 258.75,
-      "NVDA": 228.405,
-      "MRVL": 208.85,
-      "AMAT": 435.65,
-      "MU": 957.61,
-      "TSM": 417.175,
-      "MSFT": 509.67,
-      "META": 610.59,
-      "AMD": 455.9,
-      "GOOGL": 342.37,
-      "SNDK": 1555.84,
-      "AVGO": 357.205,
-      "NBIS": 210.63,
-      "TSLA": 376.51,
-      "INTC": 91.55,
-      "MRNA": 148.97,
-      "LITE": 846.785
+      "GOOGL": 343.39,
+      "GOOG": 340.06,
+      "MU": 976.275,
+      "PLTR": 180.33,
+      "NBIS": 211.77,
+      "AMZN": 260.752,
+      "TSM": 419.6,
+      "TSLA": 364.16,
+      "AAPL": 328.465,
+      "CRM": 263.01,
+      "INTC": 92.69,
+      "META": 614.315,
+      "AVGO": 354.84,
+      "LITE": 849.8,
+      "MSFT": 509.16,
+      "MRVL": 211.1,
+      "SNDK": 1598.82,
+      "NVDA": 230.0,
+      "AMD": 459.155,
+      "MRNA": 153.165
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 20.0,
-    "MDD": 99.1547903605767,
+    "MDD": 100.0,
     "거래빈도": 2.7777777777777777,
     "자본회전율": 1.7764799999999998
   }

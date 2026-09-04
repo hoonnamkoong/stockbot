@@ -76,11 +76,28 @@ def approval_key():
     return key
 
 
-def top_by_surge(daily_csv, top, lookback=20):
-    """전일 종가 기준 거래대금 급증배수 상위 N. 장 마감 후에 확정되는 값이다."""
+def top_by_surge(daily_csv, top, lookback=20, today=None):
+    """전일 종가 기준 거래대금 급증배수 상위 N. 장 마감 후에 확정되는 값이다.
+
+    **오늘 행은 뺀다.** 이 CSV는 `fetch_kis_history.py daily --to $(date +%Y%m%d)`가
+    만들어 오늘 행을 포함하는데, 그걸 분자로 쓰면 두 가지가 깨진다(2026-09-04 실측):
+
+    - 개장 전(07:20·07:46 KST)에는 오늘 amount가 0이라 모든 종목이 아래
+      `amts[-1] <= 0`에 걸린다 → 빈 유니버스 → premarket_data.yml이 exit 1.
+      그 시각대 런이 매일 두 번 실패했다.
+    - 개장 직후(09:00 KST)에는 0이 아니지만 **진행 중인 세션**이다. 45초치
+      거래대금을 20일 평균으로 나눈 값이 순위가 된다. 실패하지 않아서 더
+      오래 갔다 — 09-04 배포분에서 상위 5 중 전일 기준과 겹치는 건 1종목뿐이었다.
+
+    시각은 이 파일의 다른 판정들과 같이 로컬시계(워크플로가 TZ=Asia/Seoul)를 쓴다.
+    """
+    if today is None:
+        today = dt.date.today().strftime('%Y%m%d')
     by = {}
     with open(daily_csv, encoding='utf-8-sig') as f:
         for r in csv.DictReader(f):
+            if r['date'] >= today:
+                continue
             by.setdefault(r['code'], []).append(r)
     out = []
     for code, rows in by.items():
@@ -192,16 +209,9 @@ def main():
     ap.add_argument('-o', '--out', default='')
     a = ap.parse_args()
 
-    codes = read_universe(a.universe) if a.universe else top_by_surge(a.daily, a.top)
-    if not codes:
-        print('유니버스가 비었다', file=sys.stderr)
-        return 1
-    tr_ids = [t.strip() for t in a.tr.split(',') if t.strip()]
-    # 한도는 TR×종목 총합이다. TR을 늘리면 종목을 줄여야 한다.
-    codes = codes[:max(1, MAX_SUBSCRIBE // len(tr_ids))]
-    print('유니버스:', ', '.join(f'{n or c}' for c, n in codes[:10]),
-          f'… (총 {len(codes)})')
-
+    # 창 판정이 먼저다. 유니버스 판정을 앞에 두면 창이 닫힌 뒤 깨어난 런이
+    # 빈 유니버스로 exit 1을 내면서, 정작 할 일이 없는데 사람을 부른다 —
+    # 창 가드(2026-09-03)가 그 경로에서 무력해진다.
     state = window_state(dt.datetime.now().strftime('%H%M'), a.start, a.until)
     if state == 'past':
         # 실패가 아니라 '할 일이 없음'이다. exit 1로 죽이면 cron이 밀린 날마다
@@ -216,6 +226,16 @@ def main():
                            a.start, a.until) == 'wait':
             time.sleep(10)
         print(f'{a.start} 도달 — 수집 시작', flush=True)
+
+    codes = read_universe(a.universe) if a.universe else top_by_surge(a.daily, a.top)
+    if not codes:
+        print('유니버스가 비었다', file=sys.stderr)
+        return 1
+    tr_ids = [t.strip() for t in a.tr.split(',') if t.strip()]
+    # 한도는 TR×종목 총합이다. TR을 늘리면 종목을 줄여야 한다.
+    codes = codes[:max(1, MAX_SUBSCRIBE // len(tr_ids))]
+    print('유니버스:', ', '.join(f'{n or c}' for c, n in codes[:10]),
+          f'… (총 {len(codes)})')
 
     out = a.out or os.path.join('data', f'rt_{tr_ids[0]}_{dt.date.today():%Y%m%d}.csv')
     asyncio.run(collect(codes, tr_ids, out, a.until, approval_key()))

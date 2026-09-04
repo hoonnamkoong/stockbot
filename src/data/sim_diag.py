@@ -53,31 +53,49 @@ def set_cycle(cycle_id) -> None:
     _cycle_id = cycle_id
 
 
-def month_path(sim: str, today: str = None) -> str:
-    """이번 달 진단 로그의 쓰기 경로.
+def day_path(sim: str, today: str = None) -> str:
+    """**오늘** 진단 로그의 쓰기 경로.
 
-    ⚠ 읽을 때는 이 경로 하나만 열면 안 된다. COLUMNS가 바뀐 달은
+    월별이던 시절, 이 파일들은 장중 2분 루프가 매 사이클 통째로 db-data에
+    재커밋했다 — 2026-09-04 실측 sim12_diag_2026-09.csv가 3.7MB에 하루 100회다.
+    일별로 쪼개면 지난 날짜 파일은 다시 쓰이지 않는다(rank_snapshot.day_path와
+    같은 이유).
+
+    ⚠ 읽을 때는 이 경로 하나만 열면 안 된다. COLUMNS가 바뀐 날은
     `_move_stale_if_needed`가 옛 파일을 `..._v1.csv`로 비켜놓고 정규 경로를 새로
-    시작하므로, 그 달의 기록이 두 파일로 나뉜다. 정규 경로만 읽으면 컬럼 변경
-    이전 행이 조용히 통째로 빠진다 — `month_glob()`을 쓸 것.
+    시작하므로, 그날 기록이 두 파일로 나뉜다 — `day_files()`/`month_files()`를 쓸 것.
     """
     d = ''.join(ch for ch in str(today or _today()) if ch.isdigit())
-    ym = f"{d[:4]}-{d[4:6]}" if len(d) >= 6 else 'unknown'
-    return os.path.join(DATA_DIR, f"{sim}_diag_{ym}.csv")
+    ymd = f"{d[:4]}-{d[4:6]}-{d[6:8]}" if len(d) >= 8 else 'unknown'
+    return os.path.join(DATA_DIR, f"{sim}_diag_{ymd}.csv")
 
 
-def month_files(sim: str, today: str = None) -> list:
-    """그 달 진단 로그의 **모든** 파일 (정규 경로 + 컬럼 변경으로 갈라진 _vN).
+def day_files(sim: str, today: str = None) -> list:
+    """그날 진단 로그의 **모든** 파일 (정규 경로 + 컬럼 변경으로 갈라진 _vN).
 
-    오래된 것부터 반환한다. 분석은 이걸 써야 한다 — month_path() 하나만 읽으면
-    컬럼이 바뀐 달의 앞부분을 못 본다(2026-08에 cycle_id가 추가되며 실제로
-    sim1_diag_2026-08.csv가 갈라졌다).
+    오래된 것부터 반환한다. 분석은 이걸 써야 한다 — day_path() 하나만 읽으면
+    컬럼이 바뀐 날의 앞부분을 못 본다(2026-08에 cycle_id가 추가되며 실제로
+    sim1_diag가 갈라졌다).
     """
     import glob
-    base, ext = os.path.splitext(month_path(sim, today))
+    base, ext = os.path.splitext(day_path(sim, today))
     # _v1, _v2 … 가 시간순으로 앞선다(옛 파일이 먼저 비켜났다).
     versioned = sorted(glob.glob(f"{base}_v*{ext}"))
     return versioned + ([base + ext] if os.path.exists(base + ext) else [])
+
+
+def month_files(sim: str, today: str = None) -> list:
+    """그 **달** 진단 로그의 모든 파일. 일별 분할 뒤에도 달 단위 분석이 필요하다.
+
+    월별 파일(`sim1_diag_2026-08.csv`)과 일별 파일(`sim1_diag_2026-08-10.csv`)이
+    함께 잡힌다 — 2026-09-04 전환 이전 데이터가 월별로 남아 있기 때문이다.
+    파일명을 짚지 말고 이 함수를 쓸 것([[monthly-split-needs-glob-ownership]]).
+    """
+    import glob
+    d = ''.join(ch for ch in str(today or _today()) if ch.isdigit())
+    ym = f"{d[:4]}-{d[4:6]}" if len(d) >= 6 else 'unknown'
+    pat = os.path.join(DATA_DIR, f"{sim}_diag_{ym}*.csv")
+    return sorted(glob.glob(pat))
 
 
 def _today() -> str:
@@ -147,7 +165,7 @@ def append(sim: str, records: list, path: str = None, log=print) -> int:
                   f'후보가 0개였거나 판단 루프에 도달하지 못했습니다')
         return 0
     try:
-        path = path or month_path(sim)
+        path = path or day_path(sim)
         if not _move_stale_if_needed(path):
             # 옛 파일을 비켜놓지 못했으면 로그를 쓰지 않아 데이터 정합성 유지.
             # 판단 자체는 옳다(열이 어긋나느니 안 쓰는 게 낫다) — 침묵만 고친다.

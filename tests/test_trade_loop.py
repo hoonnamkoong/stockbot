@@ -337,7 +337,7 @@ def test_sim6_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
     sim_diag가 쓴 진단 CSV도 여기서 같이 실어야 db-data에 도달한다(sim1처럼
     scraper.yml에 남은 심은 그쪽 `data/*.csv` 기본 경로로 나가지만, 이 루프로
     옮겨온 sim6·sim9는 그 워크플로에서 안 돈다)."""
-    from src.data.sim_diag import month_path
+    from src.data.sim_diag import day_path
     monkeypatch.chdir(tmp_path)
     now = _Ctx().now_kst
     trade_loop._write_deploy_manifest(
@@ -346,13 +346,13 @@ def test_sim6_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
         encoding='utf-8').split()
     assert 'sim_bear_state.json' in lines
     assert 'trade_history_sim_bear.csv' in lines
-    assert os.path.basename(month_path('sim6', now.strftime('%Y%m%d'))) in lines
+    assert os.path.basename(day_path('sim6', now.strftime('%Y%m%d'))) in lines
 
 
 def test_sim9_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
     """2026-08-20: sim6에서 이 함정을 고친 날, 같은 60초 루프로 옮겨와 있던
     sim9도 diag를 쓰면서 똑같이 매니페스트에서 빠져 있던 게 드러났다."""
-    from src.data.sim_diag import month_path
+    from src.data.sim_diag import day_path
     monkeypatch.chdir(tmp_path)
     now = _Ctx().now_kst
     trade_loop._write_deploy_manifest(
@@ -360,11 +360,11 @@ def test_sim9_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
     lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
         encoding='utf-8').split()
     assert 'sim_gapfade_state.json' in lines
-    assert os.path.basename(month_path('sim9', now.strftime('%Y%m%d'))) in lines
+    assert os.path.basename(day_path('sim9', now.strftime('%Y%m%d'))) in lines
 
 
 def test_sim12_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
-    from src.data.sim_diag import month_path
+    from src.data.sim_diag import day_path
     monkeypatch.chdir(tmp_path)
     now = _Ctx().now_kst
     trade_loop._write_deploy_manifest(
@@ -372,11 +372,11 @@ def test_sim12_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
     lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
         encoding='utf-8').split()
     assert 'sim_regimedual_state.json' in lines
-    assert os.path.basename(month_path('sim12', now.strftime('%Y%m%d'))) in lines
+    assert os.path.basename(day_path('sim12', now.strftime('%Y%m%d'))) in lines
 
 
 def test_both_diag_files_carried_when_both_sims_ran(tmp_path, monkeypatch):
-    from src.data.sim_diag import month_path
+    from src.data.sim_diag import day_path
     monkeypatch.chdir(tmp_path)
     now = _Ctx().now_kst
     trade_loop._write_deploy_manifest(
@@ -384,8 +384,8 @@ def test_both_diag_files_carried_when_both_sims_ran(tmp_path, monkeypatch):
         extra_sim_ids={'sim6_bear', 'sim9_gap_fade'})
     lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
         encoding='utf-8').split()
-    assert os.path.basename(month_path('sim6', now.strftime('%Y%m%d'))) in lines
-    assert os.path.basename(month_path('sim9', now.strftime('%Y%m%d'))) in lines
+    assert os.path.basename(day_path('sim6', now.strftime('%Y%m%d'))) in lines
+    assert os.path.basename(day_path('sim9', now.strftime('%Y%m%d'))) in lines
 
 
 def test_sim6_diag_file_is_skipped_without_now(tmp_path, monkeypatch):
@@ -727,7 +727,7 @@ def test_money_files_are_deployed(tmp_path, monkeypatch):
     names = trade_loop.money_output_files(datetime(2026, 8, 10, 10, 0))
 
     assert 'rank_state.json' in names
-    assert 'money_2026-08.csv' in names
+    assert 'money_2026-08-10.csv' in names
 
 
 # ── 부분 결손 (2026-08-09) ──────────────────────────────────────────

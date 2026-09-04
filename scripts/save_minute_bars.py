@@ -8,11 +8,12 @@
 왜 마감 후인가: KIS 분봉(FHKST03010200)은 **당일치만** 조회된다. 과거로 소급할 수
 없으므로 그날 안에 저장해 두어야 하고, eod_data.yml이 이미 마감 후에 돈다.
 
-대상 종목은 그날 순위 스냅샷(money_YYYY-MM.csv)에 오른 것들이다. 전 종목을 받으면
+대상 종목은 그날 순위 스냅샷(money_*.csv)에 오른 것들이다. 전 종목을 받으면
 KIS 유량을 태우면서 분석에 쓰이지도 않는다 — 신호가 순위 차분에서 나오기 때문이다.
 """
 
 import csv
+import glob
 import os
 import sys
 import time
@@ -69,12 +70,15 @@ def main() -> None:
     now = (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
     date_str = now.strftime('%Y%m%d')
 
-    money = os.path.join('data', f"money_{now.strftime('%Y-%m')}.csv")
-    codes = codes_for_date(money, date_str)
+    # 파일명을 짚지 않는다. 순위 스냅샷은 2026-09-04에 월별(money_2026-09.csv)에서
+    # 일별(money_2026-09-04.csv)로 바뀌었고, 전환일에는 두 형식이 함께 있다.
+    # 글롭 + 날짜 필터면 어느 쪽이든 같은 답을 준다.
+    money_files = sorted(glob.glob(os.path.join('data', 'money_*.csv')))
+    codes = sorted({c for p in money_files for c in codes_for_date(p, date_str)})
     if not codes:
         # 순위 스냅샷이 아직 없는 날(최초 배포)이거나 휴장일. 조용히 끝낸다 —
         # 여기서 죽으면 EOD 잡의 나머지(심9-1·CSV 배포)까지 같이 못 돈다.
-        print(f'[분봉] {date_str} 대상 종목 없음 ({money}) — 생략')
+        print(f'[분봉] {date_str} 대상 종목 없음 ({len(money_files)}개 파일 확인) — 생략')
         return
 
     from src.trade.kis_data_provider import KISDataProvider

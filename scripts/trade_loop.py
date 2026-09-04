@@ -251,7 +251,7 @@ def collect_rank_snapshot(log=print):
     snap_ctx = PipelineContext.from_env()
     now = snap_ctx.now_kst
     state, records = rs.snapshot(blocks, rs.load_state('data'), snap_ctx.cycle_id, now)
-    n = rs.append_records(records, rs.month_path(now, 'data'))
+    n = rs.append_records(records, rs.day_path(now, 'data'))
     rs.save_state(state, now, 'data')
     log(f'[순위] {n}행 기록 ('
         + ' / '.join(f'{src} {len(m)}종목' for src, m in state.items()) + ')')
@@ -268,8 +268,8 @@ def money_output_files(now) -> list[str]:
     파일명은 런타임에 현재 월을 해석해야 한다 — 배포 스텝이 `[ -f data/$name ]`로
     한 줄씩 존재를 검사하므로 와일드카드가 매칭되지 않는다.
     """
-    from src.data.rank_snapshot import STATE_FILENAME, month_path
-    return [STATE_FILENAME, os.path.basename(month_path(now, 'data'))]
+    from src.data.rank_snapshot import STATE_FILENAME, day_path
+    return [STATE_FILENAME, os.path.basename(day_path(now, 'data'))]
 
 
 def regime_output_files(now) -> list[str]:
@@ -450,9 +450,9 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
             if now is not None:
                 for reg_id, diag_prefix in DIAG_LOG_SIM_IDS.items():
                     if reg_id in all_sim_ids:
-                        from src.data.sim_diag import month_path
+                        from src.data.sim_diag import day_path
                         names.append(os.path.basename(
-                            month_path(diag_prefix, now.strftime('%Y%m%d'))))
+                            day_path(diag_prefix, now.strftime('%Y%m%d'))))
         if not names:
             return
         os.makedirs('data', exist_ok=True)

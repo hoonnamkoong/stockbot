@@ -79,3 +79,28 @@ def test_창이_닫혔으면_유니버스가_비어도_실패가_아니다(tmp_p
                         ['collect_kis_realtime.py', '--universe', str(empty),
                          '--start', '0800', '--until', '0850'])
     assert cr.main() == 0, '창이 닫힌 뒤 깨어난 런은 조용히 끝나야 한다'
+
+
+def test_끊기면_창이_남은_동안_다시_붙는다():
+    """`async with` 하나뿐이던 시절, KIS가 소켓을 한 번 닫으면 잡이 죽었다.
+
+    2.5시간짜리 장중 세션에서 한 번의 절단이 그날 수집분을 통째로 날렸다 —
+    예외가 main까지 올라가 exit 1이 되고, 뒤의 커밋 스텝이 skip되기 때문이다
+    (2026-09-03 intraday 실패).
+    """
+    from collect_kis_realtime import should_reconnect
+    assert should_reconnect('0930', '1130', drops=1) is True
+    assert should_reconnect('0930', '1130', drops=3) is True
+
+
+def test_창이_닫혔으면_다시_붙지_않는다():
+    from collect_kis_realtime import should_reconnect
+    assert should_reconnect('1130', '1130', drops=0) is False
+    assert should_reconnect('1200', '1130', drops=0) is False
+
+
+def test_연속_절단은_상한에서_멈춘다():
+    """승인키 만료처럼 계속 거절당하면 2초마다 재시도하는 바쁜 루프가 된다."""
+    from collect_kis_realtime import MAX_DROPS, should_reconnect
+    assert should_reconnect('0930', '1130', drops=MAX_DROPS - 1) is True
+    assert should_reconnect('0930', '1130', drops=MAX_DROPS) is False

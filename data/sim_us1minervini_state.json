@@ -1,0 +1,96 @@
+{
+  "initial_cash": 20000,
+  "cash": 1441.295,
+  "invested": 18558.704999999998,
+  "portfolio": {
+    "EXPD": {
+      "name": "Expeditors International of Washington, Inc. Common Stock",
+      "quantity": 19,
+      "avg_price": 191.53,
+      "entry_date": "2026-08-27",
+      "peak_price": 191.72,
+      "is_scaled_out": false
+    },
+    "DINO": {
+      "name": "HF Sinclair Corporation Common Stock",
+      "quantity": 38,
+      "avg_price": 97.51,
+      "entry_date": "2026-08-27",
+      "peak_price": 108.09,
+      "is_scaled_out": false
+    },
+    "PSX": {
+      "name": "Phillips 66 Common Stock",
+      "quantity": 15,
+      "avg_price": 243.87,
+      "entry_date": "2026-08-27",
+      "peak_price": 260.42,
+      "is_scaled_out": false
+    },
+    "VG": {
+      "name": "Venture Global, Inc. Class A common stock",
+      "quantity": 264,
+      "avg_price": 14.395,
+      "entry_date": "2026-08-27",
+      "peak_price": 15.13,
+      "is_scaled_out": false
+    },
+    "RGA": {
+      "name": "Reinsurance Group of America, Incorporated Common Stock",
+      "quantity": 15,
+      "avg_price": 250.395,
+      "entry_date": "2026-09-02",
+      "peak_price": 257.808,
+      "is_scaled_out": false
+    }
+  },
+  "peak_nav": 20708.057999999997,
+  "total_fees": 7.344450000000001,
+  "history": [
+    20000
+  ],
+  "daily_trades": [],
+  "cooldown_codes": {},
+  "raw_stats": {
+    "cash": 1441.295,
+    "total_asset": 20514.754,
+    "profit_rate": 2.573770000000004,
+    "holdings_count": 5,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0.9334723709968191,
+    "turnover": 0.9279354999999999,
+    "frequency": 0.5555555555555556,
+    "total_fees": 7.344450000000001,
+    "current_prices": {
+      "CVX": 211.47,
+      "RGA": 255.95,
+      "EOG": 145.95,
+      "AMZN": 258.865,
+      "DINO": 106.243,
+      "VG": 14.48,
+      "EXPD": 187.095,
+      "TWLO": 240.61,
+      "MU": 956.23,
+      "DXCM": 89.64,
+      "PR": 23.73,
+      "FANG": 202.91,
+      "COP": 135.47,
+      "HALO": 110.775,
+      "OVV": 65.925,
+      "JHX": 29.57,
+      "HPE": 54.315,
+      "ROKU": 158.11,
+      "PSX": 254.63,
+      "AHR": 55.55,
+      "KYMR": 117.1
+    }
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 20.0,
+    "MDD": 97.19958288700954,
+    "거래빈도": 2.7777777777777777,
+    "자본회전율": 1.8558709999999998
+  }
+}

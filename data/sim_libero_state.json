@@ -1,0 +1,9309 @@
+{
+  "initial_cash": 0,
+  "cash": 0,
+  "invested": 0,
+  "portfolio": {},
+  "peak_nav": 0,
+  "total_fees": 0,
+  "history": [
+    0
+  ],
+  "daily_trades": [],
+  "market_index_healthy": true,
+  "last_run": "2026-09-04 15:40:30",
+  "current_regime": "SIDEWAYS",
+  "instant_regime": "SIDEWAYS",
+  "regime_confidence": 1.0,
+  "bull_score": 50.8,
+  "metrics": {
+    "breadth_score": 68.0,
+    "momentum_score": 0.75,
+    "trend_strength": 19.1,
+    "foreign_score": null,
+    "volatility_score": null
+  },
+  "regime_history": [
+    "SIDEWAYS",
+    "SIDEWAYS",
+    "SIDEWAYS",
+    "SIDEWAYS",
+    "SIDEWAYS"
+  ],
+  "recommended_sims": [
+    "sim5_sideways",
+    "sim_psych",
+    "sim_spillover"
+  ],
+  "sample_size": 100,
+  "cooldown_codes": {},
+  "daily_regime_log": [
+    {
+      "date": "2026-07-23",
+      "regime": "SIDEWAYS",
+      "bull_score": 52.4,
+      "breadth": 74.0
+    },
+    {
+      "date": "2026-07-24",
+      "regime": "SIDEWAYS",
+      "bull_score": 28.8,
+      "breadth": 24.0
+    },
+    {
+      "date": "2026-07-27",
+      "regime": "BEAR",
+      "bull_score": 43.5,
+      "breadth": 50.0
+    },
+    {
+      "date": "2026-07-28",
+      "regime": "SIDEWAYS",
+      "bull_score": 19.1,
+      "breadth": 8.0
+    },
+    {
+      "date": "2026-07-29",
+      "regime": "BEAR",
+      "bull_score": 50.8,
+      "breadth": 67.0
+    },
+    {
+      "date": "2026-07-30",
+      "regime": "BEAR",
+      "bull_score": 47.7,
+      "breadth": 51.0
+    },
+    {
+      "date": "2026-07-31",
+      "regime": "SIDEWAYS",
+      "bull_score": 59.4,
+      "breadth": 72.0
+    },
+    {
+      "date": "2026-08-03",
+      "regime": "BULL",
+      "bull_score": 23.1,
+      "breadth": 14.0
+    },
+    {
+      "date": "2026-08-04",
+      "regime": "SIDEWAYS",
+      "bull_score": 50.6,
+      "breadth": 70.0
+    },
+    {
+      "date": "2026-08-05",
+      "regime": "SIDEWAYS",
+      "bull_score": 53.0,
+      "breadth": 73.0
+    },
+    {
+      "date": "2026-08-06",
+      "regime": "SIDEWAYS",
+      "bull_score": 21.1,
+      "breadth": 0.0
+    },
+    {
+      "date": "2026-08-10",
+      "regime": "SIDEWAYS",
+      "bull_score": 17.5,
+      "breadth": 0.0
+    },
+    {
+      "date": "2026-08-11",
+      "regime": "SIDEWAYS",
+      "bull_score": 18.3,
+      "breadth": 2.0
+    },
+    {
+      "date": "2026-08-12",
+      "regime": "SIDEWAYS",
+      "bull_score": 17.9,
+      "breadth": 1.0
+    },
+    {
+      "date": "2026-08-13",
+      "regime": "SIDEWAYS",
+      "bull_score": 18.7,
+      "breadth": 3.0
+    },
+    {
+      "date": "2026-08-14",
+      "regime": "SIDEWAYS",
+      "bull_score": 50.8,
+      "breadth": 78.0
+    },
+    {
+      "date": "2026-08-18",
+      "regime": "SIDEWAYS",
+      "bull_score": 42.1,
+      "breadth": 36.0
+    },
+    {
+      "date": "2026-08-19",
+      "regime": "BEAR",
+      "bull_score": 21.0,
+      "breadth": 9.0
+    },
+    {
+      "date": "2026-08-20",
+      "regime": "BEAR",
+      "bull_score": 42.3,
+      "breadth": 50.0
+    },
+    {
+      "date": "2026-08-21",
+      "regime": "SIDEWAYS",
+      "bull_score": 24.4,
+      "breadth": 9.0
+    },
+    {
+      "date": "2026-08-24",
+      "regime": "SIDEWAYS",
+      "bull_score": 43.6,
+      "breadth": 49.0
+    },
+    {
+      "date": "2026-08-25",
+      "regime": "SIDEWAYS",
+      "bull_score": 25.6,
+      "breadth": 14.0
+    },
+    {
+      "date": "2026-08-26",
+      "regime": "SIDEWAYS",
+      "bull_score": 47.7,
+      "breadth": 62.0
+    },
+    {
+      "date": "2026-08-27",
+      "regime": "SIDEWAYS",
+      "bull_score": 51.1,
+      "breadth": 69.0
+    },
+    {
+      "date": "2026-08-28",
+      "regime": "SIDEWAYS",
+      "bull_score": 41.3,
+      "breadth": 47.0
+    },
+    {
+      "date": "2026-08-31",
+      "regime": "SIDEWAYS",
+      "bull_score": 25.1,
+      "breadth": 15.0
+    },
+    {
+      "date": "2026-09-01",
+      "regime": "SIDEWAYS",
+      "bull_score": 37.7,
+      "breadth": 39.0
+    },
+    {
+      "date": "2026-09-02",
+      "regime": "SIDEWAYS",
+      "bull_score": 21.9,
+      "breadth": 9.0
+    },
+    {
+      "date": "2026-09-03",
+      "regime": "BEAR",
+      "bull_score": 42.3,
+      "breadth": 49.0
+    },
+    {
+      "date": "2026-09-04",
+      "regime": "SIDEWAYS",
+      "bull_score": 57.9,
+      "breadth": 83.0
+    }
+  ],
+  "calibration_log": [
+    {
+      "date": "2026-06-15",
+      "libero_breadth": 86.4,
+      "actual_kospi_breadth": 34.2,
+      "gap": 52.2,
+      "bull_score": 79.8,
+      "regime": "BULL"
+    },
+    {
+      "date": "2026-06-16",
+      "libero_breadth": 60.0,
+      "actual_kospi_breadth": 34.2,
+      "gap": 25.8,
+      "bull_score": 54.2,
+      "regime": "BULL"
+    },
+    {
+      "date": "2026-06-17",
+      "libero_breadth": 16.7,
+      "actual_kospi_breadth": 34.2,
+      "gap": -17.5,
+      "bull_score": 59.6,
+      "regime": "BULL"
+    },
+    {
+      "date": "2026-06-18",
+      "libero_breadth": 66.7,
+      "actual_kospi_breadth": 34.2,
+      "gap": 32.5,
+      "bull_score": 74.2,
+      "regime": "BULL"
+    },
+    {
+      "date": "2026-06-19",
+      "libero_breadth": 75.0,
+      "actual_kospi_breadth": 34.2,
+      "gap": 40.8,
+      "bull_score": 64.0,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-06-22",
+      "libero_breadth": 40.0,
+      "actual_kospi_breadth": 34.2,
+      "gap": 5.8,
+      "bull_score": 37.2,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-06-23",
+      "libero_breadth": 50.0,
+      "actual_kospi_breadth": 34.2,
+      "gap": 15.8,
+      "bull_score": 69.8,
+      "regime": "BULL"
+    },
+    {
+      "date": "2026-06-24",
+      "libero_breadth": 100.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 95.0,
+      "bull_score": 46.6,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-06-25",
+      "libero_breadth": 100.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 95.0,
+      "bull_score": 68.2,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-06-26",
+      "libero_breadth": 25.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 20.0,
+      "bull_score": 33.2,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-06-29",
+      "libero_breadth": 50.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 45.0,
+      "bull_score": 40.8,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-06-30",
+      "libero_breadth": 100.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 95.0,
+      "bull_score": 59.6,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-07-01",
+      "libero_breadth": 66.7,
+      "actual_kospi_breadth": 5.0,
+      "gap": 61.7,
+      "bull_score": 54.5,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-07-02",
+      "libero_breadth": 25.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 20.0,
+      "bull_score": 60.6,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-07-03",
+      "libero_breadth": 40.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 35.0,
+      "bull_score": 33.2,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-07-06",
+      "libero_breadth": 100.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 95.0,
+      "bull_score": 64.0,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-07-07",
+      "libero_breadth": 33.3,
+      "actual_kospi_breadth": 5.0,
+      "gap": 28.3,
+      "bull_score": 55.5,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-07-08",
+      "libero_breadth": 25.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 20.0,
+      "bull_score": 30.8,
+      "regime": "SIDEWAYS"
+    },
+    {
+      "date": "2026-07-09",
+      "libero_breadth": 48.0,
+      "actual_kospi_breadth": 34.0,
+      "gap": 14.0,
+      "bull_score": 54.8,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-13",
+      "libero_breadth": 68.0,
+      "actual_kospi_breadth": 19.0,
+      "gap": 49.0,
+      "bull_score": 44.7,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-14",
+      "libero_breadth": 33.0,
+      "actual_kospi_breadth": 24.0,
+      "gap": 9.0,
+      "bull_score": 38.5,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-15",
+      "libero_breadth": 96.0,
+      "actual_kospi_breadth": 95.0,
+      "gap": 1.0,
+      "bull_score": 72.1,
+      "regime": "BULL",
+      "v": 2
+    },
+    {
+      "date": "2026-07-16",
+      "libero_breadth": 40.0,
+      "actual_kospi_breadth": 41.0,
+      "gap": -1.0,
+      "bull_score": 39.0,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-17",
+      "libero_breadth": 41.0,
+      "actual_kospi_breadth": 41.0,
+      "gap": 0.0,
+      "bull_score": 41.2,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-20",
+      "libero_breadth": 5.0,
+      "actual_kospi_breadth": 5.0,
+      "gap": 0.0,
+      "bull_score": 19.5,
+      "regime": "BEAR",
+      "v": 2
+    },
+    {
+      "date": "2026-07-21",
+      "libero_breadth": 12.0,
+      "actual_kospi_breadth": 70.0,
+      "gap": -58.0,
+      "bull_score": 56.4,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-22",
+      "libero_breadth": 98.0,
+      "actual_kospi_breadth": 71.0,
+      "gap": 27.0,
+      "bull_score": 54.4,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-23",
+      "libero_breadth": 74.0,
+      "actual_kospi_breadth": 91.0,
+      "gap": -17.0,
+      "bull_score": 65.8,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-24",
+      "libero_breadth": 24.0,
+      "actual_kospi_breadth": 29.0,
+      "gap": -5.0,
+      "bull_score": 28.3,
+      "regime": "BEAR",
+      "v": 2
+    },
+    {
+      "date": "2026-07-27",
+      "libero_breadth": 50.0,
+      "actual_kospi_breadth": 56.0,
+      "gap": -6.0,
+      "bull_score": 46.6,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-28",
+      "libero_breadth": 8.0,
+      "actual_kospi_breadth": 4.0,
+      "gap": 4.0,
+      "bull_score": 11.3,
+      "regime": "BEAR",
+      "v": 2
+    },
+    {
+      "date": "2026-07-29",
+      "libero_breadth": 67.0,
+      "actual_kospi_breadth": 11.0,
+      "gap": 56.0,
+      "bull_score": 21.3,
+      "regime": "BEAR",
+      "v": 2
+    },
+    {
+      "date": "2026-07-30",
+      "libero_breadth": 51.0,
+      "actual_kospi_breadth": 53.0,
+      "gap": -2.0,
+      "bull_score": 48.8,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-07-31",
+      "libero_breadth": 72.0,
+      "actual_kospi_breadth": 85.0,
+      "gap": -13.0,
+      "bull_score": 69.0,
+      "regime": "BULL",
+      "v": 2
+    },
+    {
+      "date": "2026-08-03",
+      "libero_breadth": 14.0,
+      "actual_kospi_breadth": 35.0,
+      "gap": -21.0,
+      "bull_score": 33.2,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-04",
+      "libero_breadth": 70.0,
+      "actual_kospi_breadth": 83.0,
+      "gap": -13.0,
+      "bull_score": 57.7,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-05",
+      "libero_breadth": 73.0,
+      "actual_kospi_breadth": 84.0,
+      "gap": -11.0,
+      "bull_score": 59.7,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-14",
+      "libero_breadth": 78.0,
+      "actual_kospi_breadth": 77.0,
+      "gap": 1.0,
+      "bull_score": 50.7,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-18",
+      "libero_breadth": 36.0,
+      "actual_kospi_breadth": 22.0,
+      "gap": 14.0,
+      "bull_score": 33.8,
+      "regime": "BEAR",
+      "v": 2
+    },
+    {
+      "date": "2026-08-19",
+      "libero_breadth": 9.0,
+      "actual_kospi_breadth": 15.0,
+      "gap": -6.0,
+      "bull_score": 25.9,
+      "regime": "BEAR",
+      "v": 2
+    },
+    {
+      "date": "2026-08-20",
+      "libero_breadth": 50.0,
+      "actual_kospi_breadth": 59.0,
+      "gap": -9.0,
+      "bull_score": 46.4,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-21",
+      "libero_breadth": 9.0,
+      "actual_kospi_breadth": 32.0,
+      "gap": -23.0,
+      "bull_score": 34.1,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-24",
+      "libero_breadth": 49.0,
+      "actual_kospi_breadth": 58.0,
+      "gap": -9.0,
+      "bull_score": 48.0,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-25",
+      "libero_breadth": 14.0,
+      "actual_kospi_breadth": 71.0,
+      "gap": -57.0,
+      "bull_score": 53.4,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-26",
+      "libero_breadth": 62.0,
+      "actual_kospi_breadth": 65.0,
+      "gap": -3.0,
+      "bull_score": 49.8,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-27",
+      "libero_breadth": 69.0,
+      "actual_kospi_breadth": 60.0,
+      "gap": 9.0,
+      "bull_score": 47.2,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-08-31",
+      "libero_breadth": 15.0,
+      "actual_kospi_breadth": 43.0,
+      "gap": -28.0,
+      "bull_score": 40.4,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-09-01",
+      "libero_breadth": 39.0,
+      "actual_kospi_breadth": 48.0,
+      "gap": -9.0,
+      "bull_score": 41.9,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-09-02",
+      "libero_breadth": 9.0,
+      "actual_kospi_breadth": 7.0,
+      "gap": 2.0,
+      "bull_score": 19.7,
+      "regime": "BEAR",
+      "v": 2
+    },
+    {
+      "date": "2026-09-03",
+      "libero_breadth": 49.0,
+      "actual_kospi_breadth": 60.0,
+      "gap": -11.0,
+      "bull_score": 47.4,
+      "regime": "SIDEWAYS",
+      "v": 2
+    },
+    {
+      "date": "2026-09-04",
+      "libero_breadth": 83.0,
+      "actual_kospi_breadth": 67.0,
+      "gap": 16.0,
+      "bull_score": 50.5,
+      "regime": "SIDEWAYS",
+      "v": 2
+    }
+  ],
+  "breadth_source": "top100_live",
+  "intraday": {
+    "date": "2026-09-04",
+    "measurements": [
+      {
+        "t": "09:00",
+        "breadth": 83.0
+      },
+      {
+        "t": "10:00",
+        "breadth": 61.0
+      },
+      {
+        "t": "11:00",
+        "breadth": 61.0
+      },
+      {
+        "t": "12:00",
+        "breadth": 68.0
+      },
+      {
+        "t": "13:00",
+        "breadth": 60.0
+      },
+      {
+        "t": "14:00",
+        "breadth": 60.0
+      },
+      {
+        "t": "15:00",
+        "breadth": 66.0
+      },
+      {
+        "t": "15:30",
+        "breadth": 67.0
+      }
+    ],
+    "predictions": [
+      {
+        "made_at": "09:00",
+        "target": "10:00",
+        "type": "h1",
+        "model": "velocity",
+        "value": 83.0,
+        "scored": true
+      },
+      {
+        "made_at": "09:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 83.0,
+        "scored": true
+      },
+      {
+        "made_at": "09:00",
+        "target": "10:00",
+        "type": "h1",
+        "model": "smoothed_velocity",
+        "value": 83.0,
+        "scored": true
+      },
+      {
+        "made_at": "09:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 83.0,
+        "scored": true
+      },
+      {
+        "made_at": "09:00",
+        "target": "10:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 83.0,
+        "scored": true
+      },
+      {
+        "made_at": "09:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 83.0,
+        "scored": true
+      },
+      {
+        "made_at": "10:00",
+        "target": "11:00",
+        "type": "h1",
+        "model": "velocity",
+        "value": 39.0,
+        "scored": true
+      },
+      {
+        "made_at": "10:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 0.5,
+        "scored": true
+      },
+      {
+        "made_at": "10:00",
+        "target": "11:00",
+        "type": "h1",
+        "model": "smoothed_velocity",
+        "value": 39.0,
+        "scored": true
+      },
+      {
+        "made_at": "10:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 0.5,
+        "scored": true
+      },
+      {
+        "made_at": "10:00",
+        "target": "11:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 61.0,
+        "scored": true
+      },
+      {
+        "made_at": "10:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 61.0,
+        "scored": true
+      },
+      {
+        "made_at": "11:00",
+        "target": "12:00",
+        "type": "h1",
+        "model": "velocity",
+        "value": 61.0,
+        "scored": true
+      },
+      {
+        "made_at": "11:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 61.0,
+        "scored": true
+      },
+      {
+        "made_at": "11:00",
+        "target": "12:00",
+        "type": "h1",
+        "model": "smoothed_velocity",
+        "value": 50.0,
+        "scored": true
+      },
+      {
+        "made_at": "11:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 36.3,
+        "scored": true
+      },
+      {
+        "made_at": "11:00",
+        "target": "12:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 61.0,
+        "scored": true
+      },
+      {
+        "made_at": "11:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 61.0,
+        "scored": true
+      },
+      {
+        "made_at": "12:00",
+        "target": "13:00",
+        "type": "h1",
+        "model": "velocity",
+        "value": 75.0,
+        "scored": true
+      },
+      {
+        "made_at": "12:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 80.2,
+        "scored": true
+      },
+      {
+        "made_at": "12:00",
+        "target": "13:00",
+        "type": "h1",
+        "model": "smoothed_velocity",
+        "value": 63.0,
+        "scored": true
+      },
+      {
+        "made_at": "12:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 59.2,
+        "scored": true
+      },
+      {
+        "made_at": "12:00",
+        "target": "13:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 68.0,
+        "scored": true
+      },
+      {
+        "made_at": "12:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 68.0,
+        "scored": true
+      },
+      {
+        "made_at": "13:00",
+        "target": "14:00",
+        "type": "h1",
+        "model": "velocity",
+        "value": 52.0,
+        "scored": true
+      },
+      {
+        "made_at": "13:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 50.0,
+        "scored": true
+      },
+      {
+        "made_at": "13:00",
+        "target": "14:00",
+        "type": "h1",
+        "model": "smoothed_velocity",
+        "value": 54.2,
+        "scored": true
+      },
+      {
+        "made_at": "13:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 52.8,
+        "scored": true
+      },
+      {
+        "made_at": "13:00",
+        "target": "14:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 60.0,
+        "scored": true
+      },
+      {
+        "made_at": "13:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 60.0,
+        "scored": true
+      },
+      {
+        "made_at": "14:00",
+        "target": "15:00",
+        "type": "h1",
+        "model": "velocity",
+        "value": 60.0,
+        "scored": true
+      },
+      {
+        "made_at": "14:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 60.0,
+        "scored": true
+      },
+      {
+        "made_at": "14:00",
+        "target": "15:00",
+        "type": "h1",
+        "model": "smoothed_velocity",
+        "value": 59.8,
+        "scored": true
+      },
+      {
+        "made_at": "14:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 59.8,
+        "scored": true
+      },
+      {
+        "made_at": "14:00",
+        "target": "15:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 60.0,
+        "scored": true
+      },
+      {
+        "made_at": "14:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 60.0,
+        "scored": true
+      },
+      {
+        "made_at": "15:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 67.5,
+        "scored": true
+      },
+      {
+        "made_at": "15:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 66.3,
+        "scored": true
+      },
+      {
+        "made_at": "15:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 66.0,
+        "scored": true
+      }
+    ]
+  },
+  "intraday_score_log": [
+    {
+      "date": "2026-07-08",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 17.0,
+      "actual": 17.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-08",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 17.0,
+      "actual": 12.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-07-08",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 7.0,
+      "actual": 5.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-07-08",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 0.0,
+      "actual": 9.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 48.0,
+      "actual": 61.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 74.0,
+      "actual": 34.0,
+      "gap": 40.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 7.0,
+      "actual": 14.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 0.0,
+      "actual": 34.0,
+      "gap": -34.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 54.0,
+      "actual": 25.0,
+      "gap": 29.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 16.0,
+      "actual": 35.0,
+      "gap": -19.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 48.0,
+      "actual": 34.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 96.8,
+      "actual": 34.0,
+      "gap": 62.8
+    },
+    {
+      "date": "2026-07-09",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 34.0,
+      "gap": -34.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 34.0,
+      "gap": -34.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 59.0,
+      "actual": 34.0,
+      "gap": 25.0
+    },
+    {
+      "date": "2026-07-09",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 18.2,
+      "actual": 34.0,
+      "gap": -15.8
+    },
+    {
+      "date": "2026-07-09",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 37.5,
+      "actual": 34.0,
+      "gap": 3.5
+    },
+    {
+      "date": "2026-07-10",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 89.0,
+      "actual": 95.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-07-10",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 94.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-07-10",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 93.0,
+      "actual": 96.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-07-10",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 98.0,
+      "actual": 97.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-10",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 98.0,
+      "actual": 92.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-07-10",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 87.0,
+      "actual": 93.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 68.0,
+      "actual": 65.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 62.0,
+      "actual": 38.0,
+      "gap": 24.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 11.0,
+      "actual": 44.0,
+      "gap": -33.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 50.0,
+      "actual": 22.0,
+      "gap": 28.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 0.0,
+      "actual": 24.0,
+      "gap": -24.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 26.0,
+      "actual": 22.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 19.0,
+      "gap": 49.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 56.8,
+      "actual": 19.0,
+      "gap": 37.8
+    },
+    {
+      "date": "2026-07-13",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 19.0,
+      "gap": -19.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 54.5,
+      "actual": 19.0,
+      "gap": 35.5
+    },
+    {
+      "date": "2026-07-13",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 19.0,
+      "gap": -19.0
+    },
+    {
+      "date": "2026-07-13",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 25.5,
+      "actual": 19.0,
+      "gap": 6.5
+    },
+    {
+      "date": "2026-07-13",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 21.5,
+      "actual": 19.0,
+      "gap": 2.5
+    },
+    {
+      "date": "2026-07-14",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 33.0,
+      "actual": 42.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 51.0,
+      "actual": 12.0,
+      "gap": 39.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 0.0,
+      "actual": 17.0,
+      "gap": -17.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 22.0,
+      "actual": 21.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 25.0,
+      "actual": 30.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 39.0,
+      "actual": 24.0,
+      "gap": 15.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 33.0,
+      "actual": 24.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 66.8,
+      "actual": 24.0,
+      "gap": 42.8
+    },
+    {
+      "date": "2026-07-14",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 24.0,
+      "gap": -24.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 25.8,
+      "actual": 24.0,
+      "gap": 1.8
+    },
+    {
+      "date": "2026-07-14",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 26.0,
+      "actual": 24.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-07-14",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 36.8,
+      "actual": 24.0,
+      "gap": 12.8
+    },
+    {
+      "date": "2026-07-14",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 22.5,
+      "actual": 24.0,
+      "gap": -1.5
+    },
+    {
+      "date": "2026-07-15",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 96.0,
+      "actual": 92.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 88.0,
+      "actual": 98.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 100.0,
+      "actual": 96.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 94.0,
+      "actual": 97.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 98.0,
+      "actual": 96.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 95.0,
+      "actual": 96.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 96.0,
+      "actual": 95.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 81.0,
+      "actual": 95.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 95.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-07-15",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 92.5,
+      "actual": 95.0,
+      "gap": -2.5
+    },
+    {
+      "date": "2026-07-15",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 98.2,
+      "actual": 95.0,
+      "gap": 3.2
+    },
+    {
+      "date": "2026-07-15",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 95.2,
+      "actual": 95.0,
+      "gap": 0.2
+    },
+    {
+      "date": "2026-07-15",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 96.0,
+      "actual": 95.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 40.0,
+      "actual": 36.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 32.0,
+      "actual": 19.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 2.0,
+      "actual": 30.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 41.0,
+      "actual": 34.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 38.0,
+      "actual": 31.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 28.0,
+      "actual": 31.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 40.0,
+      "actual": 41.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 25.0,
+      "actual": 41.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 41.0,
+      "gap": -41.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 49.2,
+      "actual": 41.0,
+      "gap": 8.2
+    },
+    {
+      "date": "2026-07-16",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 39.0,
+      "actual": 41.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-07-16",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 28.8,
+      "actual": 41.0,
+      "gap": -12.2
+    },
+    {
+      "date": "2026-07-16",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 31.0,
+      "actual": 41.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-17",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 41.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 5.0,
+      "actual": 8.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 11.0,
+      "actual": 12.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 16.0,
+      "actual": 8.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 4.0,
+      "actual": 7.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 6.0,
+      "actual": 8.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 9.0,
+      "actual": 5.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 5.0,
+      "actual": 5.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 15.5,
+      "actual": 5.0,
+      "gap": 10.5
+    },
+    {
+      "date": "2026-07-20",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 21.0,
+      "actual": 5.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 1.0,
+      "actual": 5.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-07-20",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 5.8,
+      "actual": 5.0,
+      "gap": 0.8
+    },
+    {
+      "date": "2026-07-20",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 8.8,
+      "actual": 5.0,
+      "gap": 3.8
+    },
+    {
+      "date": "2026-07-20",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 4.2,
+      "actual": 5.0,
+      "gap": -0.8
+    },
+    {
+      "date": "2026-07-21",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 12.0,
+      "actual": 38.0,
+      "gap": -26.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 64.0,
+      "actual": 64.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 90.0,
+      "actual": 79.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 94.0,
+      "actual": 84.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 89.0,
+      "actual": 74.0,
+      "gap": 15.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 64.0,
+      "actual": 72.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 12.0,
+      "actual": 70.0,
+      "gap": -58.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 70.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 70.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 70.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-07-21",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 90.2,
+      "actual": 70.0,
+      "gap": 20.2
+    },
+    {
+      "date": "2026-07-21",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 66.5,
+      "actual": 70.0,
+      "gap": -3.5
+    },
+    {
+      "date": "2026-07-21",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 71.5,
+      "actual": 70.0,
+      "gap": 1.5
+    },
+    {
+      "date": "2026-07-22",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 98.0,
+      "actual": 93.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-07-22",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 88.0,
+      "actual": 94.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-07-22",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 95.0,
+      "actual": 91.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-07-22",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 88.0,
+      "actual": 93.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-07-22",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 95.0,
+      "actual": 88.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-07-22",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 83.0,
+      "actual": 74.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-07-22",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 98.0,
+      "actual": 71.0,
+      "gap": 27.0
+    },
+    {
+      "date": "2026-07-22",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 79.2,
+      "actual": 71.0,
+      "gap": 8.2
+    },
+    {
+      "date": "2026-07-22",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 96.2,
+      "actual": 71.0,
+      "gap": 25.2
+    },
+    {
+      "date": "2026-07-22",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 85.8,
+      "actual": 71.0,
+      "gap": 14.8
+    },
+    {
+      "date": "2026-07-22",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 95.5,
+      "actual": 71.0,
+      "gap": 24.5
+    },
+    {
+      "date": "2026-07-22",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 84.2,
+      "actual": 71.0,
+      "gap": 13.2
+    },
+    {
+      "date": "2026-07-22",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 70.5,
+      "actual": 71.0,
+      "gap": -0.5
+    },
+    {
+      "date": "2026-07-23",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 74.0,
+      "actual": 91.0,
+      "gap": -17.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 89.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 87.0,
+      "actual": 91.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 93.0,
+      "actual": 91.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 91.0,
+      "actual": 89.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 87.0,
+      "actual": 91.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 74.0,
+      "actual": 91.0,
+      "gap": -17.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 91.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 84.5,
+      "actual": 91.0,
+      "gap": -6.5
+    },
+    {
+      "date": "2026-07-23",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 94.5,
+      "actual": 91.0,
+      "gap": 3.5
+    },
+    {
+      "date": "2026-07-23",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 91.0,
+      "actual": 91.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-23",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 87.5,
+      "actual": 91.0,
+      "gap": -3.5
+    },
+    {
+      "date": "2026-07-23",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 91.5,
+      "actual": 91.0,
+      "gap": 0.5
+    },
+    {
+      "date": "2026-07-24",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 24.0,
+      "actual": 40.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 56.0,
+      "actual": 26.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 12.0,
+      "actual": 22.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 18.0,
+      "actual": 22.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 22.0,
+      "actual": 27.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 32.0,
+      "actual": 26.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 24.0,
+      "actual": 29.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 84.0,
+      "actual": 29.0,
+      "gap": 55.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 29.0,
+      "gap": -29.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 15.0,
+      "actual": 29.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 22.0,
+      "actual": 29.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-07-24",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 30.7,
+      "actual": 29.0,
+      "gap": 1.7
+    },
+    {
+      "date": "2026-07-24",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 25.8,
+      "actual": 29.0,
+      "gap": -3.2
+    },
+    {
+      "date": "2026-07-27",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 50.0,
+      "actual": 63.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 76.0,
+      "actual": 46.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 29.0,
+      "actual": 42.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 38.0,
+      "actual": 40.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 38.0,
+      "actual": 56.0,
+      "gap": -18.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 72.0,
+      "actual": 55.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 50.0,
+      "actual": 56.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 98.8,
+      "actual": 56.0,
+      "gap": 42.8
+    },
+    {
+      "date": "2026-07-27",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 7.8,
+      "actual": 56.0,
+      "gap": -48.2
+    },
+    {
+      "date": "2026-07-27",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 35.0,
+      "actual": 56.0,
+      "gap": -21.0
+    },
+    {
+      "date": "2026-07-27",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 37.5,
+      "actual": 56.0,
+      "gap": -18.5
+    },
+    {
+      "date": "2026-07-27",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 67.9,
+      "actual": 56.0,
+      "gap": 11.9
+    },
+    {
+      "date": "2026-07-27",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 54.8,
+      "actual": 56.0,
+      "gap": -1.2
+    },
+    {
+      "date": "2026-07-28",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 8.0,
+      "actual": 7.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 6.0,
+      "actual": 5.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 3.0,
+      "actual": 5.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 5.0,
+      "actual": 5.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 5.0,
+      "actual": 3.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 1.0,
+      "actual": 2.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 8.0,
+      "actual": 4.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 4.3,
+      "actual": 4.0,
+      "gap": 0.3
+    },
+    {
+      "date": "2026-07-28",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.5,
+      "actual": 4.0,
+      "gap": -3.5
+    },
+    {
+      "date": "2026-07-28",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 5.0,
+      "actual": 4.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 5.0,
+      "actual": 4.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-28",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 1.5,
+      "actual": 4.0,
+      "gap": -2.5
+    },
+    {
+      "date": "2026-07-28",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 1.8,
+      "actual": 4.0,
+      "gap": -2.2
+    },
+    {
+      "date": "2026-07-29",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 67.0,
+      "actual": 70.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 73.0,
+      "actual": 25.0,
+      "gap": 48.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 0.0,
+      "actual": 7.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 0.0,
+      "actual": 11.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 15.0,
+      "actual": 10.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 9.0,
+      "actual": 8.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 67.0,
+      "actual": 11.0,
+      "gap": 56.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 78.2,
+      "actual": 11.0,
+      "gap": 67.2
+    },
+    {
+      "date": "2026-07-29",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 11.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 11.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 16.0,
+      "actual": 11.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-07-29",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 9.2,
+      "actual": 11.0,
+      "gap": -1.8
+    },
+    {
+      "date": "2026-07-29",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 7.5,
+      "actual": 11.0,
+      "gap": -3.5
+    },
+    {
+      "date": "2026-07-30",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 51.0,
+      "actual": 61.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 71.0,
+      "actual": 90.0,
+      "gap": -19.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 100.0,
+      "actual": 70.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 50.0,
+      "actual": 56.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 42.0,
+      "actual": 49.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 42.0,
+      "actual": 48.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 51.0,
+      "actual": 53.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 88.5,
+      "actual": 53.0,
+      "gap": 35.5
+    },
+    {
+      "date": "2026-07-30",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 53.0,
+      "gap": 47.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 35.0,
+      "actual": 53.0,
+      "gap": -18.0
+    },
+    {
+      "date": "2026-07-30",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 38.6,
+      "actual": 53.0,
+      "gap": -14.4
+    },
+    {
+      "date": "2026-07-30",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 43.8,
+      "actual": 53.0,
+      "gap": -9.2
+    },
+    {
+      "date": "2026-07-30",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 47.8,
+      "actual": 53.0,
+      "gap": -5.2
+    },
+    {
+      "date": "2026-07-31",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 72.0,
+      "actual": 79.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 86.0,
+      "actual": 83.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 87.0,
+      "actual": 84.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 85.0,
+      "actual": 77.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 70.0,
+      "actual": 84.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 91.0,
+      "actual": 86.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 72.0,
+      "actual": 85.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 98.2,
+      "actual": 85.0,
+      "gap": 13.2
+    },
+    {
+      "date": "2026-07-31",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 92.0,
+      "actual": 85.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-07-31",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 85.8,
+      "actual": 85.0,
+      "gap": 0.8
+    },
+    {
+      "date": "2026-07-31",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 68.2,
+      "actual": 85.0,
+      "gap": -16.8
+    },
+    {
+      "date": "2026-07-31",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 89.2,
+      "actual": 85.0,
+      "gap": 4.2
+    },
+    {
+      "date": "2026-07-31",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 86.5,
+      "actual": 85.0,
+      "gap": 1.5
+    },
+    {
+      "date": "2026-08-03",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 14.0,
+      "actual": 30.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 46.0,
+      "actual": 38.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 46.0,
+      "actual": 36.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 34.0,
+      "actual": 32.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 28.0,
+      "actual": 33.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 34.0,
+      "actual": 25.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 35.0,
+      "gap": -21.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 74.0,
+      "actual": 35.0,
+      "gap": 39.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 56.0,
+      "actual": 35.0,
+      "gap": 21.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 32.5,
+      "actual": 35.0,
+      "gap": -2.5
+    },
+    {
+      "date": "2026-08-03",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 27.0,
+      "actual": 35.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-03",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 33.8,
+      "actual": 35.0,
+      "gap": -1.2
+    },
+    {
+      "date": "2026-08-03",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 23.1,
+      "actual": 35.0,
+      "gap": -11.9
+    },
+    {
+      "date": "2026-08-04",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 70.0,
+      "actual": 45.0,
+      "gap": 25.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 20.0,
+      "actual": 72.0,
+      "gap": -52.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 99.0,
+      "actual": 56.0,
+      "gap": 43.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 40.0,
+      "actual": 60.0,
+      "gap": -20.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 64.0,
+      "actual": 62.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 64.0,
+      "actual": 76.0,
+      "gap": -12.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 70.0,
+      "actual": 83.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 83.0,
+      "gap": -83.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 83.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 29.3,
+      "actual": 83.0,
+      "gap": -53.7
+    },
+    {
+      "date": "2026-08-04",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 65.0,
+      "actual": 83.0,
+      "gap": -18.0
+    },
+    {
+      "date": "2026-08-04",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 63.5,
+      "actual": 83.0,
+      "gap": -19.5
+    },
+    {
+      "date": "2026-08-04",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 79.5,
+      "actual": 83.0,
+      "gap": -3.5
+    },
+    {
+      "date": "2026-08-05",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 73.0,
+      "actual": 88.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 92.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 96.0,
+      "actual": 87.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 82.0,
+      "actual": 86.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 85.0,
+      "actual": 81.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 76.0,
+      "actual": 84.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 73.0,
+      "actual": 84.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 84.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 84.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-08-05",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 78.3,
+      "actual": 84.0,
+      "gap": -5.7
+    },
+    {
+      "date": "2026-08-05",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 84.8,
+      "actual": 84.0,
+      "gap": 0.8
+    },
+    {
+      "date": "2026-08-05",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 77.3,
+      "actual": 84.0,
+      "gap": -6.7
+    },
+    {
+      "date": "2026-08-05",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 84.8,
+      "actual": 84.0,
+      "gap": 0.8
+    },
+    {
+      "date": "2026-08-06",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 0.0,
+      "actual": 42.0,
+      "gap": -42.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 84.0,
+      "actual": 28.0,
+      "gap": 56.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 14.0,
+      "actual": 46.0,
+      "gap": -32.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 64.0,
+      "actual": 41.0,
+      "gap": 23.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 36.0,
+      "actual": 51.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 61.0,
+      "actual": 48.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 44.0,
+      "gap": -44.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 44.0,
+      "gap": 56.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 44.0,
+      "gap": -44.0
+    },
+    {
+      "date": "2026-08-06",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 77.3,
+      "actual": 44.0,
+      "gap": 33.3
+    },
+    {
+      "date": "2026-08-06",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 34.8,
+      "actual": 44.0,
+      "gap": -9.2
+    },
+    {
+      "date": "2026-08-06",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 58.4,
+      "actual": 44.0,
+      "gap": 14.4
+    },
+    {
+      "date": "2026-08-06",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 47.3,
+      "actual": 44.0,
+      "gap": 3.3
+    },
+    {
+      "date": "2026-08-10",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 0.0,
+      "actual": 63.0,
+      "gap": -63.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 58.0,
+      "gap": 42.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 53.0,
+      "actual": 65.0,
+      "gap": -12.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 72.0,
+      "actual": 62.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 59.0,
+      "actual": 53.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 44.0,
+      "actual": 66.0,
+      "gap": -22.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 70.0,
+      "gap": -70.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 70.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-08-10",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 46.8,
+      "actual": 70.0,
+      "gap": -23.2
+    },
+    {
+      "date": "2026-08-10",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 77.2,
+      "actual": 70.0,
+      "gap": 7.2
+    },
+    {
+      "date": "2026-08-10",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 58.2,
+      "actual": 70.0,
+      "gap": -11.8
+    },
+    {
+      "date": "2026-08-10",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 46.2,
+      "actual": 70.0,
+      "gap": -23.8
+    },
+    {
+      "date": "2026-08-10",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 69.2,
+      "actual": 70.0,
+      "gap": -0.8
+    },
+    {
+      "date": "2026-08-11",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 2.0,
+      "actual": 46.0,
+      "gap": -44.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 90.0,
+      "actual": 54.0,
+      "gap": 36.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 62.0,
+      "actual": 51.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 48.0,
+      "actual": 50.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 49.0,
+      "actual": 47.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 44.0,
+      "actual": 46.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 2.0,
+      "actual": 47.0,
+      "gap": -45.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 47.0,
+      "gap": 53.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 72.0,
+      "actual": 47.0,
+      "gap": 25.0
+    },
+    {
+      "date": "2026-08-11",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 45.8,
+      "actual": 47.0,
+      "gap": -1.2
+    },
+    {
+      "date": "2026-08-11",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 48.8,
+      "actual": 47.0,
+      "gap": 1.8
+    },
+    {
+      "date": "2026-08-11",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 44.8,
+      "actual": 47.0,
+      "gap": -2.2
+    },
+    {
+      "date": "2026-08-11",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 45.8,
+      "actual": 47.0,
+      "gap": -1.2
+    },
+    {
+      "date": "2026-08-12",
+      "type": "h1",
+      "made_at": "09:00",
+      "target": "10:00",
+      "pred": 1.0,
+      "actual": 71.0,
+      "gap": -70.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "h1",
+      "made_at": "10:00",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 71.0,
+      "gap": 29.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "h1",
+      "made_at": "11:00",
+      "target": "12:00",
+      "pred": 71.0,
+      "actual": 67.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "h1",
+      "made_at": "12:00",
+      "target": "13:00",
+      "pred": 63.0,
+      "actual": 66.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "h1",
+      "made_at": "13:00",
+      "target": "14:00",
+      "pred": 65.0,
+      "actual": 61.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "h1",
+      "made_at": "14:00",
+      "target": "15:00",
+      "pred": 56.0,
+      "actual": 58.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "eod",
+      "made_at": "09:00",
+      "target": "EOD",
+      "pred": 1.0,
+      "actual": 61.0,
+      "gap": -60.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "eod",
+      "made_at": "10:00",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 61.0,
+      "gap": 39.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "eod",
+      "made_at": "11:00",
+      "target": "EOD",
+      "pred": 71.0,
+      "actual": 61.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "eod",
+      "made_at": "12:00",
+      "target": "EOD",
+      "pred": 60.0,
+      "actual": 61.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-12",
+      "type": "eod",
+      "made_at": "13:00",
+      "target": "EOD",
+      "pred": 64.8,
+      "actual": 61.0,
+      "gap": 3.8
+    },
+    {
+      "date": "2026-08-12",
+      "type": "eod",
+      "made_at": "14:00",
+      "target": "EOD",
+      "pred": 57.2,
+      "actual": 61.0,
+      "gap": -3.8
+    },
+    {
+      "date": "2026-08-12",
+      "type": "eod",
+      "made_at": "15:00",
+      "target": "EOD",
+      "pred": 57.2,
+      "actual": 61.0,
+      "gap": -3.8
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 3.0,
+      "actual": 76.0,
+      "gap": -73.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 3.0,
+      "actual": 76.0,
+      "gap": -73.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 77.0,
+      "gap": 23.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 76.0,
+      "actual": 77.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 78.0,
+      "actual": 72.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 77.0,
+      "actual": 72.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 67.0,
+      "actual": 71.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 72.0,
+      "actual": 71.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 70.0,
+      "actual": 68.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 71.0,
+      "actual": 68.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 65.0,
+      "actual": 61.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 68.0,
+      "actual": 61.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 3.0,
+      "actual": 66.0,
+      "gap": -63.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 3.0,
+      "actual": 66.0,
+      "gap": -63.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 66.0,
+      "gap": 34.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 76.0,
+      "actual": 66.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 79.2,
+      "actual": 66.0,
+      "gap": 13.2
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 77.0,
+      "actual": 66.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 63.2,
+      "actual": 66.0,
+      "gap": -2.8
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 72.0,
+      "actual": 66.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 69.8,
+      "actual": 66.0,
+      "gap": 3.8
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 71.0,
+      "actual": 66.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 65.8,
+      "actual": 66.0,
+      "gap": -0.2
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 66.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 59.2,
+      "actual": 66.0,
+      "gap": -6.8
+    },
+    {
+      "date": "2026-08-13",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 61.0,
+      "actual": 66.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 78.0,
+      "actual": 68.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 78.0,
+      "actual": 68.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 58.0,
+      "actual": 66.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 68.0,
+      "actual": 66.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 64.0,
+      "actual": 56.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 66.0,
+      "actual": 56.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 46.0,
+      "actual": 67.0,
+      "gap": -21.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 56.0,
+      "actual": 67.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 78.0,
+      "actual": 68.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 67.0,
+      "actual": 68.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 69.0,
+      "actual": 79.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 68.0,
+      "actual": 79.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 78.0,
+      "actual": 77.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 78.0,
+      "actual": 77.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 40.5,
+      "actual": 77.0,
+      "gap": -36.5
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 77.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 61.5,
+      "actual": 77.0,
+      "gap": -15.5
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 66.0,
+      "actual": 77.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 38.5,
+      "actual": 77.0,
+      "gap": -38.5
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 56.0,
+      "actual": 77.0,
+      "gap": -21.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 80.8,
+      "actual": 77.0,
+      "gap": 3.8
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 67.0,
+      "actual": 77.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 68.8,
+      "actual": 77.0,
+      "gap": -8.2
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 77.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 81.8,
+      "actual": 77.0,
+      "gap": 4.8
+    },
+    {
+      "date": "2026-08-14",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 79.0,
+      "actual": 77.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 36.0,
+      "actual": 41.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 36.0,
+      "actual": 41.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 46.0,
+      "actual": 35.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 41.0,
+      "actual": 35.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 29.0,
+      "actual": 24.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 35.0,
+      "actual": 24.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 13.0,
+      "actual": 24.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 24.0,
+      "actual": 24.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 24.0,
+      "actual": 31.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 24.0,
+      "actual": 31.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 38.0,
+      "actual": 20.0,
+      "gap": 18.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 31.0,
+      "actual": 20.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 36.0,
+      "actual": 22.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 36.0,
+      "actual": 22.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 54.8,
+      "actual": 22.0,
+      "gap": 32.8
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 41.0,
+      "actual": 22.0,
+      "gap": 19.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 21.5,
+      "actual": 22.0,
+      "gap": -0.5
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 35.0,
+      "actual": 22.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 4.8,
+      "actual": 22.0,
+      "gap": -17.2
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 24.0,
+      "actual": 22.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 24.0,
+      "actual": 22.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 24.0,
+      "actual": 22.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 36.2,
+      "actual": 22.0,
+      "gap": 14.2
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 31.0,
+      "actual": 22.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 17.2,
+      "actual": 22.0,
+      "gap": -4.8
+    },
+    {
+      "date": "2026-08-18",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 20.0,
+      "actual": 22.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 9.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 9.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 9.0,
+      "actual": 12.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 9.0,
+      "actual": 12.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 15.0,
+      "actual": 14.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 12.0,
+      "actual": 14.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 16.0,
+      "actual": 14.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 14.0,
+      "actual": 14.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 14.0,
+      "actual": 14.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 14.0,
+      "actual": 14.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 14.0,
+      "actual": 13.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 14.0,
+      "actual": 13.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 15.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 15.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 15.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 15.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 18.8,
+      "actual": 15.0,
+      "gap": 3.8
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 12.0,
+      "actual": 15.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 17.5,
+      "actual": 15.0,
+      "gap": 2.5
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 15.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 15.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 15.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 15.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 15.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 12.8,
+      "actual": 15.0,
+      "gap": -2.2
+    },
+    {
+      "date": "2026-08-19",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 13.0,
+      "actual": 15.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 50.0,
+      "actual": 64.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 50.0,
+      "actual": 64.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 50.0,
+      "actual": 64.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 78.0,
+      "actual": 68.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 78.0,
+      "actual": 68.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 64.0,
+      "actual": 68.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 72.0,
+      "actual": 67.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 77.0,
+      "actual": 67.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 68.0,
+      "actual": 67.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 66.0,
+      "actual": 67.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 72.7,
+      "actual": 67.0,
+      "gap": 5.7
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 67.0,
+      "actual": 67.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 67.0,
+      "actual": 58.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 71.2,
+      "actual": 58.0,
+      "gap": 13.2
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 67.0,
+      "actual": 58.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 49.0,
+      "actual": 56.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 56.5,
+      "actual": 56.0,
+      "gap": 0.5
+    },
+    {
+      "date": "2026-08-20",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 58.0,
+      "actual": 56.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 50.0,
+      "actual": 59.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 50.0,
+      "actual": 59.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 50.0,
+      "actual": 59.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 59.0,
+      "gap": 41.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 59.0,
+      "gap": 41.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 64.0,
+      "actual": 59.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 77.0,
+      "actual": 59.0,
+      "gap": 18.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 88.2,
+      "actual": 59.0,
+      "gap": 29.2
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 59.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 65.2,
+      "actual": 59.0,
+      "gap": 6.2
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 76.9,
+      "actual": 59.0,
+      "gap": 17.9
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 67.0,
+      "actual": 59.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 67.0,
+      "actual": 59.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 72.3,
+      "actual": 59.0,
+      "gap": 13.3
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 67.0,
+      "actual": 59.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 51.2,
+      "actual": 59.0,
+      "gap": -7.8
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 56.9,
+      "actual": 59.0,
+      "gap": -2.1
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 58.0,
+      "actual": 59.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 55.5,
+      "actual": 59.0,
+      "gap": -3.5
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 55.2,
+      "actual": 59.0,
+      "gap": -3.8
+    },
+    {
+      "date": "2026-08-20",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 56.0,
+      "actual": 59.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 25.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 25.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 25.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 41.0,
+      "actual": 27.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 41.0,
+      "actual": 27.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 25.0,
+      "actual": 27.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 29.0,
+      "actual": 31.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 36.0,
+      "actual": 31.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 27.0,
+      "actual": 31.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 35.0,
+      "actual": 33.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 38.3,
+      "actual": 33.0,
+      "gap": 5.3
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 31.0,
+      "actual": 33.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 35.0,
+      "actual": 39.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 39.0,
+      "actual": 39.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 33.0,
+      "actual": 39.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 45.0,
+      "actual": 33.0,
+      "gap": 12.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 42.5,
+      "actual": 33.0,
+      "gap": 9.5
+    },
+    {
+      "date": "2026-08-21",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 39.0,
+      "actual": 33.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 32.0,
+      "gap": -23.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 32.0,
+      "gap": -23.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 32.0,
+      "gap": -23.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 69.0,
+      "actual": 32.0,
+      "gap": 37.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 69.0,
+      "actual": 32.0,
+      "gap": 37.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 25.0,
+      "actual": 32.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 31.5,
+      "actual": 32.0,
+      "gap": -0.5
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 47.2,
+      "actual": 32.0,
+      "gap": 15.2
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 27.0,
+      "actual": 32.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 38.0,
+      "actual": 32.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 43.8,
+      "actual": 32.0,
+      "gap": 11.8
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 31.0,
+      "actual": 32.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 35.5,
+      "actual": 32.0,
+      "gap": 3.5
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 40.5,
+      "actual": 32.0,
+      "gap": 8.5
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 33.0,
+      "actual": 32.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 43.5,
+      "actual": 32.0,
+      "gap": 11.5
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 41.6,
+      "actual": 32.0,
+      "gap": 9.6
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 39.0,
+      "actual": 32.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 31.5,
+      "actual": 32.0,
+      "gap": -0.5
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 33.4,
+      "actual": 32.0,
+      "gap": 1.4
+    },
+    {
+      "date": "2026-08-21",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 33.0,
+      "actual": 32.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 49.0,
+      "actual": 65.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 49.0,
+      "actual": 65.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 49.0,
+      "actual": 65.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 81.0,
+      "actual": 47.0,
+      "gap": 34.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 81.0,
+      "actual": 47.0,
+      "gap": 34.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 65.0,
+      "actual": 47.0,
+      "gap": 18.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 29.0,
+      "actual": 55.0,
+      "gap": -26.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 46.0,
+      "actual": 55.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 47.0,
+      "actual": 55.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 63.0,
+      "actual": 50.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 57.0,
+      "actual": 50.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 55.0,
+      "actual": 50.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 45.0,
+      "actual": 52.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 50.2,
+      "actual": 52.0,
+      "gap": -1.8
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 50.0,
+      "actual": 52.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 54.0,
+      "actual": 54.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 48.8,
+      "actual": 54.0,
+      "gap": -5.2
+    },
+    {
+      "date": "2026-08-24",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 52.0,
+      "actual": 54.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 58.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 58.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 58.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 58.0,
+      "gap": 42.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 58.0,
+      "gap": 42.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 65.0,
+      "actual": 58.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 6.5,
+      "actual": 58.0,
+      "gap": -51.5
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 44.8,
+      "actual": 58.0,
+      "gap": -13.2
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 47.0,
+      "actual": 58.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 69.0,
+      "actual": 58.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 58.5,
+      "actual": 58.0,
+      "gap": 0.5
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 55.0,
+      "actual": 58.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 43.8,
+      "actual": 58.0,
+      "gap": -14.2
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 50.3,
+      "actual": 58.0,
+      "gap": -7.7
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 50.0,
+      "actual": 58.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 53.5,
+      "actual": 58.0,
+      "gap": -4.5
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 49.6,
+      "actual": 58.0,
+      "gap": -8.4
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 52.0,
+      "actual": 58.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 54.5,
+      "actual": 58.0,
+      "gap": -3.5
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 54.4,
+      "actual": 58.0,
+      "gap": -3.6
+    },
+    {
+      "date": "2026-08-24",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 54.0,
+      "actual": 58.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 14.0,
+      "actual": 47.0,
+      "gap": -33.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 14.0,
+      "actual": 47.0,
+      "gap": -33.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 14.0,
+      "actual": 47.0,
+      "gap": -33.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 80.0,
+      "actual": 45.0,
+      "gap": 35.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 80.0,
+      "actual": 45.0,
+      "gap": 35.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 47.0,
+      "actual": 45.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 43.0,
+      "actual": 43.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 60.5,
+      "actual": 43.0,
+      "gap": 17.5
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 45.0,
+      "actual": 43.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 41.0,
+      "actual": 56.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 52.7,
+      "actual": 56.0,
+      "gap": -3.3
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 43.0,
+      "actual": 56.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 69.0,
+      "actual": 63.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 66.5,
+      "actual": 63.0,
+      "gap": 3.5
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 56.0,
+      "actual": 63.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 70.0,
+      "actual": 63.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 67.0,
+      "actual": 63.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 63.0,
+      "actual": 63.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 71.0,
+      "gap": -57.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 71.0,
+      "gap": -57.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 71.0,
+      "gap": -57.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 71.0,
+      "gap": 29.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 71.0,
+      "gap": 29.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 47.0,
+      "actual": 71.0,
+      "gap": -24.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 40.5,
+      "actual": 71.0,
+      "gap": -30.5
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 79.9,
+      "actual": 71.0,
+      "gap": 8.9
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 45.0,
+      "actual": 71.0,
+      "gap": -26.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 39.5,
+      "actual": 71.0,
+      "gap": -31.5
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 59.9,
+      "actual": 71.0,
+      "gap": -11.1
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 43.0,
+      "actual": 71.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 72.2,
+      "actual": 71.0,
+      "gap": 1.2
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 69.1,
+      "actual": 71.0,
+      "gap": -1.9
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 56.0,
+      "actual": 71.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 68.2,
+      "actual": 71.0,
+      "gap": -2.8
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 66.0,
+      "actual": 71.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 63.0,
+      "actual": 71.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 63.0,
+      "actual": 71.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 64.1,
+      "actual": 71.0,
+      "gap": -6.9
+    },
+    {
+      "date": "2026-08-25",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 63.0,
+      "actual": 71.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 62.0,
+      "actual": 44.0,
+      "gap": 18.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 62.0,
+      "actual": 44.0,
+      "gap": 18.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 62.0,
+      "actual": 44.0,
+      "gap": 18.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 26.0,
+      "actual": 52.0,
+      "gap": -26.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 26.0,
+      "actual": 52.0,
+      "gap": -26.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 44.0,
+      "actual": 52.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 60.0,
+      "actual": 68.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 47.0,
+      "actual": 68.0,
+      "gap": -21.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 52.0,
+      "actual": 68.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 84.0,
+      "actual": 70.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 70.0,
+      "actual": 70.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 68.0,
+      "actual": 70.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 72.0,
+      "actual": 66.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 72.0,
+      "actual": 66.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 70.0,
+      "actual": 66.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 62.0,
+      "actual": 64.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 71.5,
+      "actual": 64.0,
+      "gap": 7.5
+    },
+    {
+      "date": "2026-08-26",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 66.0,
+      "actual": 64.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 62.0,
+      "actual": 65.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 62.0,
+      "actual": 65.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 62.0,
+      "actual": 65.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 65.0,
+      "gap": -65.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 65.0,
+      "gap": -65.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 44.0,
+      "actual": 65.0,
+      "gap": -21.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 70.0,
+      "actual": 65.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 40.8,
+      "actual": 65.0,
+      "gap": -24.2
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 52.0,
+      "actual": 65.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 96.0,
+      "actual": 65.0,
+      "gap": 31.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 71.5,
+      "actual": 65.0,
+      "gap": 6.5
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 65.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 72.5,
+      "actual": 65.0,
+      "gap": 7.5
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 72.5,
+      "actual": 65.0,
+      "gap": 7.5
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 70.0,
+      "actual": 65.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 63.0,
+      "actual": 65.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 70.1,
+      "actual": 65.0,
+      "gap": 5.1
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 66.0,
+      "actual": 65.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 63.5,
+      "actual": 65.0,
+      "gap": -1.5
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 64.8,
+      "actual": 65.0,
+      "gap": -0.2
+    },
+    {
+      "date": "2026-08-26",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 64.0,
+      "actual": 65.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 69.0,
+      "actual": 56.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 69.0,
+      "actual": 56.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 69.0,
+      "actual": 56.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 43.0,
+      "actual": 68.0,
+      "gap": -25.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 43.0,
+      "actual": 68.0,
+      "gap": -25.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 56.0,
+      "actual": 68.0,
+      "gap": -12.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 80.0,
+      "actual": 66.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 67.5,
+      "actual": 66.0,
+      "gap": 1.5
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 68.0,
+      "actual": 66.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 64.0,
+      "actual": 59.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 65.0,
+      "actual": 59.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 66.0,
+      "actual": 59.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 52.0,
+      "actual": 54.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 56.5,
+      "actual": 54.0,
+      "gap": 2.5
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 59.0,
+      "actual": 54.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 49.0,
+      "actual": 51.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 53.5,
+      "actual": 51.0,
+      "gap": 2.5
+    },
+    {
+      "date": "2026-08-27",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 54.0,
+      "actual": 51.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 69.0,
+      "actual": 60.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 69.0,
+      "actual": 60.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 69.0,
+      "actual": 60.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 20.4,
+      "actual": 60.0,
+      "gap": -39.6
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 20.4,
+      "actual": 60.0,
+      "gap": -39.6
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 56.0,
+      "actual": 60.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 95.0,
+      "actual": 60.0,
+      "gap": 35.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 66.9,
+      "actual": 60.0,
+      "gap": 6.9
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 60.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 62.5,
+      "actual": 60.0,
+      "gap": 2.5
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 64.2,
+      "actual": 60.0,
+      "gap": 4.2
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 66.0,
+      "actual": 60.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 50.2,
+      "actual": 60.0,
+      "gap": -9.8
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 55.9,
+      "actual": 60.0,
+      "gap": -4.1
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 59.0,
+      "actual": 60.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 50.2,
+      "actual": 60.0,
+      "gap": -9.8
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 53.6,
+      "actual": 60.0,
+      "gap": -6.4
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 54.0,
+      "actual": 60.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 50.2,
+      "actual": 60.0,
+      "gap": -9.8
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 49.9,
+      "actual": 60.0,
+      "gap": -10.1
+    },
+    {
+      "date": "2026-08-27",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 51.0,
+      "actual": 60.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 47.0,
+      "actual": 35.0,
+      "gap": 12.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 47.0,
+      "actual": 35.0,
+      "gap": 12.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 47.0,
+      "actual": 35.0,
+      "gap": 12.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 23.0,
+      "actual": 41.0,
+      "gap": -18.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 23.0,
+      "actual": 41.0,
+      "gap": -18.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 35.0,
+      "actual": 41.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 47.0,
+      "actual": 54.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 38.0,
+      "actual": 54.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 41.0,
+      "actual": 54.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 67.0,
+      "actual": 62.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 56.3,
+      "actual": 62.0,
+      "gap": -5.7
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 54.0,
+      "actual": 62.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 70.0,
+      "actual": 61.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 65.8,
+      "actual": 61.0,
+      "gap": 4.8
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 62.0,
+      "actual": 61.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 60.0,
+      "actual": 50.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 67.5,
+      "actual": 50.0,
+      "gap": 17.5
+    },
+    {
+      "date": "2026-08-28",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 61.0,
+      "actual": 50.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 15.0,
+      "actual": 13.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 15.0,
+      "actual": 13.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 15.0,
+      "actual": 13.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 11.0,
+      "actual": 13.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 11.0,
+      "actual": 13.0,
+      "gap": -2.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 13.0,
+      "actual": 13.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 13.0,
+      "actual": 27.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 12.0,
+      "actual": 27.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 13.0,
+      "actual": 27.0,
+      "gap": -14.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 41.0,
+      "actual": 32.0,
+      "gap": 9.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 31.0,
+      "actual": 32.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 27.0,
+      "actual": 32.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 37.0,
+      "actual": 42.0,
+      "gap": -5.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 36.2,
+      "actual": 42.0,
+      "gap": -5.8
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 32.0,
+      "actual": 42.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 52.0,
+      "actual": 39.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 49.2,
+      "actual": 39.0,
+      "gap": 10.2
+    },
+    {
+      "date": "2026-08-31",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 42.0,
+      "actual": 39.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 15.0,
+      "actual": 43.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 15.0,
+      "actual": 43.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 15.0,
+      "actual": 43.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 7.5,
+      "actual": 43.0,
+      "gap": -35.5
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 7.5,
+      "actual": 43.0,
+      "gap": -35.5
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 13.0,
+      "actual": 43.0,
+      "gap": -30.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 13.0,
+      "actual": 43.0,
+      "gap": -30.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 10.8,
+      "actual": 43.0,
+      "gap": -32.2
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 13.0,
+      "actual": 43.0,
+      "gap": -30.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 51.5,
+      "actual": 43.0,
+      "gap": 8.5
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 34.0,
+      "actual": 43.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 27.0,
+      "actual": 43.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 38.2,
+      "actual": 43.0,
+      "gap": -4.8
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 37.3,
+      "actual": 43.0,
+      "gap": -5.7
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 32.0,
+      "actual": 43.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 49.2,
+      "actual": 43.0,
+      "gap": 6.2
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 47.3,
+      "actual": 43.0,
+      "gap": 4.3
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 42.0,
+      "actual": 43.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 38.3,
+      "actual": 43.0,
+      "gap": -4.7
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 40.5,
+      "actual": 43.0,
+      "gap": -2.5
+    },
+    {
+      "date": "2026-08-31",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 39.0,
+      "actual": 43.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 39.0,
+      "actual": 32.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 39.0,
+      "actual": 32.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 39.0,
+      "actual": 32.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 25.0,
+      "actual": 32.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 25.0,
+      "actual": 32.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 32.0,
+      "actual": 32.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 32.0,
+      "actual": 27.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 28.5,
+      "actual": 27.0,
+      "gap": 1.5
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 32.0,
+      "actual": 27.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 22.0,
+      "actual": 40.0,
+      "gap": -18.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 23.0,
+      "actual": 40.0,
+      "gap": -17.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 27.0,
+      "actual": 40.0,
+      "gap": -13.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 53.0,
+      "actual": 36.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 40.2,
+      "actual": 36.0,
+      "gap": 4.2
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 40.0,
+      "actual": 36.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 32.0,
+      "actual": 52.0,
+      "gap": -20.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 37.0,
+      "actual": 52.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 36.0,
+      "actual": 52.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 39.0,
+      "actual": 48.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 39.0,
+      "actual": 48.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 39.0,
+      "actual": 48.0,
+      "gap": -9.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 12.8,
+      "actual": 48.0,
+      "gap": -35.2
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 12.8,
+      "actual": 48.0,
+      "gap": -35.2
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 32.0,
+      "actual": 48.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 32.0,
+      "actual": 48.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 24.1,
+      "actual": 48.0,
+      "gap": -23.9
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 32.0,
+      "actual": 48.0,
+      "gap": -16.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 18.2,
+      "actual": 48.0,
+      "gap": -29.8
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 20.0,
+      "actual": 48.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 27.0,
+      "actual": 48.0,
+      "gap": -21.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 56.2,
+      "actual": 48.0,
+      "gap": 8.2
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 40.3,
+      "actual": 48.0,
+      "gap": -7.7
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 40.0,
+      "actual": 48.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 33.0,
+      "actual": 48.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 36.8,
+      "actual": 48.0,
+      "gap": -11.2
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 36.0,
+      "actual": 48.0,
+      "gap": -12.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 56.0,
+      "actual": 48.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 53.2,
+      "actual": 48.0,
+      "gap": 5.2
+    },
+    {
+      "date": "2026-09-01",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 52.0,
+      "actual": 48.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 13.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 13.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 9.0,
+      "actual": 13.0,
+      "gap": -4.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 17.0,
+      "actual": 14.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 17.0,
+      "actual": 14.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 13.0,
+      "actual": 14.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 15.0,
+      "actual": 15.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 16.5,
+      "actual": 15.0,
+      "gap": 1.5
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 14.0,
+      "actual": 15.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 16.0,
+      "actual": 13.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 17.0,
+      "actual": 13.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 15.0,
+      "actual": 13.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 11.0,
+      "actual": 11.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 14.0,
+      "actual": 11.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 13.0,
+      "actual": 11.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 9.0,
+      "actual": 6.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 10.5,
+      "actual": 6.0,
+      "gap": 4.5
+    },
+    {
+      "date": "2026-09-02",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 11.0,
+      "actual": 6.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 7.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 7.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 9.0,
+      "actual": 7.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 24.0,
+      "actual": 7.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 24.0,
+      "actual": 7.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 13.0,
+      "actual": 7.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 16.2,
+      "actual": 7.0,
+      "gap": 9.2
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 19.6,
+      "actual": 7.0,
+      "gap": 12.6
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 14.0,
+      "actual": 7.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 16.8,
+      "actual": 7.0,
+      "gap": 9.8
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 18.5,
+      "actual": 7.0,
+      "gap": 11.5
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 15.0,
+      "actual": 7.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 10.5,
+      "actual": 7.0,
+      "gap": 3.5
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 14.2,
+      "actual": 7.0,
+      "gap": 7.2
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 13.0,
+      "actual": 7.0,
+      "gap": 6.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 9.5,
+      "actual": 7.0,
+      "gap": 2.5
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 10.6,
+      "actual": 7.0,
+      "gap": 3.6
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 11.0,
+      "actual": 7.0,
+      "gap": 4.0
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 4.8,
+      "actual": 7.0,
+      "gap": -2.2
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 5.5,
+      "actual": 7.0,
+      "gap": -1.5
+    },
+    {
+      "date": "2026-09-02",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 6.0,
+      "actual": 7.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 49.0,
+      "actual": 77.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 49.0,
+      "actual": 77.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 49.0,
+      "actual": 77.0,
+      "gap": -28.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 70.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 100.0,
+      "actual": 70.0,
+      "gap": 30.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 77.0,
+      "actual": 70.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 63.0,
+      "actual": 73.0,
+      "gap": -10.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 80.5,
+      "actual": 73.0,
+      "gap": 7.5
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 70.0,
+      "actual": 73.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 76.0,
+      "actual": 76.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 81.0,
+      "actual": 76.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 73.0,
+      "actual": 76.0,
+      "gap": -3.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 79.0,
+      "actual": 77.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 82.8,
+      "actual": 77.0,
+      "gap": 5.8
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 76.0,
+      "actual": 77.0,
+      "gap": -1.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 78.0,
+      "actual": 67.0,
+      "gap": 11.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 77.0,
+      "actual": 67.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 77.0,
+      "actual": 67.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 60.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 60.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 60.0,
+      "gap": -11.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 60.0,
+      "gap": 40.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 100.0,
+      "actual": 60.0,
+      "gap": 40.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 77.0,
+      "actual": 60.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 54.2,
+      "actual": 60.0,
+      "gap": -5.8
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 93.6,
+      "actual": 60.0,
+      "gap": 33.6
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 70.0,
+      "actual": 60.0,
+      "gap": 10.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 78.2,
+      "actual": 60.0,
+      "gap": 18.2
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 87.0,
+      "actual": 60.0,
+      "gap": 27.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 73.0,
+      "actual": 60.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 79.7,
+      "actual": 60.0,
+      "gap": 19.7
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 84.4,
+      "actual": 60.0,
+      "gap": 24.4
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 76.0,
+      "actual": 60.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 77.7,
+      "actual": 60.0,
+      "gap": 17.7
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 77.0,
+      "actual": 60.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 77.0,
+      "actual": 60.0,
+      "gap": 17.0
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 64.6,
+      "actual": 60.0,
+      "gap": 4.6
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 66.8,
+      "actual": 60.0,
+      "gap": 6.8
+    },
+    {
+      "date": "2026-09-03",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 67.0,
+      "actual": 60.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "10:00",
+      "pred": 83.0,
+      "actual": 61.0,
+      "gap": 22.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "10:00",
+      "pred": 83.0,
+      "actual": 61.0,
+      "gap": 22.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 83.0,
+      "actual": 61.0,
+      "gap": 22.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "11:00",
+      "pred": 39.0,
+      "actual": 61.0,
+      "gap": -22.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "11:00",
+      "pred": 39.0,
+      "actual": 61.0,
+      "gap": -22.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 61.0,
+      "actual": 61.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "12:00",
+      "pred": 61.0,
+      "actual": 68.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "12:00",
+      "pred": 50.0,
+      "actual": 68.0,
+      "gap": -18.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 61.0,
+      "actual": 68.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "13:00",
+      "pred": 75.0,
+      "actual": 60.0,
+      "gap": 15.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "13:00",
+      "pred": 63.0,
+      "actual": 60.0,
+      "gap": 3.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 68.0,
+      "actual": 60.0,
+      "gap": 8.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "14:00",
+      "pred": 52.0,
+      "actual": 60.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "14:00",
+      "pred": 54.2,
+      "actual": 60.0,
+      "gap": -5.8
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "14:00",
+      "pred": 60.0,
+      "actual": 60.0,
+      "gap": 0.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 60.0,
+      "actual": 66.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 59.8,
+      "actual": 66.0,
+      "gap": -6.2
+    },
+    {
+      "date": "2026-09-04",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 60.0,
+      "actual": 66.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 83.0,
+      "actual": 67.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 83.0,
+      "actual": 67.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 83.0,
+      "actual": 67.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 0.5,
+      "actual": 67.0,
+      "gap": -66.5
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 0.5,
+      "actual": 67.0,
+      "gap": -66.5
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 61.0,
+      "actual": 67.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 61.0,
+      "actual": 67.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 36.3,
+      "actual": 67.0,
+      "gap": -30.7
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 61.0,
+      "actual": 67.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 80.2,
+      "actual": 67.0,
+      "gap": 13.2
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 59.2,
+      "actual": 67.0,
+      "gap": -7.8
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 68.0,
+      "actual": 67.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 50.0,
+      "actual": 67.0,
+      "gap": -17.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 52.8,
+      "actual": 67.0,
+      "gap": -14.2
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 60.0,
+      "actual": 67.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 60.0,
+      "actual": 67.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 59.8,
+      "actual": 67.0,
+      "gap": -7.2
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 60.0,
+      "actual": 67.0,
+      "gap": -7.0
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 67.5,
+      "actual": 67.0,
+      "gap": 0.5
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 66.3,
+      "actual": 67.0,
+      "gap": -0.7
+    },
+    {
+      "date": "2026-09-04",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 66.0,
+      "actual": 67.0,
+      "gap": -1.0
+    }
+  ]
+}

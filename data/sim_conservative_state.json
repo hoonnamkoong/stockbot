@@ -1,0 +1,809 @@
+{
+  "initial_cash": 3000000,
+  "cash": 92131.32414999988,
+  "invested": 2290375.0,
+  "portfolio": {
+    "003280": {
+      "name": "흥아해운",
+      "quantity": 104,
+      "avg_price": 2880.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 2950,
+      "is_scaled_out": false
+    },
+    "093370": {
+      "name": "후성",
+      "quantity": 21,
+      "avg_price": 13880.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 14010,
+      "is_scaled_out": false
+    },
+    "005930": {
+      "name": "삼성전자",
+      "quantity": 1,
+      "avg_price": 228000.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 228500,
+      "is_scaled_out": false
+    },
+    "047040": {
+      "name": "대우건설",
+      "quantity": 8,
+      "avg_price": 35250.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 36900,
+      "is_scaled_out": false
+    },
+    "001510": {
+      "name": "SK증권",
+      "quantity": 57,
+      "avg_price": 5220.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 5290,
+      "is_scaled_out": false
+    },
+    "018880": {
+      "name": "한온시스템",
+      "quantity": 70,
+      "avg_price": 4275.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 4355,
+      "is_scaled_out": false
+    },
+    "025860": {
+      "name": "남해화학",
+      "quantity": 25,
+      "avg_price": 11740.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 11740.0,
+      "is_scaled_out": false
+    },
+    "0129K0": {
+      "name": "신한제18호스팩",
+      "quantity": 127,
+      "avg_price": 2355.0,
+      "entry_date": "2026-04-30",
+      "peak_price": 2355.0,
+      "is_scaled_out": false
+    }
+  },
+  "peak_nav": 3175944.5086000003,
+  "history": [
+    3000000
+  ],
+  "daily_trades": [
+    {
+      "date": "2026-04-10",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-13",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-14",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-16",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-17",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-20",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-22",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-23",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-24",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-27",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-28",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-29",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-29",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-29",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-29",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-29",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-29",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-29",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": true
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    },
+    {
+      "date": "2026-04-30",
+      "is_win": false
+    }
+  ],
+  "raw_stats": {
+    "cash": 92131.32414999988,
+    "total_asset": 2402606.32415,
+    "profit_rate": -19.91312252833334,
+    "holdings_count": 8,
+    "win_rate": 26.16279069767442,
+    "profit_factor": 0.6900458241553153,
+    "mdd": 24.34986450033721,
+    "turnover": 33.915199666666666,
+    "frequency": 16.761904761904763,
+    "total_fees": 106790.40809999999,
+    "current_prices": {
+      "025860": 11740,
+      "001510": 5230,
+      "0129K0": 2355,
+      "041910": 7480,
+      "046890": 16510,
+      "024060": 17930,
+      "005930": 226000,
+      "003280": 2880,
+      "270520": 228,
+      "005880": 2645,
+      "006340": 13090,
+      "018880": 4355,
+      "009830": 47950,
+      "452260": 3180,
+      "199820": 16640,
+      "002780": 1458,
+      "010820": 13890,
+      "0011T0": 22550,
+      "001440": 51200,
+      "093370": 14010,
+      "034220": 12430,
+      "047040": 36900
+    }
+  },
+  "normalized_stats": {
+    "승률": 26.16279069767442,
+    "수익팩터": 13.800916483106306,
+    "MDD": 26.95040649898837,
+    "거래빈도": 83.80952380952381,
+    "자본회전율": 67.83039933333333
+  },
+  "total_fees": 106790.40809999999
+}

@@ -1,0 +1,99 @@
+{
+  "initial_cash": 20000,
+  "cash": 2235.1949999999997,
+  "invested": 17764.805,
+  "portfolio": {
+    "MU": {
+      "name": "Micron Technology, Inc. Common Stock",
+      "quantity": 4,
+      "avg_price": 938.84,
+      "entry_date": "2026-08-27",
+      "peak_price": 969.08,
+      "is_scaled_out": false
+    },
+    "NVDA": {
+      "name": "NVIDIA Corporation Common Stock",
+      "quantity": 18,
+      "avg_price": 210.25,
+      "entry_date": "2026-08-27",
+      "peak_price": 230.399,
+      "is_scaled_out": false
+    },
+    "SNDK": {
+      "name": "Sandisk Corporation Common Stock",
+      "quantity": 2,
+      "avg_price": 1503.99,
+      "entry_date": "2026-08-27",
+      "peak_price": 1607.315,
+      "is_scaled_out": false
+    },
+    "MSFT": {
+      "name": "Microsoft Corporation Common Stock",
+      "quantity": 7,
+      "avg_price": 493.875,
+      "entry_date": "2026-08-27",
+      "peak_price": 515.0,
+      "is_scaled_out": false
+    },
+    "AAPL": {
+      "name": "Apple Inc. Common Stock",
+      "quantity": 12,
+      "avg_price": 313.32,
+      "entry_date": "2026-08-27",
+      "peak_price": 330.73,
+      "is_scaled_out": false
+    }
+  },
+  "peak_nav": 20851.04,
+  "total_fees": 17.7648,
+  "history": [
+    20000
+  ],
+  "daily_trades": [],
+  "cooldown_codes": {},
+  "rebalance": {
+    "elapsed": 4,
+    "last_seen": "20260903"
+  },
+  "raw_stats": {
+    "cash": 2235.1949999999997,
+    "total_asset": 20792.295,
+    "profit_rate": 3.961474999999991,
+    "holdings_count": 5,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0.281736546474433,
+    "turnover": 0.8882399999999999,
+    "frequency": 0.5555555555555556,
+    "total_fees": 17.7648,
+    "current_prices": {
+      "PLTR": 182.345,
+      "GOOG": 338.955,
+      "AAPL": 328.0,
+      "AMZN": 258.75,
+      "NVDA": 228.405,
+      "MRVL": 208.85,
+      "AMAT": 435.65,
+      "MU": 957.61,
+      "TSM": 417.175,
+      "MSFT": 509.67,
+      "META": 610.59,
+      "AMD": 455.9,
+      "GOOGL": 342.37,
+      "SNDK": 1555.84,
+      "AVGO": 357.205,
+      "NBIS": 210.63,
+      "TSLA": 376.51,
+      "INTC": 91.55,
+      "MRNA": 148.97,
+      "LITE": 846.785
+    }
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 20.0,
+    "MDD": 99.1547903605767,
+    "거래빈도": 2.7777777777777777,
+    "자본회전율": 1.7764799999999998
+  }
+}

@@ -14,9 +14,18 @@ name: DB-Data History Truncate (이력 절단)
 # 덤: db-data 과거 커밋에 노출됐던 토큰·포트폴리오가 이력과 함께 사라진다
 # (security-posture-public-repo의 미해결 부채).
 #
-# **수동 전용이다.** force-push는 그 사이 들어온 커밋을 지운다. 자동화하려면
-# 아래 두 가드가 한 번 이상 실전에서 검증돼야 한다.
+# **월 1회 반복해야 한다.** 파일을 지워도 블롭은 이력에 남으므로, 절단이 없으면
+# monthly_archive의 삭제가 용량으로 이어지지 않는다. 그리고 아카이브 **뒤에**
+# 와야 그달 삭제분이 이력에서 같이 사라진다:
+#   1일 20:00 UTC  monthly_archive  (2일 05:00 KST)  발송 + 보관 창 밖 삭제
+#   2일 09:00 UTC  이 워크플로       (2일 18:00 KST)  절단
+# 순서는 tests/test_monthly_cleanup_order.py가 고정한다.
+#
+# 2026-09-04 첫 수동 실행에서 가드 4겹이 정상 동작했다(6737커밋 -> 1커밋,
+# 파일 981개·트리 145MB 그대로). 그 검증을 근거로 스케줄을 붙였다.
 on:
+  schedule:
+    - cron: '0 9 2 * *'
   workflow_dispatch:
     inputs:
       confirm:
@@ -48,11 +57,31 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 확인 문구 검사
+      # 실행 모드를 여기서 한 번에 정한다. cron은 입력을 줄 수 없으므로
+      # `github.event.inputs.*`가 전부 빈 문자열이고, 그대로 두면 확인 문구
+      # 검사에 걸려 매달 실패하고 dry-run으로만 돈다.
+      #
+      # 스케줄에서 확인 문구를 우회하는 근거: **이 파일에 cron을 넣은 것 자체가
+      # 그 확인**이다(PR로 리뷰된다). 되돌릴 수 없는 쪽을 지키는 건 가드 1~4이고
+      # 그건 이벤트와 무관하게 그대로 산다.
+      - name: 실행 모드 결정
+        id: mode
         run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "dry=false" >> "$GITHUB_OUTPUT"
+            echo "[Mode] schedule — 실제 절단"
+            exit 0
+          fi
           if [ "${{ github.event.inputs.confirm }}" != "TRUNCATE" ]; then
             echo "확인 문구가 TRUNCATE가 아니다 — 중단"
             exit 1
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "false" ]; then
+            echo "dry=false" >> "$GITHUB_OUTPUT"
+            echo "[Mode] 수동 — 실제 절단"
+          else
+            echo "dry=true" >> "$GITHUB_OUTPUT"
+            echo "[Mode] 수동 — dry-run"
           fi
 
       # [가드 1] db-data에 쓰는 워크플로가 하나라도 돌면 진행하지 않는다.
@@ -81,6 +110,13 @@ jobs:
           fi
           # 1은 런 조회 실패다 — 그건 사람이 봐야 한다.
           if [ "$rc" = "1" ]; then exit 1; fi
+          # 2(writer가 계속 도는 중)는 수동 실행에서는 고장이 아니다 — 사람이
+          # 로그를 보고 있다. 하지만 **스케줄에서 조용히 건너뛰면 그 달 절단이
+          # 통째로 사라지고 아무도 모른다.** 오늘 하루가 그런 침묵의 목록이었다.
+          if [ "$rc" = "2" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "[Truncate] 월간 절단이 빈틈을 못 찾았다 — 사람이 봐야 한다"
+            exit 1
+          fi
           exit 0
 
       - name: 절단
@@ -120,7 +156,7 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ github.event.inputs.dry_run }}" != "false" ]; then
+          if [ "${{ steps.mode.outputs.dry }}" != "false" ]; then
             echo "[Truncate] dry-run — force-push하지 않는다"
             echo "[Truncate] 실행하려면 dry_run=false 로 다시 돌릴 것"
             exit 0
@@ -130,7 +166,7 @@ jobs:
           echo "[Truncate] 완료 — db-data가 커밋 1개로 재시작"
 
       - name: 결과 확인
-        if: steps.guard.outputs.ok == 'true' && github.event.inputs.dry_run == 'false'
+        if: steps.guard.outputs.ok == 'true' && steps.mode.outputs.dry == 'false'
         run: |
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           rm -rf verify_repo

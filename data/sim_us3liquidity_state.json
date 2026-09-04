@@ -8,7 +8,7 @@
       "quantity": 4,
       "avg_price": 938.84,
       "entry_date": "2026-08-27",
-      "peak_price": 1001.81,
+      "peak_price": 1002.76,
       "is_scaled_out": false
     },
     "NVDA": {
@@ -24,7 +24,7 @@
       "quantity": 2,
       "avg_price": 1503.99,
       "entry_date": "2026-08-27",
-      "peak_price": 1689.47,
+      "peak_price": 1718.13,
       "is_scaled_out": false
     },
     "MSFT": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21194.375,
+  "peak_nav": 21209.665,
   "total_fees": 17.7648,
   "history": [
     20000
@@ -57,43 +57,43 @@
   },
   "raw_stats": {
     "cash": 2235.1949999999997,
-    "total_asset": 21122.155,
-    "profit_rate": 5.610774999999994,
+    "total_asset": 21209.665,
+    "profit_rate": 6.048325000000005,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
-    "mdd": 0.3407507888295888,
+    "mdd": 0.0,
     "turnover": 0.8882399999999999,
-    "frequency": 0.5555555555555556,
+    "frequency": 0.5,
     "total_fees": 17.7648,
     "current_prices": {
-      "NVDA": 232.14,
-      "MRNA": 142.497,
-      "SNDK": 1684.77,
-      "MU": 1001.02,
-      "AAPL": 318.53,
-      "INTC": 95.305,
-      "LITE": 866.98,
-      "NBIS": 215.33,
-      "GOOGL": 337.756,
-      "MRVL": 220.9,
-      "TSLA": 354.72,
-      "AMZN": 256.44,
-      "GOOG": 334.4,
-      "TSM": 425.941,
-      "PLTR": 176.77,
-      "CRM": 258.533,
-      "AVGO": 356.21,
-      "META": 609.27,
-      "AMD": 472.62,
-      "MSFT": 501.78
+      "MRVL": 221.19,
+      "TSLA": 351.77,
+      "AVGO": 355.49,
+      "CRM": 259.94,
+      "LITE": 875.845,
+      "GOOG": 335.38,
+      "MU": 1002.76,
+      "GOOGL": 338.68,
+      "NVDA": 231.66,
+      "AMZN": 257.21,
+      "AMD": 475.13,
+      "SNDK": 1718.13,
+      "AAPL": 320.84,
+      "NBIS": 217.36,
+      "MRNA": 145.77,
+      "MSFT": 501.03,
+      "INTC": 95.55,
+      "META": 611.53,
+      "TSM": 427.3,
+      "PLTR": 175.063
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 20.0,
-    "MDD": 98.97774763351123,
-    "거래빈도": 2.7777777777777777,
+    "MDD": 100.0,
+    "거래빈도": 2.5,
     "자본회전율": 1.7764799999999998
   }
 }

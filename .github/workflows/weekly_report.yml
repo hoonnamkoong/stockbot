@@ -26,8 +26,14 @@ jobs:
 
       - name: Generate and Send Report
         env:
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          # src/weekly_reporter.py가 읽는 이름은 EMAIL_USER/EMAIL_PASS다.
+          # 2026-09-04까지 여기서는 GMAIL_USER/GMAIL_PASSWORD를 넘겼고, 그중
+          # GMAIL_PASSWORD는 레포에 없는 이름이라 빈 값이었다(실재하는 이름은
+          # GMAIL_APP_PASSWORD). 즉 이 배선으로는 메일이 나갈 수 없었는데,
+          # 코드가 "EMAIL_USER or EMAIL_PASS missing"만 출력하고 정상 종료해서
+          # 워크플로는 계속 초록색이었다.
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

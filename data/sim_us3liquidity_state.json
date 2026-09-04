@@ -8,7 +8,7 @@
       "quantity": 4,
       "avg_price": 938.84,
       "entry_date": "2026-08-27",
-      "peak_price": 976.275,
+      "peak_price": 986.44,
       "is_scaled_out": false
     },
     "NVDA": {
@@ -16,7 +16,7 @@
       "quantity": 18,
       "avg_price": 210.25,
       "entry_date": "2026-08-27",
-      "peak_price": 230.399,
+      "peak_price": 231.77,
       "is_scaled_out": false
     },
     "SNDK": {
@@ -24,7 +24,7 @@
       "quantity": 2,
       "avg_price": 1503.99,
       "entry_date": "2026-08-27",
-      "peak_price": 1607.315,
+      "peak_price": 1623.43,
       "is_scaled_out": false
     },
     "MSFT": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 20983.635000000002,
+  "peak_nav": 21089.075,
   "total_fees": 17.7648,
   "history": [
     20000
@@ -57,8 +57,8 @@
   },
   "raw_stats": {
     "cash": 2235.1949999999997,
-    "total_asset": 20983.635000000002,
-    "profit_rate": 4.91817500000001,
+    "total_asset": 21089.075,
+    "profit_rate": 5.445375000000004,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -67,26 +67,26 @@
     "frequency": 0.5555555555555556,
     "total_fees": 17.7648,
     "current_prices": {
-      "GOOGL": 343.39,
-      "GOOG": 340.06,
-      "MU": 976.275,
-      "PLTR": 180.33,
-      "NBIS": 211.77,
-      "AMZN": 260.752,
-      "TSM": 419.6,
-      "TSLA": 364.16,
-      "AAPL": 328.465,
-      "CRM": 263.01,
-      "INTC": 92.69,
-      "META": 614.315,
-      "AVGO": 354.84,
-      "LITE": 849.8,
-      "MSFT": 509.16,
-      "MRVL": 211.1,
-      "SNDK": 1598.82,
-      "NVDA": 230.0,
-      "AMD": 459.155,
-      "MRNA": 153.165
+      "TSM": 422.48,
+      "INTC": 92.989,
+      "MRVL": 213.67,
+      "LITE": 845.31,
+      "SNDK": 1623.43,
+      "CRM": 261.02,
+      "MU": 986.44,
+      "AMZN": 260.25,
+      "GOOGL": 341.685,
+      "NVDA": 231.77,
+      "MSFT": 507.68,
+      "AVGO": 358.0,
+      "NBIS": 213.01,
+      "AMD": 465.22,
+      "MRNA": 152.375,
+      "AAPL": 327.97,
+      "META": 608.6,
+      "GOOG": 338.22,
+      "PLTR": 179.82,
+      "TSLA": 359.395
     }
   },
   "normalized_stats": {

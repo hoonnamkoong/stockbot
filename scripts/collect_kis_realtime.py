@@ -59,6 +59,8 @@ from src.trade.auth import get_base_url, load_env  # noqa: E402
 
 WS_URL = 'ws://ops.koreainvestment.com:21000'
 MAX_SUBSCRIBE = 40          # KIS 웹소켓 구독 한도(약 41건). 여유를 둔다.
+MAX_DROPS = 10              # 연속 절단 상한. KIS가 계속 거절하면 무한재시도가 된다.
+RECONNECT_WAIT_SEC = 2
 
 
 def approval_key():
@@ -129,53 +131,85 @@ async def collect(codes, tr_ids, out_path, until_hhmm, key):
         w.writeheader()
 
     n = 0
+    drops = 0
     try:
-        async with websockets.connect(WS_URL, ping_interval=None, open_timeout=15) as ws:
-            for tr_id in tr_ids:
-                for code, _ in codes:
-                    await ws.send(json.dumps({
-                        'header': {'approval_key': key, 'custtype': 'P',
-                                   'tr_type': '1', 'content-type': 'utf-8'},
-                        'body': {'input': {'tr_id': tr_id, 'tr_key': code}}}))
-                    await asyncio.sleep(0.05)
-            print(f'{len(codes)}종목 × {len(tr_ids)}TR = {len(codes)*len(tr_ids)}건 구독 '
-                  f'({",".join(tr_ids)}). {until_hhmm}까지 수신.', flush=True)
+        # 끊기면 다시 붙는다. 예전에는 `async with` 하나뿐이라 KIS가 소켓을 한 번만
+        # 닫아도(ConnectionClosedError) 예외가 main까지 올라가 잡이 죽었고, 그러면
+        # 뒤의 커밋 스텝이 skip돼 **그때까지 모은 데이터가 통째로 배포되지 않았다.**
+        # 장중 세션은 2.5시간짜리라 한 번의 절단이 그날 전체를 날렸다
+        # (2026-09-03 intraday 실패).
+        while should_reconnect(dt.datetime.now().strftime('%H%M'), until_hhmm, drops):
+            try:
+                async with websockets.connect(WS_URL, ping_interval=None,
+                                              open_timeout=15) as ws:
+                    for tr_id in tr_ids:
+                        for code, _ in codes:
+                            await ws.send(json.dumps({
+                                'header': {'approval_key': key, 'custtype': 'P',
+                                           'tr_type': '1', 'content-type': 'utf-8'},
+                                'body': {'input': {'tr_id': tr_id, 'tr_key': code}}}))
+                            await asyncio.sleep(0.05)
+                    print(f'{len(codes)}종목 × {len(tr_ids)}TR = '
+                          f'{len(codes)*len(tr_ids)}건 구독 '
+                          f'({",".join(tr_ids)}). {until_hhmm}까지 수신.', flush=True)
 
-            while True:
-                now = dt.datetime.now().strftime('%H%M')
-                if now >= until_hhmm:
-                    print(f'{until_hhmm} 도달 — 종료', flush=True)
-                    break
-                try:
-                    msg = await asyncio.wait_for(ws.recv(), timeout=30)
-                except asyncio.TimeoutError:
-                    continue
+                    while True:
+                        now = dt.datetime.now().strftime('%H%M')
+                        if now >= until_hhmm:
+                            print(f'{until_hhmm} 도달 — 종료', flush=True)
+                            break
+                        try:
+                            msg = await asyncio.wait_for(ws.recv(), timeout=30)
+                        except asyncio.TimeoutError:
+                            continue
 
-                if msg.startswith('{'):        # 구독 응답/PINGPONG
-                    d = json.loads(msg)
-                    body = d.get('body') or {}
-                    if body.get('msg1') and 'SUBSCRIBE' not in str(body.get('msg1')):
-                        print('  [응답]', body.get('msg1'), flush=True)
-                    if (d.get('header') or {}).get('tr_id') == 'PINGPONG':
-                        await ws.pong(msg)
-                    continue
+                        if msg.startswith('{'):        # 구독 응답/PINGPONG
+                            d = json.loads(msg)
+                            body = d.get('body') or {}
+                            if body.get('msg1') and 'SUBSCRIBE' not in str(body.get('msg1')):
+                                print('  [응답]', body.get('msg1'), flush=True)
+                            if (d.get('header') or {}).get('tr_id') == 'PINGPONG':
+                                await ws.pong(msg)
+                            continue
 
-                # 실시간: 암호화플래그|TR|건수|본문(^구분, 건수만큼 반복)
-                parts = msg.split('|')
-                if len(parts) < 4:
-                    continue
-                body = parts[3]
-                code = body.split('^')[0] if '^' in body else ''
-                w.writerow(dict(recv_at=dt.datetime.now().isoformat(timespec='seconds'),
-                                tr_id=parts[1], code=code, raw=body))
-                n += 1
-                if n % 200 == 0:
-                    f.flush()
-                    print(f'  {n}건 수신', flush=True)
+                        # 실시간: 암호화플래그|TR|건수|본문(^구분, 건수만큼 반복)
+                        parts = msg.split('|')
+                        if len(parts) < 4:
+                            continue
+                        body = parts[3]
+                        code = body.split('^')[0] if '^' in body else ''
+                        w.writerow(dict(recv_at=dt.datetime.now().isoformat(timespec='seconds'),
+                                        tr_id=parts[1], code=code, raw=body))
+                        n += 1
+                        if n % 200 == 0:
+                            f.flush()
+                            print(f'  {n}건 수신', flush=True)
+            except (websockets.exceptions.WebSocketException, OSError) as e:
+                drops += 1
+                f.flush()      # 받은 데까지는 남긴다
+                print(f'  [재접속] 연결이 끊겼다({type(e).__name__}: {e}) — '
+                      f'{drops}회째, 창이 남아 있으면 다시 붙는다', flush=True)
+                await asyncio.sleep(RECONNECT_WAIT_SEC)
+        if drops >= MAX_DROPS:
+            print(f'  [재접속] 상한 {MAX_DROPS}회 도달 — 수신을 접는다', flush=True)
     finally:
         f.flush()
         f.close()
-        print(f'총 {n}건 저장 → {out_path}', flush=True)
+        print(f'총 {n}건 저장 → {out_path}'
+              + (f' (재접속 {drops}회)' if drops else ''), flush=True)
+
+
+def should_reconnect(now_hhmm: str, until_hhmm: str, drops: int,
+                     max_drops: int = MAX_DROPS) -> bool:
+    """끊긴 뒤 다시 붙을까. 창이 남아 있고 연속 절단이 상한 아래면 붙는다.
+
+    창 판정과 같은 이유로 순수 함수다 — 이 판정이 async 루프 안에 묻혀 있으면
+    아무도 테스트하지 않고, 그러면 도달 불가가 돼도 아무도 모른다(window_state).
+
+    상한이 필요한 이유: KIS가 승인키 만료 등으로 계속 거절하면 창이 닫힐 때까지
+    2초마다 재시도하는 바쁜 루프가 된다.
+    """
+    return now_hhmm < until_hhmm and drops < max_drops
 
 
 def window_state(now_hhmm: str, start_hhmm: str, until_hhmm: str) -> str:

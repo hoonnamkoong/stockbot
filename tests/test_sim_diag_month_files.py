@@ -18,13 +18,13 @@ def test_month_files_includes_split_off_versions(tmp_path, monkeypatch):
     monkeypatch.setattr(sim_diag, 'DATA_DIR', str(tmp_path))
 
     # 옛 헤더를 가진 파일이 이미 있는 상태에서 한 줄 쓰면 갈라진다.
-    canonical = sim_diag.month_path('sim1', '20260810')
+    canonical = sim_diag.day_path('sim1', '20260810')
     with open(canonical, 'w', encoding='utf-8') as f:
         f.write('ts,sim,code\n2026-08-01 09:00:00,sim1,005930\n')
 
     sim_diag.append('sim1', [{'code': '000660'}], path=canonical)
 
-    files = sim_diag.month_files('sim1', '20260810')
+    files = sim_diag.day_files('sim1', '20260810')
     assert len(files) == 2, f'갈라진 파일을 모두 돌려줘야 한다: {files}'
     assert files[0].endswith('_v1.csv'), '옛 파일이 먼저 와야 한다(시간순)'
     assert files[-1] == canonical
@@ -32,4 +32,4 @@ def test_month_files_includes_split_off_versions(tmp_path, monkeypatch):
 
 def test_month_files_is_empty_when_nothing_written(tmp_path, monkeypatch):
     monkeypatch.setattr(sim_diag, 'DATA_DIR', str(tmp_path))
-    assert sim_diag.month_files('sim1', '20260810') == []
+    assert sim_diag.day_files('sim1', '20260810') == []

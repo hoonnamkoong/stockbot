@@ -86,9 +86,19 @@ COLUMNS = [
 ]
 
 
-def month_path(now, data_dir: str = 'data') -> str:
-    """월별 분할. sim_diag·post_archive와 같은 이유로 한 파일이 무한정 커지는 것을 막는다."""
-    return os.path.join(data_dir, f"money_{now.strftime('%Y-%m')}.csv")
+def day_path(now, data_dir: str = 'data') -> str:
+    """**일별** 분할.
+
+    월별이던 시절, 이 파일은 하루 100번 통째로 db-data에 재커밋됐다(장중 2분 루프가
+    매 사이클 배포한다 — 건너뛰면 러너가 다음 런에서 원격본을 복원하므로 그 사이클
+    행이 유실된다). 월말이면 24MB짜리를 100번 밀게 되고, 2026-09-04 실측에서
+    db-data 6737커밋·레포 1.0GB의 86%가 그렇게 쌓인 이력이었다.
+
+    일별로 쪼개면 하루치가 1MB 수준이고, **지난 날짜 파일은 다시 쓰이지 않는다.**
+    읽는 쪽은 파일명을 짚지 말고 `money_*.csv` 글롭 + 날짜 필터를 쓸 것
+    (scripts/save_minute_bars.py) — 월↔일 전환일에는 두 형식이 함께 있다.
+    """
+    return os.path.join(data_dir, f"money_{now.strftime('%Y-%m-%d')}.csv")
 
 
 def load_state(data_dir: str = 'data') -> dict | None:

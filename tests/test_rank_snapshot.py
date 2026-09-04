@@ -86,7 +86,7 @@ def test_warmup_is_false_once_a_previous_snapshot_exists():
 # ── 저장 ────────────────────────────────────────────────────────────
 
 from src.data.rank_snapshot import (
-    load_state, save_state, build_records, COLUMNS, append_records, month_path,
+    load_state, save_state, build_records, COLUMNS, append_records, day_path,
 )
 from datetime import datetime
 
@@ -140,8 +140,14 @@ def test_appends_do_not_rewrite_the_header(tmp_path):
     assert lines[0].startswith(COLUMNS[0]) and len(lines) == 3
 
 
-def test_monthly_file_name():
-    assert month_path(datetime(2026, 8, 10), 'data').endswith('money_2026-08.csv')
+def test_daily_file_name():
+    """월별 파일은 하루 100번 통째로 재커밋된다 — 월말에 24MB가 된다.
+
+    2026-09-04 실측: db-data 6737커밋 중 절반이 최근 15일치이고, 레포 1.0GB의
+    86%가 이력이다. money_2026-09.csv 하나가 하루 100회 커밋됐다. 일별로 쪼개면
+    파일이 1MB 수준이 되고 **지난 날짜는 다시 안 써진다.**
+    """
+    assert day_path(datetime(2026, 8, 10), 'data').endswith('money_2026-08-10.csv')
 
 
 # ── 블록별 순위 공간 (2026-08-09) ────────────────────────────────────

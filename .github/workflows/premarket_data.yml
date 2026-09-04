@@ -55,6 +55,13 @@ jobs:
           git fetch origin db-data --depth=1 || true
           git checkout origin/db-data -- data/ 2>/dev/null || echo "db-data 없음 — 첫 실행"
 
+      # 토큰의 유일한 발급자는 token_manager다. 이 스텝이 없으면 러너에 캐시가 없어
+      # auth.py의 자가발급 안전망이 매 런 새 토큰을 발급한다(2026-09-04: 하루 4회).
+      - name: Manage KIS Token
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python scripts/token_manager.py
+
       - name: 미국 지수 적재 (휴장일에도 — 시계열이 끊기면 안 된다)
         run: |
           # 용도는 진입 신호가 아니라 **국면 판정**이다. 미국 밤 → 한국 갭 상관은
@@ -200,6 +207,14 @@ jobs:
           git checkout origin/db-data -- data/ 2>/dev/null || true
           if [ -e data/premarket_universe.csv ]; then echo "ok=true" >> $GITHUB_OUTPUT
           else echo "ok=false" >> $GITHUB_OUTPUT; echo "유니버스 없음 — 휴장일이거나 앞 잡 실패"; fi
+
+      # 토큰의 유일한 발급자는 token_manager다. 이 스텝이 없으면 러너에 캐시가 없어
+      # auth.py의 자가발급 안전망이 매 런 새 토큰을 발급한다(2026-09-04: 하루 4회).
+      - name: Manage KIS Token
+        if: steps.univ.outputs.ok == 'true'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python scripts/token_manager.py
 
       - name: 장중 체결+호가 적재 (09:00~11:30)
         if: steps.univ.outputs.ok == 'true'

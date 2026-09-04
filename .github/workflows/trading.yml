@@ -217,7 +217,11 @@ jobs:
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_EVENT_NAME: "${{ github.event_name }}"
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
-        run: PYTHONPATH=. python scripts/trade_loop.py
+        # `-u`: 잡 타임아웃에 잘린 런은 stdout이 파이프라 **블록 버퍼링**되고,
+        # 그러면 로그가 한 줄도 안 남는다. 2026-09-04 05:46Z 런은 178초를 쓰고
+        # 잘렸는데 출력이 통째로 비어 어디서 멈췄는지 알 수 없었다.
+        # eod_data의 분봉 스텝이 같은 이유로 이미 -u를 쓴다(8c4d63955).
+        run: PYTHONPATH=. python -u scripts/trade_loop.py
 
       # 배포 대상은 이 워크플로가 실제로 쓴 것만이다. data/ 전체를 밀면 스크래퍼가
       # 방금 갱신한 파일(스크래핑 산출물·나머지 심 상태)을 런 시작 시점의 낡은

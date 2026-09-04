@@ -25,9 +25,11 @@ push가 들어오고 거기에 심 상태·매매 기록이 있다. 두 겹으�
 
 2번이 결정적이고 1번은 진단이다 — 왜 막혔는지 사람에게 보여준다.
 """
+import argparse
 import json
 import os
 import sys
+import time
 from urllib import error, parse, request
 
 # db-data에 push하는 워크플로 이름(= 워크플로 파일의 `name:`).
@@ -78,20 +80,37 @@ def _fetch_runs(log=print) -> list | None:
     return out
 
 
-def main() -> int:
-    runs = _fetch_runs()
-    if runs is None:
-        # 확인이 안 되면 진행하지 않는다. 절단은 되돌릴 수 없다 —
-        # 모르면 멈추는 쪽이 맞다(fail-closed).
-        print('[Truncate] 진행 중 런을 확인할 수 없어 중단한다')
-        return 1
-    busy = busy_writers(runs)
-    if busy:
-        print(f'[Truncate] db-data writer가 돌고 있다: {", ".join(busy)}')
-        print('[Truncate] 마감 후(장중 트리거가 멈춘 창)에 다시 실행할 것')
-        return 1
-    print(f'[Truncate] db-data writer 없음 (확인한 런 {len(runs)}개) — 진행 가능')
-    return 0
+def main(argv=None) -> int:
+    """0=진행 가능, 2=writer가 도는 중(고장 아님), 1=확인 불가(고장).
+
+    2와 1을 나누는 이유: trading은 2분마다 런을 띄우므로 어느 한 순간을 찍으면
+    거의 항상 뭔가 돌고 있다. 그건 사고가 아니라 "지금은 때가 아니다"이고,
+    거기에 텔레그램을 보내면 도배가 된다. 반면 런 조회 자체가 실패하면 그건
+    진짜 이상이고 사람이 봐야 한다.
+    """
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--retries', type=int, default=1,
+                    help='빈틈을 찾을 때까지 재확인할 횟수')
+    ap.add_argument('--interval', type=int, default=20, help='재확인 간격(초)')
+    a = ap.parse_args(argv)
+
+    for attempt in range(1, max(1, a.retries) + 1):
+        runs = _fetch_runs()
+        if runs is None:
+            # 확인이 안 되면 진행하지 않는다. 절단은 되돌릴 수 없다 —
+            # 모르면 멈추는 쪽이 맞다(fail-closed).
+            print('[Truncate] 진행 중 런을 확인할 수 없어 중단한다')
+            return 1
+        busy = busy_writers(runs)
+        if not busy:
+            print(f'[Truncate] db-data writer 없음 (확인한 런 {len(runs)}개) — 진행 가능')
+            return 0
+        print(f'[Truncate] ({attempt}/{a.retries}) db-data writer가 돌고 있다: '
+              f'{", ".join(busy)}')
+        if attempt < a.retries:
+            time.sleep(a.interval)
+    print('[Truncate] 빈틈을 못 찾았다 — 마감 후(장중 트리거가 멈춘 창)에 다시 실행할 것')
+    return 2
 
 
 if __name__ == '__main__':

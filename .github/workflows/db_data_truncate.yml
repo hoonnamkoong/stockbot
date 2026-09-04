@@ -55,14 +55,36 @@ jobs:
             exit 1
           fi
 
-      # [가드 1] db-data에 쓰는 워크플로가 하나라도 돌면 거부한다.
-      # 마감 후(장중 트리거가 멈춘 창)에 실행하라는 뜻이다.
+      # [가드 1] db-data에 쓰는 워크플로가 하나라도 돌면 진행하지 않는다.
+      #
+      # trading은 2분마다 런을 띄우므로 어느 한 순간을 찍으면 거의 항상 뭔가
+      # 돌고 있다. 그래서 빈틈을 찾을 때까지 몇 번 다시 본다(최대 약 4분).
+      #
+      # **막힌 것은 고장이 아니다.** 2026-09-04 첫 dry-run에서 가드가 정상
+      # 동작해 막았는데, 스텝이 exit 1이라 실패 알림이 텔레그램으로 나갔다.
+      # "지금은 때가 아니다"에 사람을 부르면 도배가 된다. 그래서 여기서는
+      # 종료코드를 나눠 받는다 — 2(바쁨)는 조용히 건너뛰고, 1(런 조회 실패)만
+      # 진짜 이상으로 올린다.
       - name: 가드 — db-data writer가 도는 중인가
+        id: guard
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 scripts/truncate_data_branch.py
+        run: |
+          set +e
+          python3 scripts/truncate_data_branch.py --retries 12 --interval 20
+          rc=$?
+          set -e
+          if [ "$rc" = "0" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+          # 1은 런 조회 실패다 — 그건 사람이 봐야 한다.
+          if [ "$rc" = "1" ]; then exit 1; fi
+          exit 0
 
       - name: 절단
+        if: steps.guard.outputs.ok == 'true'
         run: |
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -108,7 +130,7 @@ jobs:
           echo "[Truncate] 완료 — db-data가 커밋 1개로 재시작"
 
       - name: 결과 확인
-        if: ${{ github.event.inputs.dry_run == 'false' }}
+        if: steps.guard.outputs.ok == 'true' && github.event.inputs.dry_run == 'false'
         run: |
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           rm -rf verify_repo

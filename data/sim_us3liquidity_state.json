@@ -8,7 +8,7 @@
       "quantity": 4,
       "avg_price": 938.84,
       "entry_date": "2026-08-27",
-      "peak_price": 994.26,
+      "peak_price": 997.325,
       "is_scaled_out": false
     },
     "NVDA": {
@@ -24,7 +24,7 @@
       "quantity": 2,
       "avg_price": 1503.99,
       "entry_date": "2026-08-27",
-      "peak_price": 1647.0,
+      "peak_price": 1648.54,
       "is_scaled_out": false
     },
     "MSFT": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21143.259000000002,
+  "peak_nav": 21152.675,
   "total_fees": 17.7648,
   "history": [
     20000
@@ -57,42 +57,42 @@
   },
   "raw_stats": {
     "cash": 2235.1949999999997,
-    "total_asset": 21140.995,
-    "profit_rate": 5.704974999999995,
+    "total_asset": 21152.675,
+    "profit_rate": 5.763374999999996,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
-    "mdd": 0.010707904585583764,
+    "mdd": 0.0,
     "turnover": 0.8882399999999999,
     "frequency": 0.5555555555555556,
     "total_fees": 17.7648,
     "current_prices": {
-      "GOOGL": 340.48,
-      "INTC": 94.101,
-      "NVDA": 234.46,
-      "TSM": 425.5,
-      "NBIS": 216.87,
-      "MRNA": 147.47,
-      "TSLA": 358.132,
-      "MU": 993.69,
-      "SNDK": 1647.0,
-      "AAPL": 323.865,
-      "MSFT": 504.34,
-      "GOOG": 337.14,
-      "AVGO": 357.29,
-      "PLTR": 177.17,
-      "CRM": 259.805,
-      "AMD": 468.63,
+      "TSM": 425.51,
+      "LITE": 873.385,
+      "PLTR": 176.98,
+      "AVGO": 356.712,
+      "SNDK": 1648.54,
+      "AMD": 470.53,
+      "NBIS": 217.25,
+      "MSFT": 504.46,
+      "MRNA": 146.57,
+      "GOOG": 337.47,
+      "AMZN": 257.83,
+      "TSLA": 359.146,
+      "MU": 997.325,
+      "CRM": 259.92,
+      "GOOGL": 340.92,
+      "AAPL": 323.75,
+      "NVDA": 234.16,
+      "MRVL": 218.9,
       "META": 608.0,
-      "AMZN": 258.055,
-      "LITE": 868.99,
-      "MRVL": 217.18
+      "INTC": 94.685
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 20.0,
-    "MDD": 99.96787628624325,
+    "MDD": 100.0,
     "거래빈도": 2.7777777777777777,
     "자본회전율": 1.7764799999999998
   }

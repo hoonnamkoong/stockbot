@@ -1,0 +1,120 @@
+name: Monthly Data Archive (월간 아카이브)
+
+# 매달 1일, 지난달 데이터를 메일로 내보내고 보관 창(2개월) 밖의 달을 지운다.
+#
+# 왜 (2026-09-04 실측):
+#   레포 전체     1.0 GB    public, GitHub 권장 상한 1GB
+#   db-data HEAD 138.6 MB   실제로 쓰는 데이터
+#   db-data 커밋  6737개    절반이 최근 15일치
+# 86%가 이력이다. 계속 쌓으면 상한을 넘는다.
+#
+# **보낸 것만 지운다.** KIS 분봉·체결은 당일치만 조회되므로 지운 달은 복구가 없다.
+# 판정은 scripts/archive_monthly_data.py의 months_to_delete가 한다 —
+# data/archive_log.json에 발송 기록이 있는 달만 삭제 대상이 된다.
+#
+# cron 하나만 두는 이유: 이 배치는 시각에 민감하지 않다. 몇 시간 밀려도 무해하다
+# (eod_data처럼 다음 세션을 막는 산출물을 만들지 않는다). 발화가 통째로 드롭돼도
+# 다음 달에 두 달치를 함께 보낸다 — archive_log가 이미 보낸 달을 건너뛴다.
+on:
+  schedule:
+    - cron: '0 20 1 * *'   # 20:00 UTC 1일 = 05:00 KST 2일. 장 밖 시각이다.
+  workflow_dispatch:
+    inputs:
+      today:
+        description: '기준일 override (YYYY-MM-DD)'
+        required: false
+        default: ''
+      dry_run:
+        description: '발송·삭제 없이 계획만 출력'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: monthly-archive
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    # 96MB를 gzip해서 메일로 보낸다. 정상 5~10분이지만 SMTP가 느린 날을 감안한다.
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Seoul
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # 표준 라이브러리만 쓴다(gzip·smtplib·email) — 설치 실패 지점을 없앤다.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 아카이브 · 발송 · 삭제
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: |
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+          # 발송 기록은 러너 로컬(.archive_sent.json)에도 남는다. 아래 재시도가
+          # 다시 clone해도 그 사본 덕에 메일이 두 번 나가지 않는다.
+          #
+          # unshallow하지 않는다 — db-data 6737커밋을 통째로 받으면 실측 142초다
+          # (us_trading.yml). 충돌 시에는 다시 clone(depth 1, 약 6초)한다.
+          # `[ 조건 ] && X` 로 쓰면 안 된다 — 조건이 거짓일 때 그 줄이 1을 돌려주고
+          # `shell: bash -e`가 거기서 스크립트를 끝낸다(입력이 빈 cron 실행마다 실패).
+          ARGS=""
+          if [ -n "${{ github.event.inputs.today }}" ]; then
+            ARGS="$ARGS --today ${{ github.event.inputs.today }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          for i in 1 2 3; do
+            rm -rf db_repo
+            git clone --depth 1 --branch db-data "$REPO_URL" db_repo || {
+              echo "[Archive] db-data clone 실패"; exit 1; }
+
+            PYTHONPATH=. python -u scripts/archive_monthly_data.py \
+              --data-dir db_repo/data --local-log .archive_sent.json $ARGS || {
+              echo "[Archive] 스크립트 실패"; exit 1; }
+
+            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+              echo "[Archive] dry-run — 커밋하지 않는다"; exit 0
+            fi
+
+            # -A는 삭제도 스테이징한다. 이 잡의 목적 절반이 삭제다.
+            git -C db_repo add -A data/
+            if git -C db_repo diff --cached --quiet; then
+              echo "[Archive] 변경 없음"; exit 0
+            fi
+            git -C db_repo commit -m "chore(archive): $(date +'%Y-%m') 월간 아카이브 · 보관 창 정리"
+            if git -C db_repo push origin db-data; then
+              echo "[Archive] push 성공 (시도 $i)"; exit 0
+            fi
+            echo "[Archive] push 충돌 — 다시 clone해서 재시도 ($i/3)"
+          done
+          echo "[Archive] push 3회 실패"
+          exit 1
+
+      # 실패 **연속당 1통**이다. 런마다 보내면 지속 실패에 수백 통이 나가고,
+      # 도배는 침묵과 같다 — scripts/notify_workflow_failure.py가 직전 완료 런의
+      # 결과를 보고 억제한다.
+      #
+      # 조건이 `failure()`가 아닌 이유: 잡 타임아웃의 결론은 cancelled이고
+      # `failure()`는 거기 안 걸린다. `cancelled()`도 **워크플로** 취소를 보는
+      # 함수라 잡 타임아웃을 보장하지 못한다 — 취소된 잡에서도 도는 것이
+      # 문서화된 건 `always()`뿐이다.
+      - name: Notify on failure
+        if: always() && job.status != 'success'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: monthly_archive.yml
+        run: python3 scripts/notify_workflow_failure.py

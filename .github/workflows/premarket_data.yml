@@ -55,6 +55,19 @@ jobs:
           git fetch origin db-data --depth=1 || true
           git checkout origin/db-data -- data/ 2>/dev/null || echo "db-data 없음 — 첫 실행"
 
+      # 토큰의 유일한 발급자는 token_manager다(다른 워크플로 전부 동일 패턴).
+      # 이 잡은 GH_PAT를 안 넘겨서 뒤 스텝(fetch_kis_history.py → auth.get_access_token)이
+      # 비공개 레포 캐시를 못 읽고 매번 KIS에 직접 새 토큰을 발급했다 — 하루 여러 번
+      # 발급되고, token_refresh.yml과 같은 분에 겹치면 EGW00133으로 한쪽이 거부돼
+      # 프리마켓 수집이 통째로 실패했다(2026-09-02 아침). 여기서 비공개 레포의 유효
+      # 토큰을 로컬 캐시로 내려놓기만 하면 뒤 스텝은 그걸 읽는다.
+      - name: Manage KIS Token
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: python scripts/token_manager.py
+
       - name: 미국 지수 적재 (휴장일에도 — 시계열이 끊기면 안 된다)
         run: |
           # 용도는 진입 신호가 아니라 **국면 판정**이다. 미국 밤 → 한국 갭 상관은

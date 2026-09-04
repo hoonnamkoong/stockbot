@@ -144,17 +144,17 @@ def test_missing_file_is_empty_not_an_error(tmp_path):
 # `0행 저장`이 성공처럼 찍힌다. KIS 분봉은 당일치만 조회되므로 **그날 데이터는
 # 영구 손실**이고, 다음 날 알아채도 복구할 방법이 없다.
 
-def _run_main(monkeypatch, tmp_path, bars_for_call):
+def _run_main(monkeypatch, tmp_path, bars_for_call, codes=('005930',), provider=None):
     import scripts.save_minute_bars as smb
     monkeypatch.chdir(tmp_path)
     (tmp_path / 'data').mkdir(exist_ok=True)   # 재실행 테스트가 두 번 부른다
     from datetime import datetime, timezone, timedelta
     now = (datetime.now(timezone.utc) + timedelta(hours=9))
+    rows = ''.join(f"1,{now.strftime('%Y-%m-%d')}T09:00:00,{c}\n" for c in codes)
     (tmp_path / 'data' / f"money_{now.strftime('%Y-%m')}.csv").write_text(
-        f"cycle_id,ts,code\n1,{now.strftime('%Y-%m-%d')}T09:00:00,005930\n",
-        encoding='utf-8')
+        f"cycle_id,ts,code\n{rows}", encoding='utf-8')
 
-    provider = mock.MagicMock()
+    provider = provider if provider is not None else mock.MagicMock()
     provider.get_minute_bars.side_effect = bars_for_call
     monkeypatch.setattr('src.trade.kis_data_provider.KISDataProvider',
                         lambda *a, **k: provider)
@@ -163,6 +163,19 @@ def _run_main(monkeypatch, tmp_path, bars_for_call):
     monkeypatch.setattr(smb.alerts, 'send_alert', alert)
     smb.main()
     return alert
+
+
+def _fake_clock(monkeypatch, step):
+    """monotonic()을 부를 때마다 step초씩 흐르는 시계. 예산 소진을 결정적으로 만든다."""
+    import scripts.save_minute_bars as smb
+    t = {'v': 0.0}
+
+    def now():
+        v = t['v']
+        t['v'] += step
+        return v
+
+    monkeypatch.setattr(smb.time, 'monotonic', now)
 
 
 def test_all_empty_responses_raise_a_human_alert(monkeypatch, tmp_path):
@@ -217,3 +230,75 @@ def test_rerunning_the_day_replaces_instead_of_duplicating(monkeypatch, tmp_path
         rows = list(_csv.DictReader(f))
     keys = [(r['date'], r['code'], r['hhmm']) for r in rows]
     assert len(keys) == len(set(keys)), f'재실행분이 중복으로 쌓였다: {keys}'
+
+
+# ── 벽시계 예산 (2026-09-03) ────────────────────────────────────────
+# 이 수집은 일이 종목 수에 비례하는데(그날 순위에 오른 종목 전부 × 13앵커) 잡
+# 예산은 20분 고정이다. 상한이 없어 09-01~02 EOD 배치가 이 스텝에서 잡 타임아웃에
+# 걸렸고, **뒤에 있던 배포 스텝이 통째로 스킵됐다** — 심9-1·심11 계산은 이미
+# 끝나 있었는데 db-data로 안 나가 감시목록이 두 세션 낡았다. 잃은 것은 수집이
+# 아니라 배포다. `|| echo`는 0이 아닌 종료만 잡지 '끝나지 않는 것'은 못 막는다.
+
+def test_budget_stops_the_scan_instead_of_eating_the_job(monkeypatch, tmp_path):
+    """예산이 끝나면 남은 종목을 포기하고 **정상 종료**한다 — 뒤 스텝이 돌아야 한다."""
+    import scripts.save_minute_bars as smb
+    monkeypatch.setattr(smb, 'BUDGET_SEC', 100)
+    _fake_clock(monkeypatch, step=30)      # 4번째 확인에서 예산 소진
+    provider = mock.MagicMock()
+
+    _run_main(monkeypatch, tmp_path,
+              lambda *a, **k: [{'hhmm': '0900', 'price': 100, 'volume': 10}],
+              codes=('005930', '000660', '035720'), provider=provider)
+
+    calls = provider.get_minute_bars.call_count
+    assert calls < 3 * len(anchor_times()), (
+        f'예산을 무시하고 끝까지 돌았다({calls}콜) — 잡 예산을 통째로 먹는다.')
+
+
+def test_budget_is_checked_between_anchors_not_only_between_codes(monkeypatch, tmp_path):
+    """종목 사이에서만 보면 느린 날 한 종목(13콜 × 24.9초 = 5.4분)이 예산을
+    통째로 넘겨 상한이 상한이 아니게 된다."""
+    import scripts.save_minute_bars as smb
+    monkeypatch.setattr(smb, 'BUDGET_SEC', 100)
+    _fake_clock(monkeypatch, step=30)
+    provider = mock.MagicMock()
+
+    _run_main(monkeypatch, tmp_path,
+              lambda *a, **k: [{'hhmm': '0900', 'price': 100, 'volume': 10}],
+              codes=('005930',), provider=provider)
+
+    calls = provider.get_minute_bars.call_count
+    assert calls < len(anchor_times()), (
+        f'한 종목의 13앵커를 예산과 무관하게 전부 돌았다({calls}콜).')
+
+
+def test_partial_scan_still_saves_what_it_got(monkeypatch, tmp_path):
+    """분봉은 당일치만 조회된다 — 중단해도 받은 데까지는 남겨야 한다(0보다 낫다)."""
+    import csv as _csv
+    import scripts.save_minute_bars as smb
+    monkeypatch.setattr(smb, 'BUDGET_SEC', 100)
+    _fake_clock(monkeypatch, step=30)
+
+    _run_main(monkeypatch, tmp_path,
+              lambda *a, **k: [{'hhmm': '0900', 'price': 100, 'volume': 10}],
+              codes=('005930', '000660'))
+
+    p = next((tmp_path / 'data').glob('minute_*.csv'))
+    with open(p, encoding='utf-8') as f:
+        rows = list(_csv.DictReader(f))
+    assert rows, '중단하면서 받아둔 것까지 버렸다 — 그만큼이 영구 손실이다.'
+
+
+def test_partial_scan_tells_a_human(monkeypatch, tmp_path):
+    """중단도 결손이다. 이 스크립트가 비켜준 덕에 워크플로는 초록색이라
+    로그만 남기면 '그날은 종목이 적었다'로 오독된다."""
+    import scripts.save_minute_bars as smb
+    monkeypatch.setattr(smb, 'BUDGET_SEC', 100)
+    _fake_clock(monkeypatch, step=30)
+
+    alert = _run_main(monkeypatch, tmp_path,
+                      lambda *a, **k: [{'hhmm': '0900', 'price': 100, 'volume': 10}],
+                      codes=('005930', '000660'))
+
+    assert alert.call_count == 1, '부분 수집이 조용히 지나갔다'
+    assert '분봉' in alert.call_args[0][0]

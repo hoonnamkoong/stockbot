@@ -1,0 +1,138 @@
+name: DB-Data History Truncate (이력 절단)
+
+# db-data의 **이력만** 버리고 현재 스냅샷은 그대로 둔다(orphan 커밋 1개로 재시작).
+#
+# 왜 (2026-09-04 실측):
+#   레포 전체     1.0 GB    public, GitHub 권장 상한 1GB
+#   db-data HEAD 138.6 MB   실제로 쓰는 데이터
+#   db-data 커밋  6737개    2026-05-07 시작, 절반이 최근 15일치
+# 86%가 이력인데 그 이력을 읽는 소비자가 없다:
+#   대시보드    raw.githubusercontent.com/.../db-data/data/...  HEAD만
+#   워크플로    git clone --depth 1                              14곳
+#   신선도감사  경로별 **최신** 커밋 1건만
+#
+# 덤: db-data 과거 커밋에 노출됐던 토큰·포트폴리오가 이력과 함께 사라진다
+# (security-posture-public-repo의 미해결 부채).
+#
+# **수동 전용이다.** force-push는 그 사이 들어온 커밋을 지운다. 자동화하려면
+# 아래 두 가드가 한 번 이상 실전에서 검증돼야 한다.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '되돌릴 수 없다. 진행하려면 TRUNCATE 를 입력'
+        required: true
+        default: ''
+      dry_run:
+        description: '가드만 돌리고 force-push는 하지 않는다'
+        required: false
+        default: 'true'
+
+concurrency:
+  group: db-data-truncate
+  cancel-in-progress: false
+
+jobs:
+  truncate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+    permissions:
+      contents: write
+      actions: read       # 진행 중 런을 조회한다
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 확인 문구 검사
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "TRUNCATE" ]; then
+            echo "확인 문구가 TRUNCATE가 아니다 — 중단"
+            exit 1
+          fi
+
+      # [가드 1] db-data에 쓰는 워크플로가 하나라도 돌면 거부한다.
+      # 마감 후(장중 트리거가 멈춘 창)에 실행하라는 뜻이다.
+      - name: 가드 — db-data writer가 도는 중인가
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/truncate_data_branch.py
+
+      - name: 절단
+        run: |
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git clone --depth 1 --branch db-data "$REPO_URL" db_repo
+          cd db_repo
+          OLD=$(git rev-parse HEAD)
+          echo "[Truncate] 현재 HEAD $OLD"
+          echo "[Truncate] 파일 $(git ls-files | wc -l)개 / $(du -sh --exclude=.git . | cut -f1)"
+
+          git checkout --orphan truncated
+          git add -A
+          # -m 을 여러 번 준다. 여기 안에서 줄바꿈을 쓰면 그 줄이 열 0에서
+          # 시작해 `run: |` 블록 스칼라가 끊긴다(YAML 파싱 실패).
+          git commit -q \
+            -m "chore(db-data): 이력 절단 — 스냅샷에서 재시작 $(date +'%Y-%m-%d KST')" \
+            -m "이력이 레포 용량의 86%를 차지했고 db-data 이력을 읽는 소비자는 없다(대시보드는 raw HEAD, 워크플로는 depth 1 clone, 신선도 감사는 경로별 최신 1건)." \
+            -m "트리는 그대로다 — 직후 diff 검사가 그것을 보장한다."
+
+          # [안전장치 1] 트리가 정확히 같은지. 파일 하나라도 달라졌으면 중단한다.
+          if ! git diff --quiet "$OLD" HEAD; then
+            echo "[Truncate] 트리가 달라졌다 — 중단"
+            git diff --stat "$OLD" HEAD | tail -20
+            exit 1
+          fi
+          echo "[Truncate] 트리 동일 확인"
+
+          # [가드 2 = 안전장치 2] clone 이후 누가 push했으면 중단한다.
+          # 이게 결정적인 방어다 — 가드 1은 진단이고, 이건 경합 자체를 막는다.
+          REMOTE=$(git ls-remote "$REPO_URL" db-data | cut -f1)
+          if [ "$REMOTE" != "$OLD" ]; then
+            echo "[Truncate] clone 이후 원격이 움직였다($REMOTE) — 중단"
+            exit 1
+          fi
+
+          if [ "${{ github.event.inputs.dry_run }}" != "false" ]; then
+            echo "[Truncate] dry-run — force-push하지 않는다"
+            echo "[Truncate] 실행하려면 dry_run=false 로 다시 돌릴 것"
+            exit 0
+          fi
+
+          git push --force "$REPO_URL" truncated:db-data
+          echo "[Truncate] 완료 — db-data가 커밋 1개로 재시작"
+
+      - name: 결과 확인
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          rm -rf verify_repo
+          git clone --depth 1 --branch db-data "$REPO_URL" verify_repo
+          # 파일 하나하나를 여기서 이름으로 확인하지 않는다. 절단 스텝의
+          # `git diff --quiet $OLD HEAD`가 트리 동일성을 이미 보장하고,
+          # 워크플로에 파일명을 적으면 db-data 소유권 검사(tests/
+          # test_db_data_writer_ownership.py)가 "이 워크플로가 그 파일을 쓴다"로
+          # 읽는다. 여기서 필요한 건 절단 후에도 트리가 온전하다는 사실뿐이다.
+          echo "[Verify] 파일 $(cd verify_repo && git ls-files | wc -l)개"
+          echo "[Verify] 용량 $(du -sh --exclude=.git verify_repo | cut -f1)"
+          if [ "$(cd verify_repo && git ls-files data/ | wc -l)" -lt 100 ]; then
+            echo "[Verify] data/ 파일이 100개 미만이다 — 확인 필요"
+            exit 1
+          fi
+
+      # 조건이 `failure()`가 아닌 이유: 잡 타임아웃의 결론은 cancelled이고
+      # `failure()`는 거기 안 걸린다. `always()`만이 취소된 잡에서도 도는 것이
+      # 문서화돼 있다.
+      - name: Notify on failure
+        if: always() && job.status != 'success'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: db_data_truncate.yml
+        run: python3 scripts/notify_workflow_failure.py

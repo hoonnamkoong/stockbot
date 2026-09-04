@@ -238,42 +238,61 @@ jobs:
           fi
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git clone --depth 1 --branch db-data \
-            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {
-            echo "[Deploy] db-data 브랜치 clone 실패 — 이번 사이클 배포 생략"
-            exit 0
-          }
-          mkdir -p db_data_repo/data
-          copied=0
-          while IFS= read -r name; do
-            [ -n "$name" ] || continue
-            [ -f "data/$name" ] || continue
-            if [ "$name" = "alert_dedup.json" ]; then
-              # writer가 셋인 파일이라 덮어쓰면 남의 억제 기록을 지운다.
-              python3 scripts/merge_alert_dedup.py "db_data_repo/data/$name" "data/$name"                 && copied=$((copied+1))                 || echo "[Deploy] 쿨다운 병합 실패"
-              continue
-            fi
-            cp "data/$name" "db_data_repo/data/" && copied=$((copied+1))
-          done < data/.lite_deploy_manifest
-          echo "[Deploy] 배포 파일 $copied개"
-          cd db_data_repo
-          git add -A data/
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          git commit -m "chore(trade): sim state $(date +'%Y-%m-%d %H:%M KST')"
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
           # 스크래퍼가 그 사이 push했으면 non-fast-forward가 난다. 남의 커밋 위에
-          # 내 것을 얹어 다시 시도한다(덮어쓰지 않는다). shallow clone이라
-          # unshallow 후 rebase한다.
-          for i in 1 2 3; do
-            if git push origin db-data; then
-              echo "[Deploy] push 성공 (시도 $i)"
-              exit 0
+          # 내 것을 얹어 다시 시도한다(덮어쓰지 않는다).
+          #
+          # 예전에는 `git fetch --unshallow` 후 rebase였는데, db-data는 6707커밋
+          # (2026-09-04)이라 그 경로가 **실측 142초**다(us_trading.yml이 재둔 값).
+          # 이 잡의 예산은 3분이고 정상 런이 이미 105초를 쓴다 — 충돌하면 반드시
+          # 잘렸다(09-04 실측 114런 중 6런). 예산을 늘려서 풀 수 없다: 이 타임아웃은
+          # 원장 락 리스(4분)보다 짧아야 중복 주문이 안 난다.
+          #
+          # 그런데 이 스텝이 하는 일은 "남의 최신 상태 위에 내 파일을 얹기"이고,
+          # 그건 rebase가 아니라 **다시 clone(depth 1, 약 6초)** 이면 된다. 결과는
+          # 같고 비용은 이력 길이와 무관하다. alert_dedup 병합도 매번 최신 원격본과
+          # 하게 되어 오히려 정확해진다.
+          # `attempt || rc=$?` 형태로 부르면 함수 본문에서 `set -e`가 꺼진다.
+          # 그래서 조용히 넘어가면 안 되는 지점은 명시적으로 return한다 —
+          # add/commit이 실패했는데 "변경 없음"으로 빠지면 그 사이클의 심 상태가
+          # 소리 없이 사라진다.
+          # 반환값: 0=성공 2=clone실패(생략) 3=변경없음 1=push충돌 4=git오류
+          attempt() {
+            rm -rf db_data_repo
+            git clone --depth 1 --branch db-data "$REPO_URL" db_data_repo || return 2
+            mkdir -p db_data_repo/data
+            copied=0
+            while IFS= read -r name; do
+              [ -n "$name" ] || continue
+              [ -f "data/$name" ] || continue
+              if [ "$name" = "alert_dedup.json" ]; then
+                # writer가 셋인 파일이라 덮어쓰면 남의 억제 기록을 지운다.
+                python3 scripts/merge_alert_dedup.py "db_data_repo/data/$name" "data/$name"                   && copied=$((copied+1))                   || echo "[Deploy] 쿨다운 병합 실패"
+                continue
+              fi
+              cp "data/$name" "db_data_repo/data/" && copied=$((copied+1))
+            done < data/.lite_deploy_manifest
+            echo "[Deploy] 배포 파일 $copied개"
+            git -C db_data_repo add -A data/ || return 4
+            if git -C db_data_repo diff --cached --quiet; then
+              return 3
             fi
-            echo "[Deploy] push 충돌 — rebase 후 재시도 ($i/3)"
-            git fetch --unshallow origin db-data 2>/dev/null || git fetch origin db-data
-            git pull --rebase origin db-data || { echo "[Deploy] rebase 실패"; exit 1; }
+            git -C db_data_repo commit -m "chore(trade): sim state $(date +'%Y-%m-%d %H:%M KST')" || return 4
+            git -C db_data_repo push origin db-data || return 1
+            return 0
+          }
+
+          for i in 1 2 3; do
+            rc=0
+            attempt || rc=$?
+            case "$rc" in
+              0) echo "[Deploy] push 성공 (시도 $i)"; exit 0 ;;
+              2) echo "[Deploy] db-data 브랜치 clone 실패 — 이번 사이클 배포 생략"; exit 0 ;;
+              3) echo "No changes to commit"; exit 0 ;;
+              4) echo "[Deploy] git add/commit 실패 — 이 사이클 상태가 안 올라간다"; exit 1 ;;
+            esac
+            echo "[Deploy] push 충돌 — 다시 clone해서 재시도 ($i/3)"
           done
           echo "[Deploy] push 3회 실패"
           exit 1

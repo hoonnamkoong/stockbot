@@ -1,7 +1,6 @@
 import os
 import requests
 import json
-import base64
 from datetime import datetime, timedelta, timezone
 try:
     from dotenv import load_dotenv
@@ -35,20 +34,13 @@ def _is_data_valid(data: dict) -> bool:
 
 
 def get_access_token(force_refresh=False):
-    """
-    한국투자증권(KIS) API 접속을 위한 OAuth2 토큰을 발급하거나 캐시된 토큰을 반환합니다.
-    [Why] 1분당 토큰 발급 횟수 제한(1회)을 준수하기 위해 로컬 및 원격 캐시를 우선 확인합니다.
+    """한국투자증권(KIS) API 접속용 OAuth2 토큰을 **가져옵니다**(발급하지 않습니다).
+
+    로컬 캐시 → 비공개 레포 순으로 읽고, 둘 다 못 쓰면 유일 발급자
+    (scripts/token_manager.py)에게 맡깁니다. 발급 가드가 전부 거기 있으므로
+    이 함수가 직접 KIS에 발급을 요청하는 경로는 없습니다.
     """
     load_env()
-    
-    # 환경 변수에서 API 키 정보를 로드 (Rule 4.1에 따라 .env 또는 시스템 변수 활용)
-    app_key = os.environ.get("KIS_APP_KEY", "").strip().replace("\n", "")
-    app_secret = os.environ.get("KIS_APP_SECRET", "").strip().replace("\n", "")
-    is_virtual = os.environ.get("KIS_IS_VIRTUAL", "false").lower() == "true"
-    
-    # 실전/모의 계좌 주소 구분
-    default_url = "https://openapi.koreainvestment.com:9443" if not is_virtual else "https://openapivts.koreainvestment.com:29443"
-    base_url = os.environ.get("KIS_BASE_URL", default_url)
     
     # [What] 토큰 공유를 위해 파일명을 대시보드(TypeScript) 코드와 일치시킨 파일 경로 리스트
     possible_paths = [
@@ -124,94 +116,30 @@ def get_access_token(force_refresh=False):
     else:
         print("[Auth] 토큰 강제 갱신 요청됨.")
 
-    # [Step 4] 캐시가 없거나 유효하지 않으면 KIS API에 새 토큰 요청
-    if not app_key or not app_secret:
-        print("[Auth] 오류: KIS 자격 증명(AppKey/Secret)이 없습니다.")
+    # [Step 4] 캐시가 없거나 유효하지 않다 — **여기서 발급하지 않는다.**
+    #
+    # 발급자는 scripts/token_manager.py 하나이고, 가드도 거기에만 있다:
+    # 형제 발급 창 10분 / 강제 갱신 최소 간격 30분 / 저장소에 못 닿으면 발급 보류 /
+    # 네트워크 재시도 3회. 이 파일이 자기 힘으로 발급하던 시절에는 그중 하나도
+    # 없어서 **"원격 읽기가 5초 안에 안 끝난 것"과 "토큰이 만료된 것"이 같은
+    # 결과**를 냈다 — 2026-06-05(스크래퍼 하루 7회)과 2026-09-04(프리마켓 매 런)
+    # 두 번의 토큰 폭주가 그것이다.
+    #
+    # 지연 import: token_manager는 import 시점에 win32에서 stdout을 교체한다.
+    try:
+        from scripts.token_manager import ensure_valid_token
+    except ImportError as e:
+        print(f"[Auth] 발급자 모듈을 불러올 수 없습니다: {e}")
         return None
 
-    url = f"{base_url}/oauth2/tokenP"
-    headers = {"Content-Type": "application/json; charset=utf-8", "Accept": "application/json"}
-    payload = {"grant_type": "client_credentials", "appkey": app_key, "appsecret": app_secret}
-    
-    print(f"[Auth] KIS로부터 새 토큰 발급 시도 ({'모의' if 'vts' in base_url.lower() else '실전'})...")
-    try:
-        res = requests.post(url, headers=headers, json=payload, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            access_token = data.get('access_token')
-            expires_in = data.get('expires_in', 86400)
-            
-            if access_token:
-                now = datetime.now().astimezone()
-                expires_at = now + timedelta(seconds=expires_in)
-                token_data = {
-                    "access_token": access_token,
-                    "issued_at": now.isoformat(),
-                    "expires_at": expires_at.isoformat()
-                }
-                # 신규 토큰 저장
-                os.makedirs(os.path.dirname(token_path), exist_ok=True)
-                with open(token_path, 'w', encoding='utf-8') as f:
-                    json.dump(token_data, f, indent=2)
-                
-                print(f"[Auth] 새 토큰 저장 완료: {token_path}")
-                
-                # [V8.9.9.22 Persistence] 깃허브 원격 저장소에 즉시 동기화하여 중복 발급 방지
-                _update_github_token_cache(token_data)
-                
-                return access_token
-        else:
-            print(f"[Auth] KIS API 오류 {res.status_code}: {res.text}")
-    except Exception as e:
-        print(f"[Auth] 토큰 발급 예외 발생: {e}")
-        
-    return None
+    issued = ensure_valid_token(force_refresh=force_refresh)
+    if not issued:
+        # 발급자가 "지금 발급하면 안 된다"고 판단한 경우가 포함된다. 여기서
+        # 뒤집으면 가드를 넷 만든 의미가 없다.
+        print("[Auth] 유일 발급자가 토큰을 확보하지 못했습니다 — 자체 발급하지 않습니다.")
+        return None
+    return issued.get('access_token')
 
-def _update_github_token_cache(token_data):
-    """실시간으로 발급된 토큰을 비공개 레포(stockbot-secret)에 동기화합니다."""
-    gh_token = os.environ.get("GH_PAT") or os.environ.get("GITHUB_PAT") or os.environ.get("GITHUB_TOKEN")
-    if not gh_token:
-        print("[Auth] Skip: GH_PAT가 없어 원격 동기화를 수행하지 않습니다.")
-        return False
-
-    repo_owner = "hoonnamkoong"
-    repo_name = "stockbot-secret"
-    branch = "main"
-    gh_file_path = "kis_token_cache.json"
-    
-    api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{gh_file_path}"
-    headers = {
-        "Authorization": f"token {gh_token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-
-    try:
-        # 1. 기존 파일의 SHA 값 획득 (업데이트를 위해 필수)
-        res_get = requests.get(api_url + f"?ref={branch}", headers=headers, timeout=5)
-        sha = None
-        if res_get.status_code == 200:
-            sha = res_get.json().get('sha')
-
-        # 2. 파일 업데이트 실행
-        content_b64 = base64.b64encode(json.dumps(token_data, indent=2).encode('utf-8')).decode('utf-8')
-        payload = {
-            "message": f"[V8.9.9.22] Sync KIS Token: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            "content": content_b64,
-            "branch": branch
-        }
-        if sha:
-            payload["sha"] = sha
-
-        res_put = requests.put(api_url, headers=headers, json=payload, timeout=5)
-        if res_put.status_code in [200, 201]:
-            print(f"[Auth] GitHub 원격 동기화 성공: {gh_file_path} ({branch})")
-            return True
-        else:
-            print(f"[Auth] GitHub 동기화 실패: {res_put.status_code} {res_put.text}")
-    except Exception as e:
-        print(f"[Auth] GitHub 동기화 중 오류 발생: {e}")
-    
-    return False
 
 def get_account_info():
     """

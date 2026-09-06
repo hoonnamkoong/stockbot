@@ -263,24 +263,41 @@ def _token_issued_recently(window_min=SIBLING_ISSUE_WINDOW_MIN):
     return _issued_within(cache, window_min)
 
 
-def manage():
+def ensure_valid_token(force_refresh: bool = False):
+    """유효한 토큰을 확보해 그 캐시 dict를 반환한다. 확보 못 하면 None.
+
+    **KIS에 발급을 요청하는 코드는 이 함수 아래에만 있다.** src/trade/auth.py를
+    비롯한 모든 소비자가 여기를 거친다 — 가드(형제 발급 창 / 강제 갱신 최소 간격 /
+    저장소 미도달 시 발급 보류 / 네트워크 재시도)를 우회하는 두 번째 발급 경로가
+    생기지 않게 하기 위함이다. 2026-06-05과 2026-09-04의 토큰 폭주가 정확히
+    그 두 번째 경로였다(tests/test_auth_delegates_token_issue.py).
+
+    프로세스를 끝내지 않는다 — sys.exit는 CLI 진입점인 manage()의 몫이다.
+    """
+    return _ensure(force_refresh)[0]
+
+
+def _ensure(force_refresh: bool):
+    """(토큰 캐시 | None, 이번 호출에서 새로 발급했는가).
+
+    두 번째 값은 manage()가 강제 갱신 성공을 sys.exit(0)로 끝내야 하는지
+    가리는 데만 쓴다. 강제 갱신이어도 **레이트 가드에 걸려 발급하지 않은** 런은
+    거기 해당하지 않는다.
+    """
     print(f"\n[TokenManager] --- KIS 토큰 상태 점검 ({get_current_kst_time().strftime('%Y-%m-%d %H:%M:%S')} KST) ---")
-    
-    # 강제 갱신 모드 여부 (Vercel에서 요청 시)
-    force_refresh = os.environ.get('FORCE_TOKEN_REFRESH', 'false').lower() == 'true'
-    
+
     try:
         cache = load_token_cache()
     except TokenSourceUnavailable as e:
         # 토큰이 살아있을 수 있는데도 재발급하면 기존 토큰이 무효화되고 발급 제한만 소모한다.
         print(f"[TokenManager] ❌ 토큰 저장소 접근 불가 → 재발급하지 않고 종료: {e}")
-        return False
+        return None, False
 
     if not force_refresh and is_token_valid(cache):
         print("[TokenManager] * 기존 토큰이 아직 유효합니다. (발급 스킵)")
         # [Fix] Run Scraper 단계에서 auth.py가 로컬 파일을 먼저 읽도록 항상 로컬에 저장
         _write_local_cache(cache)
-        return True
+        return cache, False
     
     # 강제 갱신이어도 방금 발급된 유효 토큰이 있으면 발급하지 않는다.
     # (여기 도달한 비-force 런은 토큰이 무효인 경우뿐이라 가드에 걸리지 않는다.)
@@ -289,16 +306,13 @@ def manage():
         print(f"[TokenManager] * {FORCE_ISSUE_MIN_INTERVAL_MIN}분 이내에 발급된 "
               "유효 토큰이 있습니다 — 강제 갱신이지만 발급하지 않습니다.")
         _write_local_cache(recent)
-        return True
+        return recent, False
 
     # 토큰 발급 시도
     new_token = issue_new_token()
     if new_token:
         save_token_cache(new_token)
-        if force_refresh:
-            print("[TokenManager] * 강제 갱신 완료. 작업을 종료합니다.")
-            sys.exit(0) # 갱신 모드일 때는 여기서 종료
-        return True
+        return new_token, True
     
     # 발급이 거부됐다. 같은 초에 들어온 형제 런이 방금 발급했을 수 있다 —
     # 그 경우 이 런의 목적은 이미 달성됐고, 실패로 두면 중복 트리거마다 빨간 런이
@@ -310,10 +324,23 @@ def manage():
         # 성공으로 처리하는 이상 뒤 스텝이 읽을 로컬 캐시도 있어야 한다.
         # 없으면 update_market_calendar가 "토큰 캐시가 없다"로 죽는다(09-01 22:06Z).
         _write_local_cache(sibling)
-        return True
+        return sibling, False
 
     print("[TokenManager] ❌ 토큰 관리 실패")
-    return False
+    return None, False
+
+
+def manage():
+    """CLI 진입점. 강제 갱신 모드는 **새로 발급했을 때만** sys.exit(0)로 끝낸다."""
+    force_refresh = os.environ.get('FORCE_TOKEN_REFRESH', 'false').lower() == 'true'
+    token, issued_new = _ensure(force_refresh)
+    if token is None:
+        return False
+    if force_refresh and issued_new:
+        print("[TokenManager] * 강제 갱신 완료. 작업을 종료합니다.")
+        sys.exit(0)
+    return True
+
 
 if __name__ == "__main__":
     if not manage():

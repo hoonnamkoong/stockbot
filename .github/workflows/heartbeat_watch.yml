@@ -1,0 +1,81 @@
+name: Heartbeat Watch (매매 루프 생존 감시)
+
+# **"지금 멈춰 있다"를 장중에 잡는 유일한 감시자다.**
+#
+# 이 레포의 고장은 세 종류인데, 지금까지 셋째가 세션 단위로만 보였다:
+#   ① 런이 빨갛다              → notify_workflow_failure (빠름)
+#   ② 런이 초록인데 안 돌았다   → 산출물 신선도 감사 (하루 1~2회, 세션 단위)
+#   ③ 지금 루프가 멎어 있다     → **없었다**
+#
+# ②의 임계가 세션이라, 09:05에 루프가 멈추면 그 세션이 통째로 끝난 뒤에야
+# 결손으로 잡힌다. 2026-09-02의 "07시대 트리거 한 시간 실종"은 어떤 실패
+# 목록에도 안 떴다. 상주 워커로 옮기면 이 공백이 최대 위험이 된다 — 상주
+# 구조의 고장은 "사이클 하나가 빠졌다"가 아니라 "죽었고 아무도 모른다"다.
+#
+# [왜 네이티브 cron인가] 감시 대상(trading.yml)은 태스커(폰) → Vercel /api/cron
+# 으로 깨어난다. 이 감시자를 같은 경로에 두면 **폰이 죽을 때 감지기도 같이
+# 죽는다** — data_audit_backup.yml이 정확히 그 이유로 존재한다.
+# 이 레포의 cron은 못 믿지만(고빈도는 드롭, 저빈도는 지각), 이 감시자의
+# 실패 모드는 "알림이 안 감"이고 그건 현상 유지다 — 더 나빠지지 않는다.
+# cron이 통째로 안 뜨면 이 감시도 조용하다. 그건 못 막는다.
+on:
+  schedule:
+    # 00:00~06:00 UTC = 09:00~15:00 KST, 월~금. 세션당 7회.
+    # 시간당 1회로 둔 이유: 30분 격자는 이 레포에서 드롭된 고빈도 구간에
+    # 가깝고, 임계(15분)를 좁혀도 발견은 이 주기가 정한다.
+    - cron: '0 0-6 * * 1-5'
+  workflow_dispatch: {}
+
+concurrency:
+  group: heartbeat-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+    permissions:
+      contents: read
+      # 감시 대상의 런 이력을 읽는다.
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 휴장일 판정에 KIS 달력이 필요하다. 없으면 판정이 UNKNOWN이 되고
+      # 알림을 보내지 않는다 — 공휴일마다 거짓 경보를 내는 것보다 낫고,
+      # 달력 자체의 결손은 신선도 감사가 따로 본다.
+      - name: Fetch market calendar (db-data)
+        run: |
+          git fetch --depth 1 origin db-data:db-data 2>/dev/null || echo "[Info] db-data 없음"
+          mkdir -p data
+          git checkout db-data -- data/market_calendar.json 2>/dev/null || echo "[Info] 달력 없음 — 판정 불가로 처리된다"
+
+      - name: Check heartbeat
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 -u scripts/check_heartbeat.py
+
+      # 실패 **연속당 1통**. 감시자가 조용히 죽으면 감시가 없는 것과 같다.
+      #
+      # 조건이 `failure()`가 아닌 이유: 잡 타임아웃의 결론은 cancelled이고
+      # `failure()`는 거기 안 걸린다. `cancelled()`도 **워크플로** 취소를 보는
+      # 함수라 잡 타임아웃을 보장하지 못한다 — 취소된 잡에서도 도는 것이
+      # 문서화된 건 `always()`뿐이다.
+      - name: Notify on failure
+        if: always() && job.status != 'success'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: heartbeat_watch.yml
+        run: python3 scripts/notify_workflow_failure.py

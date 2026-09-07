@@ -18,8 +18,6 @@ import json
 import os
 from datetime import datetime, timedelta
 
-import requests
-
 CALENDAR_PATH = 'data/market_calendar.json'
 TOKEN_CACHE_PATH = 'data/kis_token_cache.json'
 CHK_HOLIDAY_URL = (
@@ -67,6 +65,11 @@ def fetch_calendar(access_token: str, app_key: str, app_secret: str,
         "custtype": "P",
     }
     params = {"BASS_DT": base_date, "CTX_AREA_NK": "", "CTX_AREA_FK": ""}
+
+    # requests를 모듈 최상단에서 받지 않는다. load_calendar/lookup만 쓰는
+    # 순수 독자(scripts/check_heartbeat.py)까지 서드파티 의존성이 번지면,
+    # 의존성 설치가 없는 감시 워크플로가 ImportError로 죽는다.
+    import requests
 
     res = requests.get(CHK_HOLIDAY_URL, headers=headers, params=params, timeout=10)
     res.raise_for_status()

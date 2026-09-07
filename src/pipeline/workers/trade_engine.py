@@ -500,18 +500,28 @@ class TradeEngineWorker(BaseWorker):
             own_universes: list[list[dict] | None] = [None] * len(simulators)
             enriched_by_code: dict[str, dict] = {}
             if not universe_override:
+                # [계측] 이 스테이지("버즈 불필요 페이퍼 심 동기화")는 정상 런이
+                # 45~61초, 2026-09-07 03:42Z 런은 156초를 쓰고 잡 타임아웃(3분)에
+                # 잘렸다. 스테이지 통짜 소요만 남아 있어 어느 구간인지 몰랐다 —
+                # 구간을 나눠 남긴다. 값이 없으면 다음에도 같은 자리에서 막힌다.
+                _t = time.monotonic()
                 for i, sim in enumerate(simulators):
                     if getattr(sim, 'IS_EOD', False):
                         continue
                     own_universes[i] = sim.get_universe()
+                self.log(f"  [계측] 자체 유니버스 수집 {time.monotonic() - _t:.1f}초")
                 pool = self._merge_own_universes([u for u in own_universes if u])
                 if pool:
+                    _t = time.monotonic()
                     enriched_by_code = {s['code']: s for s in self._enrich_universe(pool)
                                         if s.get('code')}
                     self.log(f"  자체 유니버스 공유 보강: 종목 {len(pool)}개 "
-                             f"({sum(len(u) for u in own_universes if u)}건 중복 제거)")
+                             f"({sum(len(u) for u in own_universes if u)}건 중복 제거) "
+                             f"[계측] {time.monotonic() - _t:.1f}초")
 
+            sim_secs: dict[str, float] = {}
             for i, sim in enumerate(simulators):
+                _t_sim = time.monotonic()
                 try:
                     # 일봉 전략은 장중 10분 루프에서 돌 이유가 없다 —
                     # scripts/run_eod_sims.py가 마감 후 1회 돌린다.
@@ -553,7 +563,10 @@ class TradeEngineWorker(BaseWorker):
                         blind = [c for c in sim.state.get('portfolio', {})
                                  if not sim_prices.get(c)]
                         if blind:
+                            _t = time.monotonic()
                             sim_prices.update(self._fetch_kis_prices(blind))
+                            self.log(f"  [계측] {sim.__class__.__name__} KIS 블라인드 "
+                                     f"보강 {len(blind)}종목 {time.monotonic() - _t:.1f}초")
                             blind = [c for c in blind if not sim_prices.get(c)]
                         if blind:
                             # 0을 현재가로 넘기면 심이 −100% 손실로 읽고 허위 손절을
@@ -567,8 +580,17 @@ class TradeEngineWorker(BaseWorker):
                     self.log(f"  {sim.__class__.__name__} 완료")
                 except Exception as e:
                     self.log_error(f"시뮬레이터 실패 ({sim.__class__.__name__}): {e}")
+                finally:
+                    # finally인 이유: 위 본문은 IS_EOD·측정 불가에서 continue로
+                    # 빠진다. 그 경로를 안 세면 "건너뛴 심이 오래 걸렸다"가
+                    # 계측에서 사라진다 — 잘린 런에서 마지막으로 보인 줄이
+                    # 정확히 그 건너뜀이었다.
+                    name = sim.__class__.__name__
+                    sim_secs[name] = sim_secs.get(name, 0.0) + time.monotonic() - _t_sim
 
-            self.log("시뮬레이터 동기화 완료")
+            slowest = sorted(sim_secs.items(), key=lambda kv: -kv[1])
+            self.log("시뮬레이터 동기화 완료 [계측] 심별 "
+                     + ', '.join(f'{k} {v:.1f}s' for k, v in slowest))
         except Exception as e:
             self.log_error(f"시뮬레이터 전체 실패: {e}")
 

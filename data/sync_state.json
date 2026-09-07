@@ -27,6 +27,21 @@
       "code": "386380",
       "name": "스카이랩스",
       "rank": 5
+    },
+    {
+      "code": "012210",
+      "name": "삼미금속",
+      "rank": 1
+    },
+    {
+      "code": "0039P0",
+      "name": "매드업",
+      "rank": 2
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 3
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +49,10 @@
     "034020",
     "066570",
     "000660",
-    "386380"
+    "386380",
+    "012210",
+    "0039P0",
+    "005930"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +81,23 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "012210",
+      "name": "삼미금속",
+      "rank": 1
+    },
+    {
+      "code": "0039P0",
+      "name": "매드업",
+      "rank": 2
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 3
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

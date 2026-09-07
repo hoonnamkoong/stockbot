@@ -3425,3 +3425,5 @@ timestamp,event,model,prompt_tokens,output_tokens,total_tokens,req_stocks,resp_s
 2026-09-07 15:00:07,,,,,,3,0,78,,,,,,,
 2026-09-07 15:10:09,cache_summary,,,,,,,,,,,0,5,21,0
 2026-09-07 15:10:11,batch_call,gemini-2.5-flash-lite,2530,552,3082,5,5,129,4489,,,,,,
+2026-09-07 15:19:58,cache_summary,,,,,,,,,,,1,5,14,0
+2026-09-07 15:20:00,batch_call,gemini-2.5-flash-lite,2774,533,3307,5,5,136,4822,,,,,,

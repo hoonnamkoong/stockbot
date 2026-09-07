@@ -2,6 +2,8 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import requests
+
 from src.market_calendar import parse_calendar, lookup
 
 
@@ -97,7 +99,7 @@ def test_fetch_calendar_sends_correct_tr_id(monkeypatch):
             'output': [{'bass_dt': '20260717', 'opnd_yn': 'N'}],
         })
 
-    monkeypatch.setattr(mc.requests, 'get', fake_get)
+    monkeypatch.setattr(requests, 'get', fake_get)
 
     days = mc.fetch_calendar('TOKEN', 'KEY', 'SECRET', '20260717')
 
@@ -111,7 +113,7 @@ def test_fetch_calendar_sends_correct_tr_id(monkeypatch):
 
 def test_fetch_calendar_raises_on_api_error(monkeypatch):
     """rt_cd가 0이 아니면 예외다 — 빈 달력으로 폴백하지 않는다."""
-    monkeypatch.setattr(mc.requests, 'get', lambda *a, **k: _FakeResponse(
+    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResponse(
         {'rt_cd': '1', 'msg1': 'EGW00123 토큰 오류'}
     ))
     with pytest.raises(RuntimeError, match='EGW00123'):
@@ -120,7 +122,7 @@ def test_fetch_calendar_raises_on_api_error(monkeypatch):
 
 def test_fetch_calendar_raises_on_empty_calendar(monkeypatch):
     """rt_cd=0인데 달력이 비면 예외다 — 판정 불가로 이어져야 한다."""
-    monkeypatch.setattr(mc.requests, 'get', lambda *a, **k: _FakeResponse(
+    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResponse(
         {'rt_cd': '0', 'output': []}
     ))
     with pytest.raises(RuntimeError, match='비어'):
@@ -187,3 +189,29 @@ def test_refresh_calendar_fetches_and_saves(monkeypatch, tmp_path):
 
     assert days == {'20260717': 'N'}
     assert mc.load_calendar(path=path) == {'20260717': 'N'}
+
+
+def test_module_imports_without_requests(monkeypatch):
+    """달력을 '읽기'만 하는 쪽은 requests 없이도 import된다.
+
+    scripts/check_heartbeat.py는 의존성 설치 스텝이 없는 워크플로에서 돌고
+    load_calendar/lookup만 쓴다. 이 모듈이 최상단에서 requests를 받으면 그
+    워치독이 ImportError로 죽는다 — 2026-09-07 하트비트 첫 런이 그렇게 실패했다.
+    """
+    import builtins
+    import importlib
+
+    real_import = builtins.__import__
+
+    def blocked(name, *args, **kwargs):
+        if name == 'requests' or name.startswith('requests.'):
+            raise ModuleNotFoundError("No module named 'requests'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', blocked)
+    monkeypatch.delitem(sys.modules, 'requests', raising=False)
+    monkeypatch.delitem(sys.modules, 'src.market_calendar', raising=False)
+
+    fresh = importlib.import_module('src.market_calendar')
+
+    assert fresh.lookup({'20260907': 'Y'}, '20260907') is True

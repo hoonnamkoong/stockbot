@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-09-08 14:51:39",
+  "last_run": "2026-09-08 15:01:04",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": 1.0,
-  "bull_score": 36.0,
+  "bull_score": 32.7,
   "metrics": {
-    "breadth_score": 33.0,
-    "momentum_score": -0.46,
+    "breadth_score": 26.0,
+    "momentum_score": -0.73,
     "trend_strength": 24.5,
     "foreign_score": null,
     "volatility_score": null
@@ -697,6 +697,10 @@
       {
         "t": "14:00",
         "breadth": 44.0
+      },
+      {
+        "t": "15:00",
+        "breadth": 26.0
       }
     ],
     "predictions": [
@@ -946,7 +950,7 @@
         "type": "h1",
         "model": "velocity",
         "value": 38.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -962,7 +966,7 @@
         "type": "h1",
         "model": "smoothed_velocity",
         "value": 44.8,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -978,7 +982,7 @@
         "type": "h1",
         "model": "naive",
         "value": 44.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -986,6 +990,30 @@
         "type": "eod",
         "model": "naive",
         "value": 44.0,
+        "scored": false
+      },
+      {
+        "made_at": "15:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "velocity",
+        "value": 21.7,
+        "scored": false
+      },
+      {
+        "made_at": "15:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 24.2,
+        "scored": false
+      },
+      {
+        "made_at": "15:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 26.0,
         "scored": false
       }
     ]
@@ -9821,6 +9849,36 @@
       "pred": 50.0,
       "actual": 44.0,
       "gap": 6.0
+    },
+    {
+      "date": "2026-09-08",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "15:00",
+      "pred": 38.0,
+      "actual": 26.0,
+      "gap": 12.0
+    },
+    {
+      "date": "2026-09-08",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "15:00",
+      "pred": 44.8,
+      "actual": 26.0,
+      "gap": 18.8
+    },
+    {
+      "date": "2026-09-08",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 44.0,
+      "actual": 26.0,
+      "gap": 18.0
     }
   ]
 }

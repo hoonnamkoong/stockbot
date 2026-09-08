@@ -34,7 +34,9 @@ import datetime as dt
 import json
 import os
 import sys
-from urllib import error, parse, request
+from urllib import error, request
+
+from src.core import notify
 
 # 이 창 안에 이미 non-success 완료 런이 있으면 보내지 않는다. trading은 2분
 # 간격이라 30분이면 15런이다 — `_fetch_runs`의 per_page가 그보다 넉넉해야
@@ -103,19 +105,14 @@ def _fetch_runs(wf: str, log) -> list[dict] | None:
 
 
 def _send(text: str, log) -> bool:
-    tok = os.environ['TELEGRAM_BOT_TOKEN']
-    chat = os.environ['TELEGRAM_CHAT_ID']
-    data = parse.urlencode({'chat_id': chat, 'text': text,
-                            'parse_mode': 'HTML'}).encode()
-    try:
-        with request.urlopen(
-                request.Request(f'https://api.telegram.org/bot{tok}/sendMessage',
-                                data=data, method='POST'), timeout=15):
-            pass
-    except (error.URLError, OSError) as e:
-        log(f'[Notify] 텔레그램 발송 실패: {e}')
-        return False
-    return True
+    """발송은 src.core.notify가 한다.
+
+    [2026-09-08] 예전엔 여기서 직접 urlopen을 불렀고 **4096자 분할이 없었다.**
+    실패가 몰린 날 이 메시지가 길어지면 텔레그램이 그냥 거부했다 —
+    하필 "뭔가 잘못됐다"를 알리는 경로다. notify도 표준 라이브러리만 쓰므로
+    이 파일의 무의존성 제약은 그대로다.
+    """
+    return notify.send(text, log=log)
 
 
 def main(log=print) -> str:

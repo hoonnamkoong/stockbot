@@ -1,97 +1,35 @@
 
 import os
-import requests
 import time
 
+from src.core import notify
+
+
 class TelegramManager:
-    """
-    Centralized manager for Telegram notifications.
-    Handles configuration, message formatting, and sending.
+    """리포트 메시지를 **조립**한다. 보내는 일은 src.core.notify가 한다.
+
+    [2026-09-08] 발신 코어(분할·재시도·HTTP)를 notify로 옮겼다. 예전에는 이
+    클래스와 notify_workflow_failure.py·audit_data_freshness.py 셋이 각자
+    보냈고, 4096자 분할과 평문 폴백이 **여기에만** 있었다 — 나머지 둘의 긴
+    메시지는 텔레그램이 그냥 거부했고 아무도 몰랐다.
+
+    도메인 조립(무엇을 어떤 문장으로 쓰는가)은 여기 남는다. notify는 텍스트만 안다.
     """
     def __init__(self, token=None, chat_id=None):
         self.token = token or os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
         self.chat_id = chat_id or os.environ.get('TELEGRAM_CHAT_ID', '').strip()
-        self.api_base = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        
+
         if not self.token or not self.chat_id:
             print("[TelegramManager] WARNING: Missing Token or Chat ID.")
             
-    # 텔레그램 sendMessage 실제 상한은 4096자. HTML 태그·이모지 바이트 오차를
-    # 감안해 여유를 둔다. [2026-08-11] 딥다이브가 2→5종목으로 늘면서 한 메시지가
-    # 상한을 넘을 수 있게 됐다 — 넘으면 API가 그냥 거부하는데, 기존 코드는
-    # 그 실패를 아무도 안 보고 "발송 완료"로 기록했다.
-    TELEGRAM_SAFE_LEN = 3900
+    # 상한·분할·재시도는 전부 src.core.notify가 갖는다. 여기 사본을 두면
+    # 또 갈라진다 — 그게 이 리팩터링의 이유다.
+    TELEGRAM_SAFE_LEN = notify.SAFE_LEN
 
     def send_message(self, text, parse_mode="HTML"):
-        """텔레그램으로 보낸다. 상한을 넘으면 문단(빈 줄) 경계로 나눠 여러
-        메시지로 순차 발송한다. 나눠 보낸 것 중 하나라도 실패하면 False를
-        돌려준다 — 일부만 갔는데 성공으로 기록되면 나머지가 조용히 사라진다."""
-        if not self.token or not self.chat_id:
-            print("[TelegramManager] Skipped: No credentials.")
-            return False
-        if len(text) <= self.TELEGRAM_SAFE_LEN:
-            return self._send_single(text, parse_mode)
-
-        chunks = self._split_into_chunks(text, self.TELEGRAM_SAFE_LEN)
-        print(f"[TelegramManager] 메시지가 {len(text)}자라 {len(chunks)}개로 나눠 보냅니다.")
-        ok = True
-        for chunk in chunks:
-            if not self._send_single(chunk, parse_mode):
-                ok = False
-        return ok
-
-    @staticmethod
-    def _split_into_chunks(text: str, limit: int) -> list:
-        """빈 줄(\\n\\n) 경계로 나눠 각 조각이 limit 이하가 되게 묶는다.
-        문단 하나가 그 자체로 limit을 넘는 드문 경우만 강제로 자른다."""
-        paragraphs = text.split('\n\n')
-        chunks, current = [], ''
-        for p in paragraphs:
-            candidate = f"{current}\n\n{p}" if current else p
-            if len(candidate) <= limit:
-                current = candidate
-                continue
-            if current:
-                chunks.append(current)
-                current = ''
-            if len(p) > limit:
-                for start in range(0, len(p), limit):
-                    chunks.append(p[start:start + limit])
-            else:
-                current = p
-        if current:
-            chunks.append(current)
-        return chunks
-
-    def _send_single(self, text, parse_mode="HTML"):
-        """Sends a raw message to Telegram (4096자 이내라고 가정)."""
-        # parse_mode=None은 "서식 없이 보낸다"는 뜻이다. 키를 None으로 넣어
-        # 보내면 텔레그램이 그걸 서식 지정으로 받아 거부한다 — 아예 뺀다.
-        payload = {"chat_id": self.chat_id, "text": text}
-        if parse_mode:
-            payload["parse_mode"] = parse_mode
-
-        try:
-            response = requests.post(self.api_base, json=payload, timeout=10)
-            response.raise_for_status()
-            print(f"[TelegramManager] Sent message (len={len(text)}). Status: 200")
-            return True
-        except Exception as e:
-            print(f"[TelegramManager] Error sending message: {e}")
-            # Retry without parse_mode if HTML fails
-            if parse_mode == "HTML":
-                print("[TelegramManager] Retrying as Plain Text...")
-                payload.pop('parse_mode', None)
-                try:
-                    retry_res = requests.post(self.api_base, json=payload, timeout=10)
-                    # [Fix] raise_for_status 누락 시 401/400 거부도 "성공"으로 보고돼
-                    # 호출부의 발송 실패 감지가 무력화된다 (메시지는 안 갔는데 True).
-                    retry_res.raise_for_status()
-                    print("[TelegramManager] Retry successful.")
-                    return True
-                except Exception as e2:
-                    print(f"[TelegramManager] Retry failed: {e2}")
-            return False
+        """텔레그램으로 보낸다. 하나라도 실패하면 False."""
+        return notify.send(text, parse_mode=parse_mode,
+                           token=self.token, chat_id=self.chat_id)
 
     def send_dashboard_link(self):
         """Sends the Dashboard Link (Always First)."""

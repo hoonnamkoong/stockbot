@@ -23,7 +23,7 @@ from urllib import error, parse, request
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.data_freshness import audit, load_manifest  # noqa: E402
-from src.core import clock
+from src.core import clock, notify
 
 _KST = clock.KST
 _BRANCH = 'db-data'
@@ -114,22 +114,12 @@ def format_report(findings: list[dict]) -> str:
 
 
 def _send(text: str, log=print) -> bool:
-    tok = os.environ.get('TELEGRAM_BOT_TOKEN')
-    chat = os.environ.get('TELEGRAM_CHAT_ID')
-    if not (tok and chat):
-        log('[Audit] 텔레그램 시크릿 없음 — 발송 생략')
-        return False
-    data = parse.urlencode({'chat_id': chat, 'text': text,
-                            'parse_mode': 'HTML'}).encode()
-    try:
-        with request.urlopen(
-                request.Request(f'https://api.telegram.org/bot{tok}/sendMessage',
-                                data=data, method='POST'), timeout=15):
-            pass
-        return True
-    except (error.URLError, OSError) as e:
-        log(f'[Audit] 텔레그램 발송 실패: {e}')
-        return False
+    """발송은 src.core.notify가 한다.
+
+    [2026-09-08] 예전엔 직접 urlopen이었고 분할이 없었다. 감사 보고는
+    **결손이 많을수록 길어진다** — 정작 길어질 때 통째로 거부됐다.
+    """
+    return notify.send(text, log=log)
 
 
 def main(log=print) -> list[dict]:

@@ -1,21 +1,16 @@
+"""TelegramManager의 발송 계약. [2026-09-08] 코어가 src.core.notify로 옮겨졌다.
+
+**테스트는 그대로 TelegramManager를 통해 부른다** — 공개 API가 안 바뀌었고,
+이렇게 해야 위임이 실제로 이어져 있는지까지 함께 검증된다. 갈아끼우는 대상만
+`requests.post`에서 `notify._post`로 바뀌었다.
+"""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
-import requests
 
+from src.core import notify
 from src.telegram_manager import TelegramManager
-
-
-class _FakeResponse:
-    """requests.Response 흉내. status가 4xx/5xx면 raise_for_status()가 던진다."""
-
-    def __init__(self, status):
-        self.status_code = status
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise requests.HTTPError(f"{self.status_code} Error")
 
 
 @pytest.fixture
@@ -23,11 +18,18 @@ def tg():
     return TelegramManager(token='t', chat_id='c')
 
 
-def _fake_post(responses, calls):
-    """호출 순서대로 responses를 돌려주는 가짜 post. 호출 인자를 calls에 기록."""
-    def post(url, json=None, timeout=None):
-        calls.append(json)
-        return responses[len(calls) - 1]
+def _fake_post(statuses, calls):
+    """호출 순서대로 statuses를 소비한다. 4xx/5xx면 던진다(urlopen과 같은 계약).
+
+    호출 인자(본문 dict)를 calls에 기록한다 — 예전 가짜는 requests의 json=
+    키워드를 받았고, 지금은 notify._post의 data 인자다.
+    """
+    def post(url, data, timeout=None):
+        calls.append(data)
+        status = statuses[min(len(calls) - 1, len(statuses) - 1)]
+        if status >= 400:
+            raise OSError(f'{status} Error')
+        return True
     return post
 
 
@@ -37,8 +39,7 @@ def test_retry_reports_failure_when_telegram_rejects_again(tg, monkeypatch):
     이 경로가 True를 돌려주면 호출부(마감 브리핑 등)의 발송 실패 감지가 통째로 무력화된다.
     """
     calls = []
-    monkeypatch.setattr(requests, 'post',
-                        _fake_post([_FakeResponse(401), _FakeResponse(401)], calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([401, 401], calls))
 
     assert tg.send_message('hi') is False
     assert len(calls) == 2                    # 1차 + 평문 재시도
@@ -51,8 +52,7 @@ def test_retry_succeeds_when_plain_text_is_accepted(tg, monkeypatch):
     재시도가 존재하는 원래 이유 — 종목명에 < 나 & 가 섞이면 텔레그램이 HTML 해석을 거부한다.
     """
     calls = []
-    monkeypatch.setattr(requests, 'post',
-                        _fake_post([_FakeResponse(400), _FakeResponse(200)], calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([400, 200], calls))
 
     assert tg.send_message('종목 <A> & <B>') is True
     assert len(calls) == 2
@@ -61,7 +61,7 @@ def test_retry_succeeds_when_plain_text_is_accepted(tg, monkeypatch):
 
 def test_first_attempt_success_does_not_retry(tg, monkeypatch):
     calls = []
-    monkeypatch.setattr(requests, 'post', _fake_post([_FakeResponse(200)], calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([200], calls))
 
     assert tg.send_message('hi') is True
     assert len(calls) == 1
@@ -72,11 +72,11 @@ def test_network_failure_on_retry_reports_failure(tg, monkeypatch):
     """답장을 아예 못 받는 경우(타임아웃 등)는 원래도 실패로 잡혔다 — 회귀 방지."""
     calls = []
 
-    def post(url, json=None, timeout=None):
-        calls.append(json)
-        raise requests.ConnectionError('unreachable')
+    def post(url, data, timeout=None):
+        calls.append(data)
+        raise OSError('unreachable')
 
-    monkeypatch.setattr(requests, 'post', post)
+    monkeypatch.setattr(notify, '_post', post)
 
     assert tg.send_message('hi') is False
     assert len(calls) == 2
@@ -86,7 +86,7 @@ def test_network_failure_on_retry_reports_failure(tg, monkeypatch):
 
 def test_short_message_is_sent_as_a_single_call(tg, monkeypatch):
     calls = []
-    monkeypatch.setattr(requests, 'post', _fake_post([_FakeResponse(200)], calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([200], calls))
 
     assert tg.send_message('짧은 메시지') is True
     assert len(calls) == 1
@@ -97,8 +97,7 @@ def test_long_message_is_split_into_multiple_calls(tg, monkeypatch):
     paragraph = '가' * 2000
     long_text = f"{paragraph}\n\n{paragraph}\n\n{paragraph}"  # 6000+자, 3개 문단
     calls = []
-    monkeypatch.setattr(requests, 'post',
-                        _fake_post([_FakeResponse(200)] * 10, calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([200] * 10, calls))
 
     ok = tg.send_message(long_text)
 
@@ -115,8 +114,7 @@ def test_one_failed_chunk_makes_the_whole_send_report_failure(tg, monkeypatch):
     long_text = f"{paragraph}\n\n{paragraph}\n\n{paragraph}"
     calls = []
     # 첫 조각 성공, 나머지는 재시도까지 전부 401
-    responses = [_FakeResponse(200)] + [_FakeResponse(401)] * 10
-    monkeypatch.setattr(requests, 'post', _fake_post(responses, calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([200] + [401] * 10, calls))
 
     assert tg.send_message(long_text) is False
 
@@ -129,7 +127,7 @@ def test_one_failed_chunk_makes_the_whole_send_report_failure(tg, monkeypatch):
 
 def test_plain_text_mode_omits_parse_mode_entirely(tg, monkeypatch):
     calls = []
-    monkeypatch.setattr(requests, 'post', _fake_post([_FakeResponse(200)], calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([200], calls))
 
     assert tg.send_message('외국계 PEF, 국내 M&A 싹쓸이', parse_mode=None) is True
     assert len(calls) == 1
@@ -139,8 +137,7 @@ def test_plain_text_mode_omits_parse_mode_entirely(tg, monkeypatch):
 def test_plain_text_mode_does_not_retry_on_failure(tg, monkeypatch):
     """평문으로 보냈는데 거부됐다면 서식 문제가 아니다 — 같은 걸 또 보낼 이유가 없다."""
     calls = []
-    monkeypatch.setattr(requests, 'post',
-                        _fake_post([_FakeResponse(400)] * 3, calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([400] * 3, calls))
 
     assert tg.send_message('hi', parse_mode=None) is False
     assert len(calls) == 1
@@ -150,7 +147,7 @@ def test_plain_text_mode_applies_to_every_chunk(tg, monkeypatch):
     """나눠 보낼 때 조각 하나만 평문이면 나머지가 그대로 400을 맞는다."""
     paragraph = '가' * 2000
     calls = []
-    monkeypatch.setattr(requests, 'post', _fake_post([_FakeResponse(200)] * 10, calls))
+    monkeypatch.setattr(notify, '_post', _fake_post([200] * 10, calls))
 
     tg.send_message(f"{paragraph}\n\n{paragraph}\n\n{paragraph}", parse_mode=None)
 
@@ -161,7 +158,7 @@ def test_plain_text_mode_applies_to_every_chunk(tg, monkeypatch):
 
 def test_split_into_chunks_keeps_each_chunk_under_limit():
     text = '\n\n'.join(['단락' * 100] * 5)  # 각 단락 400자, 5개
-    chunks = TelegramManager._split_into_chunks(text, limit=1000)
+    chunks = notify.split_chunks(text, limit=1000)
 
     assert all(len(c) <= 1000 for c in chunks)
     # 원문의 모든 문단이 어딘가에는 남아있어야 한다(유실 없음)
@@ -171,7 +168,7 @@ def test_split_into_chunks_keeps_each_chunk_under_limit():
 def test_split_into_chunks_force_splits_a_single_oversized_paragraph():
     """문단 하나가 그 자체로 limit을 넘는 드문 경우도 유실 없이 잘라야 한다."""
     text = '다' * 5000  # 문단 하나, 구분자 없음
-    chunks = TelegramManager._split_into_chunks(text, limit=2000)
+    chunks = notify.split_chunks(text, limit=2000)
 
     assert all(len(c) <= 2000 for c in chunks)
     assert ''.join(chunks) == text

@@ -19,8 +19,16 @@ def frgn_html():
 
 
 class FakeResponse:
-    def __init__(self, html):
+    """requests.Response 대역.
+
+    [2026-09-08] status_code가 생겼다. 네이버 호출이 src.core.net을 지나면서
+    상태코드를 검사하게 됐기 때문이다 — 실제 Response는 원래 갖고 있는 값이라,
+    없던 쪽이 불완전한 대역이었다.
+    """
+
+    def __init__(self, html, status=200):
         self.content = html.encode('utf-8')
+        self.status_code = status
 
 
 def test_current_price_is_parsed(monkeypatch):

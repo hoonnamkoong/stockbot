@@ -13,6 +13,7 @@ import time
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src import alerts
+from src.core import net
 from src.pipeline.context import PipelineContext
 from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
@@ -305,7 +306,10 @@ class DataFetcherWorker(BaseWorker):
         }
         url = f"https://finance.naver.com/item/frgn.naver?code={code}"
         try:
-            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            res = net.get(url, policy=net.BULK, target='naver',
+                          headers={'User-Agent': 'Mozilla/5.0'})
+            if res is None:
+                return result        # 못 닿았다. 0으로 지어내지 않는다.
             soup = BeautifulSoup(res.content, 'html.parser')
             rows = soup.select('table.type2 tr')
             data_rows = [
@@ -386,7 +390,10 @@ class DataFetcherWorker(BaseWorker):
         # 메인 페이지의 호가 정보 테이블 탐색
         try:
             main_url = f"https://finance.naver.com/item/main.naver?code={code}"
-            main_res = requests.get(main_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            main_res = net.get(main_url, policy=net.BULK, target='naver',
+                               headers={'User-Agent': 'Mozilla/5.0'})
+            if main_res is None:
+                raise RuntimeError('네이버 메인 페이지에 닿지 못했다')
             main_soup = BeautifulSoup(main_res.content, 'html.parser')
             quote_table = main_soup.select_one("table.type2.type_stock2")
             if quote_table:

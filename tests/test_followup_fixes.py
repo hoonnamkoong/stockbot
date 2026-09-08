@@ -39,9 +39,12 @@ def test_discussion_stats_returns_only_live_keys(monkeypatch):
     stats = object.__new__(DataFetcherWorker)._get_discussion_stats('002990', TODAY)
 
     # unique_posters는 Sim8 군중축, total_likes는 Sim1 likes_per_post가 쓴다
-    # (2026-07-28 추가). 소비자 없는 키를 남기지 않는다는 취지는 그대로다.
+    # (2026-07-28 추가). failure_reasons는 run()이 "페이지 수집 실패 …" 로그에
+    # 붙인다 — 2026-09-08에 실패율 92%를 보고도 429인지 리셋인지 몰랐기 때문에
+    # 생겼다(2026-09-08 추가). 소비자 없는 키를 남기지 않는다는 취지는 그대로다.
     assert set(stats) == {'recent_posts_count', 'unique_posters', 'total_likes',
-                          'new_posts', 'total_pages', 'failed_pages'}
+                          'new_posts', 'total_pages', 'failed_pages',
+                          'failure_reasons'}
 
 
 # ── 2. adopted_registry.save()는 원자적이어야 한다 ──

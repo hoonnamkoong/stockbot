@@ -30,10 +30,35 @@ class VirtualPortfolioManager:
                 return json.load(f)
         except: return {}
 
+    # 2026-04-06까지 쓰던 키. 파일에만 남아 있고 코드에는 없다.
+    _LEGACY_INVESTED_KEY = 'invested_amount'
+
+    @classmethod
+    def _normalize_balance(cls, raw):
+        """옛 스키마를 흡수해 항상 `invested`를 가진 dict를 돌려준다.
+
+        왜 필요했나: data/virtual_balance.json이 2026-04-06 이후 그대로였고
+        키가 `invested_amount`였다. 코드는 `balance['invested']`를 쓴다. 파일이
+        **이미 있으므로** init_portfolio()가 새 스키마로 다시 쓰지 않아, 샌드박스가
+        매수를 시도할 때마다 KeyError가 났다 — 2026-09-08 실측으로 스크래퍼 런
+        42개 중 35개가 그랬다. trade_engine의 except가 그걸 받아 그 사이클 전
+        종목을 'WATCH' 폴백으로 만들었고, pick_features의 신호 관측이 그만큼
+        오염됐다(약 5개월치).
+
+        값은 보존한다. 옛 키는 떼어낸다 — 두 키가 공존하면 다음 사람이 어느
+        쪽이 진짜인지 다시 물어야 한다.
+        """
+        b = dict(raw) if isinstance(raw, dict) else {}
+        legacy = b.pop(cls._LEGACY_INVESTED_KEY, None)
+        if 'invested' not in b:
+            b['invested'] = legacy if legacy is not None else 0
+        b.setdefault('cash', 3000000)
+        return b
+
     def get_balance(self):
         try:
             with open(self.balance_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                return self._normalize_balance(json.load(f))
         except: return {"cash": 3000000, "invested": 0}
 
     def save_all(self, port, balance):

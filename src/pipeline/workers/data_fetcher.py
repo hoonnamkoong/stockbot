@@ -29,6 +29,16 @@ PAGE_RETRY_WAIT = 0.5
 POST_LIMIT = 30       # 종목당 LLM에 넘길 게시글 수 (공감 상위). 2026-07-28: 5 → 30
 
 
+def format_failure_reasons(reasons: dict) -> str:
+    """실패 이유를 많은 순으로 한 줄에 담는다. 없으면 빈 문자열.
+
+    카운터에 담기기만 하고 로그에 안 나가면 없는 계측과 같다 — 2026-09-08에
+    실패율 92%를 보고도 429인지 리셋인지 몰랐던 것이 정확히 그 상태였다.
+    """
+    return ', '.join(f'{k} {v}' for k, v in
+                     sorted(reasons.items(), key=lambda kv: -kv[1]))
+
+
 # 전량 결손이 이만큼 연속돼야 사람에게 올린다. 스크래퍼는 10분 격자라 3런이면
 # 약 30분이다. 1런으로 재면 2026-08-13처럼 러너 하나의 4분짜리 네트워크 사고가
 # 사람을 깨우고, 그런 알림이 몇 번 반복되면 정작 몇 주짜리 고장 때 아무도 안 본다.
@@ -156,7 +166,8 @@ class DataFetcherWorker(BaseWorker):
                 # 바꿔도 결과가 갈리지 않는다.
                 stats = self._get_discussion_stats(s['code'], today_display)
                 count = stats['recent_posts_count']
-                pages = (stats['total_pages'], stats['failed_pages'])
+                pages = (stats['total_pages'], stats['failed_pages'],
+                         stats['failure_reasons'])
 
                 status = classify(count, self.ctx.threshold, set(adopted), s['code'])
                 if status is None:
@@ -189,14 +200,17 @@ class DataFetcherWorker(BaseWorker):
                 return s, True, pages
             except Exception as e:
                 print(f"   [DataFetcher] {s.get('name', '?')} 스킵: {e}")
-                return None, False, (0, 0)
+                return None, False, (0, 0, {})
 
         with ThreadPoolExecutor(max_workers=STOCK_WORKERS) as executor:
             futures = list(executor.map(process_one, candidates))
 
-        for res, passed, (pages, failed) in futures:
+        all_reasons: dict[str, int] = {}
+        for res, passed, (pages, failed, reasons) in futures:
             self.ctx.scrape_pages_total += pages
             self.ctx.scrape_pages_failed += failed
+            for k, v in (reasons or {}).items():
+                all_reasons[k] = all_reasons.get(k, 0) + v
             if passed and res:
                 results_raw.append(res)
 
@@ -204,6 +218,7 @@ class DataFetcherWorker(BaseWorker):
             self.log(
                 f"페이지 수집 실패 {self.ctx.scrape_pages_failed}/{self.ctx.scrape_pages_total}"
                 f" ({self.ctx.scrape_pages_failed / max(self.ctx.scrape_pages_total, 1):.1%})"
+                + (f" — {format_failure_reasons(all_reasons)}" if all_reasons else "")
             )
 
         # 5. 연속 카운트 갱신 (추적 종목은 임계값 미달이므로 연속일수에 포함하지 않는다)
@@ -396,6 +411,11 @@ class DataFetcherWorker(BaseWorker):
         max_pages, chunk_size = 40, PAGE_WORKERS
         total_pages = 0
         failed_pages = 0
+        # 실패 이유별 건수. fetch_page가 스레드풀에서 돌아 read-modify-write가
+        # 경합한다 — 락 없이 세면 계측이 조용히 줄어든다(_title_lock과 같은 이유).
+        import threading
+        failure_reasons: dict[str, int] = {}
+        reasons_lock = threading.Lock()
 
         def parse_page(res):
             soup = BeautifulSoup(res.content, 'html.parser')
@@ -417,18 +437,32 @@ class DataFetcherWorker(BaseWorker):
             return posts, stop
 
         def fetch_page(p_idx):
-            """(posts, stop, ok). 실패한 페이지를 '글 0건'으로 반환하면 게시글 수가 조용히 깎인다."""
+            """(posts, stop, ok). 실패한 페이지를 '글 0건'으로 반환하면 게시글 수가 조용히 깎인다.
+
+            실패 **이유**를 남긴다. 2026-09-08에 실패율이 7%~92%로 널뛰었는데
+            로그에는 횟수만 있었다 — 예외를 받지도 않고 버렸기 때문이다. 429(유량
+            제한)·커넥션 리셋·타임아웃은 대응이 전혀 다른데 셋이 구분되지 않았다.
+            이유를 모르는 채 동시성이나 재시도를 건드리면 짐작으로 고치는 것이다.
+            """
             url = f"https://finance.naver.com/item/board.naver?code={code}&page={p_idx}"
+            reason = 'unknown'
             for attempt in range(PAGE_RETRIES):
                 try:
                     res = session.get(url, timeout=5)
                     if res.status_code != 200:
-                        raise requests.HTTPError(f"HTTP {res.status_code}")
+                        # 상태코드를 숫자 그대로 남긴다. 'HTTPError'로 뭉뚱그리면
+                        # 429인지 503인지를 못 봐서 유량 제한 판정이 안 된다.
+                        reason = f'HTTP {res.status_code}'
+                        raise requests.HTTPError(reason)
                     posts, stop = parse_page(res)
                     return posts, stop, True
-                except requests.RequestException:
+                except requests.RequestException as e:
+                    if not isinstance(e, requests.HTTPError):
+                        reason = type(e).__name__
                     if attempt < PAGE_RETRIES - 1:
                         time.sleep(PAGE_RETRY_WAIT * (attempt + 1))
+            with reasons_lock:
+                failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
             return [], False, False
 
         # [2026-08-11, D1] 1페이지를 먼저 순차로 본다. 오늘 글이 1페이지 안에서
@@ -439,6 +473,13 @@ class DataFetcherWorker(BaseWorker):
         # 1페이지 조회 자체가 실패하면(ok=False) "다 봤다"를 모르므로 안전하게
         # 병렬 전수 스캔으로 폴백한다(모르면 스크래핑하는 쪽으로 fail).
         first_posts, first_stop, first_ok = fetch_page(1)
+        if not first_ok:
+            # 이 순차 시도는 전수 스캔으로 넘어가는 분기에서 집계에 빠져 있었다
+            # (stop이 걸린 분기에서는 total_pages=1로 세어진다). 실제로 나간
+            # 요청이므로 센다 — 안 세면 부하가 과소 보고되고, 실패 이유 합계와도
+            # 어긋난다('실패 16인데 이유 18').
+            total_pages += 1
+            failed_pages += 1
         if first_ok and first_stop:
             total_pages = 1
             for p in first_posts:
@@ -454,17 +495,36 @@ class DataFetcherWorker(BaseWorker):
                         key=lambda x: x[1]
                     )
                     stop_all = False
+                    chunk_ok = 0
                     for future, _ in chunk_res:
                         posts, stop, ok = future.result()
                         total_pages += 1
                         if not ok:
                             failed_pages += 1
+                        else:
+                            chunk_ok += 1
                         for p in posts:
                             if p['nid'] not in unique_nids:
                                 unique_nids.add(p['nid'])
                                 new_posts.append(p)
                         if stop: stop_all = True
                     if stop_all: break
+                    # 청크가 통째로 실패했으면 지금 못 닿는 것이다. 더 긁어도
+                    # 성공하지 않고 부하만 키운다 — 그리고 그 부하가 다음 실패를
+                    # 부른다. `stop`은 "어제 글에 닿았다"는 유일한 종료 신호인데
+                    # 실패한 페이지는 stop을 못 준다. 그래서 못 닿는 동안에는
+                    # 스캔이 멈출 줄을 모르고 max_pages까지 갔다.
+                    #
+                    # 2026-09-08 실측: 같은 날 런들의 (총 페이지, 실패율)이
+                    # 418→34.7% … 1473→92.0%로 단조증가했다. 전멸 상태에서
+                    # 종목당 요청이 27회 예산 대비 123회였다(테스트로 고정).
+                    #
+                    # 이렇게 모은 것은 어차피 버려진다 — LLMAnalyzerWorker에
+                    # `수집 실패율 초과 → 이번 런은 기록하지 않습니다` 게이트가 있다.
+                    # 실패는 실패로 세고(위 failed_pages) 스캔만 멈춘다. '글 0건'으로
+                    # 접으면 게시글 수가 조용히 깎인다.
+                    if not chunk_ok:
+                        break
 
         # [Sim8] 고유 작성자 수 — 한 사람의 도배와 다수의 관심을 구분하는 축.
         # writer 키는 여기서 떼어낸다. posts는 엑셀·LLM 프롬프트로 흘러가므로
@@ -483,6 +543,7 @@ class DataFetcherWorker(BaseWorker):
             'new_posts': new_posts,
             'total_pages': total_pages,
             'failed_pages': failed_pages,
+            'failure_reasons': failure_reasons,
         }
 
     def _reset_body_stats(self) -> None:

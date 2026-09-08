@@ -40,7 +40,8 @@ def _run_with_candidates(passing_codes, failing_codes):
     def fake_discussion_stats(code, today_str):
         count = 500 if code in passing_codes else 10  # threshold=100
         return {'recent_posts_count': count, 'unique_posters': 1, 'total_likes': 1,
-                'new_posts': [], 'total_pages': 1, 'failed_pages': 0}
+                'new_posts': [], 'total_pages': 1, 'failed_pages': 0,
+                'failure_reasons': {}}
 
     details_calls = []
 
@@ -105,7 +106,8 @@ def test_missing_field_log_extended_to_per_tick_power_range_history():
 
     def fake_discussion_stats(code, today_str):
         return {'recent_posts_count': 500, 'unique_posters': 1, 'total_likes': 1,
-                'new_posts': [], 'total_pages': 1, 'failed_pages': 0}
+                'new_posts': [], 'total_pages': 1, 'failed_pages': 0,
+                'failure_reasons': {}}
 
     logged = []
 

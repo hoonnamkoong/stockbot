@@ -47,6 +47,31 @@
       "code": "002990",
       "name": "금호건설",
       "rank": 4
+    },
+    {
+      "code": "079650",
+      "name": "서산",
+      "rank": 1
+    },
+    {
+      "code": "015760",
+      "name": "한국전력",
+      "rank": 2
+    },
+    {
+      "code": "386380",
+      "name": "스카이랩스",
+      "rank": 3
+    },
+    {
+      "code": "067290",
+      "name": "JW신약",
+      "rank": 4
+    },
+    {
+      "code": "010170",
+      "name": "대한광통신",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -58,7 +83,12 @@
     "032820",
     "000660",
     "005930",
-    "002990"
+    "002990",
+    "079650",
+    "015760",
+    "386380",
+    "067290",
+    "010170"
   ],
   "morning_reported_info": [
     {
@@ -107,9 +137,34 @@
       "code": "002990",
       "name": "금호건설",
       "rank": 4
+    },
+    {
+      "code": "079650",
+      "name": "서산",
+      "rank": 1
+    },
+    {
+      "code": "015760",
+      "name": "한국전력",
+      "rank": 2
+    },
+    {
+      "code": "386380",
+      "name": "스카이랩스",
+      "rank": 3
+    },
+    {
+      "code": "067290",
+      "name": "JW신약",
+      "rank": 4
+    },
+    {
+      "code": "010170",
+      "name": "대한광통신",
+      "rank": 5
     }
   ],
   "morning_complete": false,
-  "afternoon_complete": false,
+  "afternoon_complete": true,
   "daily_complete": false
 }

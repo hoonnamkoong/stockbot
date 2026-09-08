@@ -143,6 +143,17 @@ class TradeEngineWorker(BaseWorker):
     StrategyEngine.execute_simulation()을 통해 전략을 실행합니다.
     """
 
+    # 시뮬레이터 동기화 스테이지가 스스로 비켜주는 시각(스테이지 시작 기준, 초).
+    #
+    # trading.yml의 timeout-minutes는 3(180초)이고 그 안에서 체크아웃·의존성
+    # 설치·토큰·매매·이 스테이지·배포가 함께 돈다. 2026-09-08 실측으로 이
+    # 스테이지는 잡 시작 37초 지점에서 시작했다 — 배포에 남길 몫까지 빼면
+    # 여기 쓸 수 있는 건 100초 남짓이다.
+    #
+    # 정상 사이클은 45~61초를 쓴다(2026-09-07 실측). 100초는 정상 사이클을
+    # 자르지 않으면서 잘림만 막는 자리다.
+    SYNC_STAGE_DEADLINE_SEC = 100
+
     def __init__(self, ctx: PipelineContext, storage: StorageManager):
         super().__init__(ctx)
         self.storage = storage
@@ -438,6 +449,7 @@ class TradeEngineWorker(BaseWorker):
           골라 돌리는 데 쓴다 — only_sim_id(정확히 1개)의 다중 버전이다.
         """
         try:
+            _stage_started = time.monotonic()
             # 1. 오늘 candidates 기반으로 현재가 구성
             current_prices = {
                 s['code']: s.get('price', s.get('current_price', 0))
@@ -521,6 +533,19 @@ class TradeEngineWorker(BaseWorker):
 
             sim_secs: dict[str, float] = {}
             for i, sim in enumerate(simulators):
+                # 잘리는 것과 스스로 비켜주는 것은 다르다. 잘리면 잡이 cancelled가
+                # 되고 뒤에 있는 배포 스텝이 통째로 죽어 그 사이클의 심 상태가
+                # db-data에 안 올라간다 — 게다가 실패 알림까지 나간다(게이트가
+                # `job.status != 'success'`다). 남은 심은 다음 사이클이 돈다.
+                #
+                # 예산은 **스테이지 시작부터** 잰다. 앞의 유니버스 수집·공유 보강도
+                # 같은 3분을 쓰기 때문에, 심 루프만 재면 이미 늦은 뒤에 시작한다.
+                elapsed = time.monotonic() - _stage_started
+                if elapsed > self.SYNC_STAGE_DEADLINE_SEC:
+                    self.log(f"  동기화 데드라인 초과({elapsed:.0f}초 > "
+                             f"{self.SYNC_STAGE_DEADLINE_SEC}초) — 남은 "
+                             f"{len(simulators) - i}개 심은 다음 사이클로")
+                    break
                 _t_sim = time.monotonic()
                 try:
                     # 일봉 전략은 장중 10분 루프에서 돌 이유가 없다 —

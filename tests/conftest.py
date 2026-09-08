@@ -20,3 +20,16 @@ def _isolate_alert_dedup(tmp_path, monkeypatch):
     # "이 런이 쿨다운을 기록했는가"도 프로세스 상태다. 안 되돌리면 앞 테스트가
     # 켜둔 플래그 때문에 뒤 테스트가 배포 목록에 알림 파일을 넣는다.
     monkeypatch.setattr('src.alerts._state_written', False)
+
+
+@pytest.fixture(autouse=True)
+def _reset_kis_connection_breaker(monkeypatch):
+    """KIS 연결 차단기도 프로세스 상태다 — 위 쿨다운과 같은 계열의 누수다.
+
+    KISDataProvider._conn_fail_streak는 클래스 레벨이라(program_trader가 매 호출
+    새 인스턴스를 만들기 때문에 그래야 한다) 앞 테스트가 올려둔 값이 남는다.
+    임계를 넘긴 채로 넘어오면 뒤 테스트의 KIS 호출이 네트워크를 아예 안 타고
+    {}를 받는다 — 실행 순서에 따라 통과했다 실패했다 하게 된다.
+    """
+    from src.trade.kis_data_provider import KISDataProvider
+    monkeypatch.setattr(KISDataProvider, '_conn_fail_streak', 0)

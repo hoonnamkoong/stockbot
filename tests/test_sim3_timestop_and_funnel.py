@@ -22,6 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from src.strategy.simulators.base_simulator import get_kst_date
 from src.strategy.simulators.sim3_risk import SmartRiskSimulator
 
 
@@ -163,11 +164,20 @@ def test_failed_buy_is_not_counted_as_a_purchase():
     """
     # 실전에서 나는 형태: 대부분 투자돼 있고 현금만 바닥이다. NAV 기준 사이징은
     # 살 수량을 크게 잡는데 정작 지불할 현금이 없다.
+    #
+    # entry_date는 **오늘**이어야 한다. 절대 날짜를 박으면 그 날짜가 7일 타임스탑
+    # 창 밖으로 밀려나는 날 이 테스트가 조용히 뜻을 잃는다 — 원래 '2026-09-01'이
+    # 박혀 있었고 2026-09-08(정확히 7일째)에 실제로 그렇게 됐다. 타임스탑이
+    # 보유분 300주×10,000원을 팔아 현금을 채워버려서, '현금 부족'을 재려던
+    # 셋업이 '현금 충분'이 되고 매수가 성공했다. 고장 난 것은 심이 아니라
+    # 픽스처였다(같은 파일의 test_recent_entry_is_not_timestopped도 같은 이유로
+    # 오늘 날짜를 쓴다).
     sim = _sim()
     sim.state['cash'] = 1_000
     sim.state['portfolio']['999999'] = {
         'name': 'HELD', 'quantity': 300, 'avg_price': 10_000,
-        'peak_price': 10_000, 'entry_date': '2026-09-01', 'is_scaled_out': False}
+        'peak_price': 10_000, 'entry_date': get_kst_date().isoformat(),
+        'is_scaled_out': False}
     captured = {}
     import src.strategy.simulators.sim3_risk as m
     monkey = lambda *a, **k: captured.update(funnel=a[2], bought=k.get('buys', 0))

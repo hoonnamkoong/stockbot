@@ -126,7 +126,8 @@ def main(log=print) -> str:
     wf = os.environ.get('WORKFLOW_FILE', '')
     run_id = os.environ.get('GITHUB_RUN_ID', '0')
     if not should_notify(_fetch_runs(wf, log), run_id):
-        log(f'[Notify] 직전 런도 실패 — 연속 실패로 보고 알림 생략 ({wf})')
+        log(f'[Notify] 최근 {SUPPRESS_WINDOW_MIN}분 안에 이미 실패가 있었다 — '
+            f'같은 장애로 보고 알림 생략 ({wf})')
         return 'suppressed'
 
     name = os.environ.get('GITHUB_WORKFLOW', wf or '알 수 없는 워크플로')

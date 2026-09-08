@@ -15,15 +15,19 @@ fail-closed 지점이 둘로 갈린다.
 """
 import datetime as dt
 from zoneinfo import ZoneInfo
+from src.core import clock
 
 _NY = ZoneInfo('America/New_York')
-_KST = dt.timezone(dt.timedelta(hours=9))
-
-# 국내 창. 상한이 15:50인 것은 src.pipeline.context.is_market_hours와 맞춘 것이다
-# — 매도·기타 판단이 마감(15:30) 직후까지 이어진다. 신규 매수 차단선(15:30)은
-# 별개이며 program_trader가 MARKET_CLOSE_HHMM로 따로 건다.
-KR_OPEN_HHMM = (9, 0)
-KR_CLOSE_HHMM = (15, 50)
+_KST = clock.KST
+# 국내 창. 상한이 15:50인 것은 매도·기타 판단이 마감(15:30) 직후까지 이어지기
+# 때문이다. 신규 매수 차단선(15:30)은 별개이며 program_trader가
+# MARKET_CLOSE_HHMM으로 따로 건다.
+#
+# [2026-09-08] 예전엔 이 값을 주석으로 context.is_market_hours와 "맞춰" 뒀다.
+# 주석은 실행되지 않는다 — 게다가 같은 이름 `KR_CLOSE_HHMM`이 data_freshness.py
+# 에서는 15:30이었다. 이제 값은 clock 하나가 갖는다.
+KR_OPEN_HHMM = clock.KR_OPEN
+KR_CLOSE_HHMM = clock.KR_JUDGMENT_CLOSE
 
 # 산출물 신선도 감사를 돌리는 창 — "어젯밤 뭐가 안 돌았나"를 하루 한 번 받는다.
 #

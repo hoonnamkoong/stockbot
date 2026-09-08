@@ -10,10 +10,11 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.market_calendar import refresh_calendar
+from src.core import clock
 
 
 def main():
-    today = (datetime.utcnow() + timedelta(hours=9)).strftime('%Y%m%d')
+    today = (clock.now_naive()).strftime('%Y%m%d')
     try:
         days = refresh_calendar(today)
     except Exception as e:

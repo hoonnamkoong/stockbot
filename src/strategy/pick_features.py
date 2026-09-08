@@ -22,6 +22,7 @@ tick_power(원 단위 % 스케일)를 그대로 합치면 스케일이 큰 쪽�
 import csv
 import os
 from datetime import datetime, timedelta, timezone
+from src.core import clock
 
 DATA_DIR = 'data'
 
@@ -119,7 +120,7 @@ def rank_top(candidates: list[dict], n: int = 5) -> list[dict]:
 
 
 def _today() -> str:
-    return datetime.now(timezone(timedelta(hours=9))).strftime('%Y%m%d')
+    return clock.now().strftime('%Y%m%d')
 
 
 def month_path(today: str = None) -> str:
@@ -177,7 +178,7 @@ def log_features(features: list[dict], path: str = None, log=print) -> int:
                       f'생략합니다 — {path}')
             return 0
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-        ts = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')
+        ts = clock.now().strftime('%Y-%m-%d %H:%M:%S')
         is_new = not os.path.exists(path) or os.path.getsize(path) == 0
         with open(path, 'a', newline='', encoding='utf-8') as f:
             w = csv.DictWriter(f, fieldnames=COLUMNS)

@@ -21,12 +21,13 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from scripts import gh_dispatch as gh  # noqa: E402
+from src.core import clock
 
 _WORKFLOW = 'eod_data.yml'
-_KST = dt.timezone(dt.timedelta(hours=9))
+_KST = clock.KST
 # 장 마감. 이 시각 **뒤에** 시작한 런만 종가를 담는다 — eod_data.yml 자체가
 # 장중(UTC < 06:30)이면 수집을 건너뛰는 게이트를 갖고 있다.
-_KR_CLOSE_HHMM = (15, 30)
+_KR_CLOSE_HHMM = clock.KR_REGULAR_CLOSE
 
 
 # 재시도 상한과 간격. 판정 자체는 gh_dispatch.should_skip에 있다 —

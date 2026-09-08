@@ -1,6 +1,7 @@
 from src.data import hype_dict, sim_diag
 
 from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
+from src.core import clock
 
 _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
@@ -374,7 +375,7 @@ class PsychDivergenceSimulator(BaseSimulator):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
 
-        now = datetime.now(timezone(timedelta(hours=9)))
+        now = clock.now()
         today = now.strftime('%Y%m%d')
 
         # 승격은 여기 한 곳에서만 판정한다.

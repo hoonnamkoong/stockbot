@@ -2,6 +2,7 @@ import os
 import json
 import requests
 from datetime import datetime
+from src.core import clock
 
 class GeminiTrader:
     def __init__(self):
@@ -58,7 +59,7 @@ class GeminiTrader:
     def _get_current_date(self):
         # KST Current Date (+9 hours)
         from datetime import timezone, timedelta
-        kst = timezone(timedelta(hours=9))
+        kst = clock.KST
         return datetime.now(kst).strftime('%Y-%m-%d')
         
     def check_exits(self, current_data):
@@ -126,7 +127,7 @@ class GeminiTrader:
                     
                     self.state['cash'] += net_return
                     from datetime import timezone, timedelta
-                    kst_tz = timezone(timedelta(hours=9))
+                    kst_tz = clock.KST
                     current_time_kst = datetime.now(kst_tz).strftime('%H:%M:%S')
                     self.state['trade_log'].append({
                         'date': current_date + " " + current_time_kst, 
@@ -231,7 +232,7 @@ class GeminiTrader:
                         print(f"    -> Vercel 매수 요청 실패: {e}")
 
                     from datetime import timezone, timedelta
-                    kst_tz = timezone(timedelta(hours=9))
+                    kst_tz = clock.KST
                     current_time_kst = datetime.now(kst_tz).strftime('%H:%M:%S')
                     self.state['trade_log'].append({
                         'date': current_date + " " + current_time_kst, 

@@ -11,9 +11,9 @@ EOD 배치(쓰는 쪽)와 장중 루프(읽는 쪽)가 같은 날짜 키를 써�
 import datetime as dt
 
 from src import market_calendar
+from src.core import clock
 
-_KST = dt.timezone(dt.timedelta(hours=9))
-
+_KST = clock.KST
 # 정규장 마감(KST). 이 시각을 지나야 "오늘 세션은 끝났다"고 본다.
 _CLOSE_MIN = 15 * 60 + 30
 

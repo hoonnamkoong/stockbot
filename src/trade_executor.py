@@ -125,6 +125,7 @@ def save_reservations(reservations: list) -> None:
 
 import csv
 import io
+from src.core import clock
 
 # `status`는 마지막 컬럼이다 — 기존 파일의 8칸 행이 그대로 유효하게 읽히도록.
 # pending(주문 접수) / filled(체결 확인) 두 값을 쓴다. 예전에는 이 구분이 없어
@@ -284,7 +285,7 @@ def append_order_history(record: dict) -> None:
 def main():
     # [V8.9.9.16] 기준 시각을 KST로 통일 (한국 시장 기준)
     from datetime import timedelta
-    now_kst = datetime.utcnow() + timedelta(hours=9)
+    now_kst = clock.now_naive()
     print(f"\n[TradeExecutor] 실행 — {now_kst.strftime('%Y-%m-%d %H:%M:%S')} KST")
 
     # --- KIS 잔고 조회 의존성 제거 (Vercel Proxy) ---
@@ -330,7 +331,7 @@ def main():
                     target_time_str = target_time_str[:-1] + '+00:00'
                 target_time_dt = datetime.fromisoformat(target_time_str)
                 if target_time_dt.tzinfo is not None:
-                    target_time = target_time_dt.astimezone(timezone(timedelta(hours=9))).replace(tzinfo=None)
+                    target_time = target_time_dt.astimezone(clock.KST).replace(tzinfo=None)
                 else:
                     target_time = target_time_dt
 

@@ -23,8 +23,9 @@ from urllib import error, parse, request
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.data_freshness import audit, load_manifest  # noqa: E402
+from src.core import clock
 
-_KST = dt.timezone(dt.timedelta(hours=9))
+_KST = clock.KST
 _BRANCH = 'db-data'
 
 

@@ -8,13 +8,13 @@ import pandas as pd
 from datetime import datetime, timedelta
 import glob
 
+from src.core import clock
+
 def send_weekly_report():
     print("[Weekly Report] Checking if today is the reporting day...")
     
     # KST 기준 금요일 전송 (Friday = 4 in 0-6 index)
-    # GitHub Runner is UTC, so add 9 hours.
-    now_utc = datetime.utcnow()
-    now_kst = now_utc + timedelta(hours=9)
+    now_kst = clock.now_naive()
     
     # if now_kst.weekday() != 4:
     #     print(f"[Weekly Report] Today is {now_kst.strftime('%A')}, not Friday. Skipping.")

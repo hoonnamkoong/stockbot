@@ -11,12 +11,14 @@ import os
 import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from src.core import clock
 
 # 이 비율을 넘는 페이지가 실패하면 그 런의 게시글 수는 실제보다 작다.
 DEGRADED_PAGE_FAIL_RATIO = 0.10
 
-# KRX 정규장 마감 (종가 단일가 종료)
-MARKET_CLOSE_HHMM = (15, 30)
+# KRX 정규장 마감 (종가 단일가 종료) = 신규 매수 차단선.
+# 값은 clock이 갖는다 — program_trader가 이 이름으로 가져다 쓴다.
+MARKET_CLOSE_HHMM = clock.KR_REGULAR_CLOSE
 
 # cycle_id 격자 폭(초). 서로 다른 런에서 관측한 값을 같은 시각으로 묶는 단위다.
 # 태스커 주기(120초)에 맞췄다 — 런보다 촘촘하면 격자가 비고, 성글면 한 격자에
@@ -35,7 +37,9 @@ class PipelineContext:
         # 실행 시각을 생성 시점에 고정 (KST). 시계는 여기서 한 번만 읽는다 —
         # now_kst와 cycle_id가 각자 읽으면 격자 경계에서 갈릴 수 있다.
         _utc: datetime = datetime.now(timezone.utc)
-        self.now_kst: datetime = (_utc + timedelta(hours=9)).replace(tzinfo=None)
+        # clock.now_naive()를 부르지 않는 이유: 그러면 시계를 두 번 읽게 되고,
+        # 위 주석의 "여기서 한 번만"이 깨진다. 읽은 값을 변환만 한다.
+        self.now_kst: datetime = clock.as_naive(_utc)
 
         # 서로 다른 런·서로 다른 심이 남긴 관측을 "같은 시각"으로 묶는 격자 번호.
         # 이게 없으면 각자 datetime.now()를 찍어 수 초씩 어긋나고, (ts, code) 조인이
@@ -143,10 +147,10 @@ class PipelineContext:
 
         거래일 판정 불가(None)면 닫는다. 거래일인지 모르는 채로 매수하지 않는다.
         """
+        hhmm = (self.now_kst.hour, self.now_kst.minute)
         return bool(
             self.is_trading_day() is True and
-            9 <= self.now_kst.hour < 16 and
-            not (self.now_kst.hour == 15 and self.now_kst.minute >= 50)
+            clock.KR_OPEN <= hhmm < clock.KR_JUDGMENT_CLOSE
         )
 
     def is_buy_window(self) -> bool:
@@ -191,7 +195,7 @@ class PipelineContext:
         먹는지 알 수 없다. now_kst 자체는 그대로 둔다 — 날짜·거래일 판정이 한 런
         안에서 흔들리면 안 된다.
         """
-        wall = datetime.utcnow() + timedelta(hours=9)
+        wall = clock.now_naive()
         print(f"[{wall.strftime('%H:%M:%S')}] {msg}")
 
     @contextmanager

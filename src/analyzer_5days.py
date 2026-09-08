@@ -23,7 +23,7 @@ def get_recent_working_days(count=5):
     
     # Start from today (KST)
     # Use UTC to safe add 9 hours regardless of server location
-    current_date = datetime.utcnow() + timedelta(hours=9) 
+    current_date = clock.now_naive() 
     
     check_date = current_date
     
@@ -311,6 +311,7 @@ def analyze_3days():
 
 import sys
 import argparse
+from src.core import clock
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

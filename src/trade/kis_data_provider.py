@@ -155,13 +155,37 @@ class KISDataProvider:
     GET_ATTEMPTS = 3
     RETRY_BACKOFF_SEC = 0.3
 
+    # 재시도 예산을 통째로 태운 호출이 연속 이만큼 나오면, 그 프로세스에서는
+    # 더 재시도하지 않고 즉시 {}를 돌려준다.
+    #
+    # 왜: 2026-09-08에 실전매매 런 넷이 잡 타임아웃(3분)에 잘려 실패 알림이
+    # 나갔다. PR #98이 넣어둔 구간 계측이 값을 남겼는데 네 런이 거의 같았다 —
+    # 자체 유니버스 수집 50.0초, KIS 블라인드 보강(5종목) 50.0초. 꼬리가 길어진
+    # 게 아니라 상수다. 한 호출의 예산이 3 + 0.3 + 3 + 0.6 + 3 = 9.9초이고
+    # 5종목이면 49.5초다. egress가 죽으면 첫 종목에서 이미 나온 답을 종목 수만큼
+    # 다시 사고 있었다.
+    #
+    # 임계가 1이 아닌 이유: 위 GET_ATTEMPTS 주석의 blip 흡수(2026-08-13)를 깨면
+    # 안 된다. 3회 소진 = 약 30초간 한 번도 못 닿았다는 뜻이라 blip이 아니다.
+    #
+    # 클래스 레벨인 이유: program_trader는 "새 인스턴스 = 캐시 무시"로 매 호출
+    # 새 KISDataProvider를 만든다(위 _rank_cache 주석). 인스턴스 상태로 두면
+    # 차단기가 한 번도 안 걸린다.
+    CONN_BREAKER_STREAK = 3
+    _conn_fail_streak = 0
+
     def _get(self, url: str, tr_id: str, params: dict, timeout: int = READ_TIMEOUT) -> dict:
         """실패하면 {}를 돌려준다 — 없는 값을 0으로 지어내지 않는다.
 
         재시도는 **연결 계열 실패에만** 한다. rt_cd != 0이나 HTTP 500은 서버가
         대답한 것이고, 그걸 다시 던지면 유량제한만 키운다.
+
+        차단기가 걸려 있어도 반환값은 똑같은 {}다. 값의 뜻은 안 바뀌고 같은
+        결론에 더 빨리 도달할 뿐이다.
         """
         if not self._token or not self._base_url:
+            return {}
+        if KISDataProvider._conn_fail_streak >= self.CONN_BREAKER_STREAK:
             return {}
         for attempt in range(self.GET_ATTEMPTS):
             try:
@@ -175,9 +199,13 @@ class KISDataProvider:
                 if attempt + 1 < self.GET_ATTEMPTS:
                     time.sleep(self.RETRY_BACKOFF_SEC * (attempt + 1))
                     continue
+                KISDataProvider._conn_fail_streak += 1
                 return {}
             except Exception:
                 return {}
+            # 응답이 왔다 = egress가 살아 있다. rt_cd가 무엇이든 연결은 됐으므로
+            # 여기서 푼다 — 차단기가 재는 것은 데이터 정합성이 아니라 도달성이다.
+            KISDataProvider._conn_fail_streak = 0
             if r.status_code == 200:
                 try:
                     body = r.json()

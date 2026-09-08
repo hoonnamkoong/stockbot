@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 108.21,
+      "peak_price": 109.22,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 260.42,
+      "peak_price": 260.675,
       "is_scaled_out": false
     },
     "VG": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 20715.675000000003,
+  "peak_nav": 20755.32,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -53,8 +53,8 @@
   "cooldown_codes": {},
   "raw_stats": {
     "cash": 1441.295,
-    "total_asset": 20715.675000000003,
-    "profit_rate": 3.578375000000015,
+    "total_asset": 20755.32,
+    "profit_rate": 3.776599999999999,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -63,29 +63,29 @@
     "frequency": 0.38461538461538464,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "STT": 192.72,
-      "RGA": 253.27,
-      "PSX": 259.26,
-      "HALO": 109.05,
-      "HPE": 52.3,
-      "DINO": 108.21,
-      "ROKU": 155.5,
-      "PR": 23.82,
-      "BAC": 62.52,
-      "OXY": 61.08,
-      "VG": 14.8,
-      "AMZN": 256.52,
-      "APH": 83.811,
-      "EXPD": 187.75,
-      "EOG": 147.315,
-      "ANET": 196.965,
-      "OSCR": 31.715,
-      "MU": 1037.93,
-      "OVV": 65.67,
-      "COP": 136.565,
-      "FANG": 201.91,
-      "KEYS": 329.715,
-      "TWLO": 226.01
+      "FANG": 201.7,
+      "DINO": 109.22,
+      "RGA": 252.22,
+      "HALO": 107.65,
+      "OXY": 61.51,
+      "AMZN": 255.75,
+      "PR": 23.768,
+      "EOG": 147.035,
+      "OSCR": 31.535,
+      "ANET": 197.02,
+      "APH": 83.41,
+      "STT": 193.46,
+      "PSX": 260.675,
+      "COP": 136.44,
+      "VG": 14.91,
+      "MU": 1020.67,
+      "HPE": 52.345,
+      "OVV": 63.405,
+      "TWLO": 226.685,
+      "BAC": 62.57,
+      "EXPD": 186.0,
+      "KEYS": 328.69,
+      "ROKU": 154.52
     }
   },
   "normalized_stats": {

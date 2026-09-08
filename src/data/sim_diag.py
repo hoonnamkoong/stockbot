@@ -15,6 +15,7 @@ CSV·월별 분할 이유는 post_archive와 같다(배포 루프가 data/*.csv�
 import csv
 import os
 from datetime import datetime, timedelta, timezone
+from src.core import clock
 
 DATA_DIR = 'data'
 
@@ -99,7 +100,7 @@ def month_files(sim: str, today: str = None) -> list:
 
 
 def _today() -> str:
-    return datetime.now(timezone(timedelta(hours=9))).strftime('%Y%m%d')
+    return clock.now().strftime('%Y%m%d')
 
 
 def _move_stale_if_needed(path) -> bool:
@@ -173,7 +174,7 @@ def append(sim: str, records: list, path: str = None, log=print) -> int:
                       f'생략합니다 — {path}')
             return 0
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-        ts = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S')
+        ts = clock.now().strftime('%Y-%m-%d %H:%M:%S')
         is_new = not os.path.exists(path) or os.path.getsize(path) == 0
         with open(path, 'a', newline='', encoding='utf-8') as f:
             w = csv.DictWriter(f, fieldnames=COLUMNS)

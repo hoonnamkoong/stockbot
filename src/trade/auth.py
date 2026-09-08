@@ -2,6 +2,7 @@ import os
 import requests
 import json
 from datetime import datetime, timedelta, timezone
+from src.core import clock
 try:
     from dotenv import load_dotenv
     HAS_DOTENV = True
@@ -27,7 +28,7 @@ def _is_data_valid(data: dict) -> bool:
             return False
         expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
         if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone(timedelta(hours=9)))
+            expires_at = expires_at.replace(tzinfo=clock.KST)
         return (expires_at - datetime.now().astimezone()).total_seconds() > 7200
     except Exception:
         return False

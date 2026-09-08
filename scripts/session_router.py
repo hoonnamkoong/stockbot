@@ -17,10 +17,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.session_gate import (  # noqa: E402
     kr_audit_window, kr_eod_window, kr_session_open, premarket_window,
     us_session_open, us_watchlist_window, weekly_report_window)
+from src.core import clock
 
-_KST = dt.timezone(dt.timedelta(hours=9))
-
-
+_KST = clock.KST
 def decide(now_utc: dt.datetime | None = None) -> dict[str, bool]:
     now_utc = now_utc or dt.datetime.now(dt.timezone.utc)
     # 국내 게이트는 naive KST를 받는다(PipelineContext.now_kst와 같은 표현).

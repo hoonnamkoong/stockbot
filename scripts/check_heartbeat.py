@@ -26,8 +26,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src import alerts, heartbeat  # noqa: E402
 from src.market_calendar import load_calendar, lookup  # noqa: E402
+from src.core import clock
 
-_KST = dt.timezone(dt.timedelta(hours=9))
+_KST = clock.KST
 _WATCHED = 'trading.yml'
 
 

@@ -16,6 +16,7 @@ if sys.platform == 'win32':
 #          Vercel/스크래퍼는 이 비공개 레포를 인증해 읽기만 한다.
 
 import base64
+from src.core import clock
 
 TOKEN_CACHE_PATH = 'data/kis_token_cache.json'  # 런타임 내 로컬 캐시(부차적)
 
@@ -61,7 +62,7 @@ def _secret_api_url():
 
 def get_current_kst_time():
     from datetime import timezone
-    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=9)))
+    return clock.now()
 
 def _load_local_cache():
     if os.path.exists(TOKEN_CACHE_PATH):
@@ -209,7 +210,7 @@ def is_token_valid(cache):
         # If naive, assume it's KST (which was the old behavior)
         if expires_at.tzinfo is None:
             from datetime import timezone
-            expires_at = expires_at.replace(tzinfo=timezone(timedelta(hours=9)))
+            expires_at = expires_at.replace(tzinfo=clock.KST)
             
         if get_current_kst_time() + timedelta(hours=2) < expires_at:
             return True
@@ -244,7 +245,7 @@ def _issued_within(cache, window_min):
     except ValueError:
         return None
     if issued.tzinfo is None:
-        issued = issued.replace(tzinfo=timezone(timedelta(hours=9)))
+        issued = issued.replace(tzinfo=clock.KST)
     if get_current_kst_time() - issued <= timedelta(minutes=window_min):
         return cache
     return None

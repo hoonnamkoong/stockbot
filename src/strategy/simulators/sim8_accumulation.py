@@ -1,6 +1,7 @@
 import os
 
 from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, log_funnel
+from src.core import clock
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -145,7 +146,7 @@ def crowd_reference(data_dir):
     try:
         with open(os.path.join(data_dir, 'status.json'), encoding='utf-8-sig') as f:
             updated = str(json.load(f).get('last_updated', ''))[:10]
-        today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
+        today = clock.now().strftime('%Y-%m-%d')
         if updated != today:
             print(f'[Sim8] 버즈 기준선이 낡았다(status.json {updated or "없음"} ≠ {today}) — 매집 보류')
             return {}, None

@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from src import alerts
 from src.data.minute_bars import anchor_times, codes_for_date, drop_date, merge_bars
+from src.core import clock
 
 COLUMNS = ['date', 'code', 'hhmm', 'price', 'volume']
 
@@ -67,7 +68,7 @@ def append_bars(date_str: str, code: str, bars: list[dict], path: str) -> int:
 
 
 def main() -> None:
-    now = (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
+    now = clock.now_naive()
     date_str = now.strftime('%Y%m%d')
 
     # 파일명을 짚지 않는다. 순위 스냅샷은 2026-09-04에 월별(money_2026-09.csv)에서

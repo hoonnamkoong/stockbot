@@ -20,13 +20,15 @@ import datetime as dt
 import os
 
 import yaml
+from src.core import clock
 
-_KST = dt.timezone(dt.timedelta(hours=9))
+_KST = clock.KST
 MANIFEST_PATH = os.path.join(os.path.dirname(__file__), '..',
                              'config', 'data_freshness.yaml')
 
 # 마감 시각(현지). 이 시각을 지나야 그 세션이 '마감됐다'.
-KR_CLOSE_HHMM = (15, 30)
+# 국내 값은 clock이 원천이다 — 예전엔 같은 이름이 session_gate에서 15:50이었다.
+KR_CLOSE_HHMM = clock.KR_REGULAR_CLOSE
 US_CLOSE_HHMM = (16, 0)
 
 

@@ -14,6 +14,7 @@ import os
 import json
 import pandas as pd
 from datetime import datetime, timedelta
+from src.core import clock
 
 
 def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_time=None):
@@ -30,7 +31,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
     os.makedirs('data', exist_ok=True)
 
     # [V8.9.9.11] 기동 시각 동기화 및 스냅샷 시간 단위 통합 (파일 개수 최적화)
-    now_kst = start_time if start_time else (datetime.utcnow() + timedelta(hours=9))
+    now_kst = start_time if start_time else (clock.now_naive())
     timestamp = now_kst.strftime("%Y%m%d_%H")
 
     # 1. 고정 CSV 저장 (Force Sync)

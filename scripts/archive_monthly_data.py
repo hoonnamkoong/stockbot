@@ -48,6 +48,7 @@ import sys
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from src.core import clock
 
 RECIPIENT = 'hoon.namkoong@gmail.com'
 ARCHIVE_LOG = 'archive_log.json'
@@ -235,7 +236,7 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
 
     today = (dt.date.fromisoformat(a.today) if a.today
-             else (dt.datetime.utcnow() + dt.timedelta(hours=9)).date())
+             else (clock.now_naive()).date())
     groups = group_by_month(sorted(glob.glob(os.path.join(a.data_dir, '*'))))
     log = _load_log(a.data_dir, a.local_log)
 

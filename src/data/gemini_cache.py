@@ -17,12 +17,13 @@ import hashlib
 import json
 import os
 from datetime import datetime, timedelta, timezone
+from src.core import clock
 
 DEFAULT_PATH = os.path.join('data', 'gemini_cache.json')
 
 
 def today_kst() -> str:
-    return (datetime.now(timezone(timedelta(hours=9)))).strftime('%Y%m%d')
+    return (clock.now()).strftime('%Y%m%d')
 
 
 def make_key(code: str, posts: list) -> str:

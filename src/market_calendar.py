@@ -17,6 +17,7 @@ BASS_DT를 오늘로 요청하므로 오늘은 언제나 첫 페이지에 있다
 import json
 import os
 from datetime import datetime, timedelta
+from src.core import clock
 
 CALENDAR_PATH = 'data/market_calendar.json'
 TOKEN_CACHE_PATH = 'data/kis_token_cache.json'
@@ -97,7 +98,7 @@ def save_calendar(days: dict, path: str = None) -> None:
     """달력을 저장한다. updated_at은 디버깅용이며 판정에 쓰지 않는다."""
     target = path or CALENDAR_PATH
     payload = {
-        'updated_at': (datetime.utcnow() + timedelta(hours=9)).isoformat(),
+        'updated_at': (clock.now_naive()).isoformat(),
         'days': days,
     }
     parent = os.path.dirname(target)

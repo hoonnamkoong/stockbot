@@ -13,6 +13,7 @@ import requests
 from datetime import datetime, timedelta
 
 from src.trade.auth import get_access_token, get_base_url
+from src.core import clock
 
 
 FILLED = 'filled'
@@ -67,7 +68,7 @@ def _request_executions(from_date: str | None = None, to_date: str | None = None
     base_url = get_base_url()
     tr_id = 'VTTC8001R' if is_virtual else 'TTTC8001R'
 
-    now_kst = datetime.utcnow() + timedelta(hours=9)
+    now_kst = clock.now_naive()
     to_date = to_date or now_kst.strftime('%Y%m%d')
     from_date = from_date or to_date
 

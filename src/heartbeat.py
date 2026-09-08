@@ -17,9 +17,9 @@ should_reconnect에서 이미 두 번 겪었다.
 import datetime as dt
 
 from src.session_gate import kr_session_open
+from src.core import clock
 
-_KST = dt.timezone(dt.timedelta(hours=9))
-
+_KST = clock.KST
 # 루프는 2분 격자로 돌고 한 런이 두 바퀴를 돈다. 15분이면 트리거를 일곱 번
 # 놓친 것이라 정상 지터로 볼 수 없다. 더 좁혀도 발견이 빨라지지는 않는다 —
 # 감시자(heartbeat_watch.yml)가 시간당 한 번 보기 때문이다.

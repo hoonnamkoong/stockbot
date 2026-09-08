@@ -23,9 +23,9 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src import soak  # noqa: E402
+from src.core import clock
 
-_KST = dt.timezone(dt.timedelta(hours=9))
-
+_KST = clock.KST
 DEFAULT_LOG = os.path.expanduser('~/stockbot_soak.log')
 DEFAULT_INTERVAL_SEC = 60
 DEFAULT_REQUIRED_HOURS = 72

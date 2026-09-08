@@ -16,11 +16,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from scripts import gh_dispatch as gh  # noqa: E402
+from src.core import clock
 
 _WORKFLOW = 'data_audit.yml'
-_KST = dt.timezone(dt.timedelta(hours=9))
-
-
+_KST = clock.KST
 def dispatch_data_audit(now_utc: dt.datetime | None = None, log=print) -> str:
     """'dispatched' | 'skipped' | 'failed'."""
     now_kst = (now_utc or dt.datetime.now(dt.timezone.utc)).astimezone(_KST)

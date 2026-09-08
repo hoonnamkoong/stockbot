@@ -19,10 +19,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from scripts import gh_dispatch as gh  # noqa: E402
+from src.core import clock
 
 _WORKFLOW = 'weekly_report.yml'
-_KST = dt.timezone(dt.timedelta(hours=9))
-
+_KST = clock.KST
 # 창 시작(18:00 KST). src.session_gate의 WEEKLY_REPORT_OPEN_HHMM과 같은 값이지만,
 # 여기서 그 모듈을 import하면 zoneinfo가 딸려온다 — 이 스크립트는 pip install
 # 앞에서 돈다.

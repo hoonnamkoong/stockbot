@@ -5,11 +5,12 @@ import datetime
 from datetime import timedelta, timezone
 
 from src.trade import fees
+from src.core import clock
 
 
 def get_kst_now():
     # [V8.9.9.21] 시스템 환경과 무관하게 한국 표준시(UTC+9) 강제 적용
-    return datetime.datetime.now(timezone(timedelta(hours=9)))
+    return clock.now()
 
 
 def get_kst_date():

@@ -8,7 +8,7 @@
       "quantity": 4,
       "avg_price": 938.84,
       "entry_date": "2026-08-27",
-      "peak_price": 1016.59,
+      "peak_price": 1030.05,
       "is_scaled_out": false
     },
     "NVDA": {
@@ -24,7 +24,7 @@
       "quantity": 2,
       "avg_price": 1503.99,
       "entry_date": "2026-08-27",
-      "peak_price": 1740.0,
+      "peak_price": 1778.5,
       "is_scaled_out": false
     },
     "MSFT": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21265.575,
+  "peak_nav": 21397.825,
   "total_fees": 17.7648,
   "history": [
     20000
@@ -52,13 +52,13 @@
   "daily_trades": [],
   "cooldown_codes": {},
   "rebalance": {
-    "elapsed": 6,
-    "last_seen": "20260907"
+    "elapsed": 7,
+    "last_seen": "20260908"
   },
   "raw_stats": {
     "cash": 2235.1949999999997,
-    "total_asset": 21265.575,
-    "profit_rate": 6.327875000000003,
+    "total_asset": 21397.825,
+    "profit_rate": 6.989125000000003,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -67,26 +67,26 @@
     "frequency": 0.38461538461538464,
     "total_fees": 17.7648,
     "current_prices": {
-      "TSM": 428.91,
-      "AVGO": 357.895,
-      "PLTR": 174.33,
-      "INTC": 95.8,
-      "MU": 1016.59,
-      "MRNA": 145.55,
-      "NBIS": 226.39,
-      "GOOGL": 338.46,
-      "DELL": 524.14,
-      "MSFT": 499.7,
-      "LITE": 881.255,
-      "GOOG": 335.31,
-      "AAPL": 319.97,
-      "TSLA": 354.08,
-      "NVDA": 230.36,
-      "SNDK": 1740.0,
-      "AMZN": 258.51,
-      "AMD": 477.57,
-      "MRVL": 223.55,
-      "META": 616.77
+      "TSLA": 358.5,
+      "GOOGL": 336.05,
+      "TSM": 442.94,
+      "DELL": 522.575,
+      "NBIS": 241.19,
+      "PLTR": 173.68,
+      "SNDK": 1778.5,
+      "INTC": 101.0,
+      "NVDA": 232.875,
+      "GOOG": 332.51,
+      "MRNA": 143.975,
+      "MSFT": 493.46,
+      "META": 619.98,
+      "AMZN": 256.36,
+      "LITE": 901.04,
+      "AMD": 491.68,
+      "MU": 1030.05,
+      "AAPL": 319.955,
+      "AVGO": 367.34,
+      "MRVL": 231.0
     }
   },
   "normalized_stats": {

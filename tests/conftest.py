@@ -33,3 +33,17 @@ def _reset_kis_connection_breaker(monkeypatch):
     """
     from src.trade.kis_data_provider import KISDataProvider
     monkeypatch.setattr(KISDataProvider, '_conn_fail_streak', 0)
+
+
+@pytest.fixture(autouse=True)
+def _reset_net_breaker(monkeypatch):
+    """src.core.net의 대상별 차단기도 프로세스 상태다 — 위 KIS 차단기와 같은 계열.
+
+    2026-09-09에 실제로 겪었다: 네이버 실패를 만드는 테스트가 차단기를 열어 두면
+    **다음 테스트의 정상 경로가 0회 호출**이 되고, 성공을 검증하는 테스트에
+    `{'breaker_open': 9}`가 찍힌다. 대상 키가 테스트마다 다르므로 통째로 비우는
+    것이 맞다 — 남겨서 의미가 있는 상태가 아니다.
+    """
+    from src.core import net
+    monkeypatch.setattr(net, '_STREAKS', {})
+    monkeypatch.setattr(net, '_OPENED_AT', {})

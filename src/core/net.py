@@ -22,6 +22,15 @@
 구분이 없다. 네이버가 죽어도 그 차단기는 모르고, 반대도 마찬가지다.
 여기서는 `target`별로 나눠 한 서비스의 장애가 다른 서비스를 막지 않게 한다.
 
+## 차단기는 스스로 풀린다
+
+복구 경로가 없으면 차단기는 런을 끝장낸다. 열린 뒤에는 `request()`가 호출 전에
+`None`을 주므로 `_STREAKS`를 리셋할 응답이 **영영 오지 않는다**. 2026-09-09 실측에서
+네이버 게시글 수집 실패율이 같은 날 0.2% ↔ 69.5%로 널뛰었다(전부 ReadTimeout) —
+버스트가 지나가면 다시 멀쩡한데, 복구가 없으면 10분짜리 버스트가 **런 전체의
+수집 중단**이 된다. `recovery_sec`이 지나면 한 번 탐침을 보내고, 성공하면 닫고
+실패하면 다시 그만큼 기다린다.
+
 ## 청산은 막지 않는다
 
 `CRITICAL`은 차단기를 걸지 않는다(`breaker_streak=0`). "청산은 무조건 나가야
@@ -50,6 +59,7 @@ class Policy:
     attempts: int           # 연결 계열 실패에만 쓴다
     backoff: float
     breaker_streak: int     # 0이면 차단하지 않는다
+    recovery_sec: float = 30.0   # 열린 뒤 이만큼 지나면 탐침을 한 번 보낸다
 
     def budget_sec(self) -> float:
         """이 정책이 한 호출에 태울 수 있는 최대 시간(대략). 예산 계산용."""
@@ -58,11 +68,15 @@ class Policy:
 
 
 # 시세·지표처럼 **자주, 많이** 부르는 것. 여기가 곱해져서 사고가 났다.
-FAST = Policy('FAST', connect=3, read=5, attempts=3, backoff=0.3, breaker_streak=3)
+FAST = Policy('FAST', connect=3, read=5, attempts=3, backoff=0.3, breaker_streak=3,
+              recovery_sec=30)
 
 # 스크래핑처럼 느려도 되지만 양이 많은 것. 실패가 쌓이면 빨리 포기하는 편이
 # 낫다 — 어차피 하류에 '수집 실패율 초과 → 기록 안 함' 게이트가 있다.
-BULK = Policy('BULK', connect=3, read=8, attempts=2, backoff=0.5, breaker_streak=3)
+# 스크래핑 실패는 버스트로 온다(2026-09-09: 0.2% ↔ 69.5%). 복구를 짧게 잡아
+# 버스트가 지나간 뒤를 놓치지 않는다.
+BULK = Policy('BULK', connect=3, read=8, attempts=2, backoff=0.5, breaker_streak=3,
+              recovery_sec=20)
 
 # 주문·취소. 차단하지 않는다(위 독스트링 참고).
 CRITICAL = Policy('CRITICAL', connect=5, read=10, attempts=3, backoff=0.5,
@@ -72,6 +86,10 @@ CRITICAL = Policy('CRITICAL', connect=5, read=10, attempts=3, backoff=0.5,
 # 대상별 연속 소진 횟수. 프로세스 상태다 — 테스트는 conftest가 아니라
 # 각 테스트 파일이 초기화한다(대상 키가 테스트마다 다르기 때문).
 _STREAKS: dict[str, int] = {}
+
+# 차단기가 열린 시각(monotonic). 벽시계를 쓰면 NTP 보정 한 번에 차단이
+# 영구화되거나 즉시 풀린다.
+_OPENED_AT: dict[str, float] = {}
 
 _CONN_ERRORS = (requests.exceptions.Timeout, requests.exceptions.ConnectionError)
 
@@ -97,8 +115,12 @@ def request(method: str, url: str, *, policy: Policy = FAST,
     key = target or url.split('/')[2] if '//' in url else (target or url)
 
     if policy.breaker_streak and _STREAKS.get(key, 0) >= policy.breaker_streak:
-        _note(reasons, 'breaker_open')
-        return None
+        opened = _OPENED_AT.get(key)
+        if opened is not None and time.monotonic() - opened < policy.recovery_sec:
+            _note(reasons, 'breaker_open')
+            return None
+        # 복구 시간이 지났다 — 탐침을 하나 내보낸다. 실패하면 아래에서
+        # `_OPENED_AT`이 다시 찍혀 또 그만큼 기다린다.
 
     kwargs.setdefault('timeout', (policy.connect, policy.read))
     last_conn_reason = None
@@ -121,6 +143,7 @@ def request(method: str, url: str, *, policy: Policy = FAST,
         # 응답이 왔다 = 닿았다. 상태코드가 무엇이든 차단기는 푼다 —
         # 차단기가 재는 것은 데이터 정합성이 아니라 **도달성**이다.
         _STREAKS[key] = 0
+        _OPENED_AT.pop(key, None)
         if res.status_code == 200:
             return res
         # 서버가 대답한 실패는 재시도하지 않는다. 다시 던지면 유량제한만 키운다.
@@ -128,6 +151,10 @@ def request(method: str, url: str, *, policy: Policy = FAST,
         return None
 
     _STREAKS[key] = _STREAKS.get(key, 0) + 1
+    if policy.breaker_streak and _STREAKS[key] >= policy.breaker_streak:
+        # 탐침이 실패한 경우도 여기다 — 시각을 다시 찍어 또 recovery_sec을 기다린다.
+        # 안 찍으면 매 호출이 탐침이 되어 차단기가 없는 것과 같아진다.
+        _OPENED_AT[key] = time.monotonic()
     _note(reasons, last_conn_reason or 'unknown')
     return None
 

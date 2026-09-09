@@ -28,6 +28,7 @@ import requests
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from src.core import net
 from src.pipeline.workers import data_fetcher as df
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
 
@@ -79,7 +80,9 @@ def test_청크가_통째로_실패하면_스캔을_멈춘다(worker, monkeypatc
 
     # 1페이지 순차(재시도 포함) + 첫 청크(8페이지 × 재시도)까지가 상한이다.
     # 그 뒤로도 계속 가면 40페이지분이 나간다.
-    budget = df.PAGE_RETRIES * (1 + df.PAGE_WORKERS)
+    # [2026-09-09] 재시도 횟수는 이제 net이 정한다(BULK.attempts) — 호출부가
+    # 숫자를 갖지 않는다. 차단기까지 겹쳐 실제 호출은 이보다 훨씬 적다.
+    budget = net.BULK.attempts * (1 + df.PAGE_WORKERS)
     assert len(calls) <= budget, f'청크 전멸 뒤에도 계속 긁었다: {len(calls)}회'
 
 

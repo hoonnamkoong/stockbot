@@ -259,6 +259,84 @@ def test_주문_등급은_차단하지_않는다(monkeypatch):
     assert len(calls) > burned, '주문 경로가 차단기에 막혔다'
 
 
+# ── required=: 예외를 계약으로 갖는 호출부 ──────────────────────────
+#
+# 미국 배치(us_ohlcv/us_universe/us_fundamentals)는 `raise_for_status()`로
+# **예외를 올리는** 계약이고, 그 예외가 곧 알림 본문이다:
+#
+#     except Exception as e:
+#         alerts.send_alert(f'{type(e).__name__}: {e}\n\n'
+#                           '다음 거래일 미국 심은 한 건도 매매하지 않습니다.')
+#         raise
+#
+# (2026-08-26 주석: "삼키면 잡이 초록으로 끝나 실패가 두 겹으로 묻힌다" —
+#  08-24·25에 이 배치가 이틀 죽었는데 아무도 몰랐다.)
+#
+# net의 기본 계약은 `None`이다. 그냥 옮기면 예외가 사라져 그 알림이 죽는다.
+# 그래서 계약을 **호출부가 고른다** — 값을 못 얻은 것을 세는 경로는 None,
+# 못 얻으면 그 위가 통째로 무의미해지는 경로는 예외.
+
+def test_required면_None_대신_예외를_올린다(monkeypatch):
+    _spy(monkeypatch, [requests.ConnectTimeout('boom')])
+
+    with pytest.raises(net.NetError):
+        net.get('https://x/y', policy=net.FAST, target='x', required=True)
+
+
+def test_required가_아니면_기존대로_None이다(monkeypatch):
+    """기본 계약은 바뀌지 않는다 — 이미 옮긴 호출부가 전부 None을 전제한다."""
+    _spy(monkeypatch, [requests.ConnectTimeout('boom')])
+
+    assert net.get('https://x/y', policy=net.FAST, target='x') is None
+
+
+def test_예외가_이유를_문장에_담는다(monkeypatch):
+    """`f'{type(e).__name__}: {e}'`가 알림 본문이다 — 사람이 읽고 대응을 정한다.
+    이유가 없으면 '실패했다'만 남아 429인지 차단인지 못 가린다."""
+    _spy(monkeypatch, [requests.ConnectTimeout('boom')])
+
+    with pytest.raises(net.NetError) as ei:
+        net.get('https://naver/x', policy=net.FAST, target='naver', required=True)
+
+    msg = str(ei.value)
+    assert 'ConnectTimeout' in msg
+    assert 'https://naver/x' in msg
+
+
+def test_서버가_대답한_실패도_required면_예외다(monkeypatch):
+    """`raise_for_status()`가 하던 일이다 — 4xx/5xx를 그냥 넘기면 호출부가
+    빈 응답을 정상으로 읽는다."""
+    _spy(monkeypatch, [_Res(503)])
+
+    with pytest.raises(net.NetError) as ei:
+        net.get('https://x/y', policy=net.FAST, target='x', required=True)
+
+    assert 'HTTP 503' in str(ei.value)
+    assert ei.value.status == 503
+
+
+def test_차단기가_열려도_required면_예외다(monkeypatch):
+    """열린 차단기는 '못 닿았다'의 한 형태다. None으로 돌려주면 배치가
+    빈 결과로 정상 종료한다."""
+    _spy(monkeypatch, [requests.ConnectTimeout('boom')])
+
+    for _ in range(net.FAST.breaker_streak):
+        net.get('https://x/y', policy=net.FAST, target='x')
+
+    with pytest.raises(net.NetError) as ei:
+        net.get('https://x/y', policy=net.FAST, target='x', required=True)
+
+    assert 'breaker_open' in str(ei.value)
+
+
+def test_required여도_성공하면_응답을_그대로_준다(monkeypatch):
+    _spy(monkeypatch, [_Res()])
+
+    res = net.get('https://x/y', policy=net.FAST, target='x', required=True)
+
+    assert res is not None and res.status_code == 200
+
+
 # ── 실패 이유 ───────────────────────────────────────────────────────
 
 def test_실패_이유를_상태코드까지_남긴다(monkeypatch):
@@ -298,7 +376,8 @@ def _production_py():
 _NOT_YET = {
     'src/diagnose_company.py', 'src/diagnose_research.py', 'src/research_scraper.py',
     'src/trade_executor.py', 'src/data/market_cap_universe.py',
-    'src/data/us_fundamentals.py', 'src/data/us_ohlcv.py', 'src/data/us_universe.py',
+    # [2026-09-09] 미국 셋은 `required=`가 생겨 옮겼다 — `raise_for_status()`가
+    # 하던 "실패는 예외로 올린다"를 net이 갖게 된 것이 조건이었다.
     'src/market_calendar.py', 'src/strategy/analyzer.py', 'src/strategy/engine.py',
     'src/strategy/hybrid_advisor_sandbox.py', 'src/trade/auth.py',
     'src/trade/balance.py', 'src/trade/executions.py', 'src/trade/gemini_trade.py',

@@ -36,7 +36,7 @@ def _resp(json_body, status=200):
 
 
 def test_fetch_cik_map_zero_pads():
-    with mock.patch('src.data.us_fundamentals.requests.get') as m:
+    with mock.patch('src.core.net.requests.get') as m:
         m.return_value = _resp(TICKERS_RESPONSE)
         out = fetch_cik_map()
     assert out['AAPL'] == '0000320193'
@@ -49,7 +49,7 @@ def test_fetch_eps_revenue_growth_computes_yoy():
             return _resp(EPS_RESPONSE)
         return _resp(REVENUE_MISSING, status=404)
 
-    with mock.patch('src.data.us_fundamentals.requests.get', side_effect=side_effect):
+    with mock.patch('src.core.net.requests.get', side_effect=side_effect):
         out = fetch_eps_revenue_growth('0000320193')
     # (1.64 - 1.46) / 1.46 * 100
     assert round(out['eps_growth_yoy'], 2) == 12.33
@@ -60,7 +60,7 @@ def test_fetch_eps_revenue_growth_no_prior_year_match_is_none():
     only_current = {"units": {"USD/shares": [
         {"start": "2024-07-01", "end": "2024-09-28", "val": 1.64, "form": "10-Q"},
     ]}}
-    with mock.patch('src.data.us_fundamentals.requests.get') as m:
+    with mock.patch('src.core.net.requests.get') as m:
         m.return_value = _resp(only_current)
         out = fetch_eps_revenue_growth('0000320193')
     assert out['eps_growth_yoy'] is None

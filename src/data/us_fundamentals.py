@@ -11,7 +11,7 @@ EDGAR의 분기 facts에는 같은 종료일(end)에 대해 "이번 분기"와 "
 """
 import datetime as dt
 
-import requests
+from src.core import net
 
 TICKERS_URL = 'https://www.sec.gov/files/company_tickers.json'
 CONCEPT_URL = 'https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{tag}.json'
@@ -30,8 +30,9 @@ _MAX_QUARTER_DAYS = 100
 
 def fetch_cik_map() -> dict[str, str]:
     """ticker(대문자) → 10자리 zero-padded CIK."""
-    r = requests.get(TICKERS_URL, headers=HEADERS, timeout=20)
-    r.raise_for_status()
+    # required=True — 티커맵이 없으면 CIK를 못 찾아 워치리스트가 통째로 빈다.
+    r = net.get(TICKERS_URL, policy=net.FAST, target='sec',
+                headers=HEADERS, required=True)
     body = r.json()
     out = {}
     for entry in body.values():
@@ -73,13 +74,19 @@ def _latest_yoy(entries: list[dict]) -> float | None:
 
 def _fetch_concept(cik: str, tag: str) -> dict | None:
     url = CONCEPT_URL.format(cik=cik, tag=tag)
+    # 여기는 종목×태그마다 부른다 — 하나 못 얻었다고 배치를 죽이지 않는다.
+    # 다만 조용히 넘어가지도 않는다: 이유를 남긴다. 그러지 않으면 SEC가 UA를
+    # 막았을 때 워치리스트가 이유 없이 빈다.
+    reasons = {}
+    r = net.get(url, policy=net.FAST, target='sec', headers=HEADERS, reasons=reasons)
+    if r is None:
+        why = ', '.join(f'{k}' for k in reasons) or 'unknown'
+        print(f'[us_fundamentals] {tag} 조회 실패 (CIK {cik}): {why}')
+        return None
     try:
-        r = requests.get(url, headers=HEADERS, timeout=15)
-        r.raise_for_status()
         return r.json()
-    except Exception as e:
-        # 조용히 None을 돌려주면 SEC가 UA를 막았을 때 워치리스트가 이유 없이 빈다.
-        print(f'[us_fundamentals] {tag} 조회 실패 (CIK {cik}): {e}')
+    except ValueError as e:
+        print(f'[us_fundamentals] {tag} 응답 파싱 실패 (CIK {cik}): {e}')
         return None
 
 

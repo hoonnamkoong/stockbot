@@ -22,8 +22,8 @@ DAILY_RESPONSE = {
 
 
 def test_fetch_daily_ohlcv_skips_none_close():
-    with mock.patch('src.data.us_ohlcv.requests.get') as m:
-        m.return_value.raise_for_status = lambda: None
+    with mock.patch('src.core.net.requests.get') as m:
+        m.return_value.status_code = 200
         m.return_value.json.return_value = DAILY_RESPONSE
         bars = fetch_daily_ohlcv('AAPL')
     assert len(bars) == 2
@@ -33,8 +33,8 @@ def test_fetch_daily_ohlcv_skips_none_close():
 
 
 def test_fetch_current_quote_reads_meta():
-    with mock.patch('src.data.us_ohlcv.requests.get') as m:
-        m.return_value.raise_for_status = lambda: None
+    with mock.patch('src.core.net.requests.get') as m:
+        m.return_value.status_code = 200
         m.return_value.json.return_value = DAILY_RESPONSE
         q = fetch_current_quote('AAPL')
     assert q == {'price': 103.4, 'volume': 900000}
@@ -42,12 +42,12 @@ def test_fetch_current_quote_reads_meta():
 
 def test_fetch_current_quote_returns_none_when_price_missing():
     resp = {"chart": {"result": [{"meta": {}}]}}
-    with mock.patch('src.data.us_ohlcv.requests.get') as m:
-        m.return_value.raise_for_status = lambda: None
+    with mock.patch('src.core.net.requests.get') as m:
+        m.return_value.status_code = 200
         m.return_value.json.return_value = resp
         assert fetch_current_quote('AAPL') is None
 
 
 def test_fetch_current_quote_returns_none_on_exception():
-    with mock.patch('src.data.us_ohlcv.requests.get', side_effect=Exception('boom')):
+    with mock.patch('src.core.net.requests.get', side_effect=Exception('boom')):
         assert fetch_current_quote('AAPL') is None

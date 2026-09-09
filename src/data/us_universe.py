@@ -9,7 +9,7 @@ import json
 import os
 import time
 
-import requests
+from src.core import net
 
 NASDAQ_SCREENER_URL = 'https://api.nasdaq.com/api/screener/stocks'
 
@@ -51,9 +51,12 @@ def fetch_us_universe(limit: int = 1000) -> list[dict]:
     }
     rows = None
     for attempt in range(SOFT_BLOCK_RETRIES):
-        r = requests.get(NASDAQ_SCREENER_URL, params=params, headers=HEADERS,
-                         timeout=20)
-        r.raise_for_status()      # 4xx/5xx는 여기서 바로 올린다(재시도 안 함)
+        # required=True가 `raise_for_status()`를 대신한다 — 4xx/5xx는 바로
+        # 올린다(net도 서버가 대답한 실패는 재시도하지 않는다).
+        # **아래 소프트 차단 루프는 그대로 둔다**: HTTP 200에 rows만 비어 오는
+        # 실패라 net이 볼 수 없다(2026-08-24·25가 그 형태였다).
+        r = net.get(NASDAQ_SCREENER_URL, policy=net.FAST, target='nasdaq',
+                    params=params, headers=HEADERS, required=True)
         body = r.json()
         data = (body or {}).get('data') or {}
         # 현행은 data.table.rows. data.rows는 구 download 모드의 형태로, 되살아날

@@ -41,13 +41,48 @@
 
 실패하면 `None`을 돌려준다. 호출부가 그걸 0이나 빈 값으로 접으면 "측정 못 함"이
 "값이 0이다"로 위장된다 — 이 레포가 반복해서 당한 형태다.
+
+## 계약은 호출부가 고른다 (`required=`)
+
+`None`이 늘 옳지는 않다. 미국 EOD 배치는 `raise_for_status()`로 **예외를 올리는**
+계약이고, 그 예외 객체가 곧 알림 본문이다:
+
+    except Exception as e:
+        alerts.send_alert(f'{type(e).__name__}: {e} ...'); raise
+
+2026-08-24·25에 그 배치가 이틀 죽었는데 아무도 몰랐고, 그래서 저 알림이 붙었다.
+`None`으로 통일하면 저 문자열이 사라지고 배치가 **빈 결과로 정상 종료**한다.
+
+그래서 두 계약을 다 준다:
+  - 값을 못 얻은 것을 **세는** 경로(스크래핑 페이지 등) → `None`
+  - 못 얻으면 그 위가 통째로 무의미해지는 경로 → `required=True` → `NetError`
+
+같은 함수 안에서도 갈린다. `us_ohlcv.fetch_daily_ohlcv`는 예외이고
+`fetch_current_quote`는 None이다 — 전자는 그 종목을 판단할 수 없다는 뜻이고,
+후자는 "지금 값을 모른다"이기 때문이다.
 """
 import time
 from dataclasses import dataclass
 
 import requests
 
-__all__ = ['Policy', 'FAST', 'BULK', 'SCRAPE', 'CRITICAL', 'get', 'post', 'request']
+__all__ = ['Policy', 'NetError', 'FAST', 'BULK', 'SCRAPE', 'CRITICAL',
+           'get', 'post', 'request']
+
+
+class NetError(Exception):
+    """못 닿았다. `required=True`일 때만 올라온다.
+
+    문장에 **이유와 URL**을 담는다. 호출부의 알림이
+    `f'{type(e).__name__}: {e}'`로 그대로 찍기 때문이다 — 이유가 없으면
+    '실패했다'만 남아 429인지 소프트 차단인지 못 가린다.
+    """
+
+    def __init__(self, url: str, reason: str, *, status: int | None = None):
+        self.url = url
+        self.reason = reason
+        self.status = status
+        super().__init__(f'{reason} — {url}')
 
 
 @dataclass(frozen=True)
@@ -117,10 +152,21 @@ def _note(reasons, key):
         reasons[key] = reasons.get(key, 0) + 1
 
 
+def _fail(url, reason, required, *, status=None):
+    """실패를 호출부가 고른 계약으로 돌려준다."""
+    if required:
+        raise NetError(url, reason, status=status)
+    return None
+
+
 def request(method: str, url: str, *, policy: Policy = FAST,
             target: str | None = None, reasons: dict | None = None,
-            session=None, **kwargs):
+            session=None, required: bool = False, **kwargs):
     """정책에 따라 호출한다. 실패하면 None — 없는 값을 지어내지 않는다.
+
+    required: True면 실패에 `NetError`를 올린다. 못 얻으면 그 위가 통째로
+      무의미해지는 경로용이다(위 독스트링의 `required=` 절 참고). 성공 경로는
+      두 계약이 완전히 같다.
 
     target: 차단기를 나누는 키(보통 서비스 이름). 없으면 URL의 호스트를 쓴다.
     reasons: 주면 실패 이유별 건수를 담는다. 429인지 리셋인지 타임아웃인지는
@@ -136,7 +182,7 @@ def request(method: str, url: str, *, policy: Policy = FAST,
         opened = _OPENED_AT.get(key)
         if opened is not None and time.monotonic() - opened < policy.recovery_sec:
             _note(reasons, 'breaker_open')
-            return None
+            return _fail(url, 'breaker_open', required)
         # 복구 시간이 지났다 — 탐침을 하나 내보낸다. 실패하면 아래에서
         # `_OPENED_AT`이 다시 찍혀 또 그만큼 기다린다.
 
@@ -156,7 +202,7 @@ def request(method: str, url: str, *, policy: Policy = FAST,
             break
         except Exception as e:                      # noqa: BLE001
             _note(reasons, type(e).__name__)
-            return None
+            return _fail(url, type(e).__name__, required)
 
         # 응답이 왔다 = 닿았다. 상태코드가 무엇이든 차단기는 푼다 —
         # 차단기가 재는 것은 데이터 정합성이 아니라 **도달성**이다.
@@ -166,15 +212,16 @@ def request(method: str, url: str, *, policy: Policy = FAST,
             return res
         # 서버가 대답한 실패는 재시도하지 않는다. 다시 던지면 유량제한만 키운다.
         _note(reasons, f'HTTP {res.status_code}')
-        return None
+        return _fail(url, f'HTTP {res.status_code}', required, status=res.status_code)
 
     _STREAKS[key] = _STREAKS.get(key, 0) + 1
     if policy.breaker_streak and _STREAKS[key] >= policy.breaker_streak:
         # 탐침이 실패한 경우도 여기다 — 시각을 다시 찍어 또 recovery_sec을 기다린다.
         # 안 찍으면 매 호출이 탐침이 되어 차단기가 없는 것과 같아진다.
         _OPENED_AT[key] = time.monotonic()
-    _note(reasons, last_conn_reason or 'unknown')
-    return None
+    reason = last_conn_reason or 'unknown'
+    _note(reasons, reason)
+    return _fail(url, reason, required)
 
 
 def get(url: str, **kwargs):

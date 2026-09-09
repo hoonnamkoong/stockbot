@@ -40,6 +40,26 @@ export function authorizeManualOrder(input: {
   return { ok: true };
 }
 
+/**
+ * 비인증 요청이 받아 갈 매매 기록. **세션이 없으면 심(sim)만 나간다.**
+ *
+ * 2026-09-09에 `/api/trade/history`가 파라미터와 무관하게 실체결과 심 기록을
+ * 항상 합쳐서, 인증 없이 반환하고 있었다. 미들웨어 매처가 페이지만 잡고
+ * `/api/*`를 잡지 않는데 라우트에도 검사가 없었다. 안 터진 이유는 방어가 아니라
+ * URL이 안 알려져서였다.
+ *
+ * 라우트가 세션 없을 때 실거래를 **애초에 조회하지 않는데도** 이 함수가 한 번 더
+ * 거르는 이유: 조회 조건과 노출 조건이 갈라지는 것이 이 사고의 모양이었다.
+ * 둘 중 하나만 남으면 다음 수정에서 또 갈라진다.
+ */
+export function visibleTradeHistory<T>(input: {
+  hasSession: boolean;
+  real: T[];
+  sim: T[];
+}): T[] {
+  return input.hasSession ? [...input.real, ...input.sim] : [...input.sim];
+}
+
 export type ArmVerdict =
   | { ok: true; sim: string; budget: number }
   | { ok: false; error: string };

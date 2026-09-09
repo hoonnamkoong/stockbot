@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { authorizeManualOrder, validateArmRequest } from './trade-auth.ts';
+import { authorizeManualOrder, validateArmRequest, visibleTradeHistory } from './trade-auth.ts';
 import { kstTimestamp } from './kst.ts';
 
 // 실거래 문을 여는 판정이다. 라우트 안에 있을 때는 테스트가 닿지 않아,
@@ -130,4 +130,33 @@ test('자정을 넘어가는 경계에서 날짜가 함께 넘어간다', () => 
 
 test('밀리초·T·Z가 남지 않는다 — 파이썬 기록과 같은 표기여야 붙는다', () => {
   assert.match(kstTimestamp(Date.UTC(2026, 6, 30, 4, 5, 6, 789)), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+});
+
+// --- 실거래 노출 경계 (2026-09-09) ---
+// `/api/trade/history`가 인증 없이 실체결을 내보내고 있었다. 페이지만 막는
+// 미들웨어와 검사가 없는 라우트 사이의 틈이었다.
+
+const REAL = [{ id: 'r1', kind: 'real' }, { id: 'r2', kind: 'real' }];
+const SIM = [{ id: 's1', kind: 'sim' }];
+
+test('세션이 없으면 실거래가 한 건도 안 나간다', () => {
+  const out = visibleTradeHistory({ hasSession: false, real: REAL, sim: SIM });
+  assert.deepEqual(out, SIM);
+  assert.equal(out.filter((r) => r.kind === 'real').length, 0);
+});
+
+test('세션이 없으면 실거래를 넘겨도 걸러낸다 — 조회를 막는 것과 별개의 방어', () => {
+  const out = visibleTradeHistory({ hasSession: false, real: REAL, sim: [] });
+  assert.deepEqual(out, []);
+});
+
+test('세션이 있으면 실거래와 심을 함께 준다', () => {
+  const out = visibleTradeHistory({ hasSession: true, real: REAL, sim: SIM });
+  assert.equal(out.length, 3);
+});
+
+test('입력 배열을 건드리지 않는다', () => {
+  visibleTradeHistory({ hasSession: true, real: REAL, sim: SIM });
+  assert.equal(REAL.length, 2);
+  assert.equal(SIM.length, 1);
 });

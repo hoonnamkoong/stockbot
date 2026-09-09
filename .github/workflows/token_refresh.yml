@@ -20,6 +20,8 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     permissions:
       contents: write
       # 실패 알림이 직전 런의 결과를 읽는다(연속 실패 억제).

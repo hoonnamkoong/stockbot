@@ -188,6 +188,40 @@ def test_복구_시도가_실패하면_다시_닫아두고_또_기다린다(monk
     assert reasons == {'breaker_open': 1}
 
 
+def test_병렬_전수_스캔_등급은_차단하지_않는다(monkeypatch):
+    """**연속 실패 차단기는 병렬 스캔에서 오작동한다.**
+
+    2026-09-09, fetch_page를 BULK로 옮긴 첫 런의 실측:
+
+        페이지 수집 실패 348/395 (88.1%) — breaker_open 324, ReadTimeout 24
+
+    실제 타임아웃은 24건인데 324건이 차단기에 막혔고, 하류의 '수집 실패율 초과'
+    게이트가 그 런을 통째로 버렸다. `_STREAKS`는 프로세스 공유 상태인데 이 경로는
+    8스레드가 동시에 친다 — **동시에 진행 중인 실패 3건**이 "연속 3회"로 읽힌다.
+    장애 신호가 아니라 병렬성의 부산물이다.
+
+    이 경로의 "못 닿으면 그만둔다"는 청크 전멸 감지가 이미 한다.
+    """
+    calls = _spy(monkeypatch, [requests.ConnectTimeout('boom')])
+
+    for _ in range(10):
+        net.get('https://naver/board', policy=net.SCRAPE, target='naver_board')
+    burned = len(calls)
+
+    reasons = {}
+    net.get('https://naver/board', policy=net.SCRAPE, target='naver_board',
+            reasons=reasons)
+
+    assert len(calls) > burned, '병렬 스캔 경로가 차단기에 막혔다'
+    assert 'breaker_open' not in reasons
+
+
+def test_스캔_등급은_BULK와_시간_예산이_같다():
+    """차단기만 다르다 — 타임아웃까지 갈라지면 등급이 또 늘어난다."""
+    for field in ('connect', 'read', 'attempts', 'backoff'):
+        assert getattr(net.SCRAPE, field) == getattr(net.BULK, field), field
+
+
 def test_차단기는_대상별로_격리된다(monkeypatch):
     """오늘 KIS 차단기가 못 하는 것 — 네이버가 죽어도 KIS는 계속 시도해야 한다."""
     calls = _spy(monkeypatch, [requests.ConnectTimeout('boom')])

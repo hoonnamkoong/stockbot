@@ -47,7 +47,7 @@ from dataclasses import dataclass
 
 import requests
 
-__all__ = ['Policy', 'FAST', 'BULK', 'CRITICAL', 'get', 'post', 'request']
+__all__ = ['Policy', 'FAST', 'BULK', 'SCRAPE', 'CRITICAL', 'get', 'post', 'request']
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,24 @@ FAST = Policy('FAST', connect=3, read=5, attempts=3, backoff=0.3, breaker_streak
 # 버스트가 지나간 뒤를 놓치지 않는다.
 BULK = Policy('BULK', connect=3, read=8, attempts=2, backoff=0.5, breaker_streak=3,
               recovery_sec=20)
+
+# 병렬 전수 스캔. BULK와 시간 예산은 같지만 **차단기를 걸지 않는다.**
+#
+# 2026-09-09 실측이 이유다. fetch_page를 BULK로 옮긴 첫 런에서:
+#     페이지 수집 실패 348/395 (88.1%) — breaker_open 324, ReadTimeout 24
+# 실제 타임아웃은 24건인데 324건이 차단기에 막혔고, 하류의 '수집 실패율 초과'
+# 게이트가 그 런을 통째로 버렸다.
+#
+# 이유는 명확하다. `_STREAKS`는 프로세스 공유 상태인데 이 경로는 8스레드가 동시에
+# 친다 — **동시에 진행 중인 실패 3건**이 "연속 3회 실패"로 읽힌다. 그건 장애
+# 신호가 아니라 병렬성의 부산물이다. 게다가 한 번 열리면 recovery_sec 동안
+# 8스레드가 쏟아내는 수백 건이 전부 즉시 실패한다.
+#
+# 이 경로의 "못 닿으면 그만둔다"는 차단기가 아니라 **청크 전멸 감지**가 이미
+# 한다(2026-09-08, tests/test_scrape_failure_amplification.py). 두 겹이 필요 없고,
+# 겹치면 병렬성 때문에 잘못 발동하는 쪽이 이긴다.
+SCRAPE = Policy('SCRAPE', connect=3, read=8, attempts=2, backoff=0.5,
+                breaker_streak=0)
 
 # 주문·취소. 차단하지 않는다(위 독스트링 참고).
 CRITICAL = Policy('CRITICAL', connect=5, read=10, attempts=3, backoff=0.5,

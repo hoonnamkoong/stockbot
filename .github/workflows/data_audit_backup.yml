@@ -38,6 +38,8 @@ jobs:
   wake:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     permissions:
       contents: read
       # data_audit.yml을 dispatch하고, 그 전에 오늘 런 이력을 읽는다.

@@ -48,6 +48,13 @@ jobs:
         with:
           python-version: '3.11'
 
+      # src/market_calendar.py가 requests를 모듈 최상단에서 import한다. 설치 스텝이
+      # 없어 러너 이미지에 우연히 들어 있는 날만 통과했다 — 2026-09-07 두 런은
+      # `ModuleNotFoundError: No module named 'requests'`로 죽었고 09-08은 돌았다.
+      # 감시자가 조용히 죽으면 감시가 없는 것과 같다.
+      - name: 의존성 설치
+        run: pip install requests
+
       # 휴장일 판정에 KIS 달력이 필요하다. 없으면 판정이 UNKNOWN이 되고
       # 알림을 보내지 않는다 — 공휴일마다 거짓 경보를 내는 것보다 낫고,
       # 달력 자체의 결손은 신선도 감사가 따로 본다.

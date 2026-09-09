@@ -46,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul
     permissions:
       contents: write

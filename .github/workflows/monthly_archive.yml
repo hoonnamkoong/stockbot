@@ -39,6 +39,7 @@ jobs:
     # 96MB를 gzip해서 메일로 보낸다. 정상 5~10분이지만 SMTP가 느린 날을 감안한다.
     timeout-minutes: 30
     env:
+      PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul
     permissions:
       contents: write

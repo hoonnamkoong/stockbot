@@ -348,3 +348,39 @@ def test_premarket_manages_its_own_kis_token():
     assert 'GH_PAT' in manage_step, (
         'Manage KIS Token 스텝에 GH_PAT가 없다 — 비공개 레포의 기존 토큰을 못 읽고 '
         '매번 새로 발급하게 된다.')
+
+
+# ── 결정 스냅샷 (2026-09-09) ──────────────────────────────────────
+#
+# 그림자 운전의 판정 재료다. 심은 두 워크플로에 나뉘어 도는데(버즈 불필요 심은
+# trading.yml, sim1 같은 버즈 심은 scraper.yml) 파일이 하나면 뒤에 끝난 쪽이
+# 앞의 것을 되돌린다. 그래서 파일명에 writer를 넣었고, 그 규칙이 지켜지는지를
+# 여기서 본다 — 코드가 아니라 **배포 규칙**이 이 고장의 자리이기 때문이다.
+
+def test_두_워크플로가_서로_다른_runner를_쓴다():
+    """같은 이름을 쓰면 파일도 같아져 lost update가 그대로 돌아온다."""
+    import re
+    got = {}
+    for name in ('trading.yml', 'scraper.yml'):
+        m = re.search(r'STOCKBOT_RUNNER:\s*(\S+)', _text(name))
+        assert m, f'{name}에 STOCKBOT_RUNNER가 없다 — 결정 스냅샷 파일이 겹친다'
+        got[name] = m.group(1)
+    assert got['trading.yml'] != got['scraper.yml'], got
+
+
+def test_scraper는_trading의_결정_스냅샷을_배포하지_않는다():
+    """scraper.yml은 `data/*.csv`를 통째로 민다. 제외하지 않으면 이 런이
+    **시작할 때 받아온 사본**으로 trading의 결정 기록을 되돌린다."""
+    body = _text('scraper.yml')
+    assert 'decisions_*_actions-trading.csv' in body, (
+        'scraper.yml 제외 목록에 trading의 결정 스냅샷이 없다')
+
+
+def test_trading은_자기_결정_스냅샷을_배포_목록에_넣는다():
+    """명시적 매니페스트라, 안 적으면 컨테이너와 함께 사라진다
+    (sim6·sim9의 diag가 정확히 그렇게 두 번 사라졌다)."""
+    with open(os.path.join(os.path.dirname(__file__), '..',
+                           'scripts', 'trade_loop.py'), encoding='utf-8') as f:
+        src = f.read()
+    assert 'decision_log' in src and 'names.append' in src, (
+        'trade_loop의 배포 매니페스트에 결정 스냅샷이 없다')

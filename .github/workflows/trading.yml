@@ -43,6 +43,10 @@ jobs:
     timeout-minutes: 3
     env:
       PYTHONPATH: ${{ github.workspace }}
+      # 결정 스냅샷의 writer 이름. 파일명이 여기서 갈려 scraper.yml과
+      # 같은 파일을 밀지 않는다(lost update 방지). 폰 워커는 'phone'으로
+      # 띄우고, 그림자 운전은 이 둘을 비교한다.
+      STOCKBOT_RUNNER: actions-trading
       TZ: Asia/Seoul
     permissions:
       contents: write

@@ -54,6 +54,16 @@ def set_cycle(cycle_id) -> None:
     _cycle_id = cycle_id
 
 
+def current_cycle():
+    """이번 사이클 번호. 안 세팅됐으면 None.
+
+    `decision_log`가 같은 번호를 써야 두 기록이 조인된다 — 각자 시계를 다시
+    읽으면 런이 격자 경계를 넘을 때 같은 사이클의 행이 다른 번호를 받는다
+    (위 `_cycle_id` 주석과 같은 이유).
+    """
+    return _cycle_id
+
+
 def day_path(sim: str, today: str = None) -> str:
     """**오늘** 진단 로그의 쓰기 경로.
 

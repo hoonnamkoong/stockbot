@@ -77,6 +77,22 @@ def log_funnel(label, candidates, funnel, orders=None, *,
             except Exception:
                 pass
 
+        # 결정 스냅샷 — **전 심이 여기로 들어온다.** diag_id와 달리 호출부가
+        # 아무것도 넘기지 않아도 되는 이유: 심별 파일이 아니라 하루 한 파일이라
+        # 심이 늘어도 배포 매니페스트·제외 목록에 자리가 늘지 않는다.
+        # 그림자 운전(이관 3단계)에서 폰과 옛 경로를 비교할 유일한 재료다.
+        try:
+            from src.data import decision_log, sim_diag as _sd
+            decision_log.append(
+                decision_log.build_rows(
+                    label, candidates, funnel, orders,
+                    runner=decision_log.runner_name(),
+                    cycle_id=_sd.current_cycle(),
+                    ts=clock.now().strftime('%Y-%m-%d %H:%M:%S')),
+                log=lambda *_: None)
+        except Exception:
+            pass
+
         head = f'[{label} 깔때기]' + (f' 국면={regime}' if regime else '')
         if not funnel:
             # 전량 매수했으면 탈락 기록이 없는 게 맞다. 그때도 경고하면

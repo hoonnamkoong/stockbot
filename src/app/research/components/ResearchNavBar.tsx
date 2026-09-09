@@ -7,9 +7,15 @@ interface ResearchNavBarProps {
     repoOwner: string;
     repoName: string;
     lastUpdated?: string;
+    /**
+     * 리포트·엑셀 다운로드를 보일지. 공개 방문자에게는 표만 보여주기로 했다 —
+     * db-data가 이미 공개라 막는 것이 아니라, 포트폴리오 방문자가 엑셀을 받지
+     * 않기 때문이다. 설명할 것만 늘어난다.
+     */
+    showDownloads?: boolean;
 }
 
-export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: ResearchNavBarProps) => {
+export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated, showDownloads = true }: ResearchNavBarProps) => {
     // 최신 10개 다운로드 항목 생성 (db-data 브랜치 엑셀 직접 링크)
     const GITHUB_BASE = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/db-data/data`;
     
@@ -48,8 +54,14 @@ export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: Re
                 <Title order={4}>리서치 리포트</Title>
             </Group>
 
+            {!showDownloads && (
+                <Text size="xs" c="dimmed" px="md">
+                    매 거래일 수집한 종목별 관심도·수급 데이터다. 표의 열 머리를 눌러 정렬할 수 있다.
+                </Text>
+            )}
+
             {/* [V8.9.9.42] 지시 사양: 월별 통합 분석 리포트 나열 로직 (수익률 제외) */}
-            {reports
+            {showDownloads && reports
                 .filter(r => r.type === 'research')
                 .slice(0, 12)
                 .map((report, idx) => (
@@ -73,8 +85,8 @@ export const ResearchNavBar = ({ reports, repoOwner, repoName, lastUpdated }: Re
             {/* [V8.9.9.5] 데이터 다운로드 섹션 */}
             <Divider my="sm" />
             <Stack gap={5}>
-                <Text size="xs" c="dimmed" fw={700} px="md">엑셀 데이터</Text>
-                {downloadItems.map((item, idx) => (
+                {showDownloads && <Text size="xs" c="dimmed" fw={700} px="md">엑셀 데이터</Text>}
+                {showDownloads && downloadItems.map((item, idx) => (
                     <NavLink
                         key={idx}
                         label={item.label}

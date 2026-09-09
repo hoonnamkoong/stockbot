@@ -13,7 +13,7 @@ import {
 import { 
     IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
     IconAlertTriangle, IconSearch, IconAdjustments, IconRefresh, 
-    IconTimeline, IconRobot, IconAlertCircle, IconTrash, IconPlayerPlay, 
+    IconTimeline, IconAlertCircle, IconTrash, IconPlayerPlay, 
     IconDeviceMobile, IconHistory, IconChevronUp, IconChevronDown, IconPlus, IconDna 
 } from '@tabler/icons-react';
 import axios from 'axios';
@@ -22,7 +22,7 @@ import { buildPriceMap, summarizeAccount, summarizeProgram, summarizeTurn } from
 import { SIM_REGISTRY, SIM_INITIAL_CASH } from '@/lib/sim-registry.generated';
 import PortfolioTable from './PortfolioTable';
 import TradeHistoryTable from './TradeHistoryTable';
-import SimCard from './SimCard';
+import SimulationSection from '../components/SimulationSection';
 import { useProgramTrading } from './useProgramTrading';
 // [V8.9.9.22] 차트 라이브러리 SSR 충돌 방지를 위한 동적 임포트 적용
 const StrategyRadarChart = dynamic(() => import('../components/StrategyRadarChart'), { 
@@ -586,57 +586,6 @@ function TradeContent() {
         );
     }
 
-    function renderSimulationTripod() {
-        if (!geminiBalance) return null;
-        // 매니페스트에서 파생한다. type은 매니페스트 id이고 매매 기록 API가 각 행에
-        // 붙이는 값과 같아야 한다 — 어긋나면 이 카드의 기록 표가 조용히 빈다.
-        const simConfigs = SIM_REGISTRY.map((s) => ({
-            id: s.uiKey, key: s.uiKey, label: s.label, color: s.color, type: s.id,
-        }));
-        return (
-            <Stack gap="xl">
-                <Group justify="space-between">
-                    <Title order={3}><IconRobot size={24} style={{ marginBottom: -4, marginRight: 8 }}/>{simConfigs.length}-Track 지능형 시뮬레이션</Title>
-                    <Button variant="outline" size="sm" leftSection={<IconRefresh size={16}/>} onClick={() => { fetchSimulationStats(); fetchHistory(); }}>전체 데이터 갱신</Button>
-                </Group>
-                <Paper p="sm" withBorder radius="md" style={{ background: 'var(--mantine-color-red-0)' }}>
-                    <Group justify="space-between" wrap="wrap" gap="sm">
-                        <Text size="sm" fw={700} c="red">시뮬레이터 리셋</Text>
-                        <Group gap="sm" wrap="wrap">
-                            <NumberInput
-                                size="xs" w={160}
-                                placeholder="예수금(원)"
-                                value={resetCash}
-                                onChange={(v) => setResetCash(typeof v === 'number' ? v : '')}
-                                min={100000} max={1000000000} step={100000} thousandSeparator=","
-                                disabled={resetBusy}
-                            />
-                            <Button color="red" size="xs" onClick={() => setResetConfirmOpen(true)} disabled={resetBusy} loading={resetBusy}>
-                                전체 리셋
-                            </Button>
-                        </Group>
-                    </Group>
-                </Paper>
-                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                    {simConfigs.map((sim) => (
-                        <SimCard
-                            key={sim.id}
-                            uiKey={sim.key}
-                            label={sim.label}
-                            color={sim.color}
-                            type={sim.type}
-                            stats={geminiBalance[sim.key]?.raw || {}}
-                            portfolio={geminiBalance[sim.key]?.portfolio || {}}
-                            history={history}
-                            onPickCode={pickCode}
-                            onShowReason={showReason}
-                        />
-                    ))}
-                </SimpleGrid>
-            </Stack>
-        );
-    }
-
     function renderTrading() {
         return (
             <Paper p="md" withBorder radius="md">
@@ -762,7 +711,19 @@ function TradeContent() {
                     </Stack>
                 </Group>
                 <Divider my="md" label="Simulation Analysis" labelPosition="center" />
-                {renderSimulationTripod()}
+                <SimulationSection
+                    balances={geminiBalance}
+                    history={history}
+                    onRefresh={() => { fetchSimulationStats(); fetchHistory(); }}
+                    onShowReason={showReason}
+                    onPickCode={pickCode}
+                    reset={{
+                        cash: resetCash,
+                        onCashChange: (v) => setResetCash(typeof v === 'number' ? v : ''),
+                        busy: resetBusy,
+                        onOpen: () => setResetConfirmOpen(true),
+                    }}
+                />
             </Stack>
             <Modal opened={reasonModalOpen} onClose={() => setReasonModalOpen(false)} title={selectedReason.title} size="lg">
                 <Paper p="md" withBorder bg="gray.0">

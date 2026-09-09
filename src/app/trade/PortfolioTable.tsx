@@ -21,7 +21,8 @@ export default function PortfolioTable({
     /** 일괄매도 선택 상태. isReal일 때만 쓰인다 — 심 카드는 넘기지 않는다. */
     selectedCodes?: string[];
     onToggleCode?: (code: string, checked: boolean) => void;
-    onPickCode: (code: string, name: string) => void;
+    /** 없으면 읽기 전용이다 — 공개 페이지에는 채울 주문 폼이 없다. */
+    onPickCode?: (code: string, name: string) => void;
     currency?: 'KRW' | 'USD';
 }) {
     if (!holdings || holdings.length === 0) {
@@ -62,10 +63,10 @@ export default function PortfolioTable({
                                     </Table.Td>
                                 )}
                                 <Table.Td
-                                    onClick={() => onPickCode(h.code, h.name)}
-                                    style={{ cursor: 'pointer', position: 'sticky', left: isReal ? 40 : 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}
+                                    onClick={onPickCode ? () => onPickCode(h.code, h.name) : undefined}
+                                    style={{ cursor: onPickCode ? 'pointer' : 'default', position: 'sticky', left: isReal ? 40 : 0, backgroundColor: 'var(--mantine-color-body)', zIndex: 1, borderRight: '1px solid #eee' }}
                                 >
-                                    <Text size="sm" fw={700} truncate maw={100} c="blue" style={{ textDecoration: 'underline', textUnderlineOffset: '2px' }}>{h.name}</Text>
+                                    <Text size="sm" fw={700} truncate maw={100} c={onPickCode ? 'blue' : undefined} style={onPickCode ? { textDecoration: 'underline', textUnderlineOffset: '2px' } : undefined}>{h.name}</Text>
                                     <Text size="xs" c="dimmed">{h.code}</Text>
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right' }}>

@@ -27,7 +27,8 @@ export default function SimCard({
     stats: any;
     portfolio: Record<string, any>;
     history: any[];
-    onPickCode: (code: string, name: string) => void;
+    /** 없으면 보유 종목이 읽기 전용이다(공개 페이지). */
+    onPickCode?: (code: string, name: string) => void;
     onShowReason: (title: string, content: string) => void;
     currency?: 'KRW' | 'USD';
 }) {

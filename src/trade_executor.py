@@ -47,6 +47,13 @@ def _validate_trade_env_strict() -> bool:
 import requests
 
 def place_order_via_vercel(side, code, qty, price, ord_type='market'):
+    # 그림자 운전(이관 3단계): HTTP 이전에 막는다. 층2는 폰에 WEBHOOK_SECRET을
+    # 주지 않는 것이지만, 그것만 믿으면 서버 인증 경로가 바뀔 때 뚫린다.
+    from src.trade.shadow import is_shadow, refused, blocked_order_result
+    if is_shadow():
+        refused('주문', f'{side} {code} {qty}주 @{price}')
+        return blocked_order_result(side, code)
+
     webhook_secret = os.environ.get("WEBHOOK_SECRET")
     dashboard_url = os.environ.get("DASHBOARD_URL", "https://stockbot-phi.vercel.app").rstrip("/")
     # [V8.9.9.25 Structural Fix] API 주소 교정 (trade -> trade/order)

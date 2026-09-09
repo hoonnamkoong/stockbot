@@ -2,19 +2,13 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { useInterval } from '@mantine/hooks';
 import { Stock, FiveDayStock, VersionInfo, SortConfig } from '../types';
+// 행 매핑·정렬은 공개 페이지와 **같은 코드**를 쓴다. 사본을 두면 스크래퍼가
+// 포맷을 바꿀 때 한쪽만 고쳐지고 다른 화면이 조용히 0으로 보인다.
+import { mapStockRow, sortRows, nextSort, parseNum } from '@/lib/research-rows';
 
 const REPO_OWNER = "hoonnamkoong";
 const REPO_NAME = "stockbot";
 const WORKFLOW_ID = "scraper.yml";
-
-const parseNum = (val: any): number => {
-    if (typeof val === 'number') return isNaN(val) ? 0 : val;
-    if (typeof val === 'string') {
-        const cleaned = val.replace(/[^-0-9.]/g, '');
-        return parseFloat(cleaned) || 0;
-    }
-    return 0;
-};
 
 export const useResearchSource = () => {
     const [stocks, setStocks] = useState<Stock[]>([]);
@@ -56,29 +50,7 @@ export const useResearchSource = () => {
             if (!data.success) throw new Error(data.error || "데이터 로드 실패");
 
             // 1. 주요 종목 데이터 (latest_stocks.json)
-            const mappedData = (data.stocks || []).map((item: any) => ({
-                ...item,
-                market: item.market || item['시장'] || item['시장구분'],
-                code: item.code,
-                name: item.name || item['종목명'],
-                price: parseNum(item.price || item['현재가']),
-                current_price: parseNum(item.price || item['현재가']),
-                prev_close: parseNum(item.prev_close || item['전일종가'] || item['어제_종가']),
-                change_rate: parseNum(item.change_rate || item['등락률']),
-                recent_posts_count: item.recent_posts_count || item['게시물'] || item['당일_게시글수'] || item['게시글수'] || item['당일 게시글수'],
-                foreign_rate: parseNum(item.foreign_rate || item['외인비중'] || item['외인소진율'] || item['현재_외국인비중']),
-                prev_foreign_rate: parseNum(item.prev_foreign_rate || item['전일외인'] || item['전일_외국인비중'] || item['어제_외국인비중']),
-                posts_summary: item.posts_summary || item['게시물_요약'],
-                sentiment: item.sentiment || item['감정'] || item['감정분석'],
-                top_keywords: Array.isArray(item.top_keywords) ? item.top_keywords : 
-                             (typeof item.top_keywords === 'string' ? item.top_keywords.split(',').map((k: string) => k.trim()) : 
-                             (item['키워드'] || item['Top_Keyword'] || item['Top_Keywords'] || [])),
-                is_last_captured: item.is_last_captured || (item['연속'] > 1),
-                consecutive_days: Number(item.consecutive_days || item['연속']) || (item['연속_등록'] === true ? 2 : 1),
-                foreign_change_rate: parseNum(item.foreign_change_rate || item['외인변화'] || item['외국인_변화'] || item['foreign_change'] || 0),
-                latest_post: item.latest_posts && item.latest_posts.length > 0 ? item.latest_posts[0].title : (item['latest_post'] || ''),
-                status: item.status || item['상태'] || '활성',
-            }));
+            const mappedData = (data.stocks || []).map(mapStockRow);
             setStocks(mappedData);
 
             // 2. 상태 정보 (status.json)
@@ -181,22 +153,9 @@ export const useResearchSource = () => {
         }
     }, [githubToken, monitorWorkflow]);
 
-    const handleSort = (key: string) => {
-        setSortConfig(prev => ({
-            key,
-            direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
-        }));
-    };
+    const handleSort = (key: string) => setSortConfig(prev => nextSort(prev, key));
 
-    const sortData = (data: any[]) => {
-        if (!sortConfig.key) return data;
-        return [...data].sort((a, b) => {
-            const parse = (v: any) => typeof v === 'string' ? Number(v.replace(/,/g, '').replace('%', '')) || v.toLowerCase() : v;
-            const A = parse(a[sortConfig.key!]);
-            const B = parse(b[sortConfig.key!]);
-            return sortConfig.direction === 'asc' ? (A < B ? -1 : 1) : (A > B ? -1 : 1);
-        });
-    };
+    const sortData = (data: any[]) => sortRows(data, sortConfig);
 
     useEffect(() => {
         fetchData();

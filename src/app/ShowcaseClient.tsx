@@ -7,6 +7,8 @@ import {
     Container, Title, Text, Group, Stack, Button, Divider, Box, Modal, Paper, Loader, Center,
 } from '@mantine/core';
 import SimulationSection from './components/SimulationSection';
+import { StockTable } from './research/components/ResearchTables';
+import { mapStockRow, sortRows, nextSort, type SortConfig } from '@/lib/research-rows';
 
 const StrategyRadarChart = dynamic(() => import('./components/StrategyRadarChart'), {
     ssr: false,
@@ -29,6 +31,9 @@ const StrategyRadarChart = dynamic(() => import('./components/StrategyRadarChart
 export default function ShowcaseClient() {
     const [balances, setBalances] = useState<Record<string, any> | null>(null);
     const [history, setHistory] = useState<any[]>([]);
+    const [stocks, setStocks] = useState<any[]>([]);
+    const [updatedAt, setUpdatedAt] = useState('');
+    const [sort, setSort] = useState<SortConfig>({ key: 'recent_posts_count', direction: 'desc' });
     const [loading, setLoading] = useState(true);
     const [reason, setReason] = useState({ title: '', content: '' });
     const [reasonOpen, setReasonOpen] = useState(false);
@@ -36,13 +41,21 @@ export default function ShowcaseClient() {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [statsRes, histRes] = await Promise.all([
+            const [statsRes, histRes, researchRes] = await Promise.all([
                 fetch(`/api/simulation/stats?cb=${Date.now()}`),
                 fetch(`/api/trade/history?cb=${Date.now()}`),
+                fetch(`/api/stocks/research?cb=${Date.now()}`),
             ]);
             setBalances(await statsRes.json());
             const hist = await histRes.json();
             if (hist.success) setHistory(hist.data);
+            const research = await researchRes.json();
+            if (research.success) {
+                // 행 매핑은 `/research`와 **같은 함수**를 쓴다 — 사본을 두면
+                // 스크래퍼가 필드 이름을 바꿀 때 한쪽만 고쳐진다.
+                setStocks((research.stocks || []).map(mapStockRow));
+                setUpdatedAt(research.status?.last_updated || '');
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -67,20 +80,40 @@ export default function ShowcaseClient() {
                         전략을 전환한다. 아래 숫자는 실제로 매일 장중에 돌고 있는 시뮬레이터의 상태다.
                     </Text>
                 </Stack>
-                <Group gap="xs">
-                    <Button component={Link} href="/research" variant="light" size="sm">리서치 보드</Button>
-                    <Button
-                        component="a"
-                        href="https://github.com/hoonnamkoong/stockbot"
-                        target="_blank" rel="noopener noreferrer"
-                        variant="subtle" size="sm"
-                    >
-                        GitHub
-                    </Button>
-                </Group>
+                {/* **비공개 페이지로 가는 링크는 두지 않는다.** 공개 방문자에게
+                    보이는 링크가 로그인 벽으로 이어지면 고장으로 읽히고, 관리자
+                    경로가 어디인지 알려 주기만 한다. 바깥으로 나가는 GitHub만 둔다. */}
+                <Button
+                    component="a"
+                    href="https://github.com/hoonnamkoong/stockbot"
+                    target="_blank" rel="noopener noreferrer"
+                    variant="subtle" size="sm"
+                >
+                    GitHub
+                </Button>
             </Group>
 
-            <Divider my="md" label="Simulation Analysis" labelPosition="center" />
+            <Divider my="md" label="Market Research" labelPosition="center" />
+            <Text c="dimmed" size="xs" mb="sm">
+                매 거래일 수집한 종목별 관심도·수급 데이터. 열 머리를 눌러 정렬할 수 있다.
+                {updatedAt && ` · 갱신 ${updatedAt}`}
+            </Text>
+
+            {loading && !stocks.length ? (
+                <Center py="xl"><Loader /></Center>
+            ) : (
+                <StockTable
+                    stocks={sortRows(stocks, sort)}
+                    sortConfig={sort}
+                    onSort={(key) => setSort((prev) => nextSort(prev, key))}
+                    // 종목코드 복사만 한다. `/research`처럼 매매 화면으로 보내면
+                    // 공개 방문자가 로그인 벽에 부딪히고, 그 경로를 알려 주게 된다.
+                    onCellClick={(code) => navigator.clipboard?.writeText(code)}
+                    // onQuickOrder 없음 = 주문 경로가 없다(클릭도 커서도 안 붙는다)
+                />
+            )}
+
+            <Divider my="xl" label="Simulation Analysis" labelPosition="center" />
 
             {loading && !balances ? (
                 <Center py="xl"><Loader /></Center>

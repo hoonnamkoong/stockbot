@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 /**
- * 공개 쇼케이스(`/`)와 리서치 보드(`/research`)만 색인 대상이다.
+ * **색인 대상은 공개 쇼케이스(`/`) 하나뿐이다.** 나머지는 전부 로그인 뒤에 있다.
  *
  * `/login`은 클라이언트 컴포넌트라 `export const metadata`를 못 쓴다 — 그래서
  * noindex를 여기서 준다. 검색에서 가리는 것이 방어는 아니다(로그인 자체는
@@ -13,7 +13,7 @@ export default function robots(): MetadataRoute.Robots {
         rules: {
             userAgent: '*',
             allow: '/',
-            disallow: ['/trade', '/login'],
+            disallow: ['/trade', '/research', '/login'],
         },
     };
 }

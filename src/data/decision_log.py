@@ -52,8 +52,8 @@ INPUT_FIELDS = (
 )
 
 
-def day_path(today: str | None = None, data_dir: str = 'data',
-             runner: str | None = None) -> str:
+def log_path(today: str | None = None, data_dir: str = 'data',
+             runner: str | None = None, hour_: str | None = None) -> str:
     """오늘 결정 로그의 경로: `decisions_<날짜>_<runner>.csv`.
 
     **파일 이름에 writer를 넣는 이유 — 소유권이다.** 심은 두 워크플로에 나뉘어
@@ -66,12 +66,32 @@ def day_path(today: str | None = None, data_dir: str = 'data',
     수만큼**이지 심 수만큼이 아니다(심이 늘어도 자리가 늘지 않는다).
     비교는 `runner` 열로 한다 — 폰(phone) vs 돈 경로(actions-trading).
 
-    하루 한 파일인 이유: 2분 격자가 매 사이클 통째로 db-data에 올리므로 월별로
-    두면 파일이 계속 커진다(diag가 같은 이유로 일별이다).
+    **시간별로 쪼개는 이유 — 푸시 비용이다.** 2분 격자가 매 사이클 이 파일을
+    통째로 db-data에 민다. 일별로 두면 장 마감 무렵 한 번의 푸시가 하루치
+    전체가 된다. 실측(2026-09-09): 같은 방식의 `sim12_diag`가 하루 12,061행
+    1.13MB이고, 이 로그는 심 9개를 덮어 하루 ~3.6MB이다 — 기존 1.7MB 푸시가
+    5MB가 된다. trading.yml의 잡 예산은 3분이고, 배포 스텝이 잘리면 그 사이클의
+    심 상태가 통째로 안 올라간다([[cut-step-kills-the-deploy-behind-it]]).
+    시간별이면 한 푸시가 최대 1시간치(~500KB)로 묶인다.
+
+    읽는 쪽은 파일명을 짚지 말고 `files_for()`를 쓸 것 — 리터럴 파일명이 든
+    목록은 분할 규칙이 바뀌는 순간 조용히 죽는다.
     """
+    now = clock.now()
+    stamp = today or now.strftime('%Y%m%d')
+    hour = now.strftime('%H') if hour_ is None else hour_
+    who = runner or runner_name()
+    return os.path.join(data_dir, f'decisions_{stamp}_{hour}_{who}.csv')
+
+
+def files_for(today: str | None = None, data_dir: str = 'data',
+              runner: str | None = None) -> list:
+    """그날 그 writer의 파일 전부(시간 순). **글롭으로 찾는다** — 분할이
+    시간별이든 다른 것이든 읽는 쪽이 안 바뀌게 하기 위함이다."""
+    import glob
     stamp = today or clock.now().strftime('%Y%m%d')
     who = runner or runner_name()
-    return os.path.join(data_dir, f'decisions_{stamp}_{who}.csv')
+    return sorted(glob.glob(os.path.join(data_dir, f'decisions_{stamp}_*_{who}.csv')))
 
 
 def input_hash(stock: dict) -> str:
@@ -156,7 +176,7 @@ def append(rows: list, path: str | None = None, log=print) -> int:
     if not rows:
         return 0
     try:
-        path = path or day_path()
+        path = path or log_path()
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
         is_new = not os.path.exists(path) or os.path.getsize(path) == 0
         with open(path, 'a', newline='', encoding='utf-8') as f:

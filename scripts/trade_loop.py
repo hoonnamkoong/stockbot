@@ -457,7 +457,7 @@ def _write_deploy_manifest(sim_id: str | None, log=print,
                 # 위 diag와 달리 **심 목록에 매이지 않는다**: 파일이 writer별로
                 # 하나라 심이 늘어도 여기 자리가 늘지 않는다. 그게 이 파일을
                 # 심별로 만들지 않은 이유다(DIAG_LOG_SIM_IDS가 그 반대 사례).
-                from src.data.decision_log import day_path as _dec_path
+                from src.data.decision_log import log_path as _dec_path
                 names.append(os.path.basename(
                     _dec_path(now.strftime('%Y%m%d'))))
         if not names:

@@ -118,18 +118,31 @@ def test_빈_문자열도_actions로_떨어진다(monkeypatch):
 def test_파일이_runner별로_갈린다():
     """심은 두 워크플로에 나뉘어 돈다. 파일이 하나면 뒤에 끝난 쪽이 앞의 것을
     db-data에서 되돌린다 — 워크플로가 초록인 채로 일어나는 고장이다."""
-    a = dl.day_path('20260909', runner='actions-trading')
-    b = dl.day_path('20260909', runner='actions-scraper')
-    c = dl.day_path('20260909', runner='phone')
+    a = dl.log_path('20260909', runner='actions-trading', hour_='11')
+    b = dl.log_path('20260909', runner='actions-scraper', hour_='11')
+    c = dl.log_path('20260909', runner='phone', hour_='11')
     assert len({a, b, c}) == 3
-    assert a.endswith('decisions_20260909_actions-trading.csv')
+    assert a.endswith('decisions_20260909_11_actions-trading.csv')
 
 
-def test_파일_수는_심이_아니라_writer에_묶인다():
-    """심이 16개든 30개든 writer가 둘이면 파일도 둘이다."""
-    paths = {dl.day_path('20260909', runner=r)
-             for r in ('actions-trading', 'actions-scraper')}
-    assert len(paths) == 2
+def test_시간별로_갈려_한_푸시가_하루치가_되지_않는다():
+    """2분 격자가 매 사이클 이 파일을 통째로 db-data에 민다. 일별이면 마감
+    무렵 한 푸시가 하루치 전체(~3.6MB 추정)가 되고, 배포 스텝이 3분 잡 예산에
+    잘리면 그 사이클의 심 상태가 통째로 안 올라간다."""
+    h10 = dl.log_path('20260909', runner='phone', hour_='10')
+    h11 = dl.log_path('20260909', runner='phone', hour_='11')
+    assert h10 != h11
+
+
+def test_읽는_쪽은_글롭으로_찾는다(tmp_path):
+    """리터럴 파일명이 든 목록은 분할 규칙이 바뀌는 순간 조용히 죽는다."""
+    d = str(tmp_path)
+    for h in ('09', '10', '11'):
+        open(dl.log_path('20260909', data_dir=d, runner='phone', hour_=h), 'w').close()
+    open(dl.log_path('20260909', data_dir=d, runner='actions-trading', hour_='09'), 'w').close()
+    got = dl.files_for('20260909', data_dir=d, runner='phone')
+    assert len(got) == 3, got
+    assert all('phone' in g for g in got)
 
 
 # ── 파일 ────────────────────────────────────────────────────────

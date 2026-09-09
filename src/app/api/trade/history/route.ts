@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { getRealTradeHistory } from '@/lib/kis-api';
+import { visibleTradeHistory } from '@/lib/trade-auth';
 import { SIM_REGISTRY } from '@/lib/sim-registry.generated';
 import { createBucketCache, dbDataUrl } from '@/lib/db-data';
 import { parseSimHistoryCsv } from '@/lib/trade-history-csv';
@@ -59,12 +61,17 @@ const loadSimHistories = createBucketCache(async () => {
 
 export async function GET(req: NextRequest) {
     try {
+        // 심 기록은 db-data(공개 브랜치)가 원본이라 누구나 봐도 되지만, 실체결은
+        // 세션이 있어야 한다. 세션이 없으면 KIS 조회 자체를 하지 않는다 —
+        // 공개 트래픽이 실계좌 조회 쿼터를 태우는 것도 막는다.
+        const hasSession = !!(await getToken({ req, secret: process.env.NEXTAUTH_SECRET }));
+
         const [realHistory, simHistory] = await Promise.all([
-            fetchRealHistory(),
+            hasSession ? fetchRealHistory() : Promise.resolve([]),
             loadSimHistories(),
         ]);
 
-        const allHistory = [...realHistory, ...simHistory];
+        const allHistory = visibleTradeHistory({ hasSession, real: realHistory, sim: simHistory });
 
         // 시간순 정렬 (최신 → 과거)
         allHistory.sort((a, b) => {

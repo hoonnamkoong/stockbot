@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { getRealPortfolio, getVirtualPortfolio } from '@/lib/kis-api';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,10 @@ export async function GET(
         const { type } = params;
 
         if (type === 'real') {
+            // 실계좌 잔고다. 미들웨어 매처는 페이지만 잡으므로 여기서 직접 막는다.
+            const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
+            if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
             const portfolio = await getRealPortfolio();
             return NextResponse.json(portfolio, {
                 status: 200,

@@ -27,7 +27,9 @@
 주문 등급(`CRITICAL`)은 차단기를 걸지 않는다. "청산은 무조건 나가야 한다"가
 이 레포의 규칙이고, 매도를 차단기가 막으면 리스크를 줄이는 행동이 봉쇄된다.
 """
+import ast
 import os
+import re
 import sys
 
 import pytest
@@ -44,6 +46,7 @@ REPO = os.path.join(os.path.dirname(__file__), '..')
 def _reset(monkeypatch):
     """차단기 상태는 프로세스 상태다 — 테스트마다 격리한다."""
     monkeypatch.setattr(net, '_STREAKS', {})
+    monkeypatch.setattr(net, '_OPENED_AT', {})
     monkeypatch.setattr(net.time, 'sleep', lambda _s: None)
 
 
@@ -120,6 +123,69 @@ def test_연속_소진이_임계를_넘으면_네트워크를_안_탄다(monkeyp
 
     assert net.get('https://x/y', policy=net.FAST, target='naver') is None
     assert len(calls) == burned, '차단됐는데도 요청이 나갔다'
+
+
+def test_차단기는_시간이_지나면_스스로_다시_시도한다(monkeypatch):
+    """**복구 경로가 없으면 차단기는 런을 끝장낸다.**
+
+    2026-09-09 실측: 네이버 게시글 수집 실패율이 같은 날 0.2% ↔ 69.5%로 널뛴다
+    (전부 ReadTimeout). 버스트가 지나가면 다시 멀쩡한데, 복구가 없으면 3연속
+    실패로 열린 차단기가 **프로세스가 끝날 때까지** 닫히지 않는다 — 열린 뒤에는
+    `request()`가 호출 전에 None을 주므로 `_STREAKS`를 리셋할 응답이 영영 안 온다.
+    10분짜리 버스트가 런 전체의 수집 중단이 된다.
+    """
+    now = [1000.0]
+    monkeypatch.setattr(net.time, 'monotonic', lambda: now[0])
+    calls = _spy(monkeypatch, [requests.ConnectTimeout('boom')])
+
+    for _ in range(net.BULK.breaker_streak):
+        net.get('https://n/1', policy=net.BULK, target='naver')
+    burned = len(calls)
+
+    net.get('https://n/2', policy=net.BULK, target='naver')
+    assert len(calls) == burned, '차단됐는데도 요청이 나갔다'
+
+    now[0] += net.BULK.recovery_sec + 0.1
+    net.get('https://n/3', policy=net.BULK, target='naver')
+    assert len(calls) > burned, '복구 시간이 지났는데 다시 시도하지 않았다'
+
+
+def test_복구_시도가_성공하면_차단기가_닫힌다(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(net.time, 'monotonic', lambda: now[0])
+    boom = requests.ConnectTimeout('boom')
+    _spy(monkeypatch, [boom, boom, boom, _Res()])
+
+    for _ in range(net.BULK.breaker_streak):
+        net.get('https://n/1', policy=net.BULK, target='naver')
+
+    now[0] += net.BULK.recovery_sec + 0.1
+    assert net.get('https://n/2', policy=net.BULK, target='naver') is not None
+
+    # 닫혔으면 다음 호출이 차단 없이 바로 나간다.
+    reasons = {}
+    net.get('https://n/3', policy=net.BULK, target='naver', reasons=reasons)
+    assert 'breaker_open' not in reasons, '성공했는데 차단기가 아직 열려 있다'
+
+
+def test_복구_시도가_실패하면_다시_닫아두고_또_기다린다(monkeypatch):
+    """반쯤 연 상태에서 실패하면 바로 다시 닫는다 — 안 그러면 매 호출이
+    탐침이 되어 차단기가 없는 것과 같아진다."""
+    now = [1000.0]
+    monkeypatch.setattr(net.time, 'monotonic', lambda: now[0])
+    calls = _spy(monkeypatch, [requests.ConnectTimeout('boom')])
+
+    for _ in range(net.BULK.breaker_streak):
+        net.get('https://n/1', policy=net.BULK, target='naver')
+
+    now[0] += net.BULK.recovery_sec + 0.1
+    net.get('https://n/2', policy=net.BULK, target='naver')   # 탐침 — 실패
+    burned = len(calls)
+
+    reasons = {}
+    net.get('https://n/3', policy=net.BULK, target='naver', reasons=reasons)
+    assert len(calls) == burned, '탐침이 실패했는데 계속 요청이 나간다'
+    assert reasons == {'breaker_open': 1}
 
 
 def test_차단기는_대상별로_격리된다(monkeypatch):
@@ -216,6 +282,92 @@ _NOT_YET = {
 }
 
 
+_DIRECT_PATTERNS = (
+    re.compile(r'requests\.(?:get|post|put|patch|delete|request)\s*\('),
+)
+
+# 세션 경유는 net이 **지원한다**(`session=`) — 같은 호스트를 연달아 칠 때 연결을
+# 재사용하는 정당한 경로다. 그래서 `requests.Session()`의 존재만으로는 위반이
+# 아니고, **net을 안 쓰면서** 세션을 만드는 것이 위반이다. 2026-09-09까지 가드가
+# 세션을 아예 못 봐서 scripts/fetch_naver_news.py가 그 구멍으로 들어와 있었다.
+_SESSION = re.compile(r'requests\.[Ss]ession\s*\(')
+_USES_NET = re.compile(r'from src\.core import [^\n]*\bnet\b|from src\.core\.net import')
+
+
+def _direct_http(body: str) -> bool:
+    if any(p.search(body) for p in _DIRECT_PATTERNS):
+        return True
+    return bool(_SESSION.search(body)) and not _USES_NET.search(body)
+
+
+def _urlopen_calls_without_timeout(source: str):
+    """AST로 본다 — 여러 줄에 걸친 호출은 줄 단위 검사로 못 잡는다.
+    `src/core/notify.py`가 실제로 `timeout=`을 다음 줄에 두고 있어 오탐이 났다."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, 'id', None)
+        if name != 'urlopen':
+            continue
+        if not any(kw.arg == 'timeout' for kw in node.keywords):
+            out.append(node.lineno)
+    return out
+
+
+def test_stdlib_urlopen에는_반드시_타임아웃이_있다():
+    """`urlopen`은 net을 안 탄다 — 워크플로에서 `pip install requests`가 아직
+    안 된 지점에도 있어야 하는 코드라 표준 라이브러리를 쓰는 것이 **의도**다
+    (src/core/notify.py의 설계 근거와 같다). 그래서 이관을 강요하지 않는다.
+
+    대신 이 경로의 진짜 위험을 막는다: **타임아웃 없는 urlopen은 영원히 기다린다.**
+    net을 안 쓰는 대가로 정책이 없으니, 최소한 이 하나는 강제한다.
+    """
+    offenders = []
+    for path in _production_py():
+        rel = os.path.relpath(path, REPO).replace(os.sep, '/')
+        with open(path, encoding='utf-8', errors='replace') as f:
+            body = f.read()
+        for lineno in _urlopen_calls_without_timeout(body):
+            offenders.append(f'{rel}:{lineno}')
+    assert not offenders, (
+        '타임아웃 없는 urlopen이 있다 — 상대가 대답을 안 하면 영원히 기다린다:\n'
+        + '\n'.join(offenders))
+
+
+def test_가드가_실제로_무언가를_잡는다():
+    """**헛통과를 막는다.**
+
+    2026-09-09에 이 패턴들이 조용히 무효였다 — 앞에 리터럴 백스페이스가 박혀
+    어떤 파일도 안 걸렸고, 가드는 초록인 채 **아무것도 검사하지 않았다.**
+    통과가 "위반이 없다"인지 "검사기가 죽었다"인지 구분되지 않으면 가드가 아니다.
+    아래 표본이 안 걸리면 위 패턴이 망가진 것이다.
+    """
+    must_catch = (
+        'requests.get("https://x")',
+        'requests.post(url, json=body)',
+        'sess = requests.Session()',
+    )
+    for sample in must_catch:
+        assert _direct_http(sample), f'가드가 못 잡는다: {sample!r}'
+
+    must_pass = (
+        'from src.core import net',
+        'res = net.get(url, policy=net.BULK)',
+        "stats.get('cash', 0)",           # dict.get은 HTTP가 아니다
+        'import requests',                # import만으로는 호출이 아니다
+        # net에 넘길 세션은 정당하다 — net이 `session=`으로 지원하는 경로다.
+        'from src.core import net\nsess = requests.Session()\nnet.get(u, session=sess)',
+    )
+    for sample in must_pass:
+        assert not _direct_http(sample), f'가드가 헛잡는다: {sample!r}'
+
+
 def test_아직_이관_안_된_목록이_늘지_않는다():
     """46곳을 한 번에 옮기면 돈 경로까지 한 PR에 들어간다. 단계적으로 가되,
     **새 직접 호출이 생기는 것은 지금 막는다** — 목록은 줄어들기만 한다."""
@@ -226,7 +378,7 @@ def test_아직_이관_안_된_목록이_늘지_않는다():
             continue
         with open(path, encoding='utf-8', errors='replace') as f:
             body = f.read()
-        if 'requests.get(' in body or 'requests.post(' in body:
+        if _direct_http(body):
             offenders.append(rel)
 
     assert not offenders, (

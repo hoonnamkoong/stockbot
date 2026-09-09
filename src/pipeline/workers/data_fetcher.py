@@ -450,26 +450,27 @@ class DataFetcherWorker(BaseWorker):
             로그에는 횟수만 있었다 — 예외를 받지도 않고 버렸기 때문이다. 429(유량
             제한)·커넥션 리셋·타임아웃은 대응이 전혀 다른데 셋이 구분되지 않았다.
             이유를 모르는 채 동시성이나 재시도를 건드리면 짐작으로 고치는 것이다.
+
+            [2026-09-09] 그 이유 집계가 답을 줬다 — **실패는 100% ReadTimeout**이다
+            (306/440, 182/461). 429도 커넥션 리셋도 아니다. 네이버가 거부하는 게
+            아니라 제한 시간 안에 응답을 안 준다는 뜻이라, 5초는 짧았다.
+            그래서 타임아웃·재시도·차단기를 `net`에 넘긴다(BULK: read 8초).
+            **호출부는 숫자가 아니라 등급만 고른다.**
+
+            `target`이 'naver_board'인 이유: 단건 호출(종목 정보/메인)과 차단기를
+            나눈다. 페이지 전수 스캔은 8스레드가 수십 번 치는 경로라, 여기서 열린
+            차단기가 단건 조회까지 막으면 종목 정보가 통째로 빈다.
             """
             url = f"https://finance.naver.com/item/board.naver?code={code}&page={p_idx}"
-            reason = 'unknown'
-            for attempt in range(PAGE_RETRIES):
-                try:
-                    res = session.get(url, timeout=5)
-                    if res.status_code != 200:
-                        # 상태코드를 숫자 그대로 남긴다. 'HTTPError'로 뭉뚱그리면
-                        # 429인지 503인지를 못 봐서 유량 제한 판정이 안 된다.
-                        reason = f'HTTP {res.status_code}'
-                        raise requests.HTTPError(reason)
-                    posts, stop = parse_page(res)
-                    return posts, stop, True
-                except requests.RequestException as e:
-                    if not isinstance(e, requests.HTTPError):
-                        reason = type(e).__name__
-                    if attempt < PAGE_RETRIES - 1:
-                        time.sleep(PAGE_RETRY_WAIT * (attempt + 1))
+            reasons = {}
+            res = net.get(url, policy=net.BULK, target='naver_board',
+                          session=session, reasons=reasons)
+            if res is not None:
+                posts, stop = parse_page(res)
+                return posts, stop, True
             with reasons_lock:
-                failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
+                for reason, n in (reasons or {'unknown': 1}).items():
+                    failure_reasons[reason] = failure_reasons.get(reason, 0) + n
             return [], False, False
 
         # [2026-08-11, D1] 1페이지를 먼저 순차로 본다. 오늘 글이 1페이지 안에서

@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
 import requests
 
+from src.core import net
 from src.pipeline.workers import data_fetcher
 from src.pipeline.workers import llm_analyzer
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
@@ -71,10 +72,13 @@ def worker():
 
 
 def test_page_timeout_is_retried_then_succeeds(worker, monkeypatch):
-    """1페이지가 두 번 타임아웃해도 세 번째 시도에서 글을 건져야 한다."""
+    """1페이지가 타임아웃해도 남은 시도에서 글을 건져야 한다."""
+    # [2026-09-09] 재시도 횟수는 이제 `net`이 정한다(BULK.attempts) — 호출부가
+    # 숫자를 갖지 않는 것이 재편의 요점이라, 테스트도 숫자를 박지 않는다.
+    # 예전엔 3을 적어 뒀고, 등급이 2로 정하자 이 테스트만 조용히 의미가 달라졌다.
     def behavior(page, attempt):
         if page == 1:
-            if attempt < 3:
+            if attempt < net.BULK.attempts:
                 raise requests.ReadTimeout('timeout')
             return page_html(['101', '102'], trailing_old_row=True)
         return page_html([], trailing_old_row=True)
@@ -83,7 +87,7 @@ def test_page_timeout_is_retried_then_succeeds(worker, monkeypatch):
     stats = stats_for(worker)
 
     assert stats['recent_posts_count'] == 2
-    assert attempts[1] == 3
+    assert attempts[1] == net.BULK.attempts
     assert stats['failed_pages'] == 0
 
 

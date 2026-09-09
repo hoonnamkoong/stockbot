@@ -9,18 +9,31 @@
 `covered=0`으로 남긴다 — 커버리지 실패를 '뉴스 없음'으로 바꾸면 그게 곧
 조용한 결손이다(대형주는 하루에 수십 페이지라 반드시 걸린다).
 """
-import csv, sys, time, collections
+import csv, os, sys, time, collections
 import requests
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from src.core import net   # noqa: E402
 
 H = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.naver.com/'}
 MAX_PAGES = 40
 
 
 def page(sess, code, p):
-    r = sess.get('https://finance.naver.com/item/news_news.naver',
-                 params={'code': code, 'page': p}, headers=H, timeout=8)
+    """못 닿으면 None. 빈 리스트로 접으면 `fetch`가 '더 없다'로 읽어 covered=True를
+    찍는다 — 커버리지 실패가 '뉴스 없음'으로 위장되는 바로 그 형태다.
+
+    타임아웃·재시도·차단기는 `net`이 갖는다(BULK: read 8초). 이관 전 `timeout=8`과
+    같은 값이지만, 여기서 숫자를 고르지 않는 것이 요점이다.
+    """
+    r = net.get('https://finance.naver.com/item/news_news.naver',
+                policy=net.BULK, target='naver_news', session=sess,
+                params={'code': code, 'page': p}, headers=H)
+    if r is None:
+        return None
     s = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
     out = []
     for tr in s.select('table.type5 tr'):
@@ -38,10 +51,9 @@ def fetch(code, until):
     sess = requests.Session()
     rows, covered = [], False
     for p in range(1, MAX_PAGES + 1):
-        try:
-            got = page(sess, code, p)
-        except requests.RequestException:
-            time.sleep(0.5)
+        got = page(sess, code, p)
+        if got is None:
+            # 못 닿았다 — '더 없음'과 구분한다. covered는 그대로 False로 남는다.
             continue
         if not got:
             covered = True     # 더 없으면 그 종목은 전부 본 것

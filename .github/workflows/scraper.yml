@@ -52,6 +52,8 @@ jobs:
     timeout-minutes: 20
     env:
       PYTHONPATH: ${{ github.workspace }}
+      # 결정 스냅샷의 writer 이름 — trading.yml과 파일을 가른다.
+      STOCKBOT_RUNNER: actions-scraper
       TZ: Asia/Seoul
     permissions:
       contents: write
@@ -235,7 +237,9 @@ jobs:
               # DIAG_LOG_SIM_IDS). 여기서도 밀면 두 writer가 같은 파일을 두고
               # 경합해 push가 non-fast-forward로 계속 실패한다(2026-08-24).
               # sim1처럼 이 목록에 없는 심의 diag는 계속 여기서 나간다.
-              sim6_diag_*.csv|sim9_diag_*.csv|sim12_diag_*.csv|sim13_diag_*.csv) continue ;;
+              # 결정 스냅샷은 writer별로 파일이 갈린다 — trading.yml 것은
+              # 거기서 배포한다. 여기서 같이 밀면 되돌린다.
+              sim6_diag_*.csv|sim9_diag_*.csv|sim12_diag_*.csv|sim13_diag_*.csv|decisions_*_actions-trading.csv) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done

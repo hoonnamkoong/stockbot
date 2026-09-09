@@ -463,7 +463,7 @@ class DataFetcherWorker(BaseWorker):
             """
             url = f"https://finance.naver.com/item/board.naver?code={code}&page={p_idx}"
             reasons = {}
-            res = net.get(url, policy=net.BULK, target='naver_board',
+            res = net.get(url, policy=net.SCRAPE, target='naver_board',
                           session=session, reasons=reasons)
             if res is not None:
                 posts, stop = parse_page(res)

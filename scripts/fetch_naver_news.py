@@ -30,7 +30,7 @@ def page(sess, code, p):
     같은 값이지만, 여기서 숫자를 고르지 않는 것이 요점이다.
     """
     r = net.get('https://finance.naver.com/item/news_news.naver',
-                policy=net.BULK, target='naver_news', session=sess,
+                policy=net.SCRAPE, target='naver_news', session=sess,
                 params={'code': code, 'page': p}, headers=H)
     if r is None:
         return None

@@ -16,6 +16,15 @@ def cancel_order(odno: str, code: str, qty: int) -> bool:
 
     주문번호가 없으면 대상을 특정할 수 없으므로 호출하지 않고 False.
     """
+    # 그림자 운전(이관 3단계): 폰이 보는 미체결은 **옛 경로가 낸 진짜 주문**이다.
+    # 폰이 취소하면 살아 있는 매매를 방해한다 — 주문보다 이쪽이 더 위험하다.
+    # 이 경로는 Vercel을 우회해 KIS를 직접 부르므로 WEBHOOK_SECRET 부재로도
+    # 막히지 않는다. 여기 가드가 유일한 방어다.
+    from src.trade.shadow import is_shadow, refused
+    if is_shadow():
+        refused('주문취소', f'{code} odno={odno} {qty}주')
+        return False
+
     if not odno or odno == 'UNKNOWN':
         return False
     token = get_access_token()

@@ -25,10 +25,10 @@ NASDAQ_RESPONSE = {
 
 
 def test_fetch_us_universe_parses_rows():
-    with mock.patch('src.data.us_universe.requests.get') as m:
+    with mock.patch('src.core.net.requests.get') as m:
         m.return_value.status_code = 200
         m.return_value.json.return_value = NASDAQ_RESPONSE
-        m.return_value.raise_for_status = lambda: None
+        m.return_value.status_code = 200
         rows = fetch_us_universe(limit=10)
     assert len(rows) == 4
     aapl = next(r for r in rows if r['symbol'] == 'AAPL')
@@ -37,7 +37,7 @@ def test_fetch_us_universe_parses_rows():
 
 
 def test_fetch_us_universe_raises_on_http_error():
-    with mock.patch('src.data.us_universe.requests.get') as m:
+    with mock.patch('src.core.net.requests.get') as m:
         m.return_value.raise_for_status.side_effect = Exception('boom')
         try:
             fetch_us_universe(limit=10)
@@ -48,10 +48,10 @@ def test_fetch_us_universe_raises_on_http_error():
 
 def test_fetch_us_universe_raises_on_empty_rows():
     """HTTP 200이어도 rows가 null/비어있으면 (재시도 뒤) 예외를 올린다."""
-    with mock.patch('src.data.us_universe.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
+    with mock.patch('src.core.net.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
         m.return_value.status_code = 200
         m.return_value.json.return_value = {'data': {'table': {'rows': None}, 'rows': None}}
-        m.return_value.raise_for_status = lambda: None
+        m.return_value.status_code = 200
         try:
             fetch_us_universe(limit=10)
             assert False, '예외가 나야 한다'
@@ -107,9 +107,9 @@ TABLE_RESPONSE = {
 
 def test_fetch_us_universe_parses_table_rows():
     """현행 응답 형태(data.table.rows)를 읽는다."""
-    with mock.patch('src.data.us_universe.requests.get') as m:
+    with mock.patch('src.core.net.requests.get') as m:
         m.return_value.json.return_value = TABLE_RESPONSE
-        m.return_value.raise_for_status = lambda: None
+        m.return_value.status_code = 200
         rows = fetch_us_universe(limit=10)
     assert [r['symbol'] for r in rows] == ['NVDA', 'AAPL']
     # 콤마가 든 시총 문자열도 숫자로 읽어야 한다.
@@ -118,9 +118,9 @@ def test_fetch_us_universe_parses_table_rows():
 
 def test_fetch_us_universe_request_avoids_dead_params():
     """죽은 파라미터를 보내지 않는다 — download=true, 콤마로 이은 exchange."""
-    with mock.patch('src.data.us_universe.requests.get') as m:
+    with mock.patch('src.core.net.requests.get') as m:
         m.return_value.json.return_value = TABLE_RESPONSE
-        m.return_value.raise_for_status = lambda: None
+        m.return_value.status_code = 200
         fetch_us_universe(limit=10)
     params = m.call_args.kwargs['params']
     assert params.get('download') != 'true'
@@ -139,8 +139,8 @@ FILLED = {'data': {'table': {'rows': [
 
 
 def test_빈_응답이면_재시도한다():
-    with mock.patch('src.data.us_universe.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
-        m.return_value.raise_for_status = lambda: None
+    with mock.patch('src.core.net.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
+        m.return_value.status_code = 200
         m.return_value.json.side_effect = [EMPTY, EMPTY, FILLED]
         rows = fetch_us_universe(limit=10)
     assert m.call_count == 3, '재시도하지 않았다'
@@ -148,8 +148,8 @@ def test_빈_응답이면_재시도한다():
 
 
 def test_재시도가_유한하고_결국_예외다():
-    with mock.patch('src.data.us_universe.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
-        m.return_value.raise_for_status = lambda: None
+    with mock.patch('src.core.net.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
+        m.return_value.status_code = 200
         m.return_value.json.return_value = EMPTY
         try:
             fetch_us_universe(limit=10)
@@ -161,7 +161,7 @@ def test_재시도가_유한하고_결국_예외다():
 
 def test_HTTP_오류는_재시도하지_않는다():
     """소프트 차단(200+빈행)과 진짜 오류는 다르다. 4xx를 재시도하면 차단만 깊어진다."""
-    with mock.patch('src.data.us_universe.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
+    with mock.patch('src.core.net.requests.get') as m,          mock.patch('src.data.us_universe.time.sleep'):
         m.return_value.raise_for_status.side_effect = Exception('403')
         try:
             fetch_us_universe(limit=10)

@@ -9,7 +9,7 @@ SLA가 없는 비공식 API라 응답 형식이 바뀌거나 IP가 막힐 수 �
 """
 import datetime as dt
 
-import requests
+from src.core import net
 
 CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart/{symbol}'
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
@@ -22,8 +22,12 @@ _RANGE_TO_PARAMS = {
 
 def _get_chart(symbol: str, range_: str) -> dict:
     params = dict(_RANGE_TO_PARAMS.get(range_, {'range': range_, 'interval': '1d'}))
-    r = requests.get(CHART_URL.format(symbol=symbol), params=params, headers=HEADERS, timeout=15)
-    r.raise_for_status()
+    # required=True — 이 함수의 두 호출부가 계약이 다르다. `fetch_daily_ohlcv`는
+    # 예외를 그대로 올려야 하고(그 종목을 판단할 수 없다는 뜻),
+    # `fetch_current_quote`는 아래에서 잡아 None으로 접는다("지금 값을 모른다").
+    # 여기서 None을 주면 뒤의 `['chart']` 첨자가 TypeError로 터져 이유가 사라진다.
+    r = net.get(CHART_URL.format(symbol=symbol), policy=net.FAST, target='yahoo',
+                params=params, headers=HEADERS, required=True)
     return r.json()['chart']['result'][0]
 
 

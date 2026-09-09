@@ -18,13 +18,9 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "하이닉스와의 주가 비교 열세 및 경영진에 대한 부정적 의견 대두.",
-        "sentiment": "-5",
-        "keywords": [
-          "하이닉스",
-          "주가",
-          "경영진"
-        ]
+        "posts_summary": "노조, 이재용 해임, 하이닉스와의 비교 등 부정적 언급.",
+        "sentiment": "-6",
+        "keywords": []
       }
     },
     "034020": {
@@ -57,11 +53,10 @@
       "name": "한국전력",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "한국-프랑스 차세대 원전 협력 뉴스 및 25조 선납매 논의. 공매도 세력의 움직임 주시.",
-        "sentiment": "-2",
+        "posts_summary": "미국 원전 협력, 공매도 이슈, SMP 급락 우려.",
+        "sentiment": "0",
         "keywords": [
           "원전",
-          "선납매",
           "공매도"
         ]
       }
@@ -83,12 +78,11 @@
       "name": "스카이랩스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "세계 최초 혈압 반지의 유럽 진출 뉴스 확인. 최저점 매수 논의 및 2차 파동 기대.",
-        "sentiment": "1",
+        "posts_summary": "세계 최초 혈압 반지, 유럽 진출 뉴스, 1차 파동 조정 후 2차 파동 시작 기대.",
+        "sentiment": "4",
         "keywords": [
-          "혈압반지",
-          "유럽진출",
-          "최저점"
+          "혈압 반지",
+          "유럽 진출"
         ]
       }
     },
@@ -109,12 +103,11 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "AI 관련 기대감 있으나, 개인 투자자 매수 집중 및 기업 성장성 의문 제기.",
-        "sentiment": "-4",
+        "posts_summary": "매도, 중국산 영향, 개인 매수 집중 등 부정적 전망.",
+        "sentiment": "-5",
         "keywords": [
-          "AI",
-          "개인투자자",
-          "성장성"
+          "매도",
+          "중국산"
         ]
       }
     },
@@ -122,12 +115,11 @@
       "name": "빛과전자",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 광통신 산업 급등에 따른 기대감. 투기 과열 종목 지정 우려 및 6G 기반 성장성.",
-        "sentiment": "1",
+        "posts_summary": "미국 광통신 폭등 관련, 6G 기반, 국책사업 선정 기대.",
+        "sentiment": "6",
         "keywords": [
           "광통신",
-          "6G",
-          "투기과열"
+          "6G"
         ]
       }
     },
@@ -148,11 +140,11 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "외국인 및 기관의 지속적인 매수세 유입 확인. 상승 추세 전환 신호 및 악성 매물 소화 기대.",
-        "sentiment": "6",
+        "posts_summary": "상승 추세 전환 신호, 외인/기관 매수세 유입, 악성매물 소화.",
+        "sentiment": "7",
         "keywords": [
-          "외인매수",
-          "상승추세",
+          "상승 추세",
+          "외인 매수",
           "악성매물"
         ]
       }
@@ -238,12 +230,11 @@
       "name": "페니트리움바이오",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미 FDA 2A상 승인 및 다락손라십 대비 우수한 효능 확인. 5연상 기대감 고조.",
-        "sentiment": "7",
+        "posts_summary": "미 FDA 2A상 승인, 병용요법 연구 결과 공개, 암치료제 획기적 효능 기대.",
+        "sentiment": "8",
         "keywords": [
           "FDA",
-          "암치료제",
-          "효능"
+          "암치료제"
         ]
       }
     },
@@ -251,12 +242,11 @@
       "name": "삼미금속",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 증시 SMR 관련주 동반 급등 및 품절주 특징 부각. 신규 재료 기대감.",
-        "sentiment": "4",
+        "posts_summary": "미국 증시 SMR 관련주 폭등, 가스터빈 대장, 물량 이슈.",
+        "sentiment": "1",
         "keywords": [
           "SMR",
-          "품절주",
-          "재료"
+          "가스터빈"
         ]
       }
     },
@@ -276,12 +266,11 @@
       "name": "써니전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "기타 법인 장내 매수세 유입 및 지분 싸움 기대감. 단기 과열 우려도 존재.",
+        "posts_summary": "지분 싸움 및 기타법인 장내매수, 단기 목표가 설정.",
         "sentiment": "3",
         "keywords": [
-          "PBR",
-          "지분싸움",
-          "기타법인"
+          "지분 싸움",
+          "장내매수"
         ]
       }
     }

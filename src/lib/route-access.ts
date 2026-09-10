@@ -30,6 +30,7 @@ const PUBLIC_APIS = [
     '/api/simulation/stats',
     '/api/trade/history',     // 세션 없으면 심 기록만 나간다(visibleTradeHistory)
     '/api/stocks/research',
+    '/api/health',            // 정적 플래그만 반환한다 — 지킬 값이 없다
 ];
 
 /**
@@ -37,13 +38,23 @@ const PUBLIC_APIS = [
  * 이들은 세션이 아니라 시크릿으로 인증한다. 통과시키는 것이지 무방비가 아니다.
  */
 export const SELF_GUARDED_APIS = [
-    '/api/auth',             // 로그인 자체. 막으면 들어갈 문이 없다
+    '/api/auth',             // 로그인 자체. 막으면 들어갈 문이 없다(next-auth가 지킨다)
     '/api/cron',             // CRON_SECRET (smart-trigger 포함) — 태스커
     '/api/trade/ai/trigger', // CRON_SECRET
     '/api/trade/order',      // WEBHOOK_SECRET 또는 세션+PIN — 매매 루프
-    '/api/stocks/refresh',   // vercel.json 월 1회 cron
-    '/api/health',           // 값이 없는 상태 확인용(정적 플래그만 반환)
 ];
+
+/**
+ * `/api/auth`만 예외다 — next-auth가 자기 방식으로 지키고 시크릿 문자열이
+ * 라우트 파일에 없다. 나머지는 **실제로 시크릿을 검사해야** 이 목록에 들어온다.
+ *
+ * 이 예외 목록이 따로 있는 이유: 처음 목록을 짤 때 `/api/stocks/refresh`를
+ * "vercel.json cron이 부른다"는 이유로 여기 넣었는데, **그 라우트는 아무것도
+ * 검사하지 않았다.** 배포 후 실측에서 무인증 200으로 드러났다(프로덕션에서는
+ * `process.env.VERCEL` 검사로 403이라 하는 일도 없었다 — 이유 자체가 틀렸다).
+ * "스스로 검사한다"는 라벨은 붙이는 것이 아니라 확인하는 것이다.
+ */
+export const SELF_GUARD_EXEMPT = ['/api/auth'];
 
 const OPEN = [...PUBLIC_PAGES, ...PUBLIC_APIS, ...SELF_GUARDED_APIS];
 

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isOpen, SELF_GUARDED_APIS } from './route-access.ts';
+import { isOpen, SELF_GUARDED_APIS, SELF_GUARD_EXEMPT } from './route-access.ts';
 
 const ROOT = process.cwd();
 const API = path.join(ROOT, 'src', 'app', 'api');
@@ -66,6 +66,28 @@ test('시크릿으로 스스로 검사하는 라우트는 전부 열려 있다',
         if (!/WEBHOOK_SECRET|CRON_SECRET/.test(body)) continue;
         assert.ok(isOpen(r),
             `${r}는 시크릿으로 인증하는데 미들웨어가 막는다 — 기계 경로가 죽는다`);
+    }
+});
+
+test('스스로 검사한다고 적은 라우트는 실제로 시크릿을 검사한다', () => {
+    // 배포 후 실측에서 `/api/stocks/refresh`가 무인증 200으로 나왔다 —
+    // "cron이 부른다"는 이유로 목록에 넣었는데 그 라우트는 아무것도 검사하지
+    // 않았고, 프로덕션에서는 하는 일도 없었다. **라벨은 붙이는 게 아니라
+    // 확인하는 것이다.**
+    for (const p of SELF_GUARDED_APIS) {
+        if (SELF_GUARD_EXEMPT.includes(p)) continue;
+        const dir = path.join(ROOT, 'src', 'app', p);
+        const bodies: string[] = [];
+        const walk = (d: string) => {
+            for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+                const full = path.join(d, e.name);
+                if (e.isDirectory()) walk(full);
+                else if (e.name === 'route.ts') bodies.push(fs.readFileSync(full, 'utf-8'));
+            }
+        };
+        walk(dir);
+        assert.ok(bodies.some((b) => /WEBHOOK_SECRET|CRON_SECRET/.test(b)),
+            `${p}는 시크릿을 검사하지 않는데 세션 없이 통과한다 — 무인증 공개다`);
     }
 });
 

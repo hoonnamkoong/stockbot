@@ -5,39 +5,27 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "15조 자사주 매수 발표로 호재 기대감 존재, 그러나 정치적 언급 다수.",
-        "sentiment": "1",
-        "keywords": [
-          "자사주 매수",
-          "호재",
-          "기대감"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 795건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "096770": {
       "name": "SK이노베이션",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "유가 급등에 따른 주가 상승 기대감 존재. 프로그램 매수세 유입 및 JP모건의 대량 매수 언급.",
-        "sentiment": "1",
-        "keywords": [
-          "유가",
-          "프로그램 매수",
-          "JP모건"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 427건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "000660": {
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "연기금 리밸런싱 및 외국인 매수 전환 가능성 언급, 500만 가 목표.",
-        "sentiment": "3",
-        "keywords": [
-          "리밸런싱",
-          "외국인 매수",
-          "목표"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 795건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "034020": {
@@ -57,51 +45,39 @@
       "name": "페니트리움바이오",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "폐암 학회 발표 및 글로벌 제약사와의 임상 협력 등 강력한 재료 기반 상승 전망. 임상 2상 결과 및 FDA 승인 기대.",
-        "sentiment": "3",
-        "keywords": [
-          "폐암",
-          "임상",
-          "FDA"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 314건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "010170": {
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 광통신 및 반도체 강세, AI 관련주로 16000 돌파 목표.",
-        "sentiment": "3",
-        "keywords": [
-          "광통신",
-          "반도체",
-          "AI"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 164건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "047040": {
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "대차해지 운동 독려 및 미국 투자 관련 언급, 주가 상승 기대.",
-        "sentiment": "1",
-        "keywords": [
-          "대차해지",
-          "운동",
-          "기대"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 139건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "024060": {
       "name": "흥구석유",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "흥구석유, 중동 유가 급등 및 유조선 피격 관련 상승 기대. 단기 변동성 속 거래량 주목.",
-        "sentiment": "4",
+        "posts_summary": "중동 유가 급등 및 전쟁 심화 관련하여 주가 상승 기대감 있으나, 변동성 큼.",
+        "sentiment": "1",
         "keywords": [
-          "유가 급등",
-          "유조선 피격",
-          "거래량"
+          "유가",
+          "중동",
+          "급등"
         ]
       }
     },
@@ -122,13 +98,9 @@
       "name": "엔에이치스팩34호",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "단기 급등 후 급락 가능성, 스펙주 특성상 투자 주의.",
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 638건 토론 포착",
         "sentiment": "0",
-        "keywords": [
-          "스펙주",
-          "급등",
-          "급락"
-        ]
+        "keywords": []
       }
     },
     "198440": {
@@ -161,13 +133,9 @@
       "name": "삼미금속",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "그래핀 등 신소재 관련 호재 언급 있으나, 주가 하락 의견과 혼재. 변동성 큼.",
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 122건 토론 포착",
         "sentiment": "0",
-        "keywords": [
-          "그래핀",
-          "신소재",
-          "변동성"
-        ]
+        "keywords": []
       }
     },
     "002990": {
@@ -213,12 +181,12 @@
       "name": "스카이랩스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "단기 급락 이후 실망 매물 출회 및 프로그램 매매 관련 불만 제기. 일부 투자자는 추매를 긍정적으로 보나, 전반적인 투자 심리는 부정적.",
-        "sentiment": "-5",
+        "posts_summary": "2대 주주 한국산업은행 언급에도 불구하고, 단기 급락 및 급등 예상 혼재. 탕후루 및 더본코리아 패턴 비교.",
+        "sentiment": "-2",
         "keywords": [
-          "급락",
-          "매물",
-          "추매"
+          "2대 주주",
+          "패턴",
+          "급락"
         ]
       }
     },
@@ -265,13 +233,9 @@
       "name": "흥아해운",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "외인 매수세 유입 속 단기 급등 기대감 있으나, 명확한 근거 부족.",
-        "sentiment": "2",
-        "keywords": [
-          "외인",
-          "급등",
-          "기대감"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 162건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "067290": {
@@ -356,13 +320,9 @@
       "name": "금호타이어",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "CP A2+ 부여 및 내년 신용등급 상향 전망, 정상화 기대감.",
-        "sentiment": "2",
-        "keywords": [
-          "신용등급",
-          "CP",
-          "정상화"
-        ]
+        "posts_summary": "[데이터 분석] '시장 주도주' 중심 212건 토론 포착",
+        "sentiment": "0",
+        "keywords": []
       }
     }
   }

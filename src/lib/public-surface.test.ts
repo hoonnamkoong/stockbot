@@ -95,7 +95,8 @@ test('공개 페이지가 쓰는 데이터 API는 오리진을 매번 치지 않
     // 캐시까지 무력화해 요청 하나가 오리진 5회였다.
     for (const p of ['src/app/api/stocks/research/route.ts',
                      'src/app/api/simulation/stats/route.ts',
-                     'src/app/api/trade/history/route.ts']) {
+                     'src/app/api/trade/history/route.ts',
+                     'src/app/api/simulation/libero-history/route.ts']) {
         assert.ok(read(p).includes('createBucketCache'), `${p}에 신선도 캐시가 없다`);
     }
     // 캐시버스터 유무는 검사하지 않는다 — 문자열이 주석에도 있어서 **설명을

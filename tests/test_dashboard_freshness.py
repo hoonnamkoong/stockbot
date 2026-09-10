@@ -43,6 +43,11 @@ def test_the_two_dashboard_routes_use_the_helper():
     users = {os.path.relpath(p, ROOT).replace('\\', '/') for p in _files_using_the_helper()}
     assert 'src/app/api/simulation/stats/route.ts' in users
     assert 'src/app/api/trade/history/route.ts' in users
+    # 2026-09-10: 아래 둘이 뒤늦게 합류했다. 그전까지 이 라우트들은 헬퍼를 안 써서
+    # **캐시버스터 금지 규칙의 검사 대상 밖**이었고, 실제로 버스터를 달고 있었다.
+    # 같은 부류를 하나 고칠 때 나머지를 찾지 않은 것이 두 번의 누락에 공통이다.
+    assert 'src/app/api/stocks/research/route.ts' in users
+    assert 'src/app/api/simulation/libero-history/route.ts' in users
 
 
 def test_helper_users_do_not_bust_the_cache_per_request():

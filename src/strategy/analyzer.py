@@ -1,7 +1,5 @@
 import os
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 from datetime import datetime
 
 # save_data는 record_writer.py로 분리됐다. 하위 호환을 위해 re-export한다
@@ -319,69 +317,43 @@ def compare_with_history(current_df):
 
 def get_top_trending_stocks(market_type='KOSPI'):
     """
-    네이버 금융 거래상위(또는 인기 검색) 종목 리스트를 가져옵니다.
+    네이버 거래량 상위 종목 리스트를 가져옵니다.
     market_type: 'KOSPI' or 'KOSDAQ'
+
+    [2026-09-11] 원천이 finance.naver.com sise_quant(HTML) → 네이버 JSON API
+    quantTop이다(src/data/naver_api.py). 09-10에 옛 페이지가 302로 옮겨가 표가
+    사라지자 이 함수는 예외 없이 빈 목록을 냈고, 스크래퍼 후보가 0개가 됐다.
+    ETF·ETN은 이제 종목 유형으로 뺀다 — 이름 키워드는 RISE·PLUS 같은 새 브랜드를
+    못 거른다. 키워드는 그대로 둔다.
     """
-    sosok = '0' if market_type == 'KOSPI' else '1'
-    url = f"https://finance.naver.com/sise/sise_quant.naver?sosok={sosok}" 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://finance.naver.com/',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
-    }
+    from src.data import naver_api
 
     exclude_keywords = ['KODEX', 'TIGER', 'ETN', 'KBSTAR', 'ACE', 'KOSEF', 'SOL', 'HANARO', 'ARIRANG']
-    
-    try:
-        print(f"[Analyzer] Fetching {market_type} trending stocks...")
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
 
-        soup = BeautifulSoup(response.content.decode('euc-kr', 'replace'), 'html.parser')
-        table = soup.select_one('table.type_2')
-        
-        data = []
-        if table:
-            rows = table.select('tr')
-            for row in rows:
-                cols = row.select('td')
-                if len(cols) < 10: continue
-                
-                name_tag = cols[1].select_one('a')
-                if not name_tag: continue
-                name = name_tag.get_text(strip=True)
-                
-                if any(kw in name.upper() for kw in exclude_keywords): continue
+    print(f"[Analyzer] Fetching {market_type} trending stocks...")
+    rows = naver_api.stock_list('quantTop', market_type, 100)
+    if rows is None:
+        # 에러 은폐 금지 (글로벌 룰) — 빈 목록이면 '후보 없음'으로 보인다.
+        raise RuntimeError(f'get_top_trending_stocks failed: {market_type} 거래량 상위 조회 실패')
 
-                code = name_tag['href'].split('code=')[-1]
-                price_str = cols[2].get_text(strip=True).replace(',', '')
-                current_price = int(price_str) if price_str.isdigit() else 0
-                change_rate = cols[4].get_text(strip=True).strip()
-                
-                # [V50.2] 거래량(volume) 및 거래대금(amount) 추출
-                volume_str = cols[5].get_text(strip=True).replace(',', '')
-                volume = int(volume_str) if volume_str.isdigit() else 0
-                amount_str = cols[6].get_text(strip=True).replace(',', '')
-                amount = int(amount_str) * 1_000_000 if amount_str.isdigit() else 0 # 단위: 백만
-                
-                prev_close = 0
-                try:
-                    rate_float = float(change_rate.replace('%', ''))
-                    prev_close = int(current_price / (1 + rate_float/100))
-                except: pass
+    data = []
+    for r in rows:
+        name = r['name']
+        if any(kw in name.upper() for kw in exclude_keywords): continue
 
-                data.append({
-                    'market': market_type,
-                    'code': code,
-                    'name': name,
-                    'price': current_price,
-                    'prev_close': prev_close,
-                    'change_rate': change_rate,
-                    'volume': volume,
-                    'amount': amount,
-                    'source': 'volume'
-                })
-        return data[:20]
-    except Exception as e:
-        print(f"[Error] get_top_trending_stocks failed: {e}")
-        raise e # 에러 은폐 금지 (글로벌 룰)
+        current_price = int(r['price'] or 0)
+        rate = r['change_rate']
+        prev_close = int(current_price / (1 + rate / 100)) if rate is not None and current_price else 0
+
+        data.append({
+            'market': market_type,
+            'code': r['code'],
+            'name': name,
+            'price': current_price,
+            'prev_close': prev_close,
+            'change_rate': f"{rate:+.2f}%" if rate is not None else '',
+            'volume': r['volume'] or 0,
+            'amount': int(r['amount'] or 0),
+            'source': 'volume'
+        })
+    return data[:20]

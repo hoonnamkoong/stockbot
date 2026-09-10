@@ -12,9 +12,13 @@ TODAY = '2026.07.10'
 
 
 class _FakeResponse:
-    def __init__(self, html, status_code=200):
-        self.content = html.encode('utf-8')
-        self.status_code = status_code
+    status_code = 200
+
+    def __init__(self, body):
+        self._body = body
+
+    def json(self):
+        return self._body
 
 
 def test_discussion_stats_returns_only_live_keys(monkeypatch):
@@ -22,18 +26,10 @@ def test_discussion_stats_returns_only_live_keys(monkeypatch):
     from src.pipeline.workers import data_fetcher
     from src.pipeline.workers.data_fetcher import DataFetcherWorker
 
-    old_row = (f'<tr><td>2026.07.09 23:00</td>'
-               f'<td class="title"><a href="?nid=1">옛글</a></td>'
-               f'<td>x</td><td>y</td><td>0</td></tr>')
-
-    class FakeSession:
-        def __init__(self):
-            self.headers = {}
-
-        def get(self, url, timeout=None):
-            return _FakeResponse(f'<table class="type2">{old_row}</table>')
-
-    monkeypatch.setattr(data_fetcher.requests, 'Session', FakeSession)
+    old_post = {'id': '1', 'writtenAt': '2026-07-09T23:00:00', 'title': '옛글',
+                'recommendCount': 0, 'writer': {'profileId': 'x'}}
+    monkeypatch.setattr(requests.Session, 'get', lambda self, url, **kw: _FakeResponse(
+        {'result': {'posts': [old_post], 'lastOffset': None}}))
     monkeypatch.setattr(data_fetcher.time, 'sleep', lambda *_: None)
 
     stats = object.__new__(DataFetcherWorker)._get_discussion_stats('002990', TODAY)

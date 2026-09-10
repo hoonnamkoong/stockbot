@@ -26,15 +26,13 @@ _QUOTE = {'price': 6000, 'change_rate_pct': 1.0, 'per': 10.0, 'pbr': 1.0,
           'sector_name': '전기전자', 'w52_hgpr': 9000, 'w52_lwpr': 4000}
 
 
-def _enrich(stocks, quote=None, naver_html=None):
+def _enrich(stocks, quote=None, trend=None):
+    """trend: 네이버 일별 수급 행(naver_api.investor_trend). None이면 못 닿은 것."""
     kis = mock.MagicMock()
     kis.get_price_quote.return_value = quote if quote is not None else _QUOTE
     kis.get_investor_trend_estimate.return_value = {}
-    res = mock.MagicMock()
-    res.content = (naver_html or '').encode('utf-8')
-    ctx = mock.patch('requests.get', return_value=res) if naver_html else \
-        mock.patch('requests.get', side_effect=OSError('네트워크 차단'))
-    with ctx, mock.patch('src.trade.kis_data_provider.KISDataProvider', return_value=kis):
+    with mock.patch('src.data.naver_api.investor_trend', return_value=trend), \
+         mock.patch('src.trade.kis_data_provider.KISDataProvider', return_value=kis):
         return TradeEngineWorker._enrich_universe(None, stocks)
 
 
@@ -66,18 +64,13 @@ def test_w52_enables_nearness():
 
 
 # ── foreign_change: info 축이 살아나는 조건 ─────────────────
-_ROW = ('<tr>' + ''.join(f'<td>{v}</td>' for v in
-        ('2026.07.29', '6,000', '+100', '+1.5%', '1,000,000', '+5,000', '+3,000', '100', '{fr}%')) + '</tr>')
-
-
-def _naver_table(rates):
-    rows = ''.join(_ROW.format(fr=r) for r in rates)
-    return f'<table class="type2">{rows}</table>'
+def _trend(rates):
+    return [{'date': '20260729', 'close': 6000, 'volume': 1_000_000, 'organ_net': 5000,
+             'foreign_net': 3000, 'foreign_hold_ratio': r} for r in rates]
 
 
 def test_enrich_computes_foreign_change_from_two_rows():
-    out = _enrich([{'code': '005930', 'name': '삼성전자'}],
-                  naver_html=_naver_table(['12.50', '12.10']))
+    out = _enrich([{'code': '005930', 'name': '삼성전자'}], trend=_trend([12.50, 12.10]))
     assert out[0]['foreign_change'] == 0.4
 
 

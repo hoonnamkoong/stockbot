@@ -1,4 +1,4 @@
-"""네이버 페이지 파싱 실패가 KIS 보강까지 죽이면 안 된다.
+"""네이버 조회 실패가 KIS 보강까지 죽이면 안 된다.
 
 2026-08-03: 후보 18종목 전부 open_price/day_high/day_low/per/pbr/tick_power가 0으로
 들어와 심9(갭소진)가 진입 후보를 한 건도 만들지 못했다. 원인은 데이터가 아니라 구조였다 —
@@ -8,38 +8,22 @@ KIS inquire-price 호출이 main.naver 요청과 같은 try 블록 안에 있어
 [2026-08-12] KIS 호출은 이제 requests.get 사본이 아니라 KISDataProvider(하드닝된
 클라이언트, rt_cd 검사·응답 형태 대응·캐시 포함)로 위임한다. 그래서 이 파일의 KIS
 관련 테스트는 provider를 주입해 검증한다.
+
+[2026-09-11] 네이버 쪽(수급 표·호가)은 src/data/naver_api.py를 탄다. 이 파일은
+그 함수들을 대역으로 바꿔 격리만 본다.
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import requests
 from src.pipeline.workers import data_fetcher
 from src.pipeline.workers.data_fetcher import DataFetcherWorker
 
-
-def frgn_html():
-    def row(date, close, rate, foreign_rate):
-        return (
-            f'<tr><td>{date}</td><td>{close}</td><td>0</td><td>{rate}</td>'
-            f'<td>1</td><td>10</td><td>20</td><td>30</td><td>{foreign_rate}%</td></tr>'
-        )
-    return ('<table class="type2">'
-            + row('2026.07.10', '17,940', '+3.64%', '3.47')
-            + row('2026.07.09', '17,310', '+1.00%', '3.40')
-            + '</table>')
-
-
-class FakeResponse:
-    """requests.Response 대역.
-
-    [2026-09-08] status_code가 생겼다. 네이버 호출이 src.core.net을 지나면서
-    상태코드를 검사하게 됐기 때문이다 — 실제 Response는 원래 갖고 있는 값이라,
-    없던 쪽이 불완전한 대역이었다.
-    """
-
-    def __init__(self, html, status=200):
-        self.content = html.encode('utf-8')
-        self.status_code = status
+TREND = [
+    {'date': '20260710', 'close': 17940, 'volume': 1, 'organ_net': 10, 'foreign_net': 20,
+     'foreign_hold_ratio': 3.47},
+    {'date': '20260709', 'close': 17310, 'volume': 1, 'organ_net': 10, 'foreign_net': 20,
+     'foreign_hold_ratio': 3.40},
+]
 
 
 class _FakeProvider:
@@ -68,22 +52,20 @@ QUOTE = {
 }
 
 
+def _naver(monkeypatch, asking=None):
+    monkeypatch.setattr(data_fetcher.naver_api, 'investor_trend', lambda code, **kw: TREND)
+    monkeypatch.setattr(data_fetcher.naver_api, 'asking_price', lambda code, **kw: asking)
+
+
 def _worker():
     w = object.__new__(DataFetcherWorker)
     w.kis = None
     return w
 
 
-def test_kis_enrichment_survives_naver_main_failure(monkeypatch):
-    """main.naver가 죽어도 KIS 시가·고가·저가·체결강도는 채워져야 한다."""
-    def fake_get(url, **kw):
-        if 'frgn.naver' in url:
-            return FakeResponse(frgn_html())
-        if 'main.naver' in url:
-            raise requests.exceptions.ConnectTimeout('naver unreachable from runner')
-        raise AssertionError(f'예상치 못한 요청: {url}')
-
-    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+def test_kis_enrichment_survives_naver_quote_failure(monkeypatch):
+    """네이버 호가가 죽어도 KIS 시가·고가·저가·체결강도는 채워져야 한다."""
+    _naver(monkeypatch, asking=None)
     w = _worker()
     w.kis = _FakeProvider(QUOTE, tick=120.5)
 
@@ -96,19 +78,8 @@ def test_kis_enrichment_survives_naver_main_failure(monkeypatch):
 
 
 def test_naver_micro_data_survives_kis_failure(monkeypatch):
-    """반대 방향도 성립해야 한다 — KIS가 죽어도 네이버 호가 파싱은 살아 있어야 한다."""
-    quote_html = ('<table class="type2 type_stock2">'
-                  '<tr class="total"><td class="sell">300</td><td class="buy">100</td></tr>'
-                  '</table>')
-
-    def fake_get(url, **kw):
-        if 'frgn.naver' in url:
-            return FakeResponse(frgn_html())
-        if 'main.naver' in url:
-            return FakeResponse(quote_html)
-        raise AssertionError(f'예상치 못한 요청: {url}')
-
-    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+    """반대 방향도 성립해야 한다 — KIS가 죽어도 네이버 호가는 살아 있어야 한다."""
+    _naver(monkeypatch, asking={'total_sell': 300, 'total_buy': 100})
 
     d = _worker()._get_stock_details('002990')
 
@@ -117,14 +88,7 @@ def test_naver_micro_data_survives_kis_failure(monkeypatch):
 
 def test_kis_fields_come_from_the_shared_provider(monkeypatch):
     """사본을 지운 뒤에도 같은 키·같은 값이 나와야 한다(동작 무변경)."""
-    def fake_get(url, **kw):
-        if 'frgn.naver' in url:
-            return FakeResponse(frgn_html())
-        if 'main.naver' in url:
-            return FakeResponse('<table class="type2 type_stock2"></table>')
-        raise AssertionError(f'KIS를 직접 부르면 안 된다: {url}')
-
-    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+    _naver(monkeypatch)
     w = _worker()
     w.kis = _FakeProvider(QUOTE, tick=128.9)
 
@@ -138,14 +102,7 @@ def test_kis_fields_come_from_the_shared_provider(monkeypatch):
 
 def test_zero_quote_does_not_overwrite_naver_values(monkeypatch):
     """KIS가 0을 주면 덮어쓰지 않는다 — 08-04 실전 0체결이 이 형태였다."""
-    def fake_get(url, **kw):
-        if 'frgn.naver' in url:
-            return FakeResponse(frgn_html())
-        if 'main.naver' in url:
-            return FakeResponse('<table class="type2 type_stock2"></table>')
-        raise AssertionError(f'KIS를 직접 부르면 안 된다: {url}')
-
-    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+    _naver(monkeypatch)
     w = _worker()
     w.kis = _FakeProvider({k: 0 for k in QUOTE}, tick=0.0)
 
@@ -165,14 +122,7 @@ def test_kis_exception_survives_and_leaves_naver_values_intact(monkeypatch):
     get_tick_power를 감싼 try/except를 지워도 이 테스트 전에는 초록으로
     남았다 — provider가 주입되지 않은 시나리오만 있었기 때문이다.
     """
-    def fake_get(url, **kw):
-        if 'frgn.naver' in url:
-            return FakeResponse(frgn_html())
-        if 'main.naver' in url:
-            return FakeResponse('<table class="type2 type_stock2"></table>')
-        raise AssertionError(f'KIS를 직접 부르면 안 된다: {url}')
-
-    monkeypatch.setattr(data_fetcher.requests, 'get', fake_get)
+    _naver(monkeypatch)
     w = _worker()
     w.kis = _FakeProvider(raises=True)
 

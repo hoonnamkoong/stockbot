@@ -5,26 +5,7 @@
 100개도 상승비율과 median 둘로 뭉개져, "전부 조금씩 올랐다"와 "몇 개가 급등하고
 나머지는 빠졌다"가 같은 행으로 기록됐다.
 """
-from src.pipeline.workers.trade_engine import market_extras, resolve_market_columns
-
-REAL_HEADER = ['N', '종목명', '현재가', '전일비', '등락률', '액면가', '시가총액',
-               '상장주식수', '외국인비율', '거래량', 'PER', 'ROE', '토론']
-
-
-def test_실제_헤더에서_열_위치를_찾는다():
-    # 2026-08-17 실측 응답. 등락률이 현행 고정 인덱스 4와 일치한다.
-    cols = resolve_market_columns(REAL_HEADER)
-    assert cols == {'price': 2, 'rate': 4, 'cap': 6, 'volume': 9}
-
-
-def test_열이_밀려도_따라간다():
-    shifted = ['N', '종목명', '신규열', '현재가', '전일비', '등락률', '액면가',
-               '시가총액', '상장주식수', '외국인비율', '거래량']
-    assert resolve_market_columns(shifted)['rate'] == 5
-
-
-def test_헤더를_못_읽으면_None이다():
-    assert resolve_market_columns(['N', '종목명', '???']) is None
+from src.pipeline.workers.trade_engine import market_extras
 
 
 def test_시총가중_상승비율은_동일가중과_다르다():

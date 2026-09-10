@@ -18,102 +18,55 @@
 시총 상위는 "오늘 어느 방향이었는가"와 무관하게 뽑히므로 박스권 저점도,
 채널 상단 돌파도 똑같이 들어올 수 있다.
 
-⚠ `_fetch_top100_breadth`(trade_engine)가 같은 페이지를 따로 파싱한다. 그쪽은
+⚠ `_fetch_top100_breadth`(trade_engine)가 같은 시총 목록을 따로 부른다. 그쪽은
 등락률만 쓰고 이쪽은 종목 목록을 쓴다 — 지금은 합치지 않았다. 합칠 때는 국면
 판정 경로를 건드리게 되므로 별도로 검증해야 한다.
 
-⚠ 그쪽(`trade_engine.resolve_market_columns`)은 이제 헤더 텍스트로 열을 찾는다.
-이 파일은 여전히 `cols[2]`/`cols[9]` 같은 고정 인덱스다. 네이버가 표 열 순서를
-바꾸면 저쪽은 알아서 따라가고 이쪽은 조용히 틀린 열을 읽는다 — 하드닝이 한쪽에만
-있다. 이 파일이 심5의 유동성 게이트를 먹인다는 점을 감안하면 신호가 없다.
+[2026-09-11] 원천이 finance.naver.com HTML 표에서 네이버 JSON API로 바뀌었다
+(src/data/naver_api.py). 09-10에 옛 페이지가 302로 옮겨가 표를 못 찾았고, 그날부터
+이 함수는 None을 냈다. 고정 열 인덱스로 읽던 위험은 필드명으로 사라졌다.
 """
-import re
-
-import requests
-from bs4 import BeautifulSoup
-
-_URL = 'https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}'
-_HDRS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    'Referer': 'https://finance.naver.com/',
-}
-_PER_PAGE = 50
+from src.data import naver_api
 
 
-def parse_rows(html: bytes) -> list[dict]:
-    """시총 페이지 1장 → [{code, name, price, amount, change_rate}]. 파싱 실패 행은 버린다.
+def to_universe_rows(rows: list[dict]) -> list[dict]:
+    """시총 목록 행 → [{code, name, price, amount, change_rate}]. 가격이 없는 행은 버린다.
 
     ⚠ `amount`(거래대금)와 `change_rate`는 2026-08-17에 추가했다. 그전까지
     `{code, name, price}`만 돌려줬는데, **심5는 `amount < 10억`이면 `continue`**라
     키가 없으면 `get('amount', 0)` → 0 → **후보 99종목이 전부 첫 게이트에서 탈락**했다.
     실제로 심5는 배포 이래 거래 0건, 현금 200만원 그대로였다.
 
-    이 페이지는 거래**대금**이 아니라 거래**량**을 준다(td[9]). 거래대금은
-    현재가 × 거래량으로 만든다 — `get_fluctuation_rank`가 쓰는 방식과 같다.
+    거래대금은 현재가 × 거래량으로 만든다 — `get_fluctuation_rank`가 쓰는 방식과 같다.
     """
-    soup = BeautifulSoup(html.decode('euc-kr', 'replace'), 'html.parser')
-    table = soup.select_one('table.type_2')
-    if not table:
-        return []
     out = []
-    for row in table.select('tr'):
-        cols = row.select('td')
-        if len(cols) < 5:
+    for r in rows:
+        price = r.get('price')
+        if not price or price <= 0:
             continue
-        tag = cols[1].select_one('a')
-        if not tag or 'code=' not in (tag.get('href') or ''):
-            continue
-        code = tag['href'].split('code=')[-1]
-        if not re.fullmatch(r'\d{6}', code):
-            continue
-        try:
-            price = int(cols[2].get_text(strip=True).replace(',', ''))
-        except ValueError:
-            continue
-        if price <= 0:
-            continue
-        row_out = {'code': code, 'name': tag.get_text(strip=True), 'price': price}
-        # 거래량(td[9]) → 거래대금. 못 읽으면 키를 넣지 않는다 — 0을 넣으면
+        row_out = {'code': r['code'], 'name': r['name'], 'price': int(price)}
+        # 거래량을 못 읽으면 키를 넣지 않는다 — 0을 넣으면
         # "유동성 0"으로 오판되어 유동성 게이트를 쓰는 심이 전량 탈락한다.
-        if len(cols) > 9:
-            try:
-                vol = int(cols[9].get_text(strip=True).replace(',', ''))
-                if vol > 0:
-                    row_out['amount'] = price * vol
-            except ValueError:
-                pass
-        if len(cols) > 4:
-            rate = cols[4].get_text(strip=True)
-            if rate:
-                row_out['change_rate'] = rate
+        if r.get('volume'):
+            row_out['amount'] = int(price) * r['volume']
+        if r.get('change_rate') is not None:
+            row_out['change_rate'] = f"{r['change_rate']:+.2f}%"
         out.append(row_out)
     return out
 
 
-def fetch_top100(limit: int = 100, get=None) -> list[dict] | None:
+def fetch_top100(limit: int = 100, fetch=None) -> list[dict] | None:
     """시총 상위 종목. **실패하면 None** — 빈 리스트와 구분한다.
 
     호출부(심의 get_universe)가 둘을 정반대로 처리한다: None이면 파이프라인
     후보를 그대로 쓰고, 빈 리스트면 '후보가 없다'가 된다. 조회 실패를 빈
     리스트로 돌려주면 그날 그 심이 조용히 아무것도 안 한다.
     """
-    fetch = get or (lambda url: requests.get(url, headers=_HDRS, timeout=10))
-    rows: list[dict] = []
-    seen: set = set()
-    pages = (limit + _PER_PAGE - 1) // _PER_PAGE
-    for page in range(1, pages + 1):
-        try:
-            res = fetch(_URL.format(page=page))
-            parsed = parse_rows(res.content)
-        except Exception:
-            return None if not rows else rows[:limit]
-        if not parsed:
-            break
-        for r in parsed:
-            if r['code'] in seen:
-                continue
-            seen.add(r['code'])
-            rows.append(r)
-            if len(rows) >= limit:
-                return rows
-    return rows or None
+    fetch = fetch or naver_api.stock_list
+    try:
+        rows = fetch('marketValue', 'KOSPI', limit)
+    except Exception:
+        return None
+    if not rows:
+        return None
+    return to_universe_rows(rows)[:limit] or None

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkPinRateLimit, recordPinFailure, clearPinFailures } from '@/lib/pin-lockout';
 import { getToken } from 'next-auth/jwt';
 
 /**
@@ -115,9 +116,17 @@ export async function POST(request: Request) {
             console.error('[Reservation] ❌ TRADE_PIN not configured on server');
             return NextResponse.json({ success: false, error: 'Server auth not configured' }, { status: 500 });
         }
+        // PIN 무차별 대입 방어 — program과 **같은 잠금**을 쓴다. 2026-09-10까지
+        // 이 라우트는 무제한이었다: 4자리 PIN을 평균 5,000회면 뚫는다.
+        const pinCheck = await checkPinRateLimit();
+        if (!pinCheck.allowed) {
+            return NextResponse.json({ success: false, error: `PIN 시도 제한 초과. ${pinCheck.retryAfterMin}분 후 재시도하세요.` }, { status: 429 });
+        }
         if (pin !== tradePin) {
+            await recordPinFailure();
             return NextResponse.json({ success: false, error: 'Invalid TRADING AUTH' }, { status: 403 });
         }
+        await clearPinFailures();
 
         // 1. Get existing file
         const { sha, content } = await getFileFromGithub();

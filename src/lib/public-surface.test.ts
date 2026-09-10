@@ -110,3 +110,61 @@ test('보안 헤더가 모든 경로에 붙는다', () => {
     }
     assert.ok(cfg.includes("source: '/:path*'"), '헤더가 일부 경로에만 붙는다');
 });
+
+// ── TRADE_PIN을 검사하는 곳은 전부 잠금을 건다 ──────────────────
+//
+// 2026-09-10 감사에서 나온 것: 잠금이 `/api/trade/program`에만 있었고
+// **실주문을 내는 `/api/trade/order`와 `/api/trade/reservation`에는 없었다.**
+// 같은 4자리 PIN을 같은 방식으로 검사하는데 방어는 하나뿐이었다는 뜻이고,
+// 세션 하나만 있으면 평균 5,000회로 실계좌 주문에 닿았다.
+//
+// 규칙이 아니라 게이트로 고정한다 — 주석에 "브루트포스 방어 필수"라고 적혀
+// 있었는데도 두 라우트가 빠졌던 것이 이 사고의 전부다.
+
+const PIN_ROUTES = [
+    'src/app/api/trade/order/route.ts',
+    'src/app/api/trade/program/route.ts',
+    'src/app/api/trade/reservation/route.ts',
+];
+
+test('TRADE_PIN을 검사하는 라우트를 전부 알고 있다', () => {
+    const found: string[] = [];
+    const walk = (dir: string) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, e.name);
+            if (e.isDirectory()) walk(full);
+            else if (e.name === 'route.ts' && fs.readFileSync(full, 'utf-8').includes('TRADE_PIN')) {
+                found.push(path.relative(ROOT, full).split(path.sep).join('/'));
+            }
+        }
+    };
+    walk(path.join(ROOT, 'src', 'app', 'api'));
+    assert.deepEqual(found.sort(), [...PIN_ROUTES].sort(),
+        'PIN을 검사하는 라우트가 바뀌었다 — 새로 생겼으면 잠금부터 붙일 것');
+});
+
+test('PIN을 검사하는 라우트는 전부 잠금을 건다', () => {
+    for (const p of PIN_ROUTES) {
+        const body = read(p);
+        // **import가 아니라 호출**을 본다 — import만 남기고 호출을 지우면
+        // 문자열 검사는 통과한다(변이로 확인했다).
+        assert.ok(body.includes('await checkPinRateLimit()'),
+            `${p}: 잠금 확인을 호출하지 않는다 — 무제한 시도가 가능하다`);
+        assert.ok(body.includes('await recordPinFailure()'),
+            `${p}: 실패를 세지 않아 잠금이 영원히 안 걸린다`);
+    }
+});
+
+test('잠금 구현은 하나다', () => {
+    // 사본을 두면 같은 program_pin_lockout.json을 두 구현이 쓰고,
+    // 임계값이 갈리는 순간 약한 쪽이 실제 방어선이 된다.
+    for (const p of PIN_ROUTES) {
+        assert.ok(read(p).includes("from '@/lib/pin-lockout'"),
+            `${p}: 공용 잠금을 쓰지 않는다`);
+        // 파일명 문자열이 아니라 **구현이 있는지**를 본다 — 주석에 저장소 이름을
+        // 적어 두는 것은 정상이고, 그걸 잡으면 게이트가 설명을 검사하게 된다
+        // (실제로 그렇게 빨개졌다).
+        assert.ok(!read(p).includes('function getPinLock'),
+            `${p}: 잠금 저장소 구현이 따로 있다 — 사본이 생겼다`);
+    }
+});

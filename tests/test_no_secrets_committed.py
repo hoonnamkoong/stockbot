@@ -54,6 +54,10 @@ FILENAME_PATTERNS = (
 FILENAME_ALLOW = re.compile(r'\.(example|sample|template)$|(^|/)\.env\.example$')
 
 # 값 패턴 예외. **비우고 시작한다** — 넣을 때는 왜 안전한지 여기 적을 것.
+# 파일 단위 예외는 그 파일 전체를 검사에서 빼므로 구멍이다. 아래
+# `test_게이트가_...`의 표본을 전부 **조립해서** 만드는 이유가 그것이다 —
+# 리터럴로 두면 이 파일이 자기 게이트에 걸려 예외를 넣게 되고, 그 예외가
+# 나중에 진짜 시크릿을 가린다. (커밋한 순간 실제로 빨개져서 알았다.)
 VALUE_ALLOW: dict[str, str] = {}
 
 
@@ -113,7 +117,7 @@ def test_게이트가_실제로_무언가를_잡는다():
         'Telegram bot token': '1234567890:AA' + 'c' * 33,
         'JWT (KIS 액세스 토큰 등)': 'eyJ' + 'd' * 20 + '.' + 'e' * 20 + '.sig',
         'KIS appkey': 'PS' + 'F' * 34,
-        'PEM 개인키': '-----BEGIN RSA PRIVATE KEY-----',
+        'PEM 개인키': '-----BEGIN RSA PRIVATE ' + 'KEY-----',
     }
     for kind, sample in samples.items():
         assert VALUE_PATTERNS[kind].search(sample), f'{kind} 패턴이 죽었다'

@@ -78,3 +78,35 @@ test('색인 대상은 공개 페이지뿐이다', () => {
             `robots.ts가 ${g}를 막지 않는다 — 로그인 화면이 검색 결과에 뜬다`);
     }
 });
+
+test('다운로드 API는 세션 뒤에 있다', () => {
+    // `/research`가 비공개로 돌아왔고 이 엔드포인트를 부르는 곳은 그 페이지뿐이다.
+    // 보안이 아니라 의도 정합성 — "공개면은 / 한 장"에 예외를 두지 않는다.
+    for (const p of ['src/app/api/download/excel/route.ts',
+                     'src/app/api/download/report/route.ts']) {
+        assert.ok(read(p).includes('getToken'), `${p}에 세션 검사가 없다`);
+    }
+});
+
+test('공개 페이지가 쓰는 데이터 API는 오리진을 매번 치지 않는다', () => {
+    // 걱정거리는 남용이 아니라 **비용**이다. 이 데이터는 누구에게나 같은 값이라
+    // 사용자를 세는 것(레이트리밋)보다 오리진을 덜 치는 쪽이 맞다.
+    // 2026-09-10까지 stocks/research만 캐시가 없었고, `?t=Date.now()`로 GitHub
+    // 캐시까지 무력화해 요청 하나가 오리진 5회였다.
+    for (const p of ['src/app/api/stocks/research/route.ts',
+                     'src/app/api/simulation/stats/route.ts',
+                     'src/app/api/trade/history/route.ts']) {
+        assert.ok(read(p).includes('createBucketCache'), `${p}에 신선도 캐시가 없다`);
+    }
+    // 캐시버스터 유무는 검사하지 않는다 — 문자열이 주석에도 있어서 **설명을
+    // 검사하게 된다**(실제로 그렇게 빨개졌다). 오리진을 매번 치지 않는다는
+    // 성질은 위 `createBucketCache`가 이미 보장한다.
+});
+
+test('보안 헤더가 모든 경로에 붙는다', () => {
+    const cfg = read('next.config.js');
+    for (const h of ['X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy']) {
+        assert.ok(cfg.includes(h), `next.config.js에 ${h}가 없다`);
+    }
+    assert.ok(cfg.includes("source: '/:path*'"), '헤더가 일부 경로에만 붙는다');
+});

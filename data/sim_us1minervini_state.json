@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 110.74,
+      "peak_price": 110.76,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 263.06,
+      "peak_price": 263.09,
       "is_scaled_out": false
     },
     "VG": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21074.201,
+  "peak_nav": 21074.365000000005,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -53,8 +53,8 @@
   "cooldown_codes": {},
   "raw_stats": {
     "cash": 1441.295,
-    "total_asset": 21074.201,
-    "profit_rate": 5.371005000000005,
+    "total_asset": 21074.365000000005,
+    "profit_rate": 5.371825000000026,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -63,33 +63,33 @@
     "frequency": 0.3333333333333333,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "BAC": 62.535,
-      "OSCR": 31.84,
-      "ANET": 191.35,
-      "PSX": 263.06,
-      "STX": 859.765,
-      "OXY": 61.355,
-      "STT": 192.51,
-      "APH": 80.41,
-      "HALO": 107.79,
-      "DINO": 110.74,
-      "PR": 23.865,
       "RGA": 245.91,
-      "FANG": 204.7,
-      "ZBRA": 343.105,
-      "OVV": 64.515,
-      "TER": 370.59,
-      "NTAP": 184.91,
-      "VG": 15.785,
-      "ROKU": 154.27,
+      "EXPD": 190.49,
+      "EOG": 147.325,
+      "NVT": 158.805,
+      "PSX": 263.09,
+      "ANET": 191.199,
+      "ROKU": 154.245,
       "IESC": 323.37,
-      "EXPD": 190.684,
+      "OVV": 64.55,
+      "STT": 192.505,
+      "VG": 15.795,
+      "DINO": 110.76,
       "KEYS": 329.36,
-      "EPD": 39.555,
-      "NVT": 158.83,
-      "TWLO": 233.5,
-      "EOG": 147.155,
-      "FCFS": 227.283
+      "OSCR": 31.8,
+      "NTAP": 185.08,
+      "EPD": 39.55,
+      "APH": 80.32,
+      "FCFS": 227.58,
+      "TER": 370.38,
+      "PR": 23.895,
+      "STX": 859.11,
+      "HALO": 107.855,
+      "TWLO": 233.12,
+      "OXY": 61.375,
+      "ZBRA": 343.13,
+      "FANG": 204.725,
+      "BAC": 62.5
     }
   },
   "normalized_stats": {

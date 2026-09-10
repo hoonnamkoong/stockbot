@@ -4,6 +4,7 @@ import { checkPinRateLimit, recordPinFailure, clearPinFailures } from '@/lib/pin
 import { placeRealOrder } from '@/lib/kis-api';
 import { authorizeManualOrder } from '@/lib/trade-auth';
 import { kstTimestamp } from '@/lib/kst';
+import { brokerRejection, classifyOrderFailure } from '@/lib/order-error';
 
 /**
  * [V8.9.9.22] Trade Order API (Remote Sync Version)
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
             const totalCost = tradePrice * Number(qty);
 
             if (side === 'buy') {
-                if (portfolio.cash < totalCost) throw new Error('가상 예수금이 부족합니다.');
+                if (portfolio.cash < totalCost) throw brokerRejection('가상 예수금이 부족합니다.');
                 portfolio.cash -= totalCost;
                 if (!portfolio.holdings[code]) {
                     portfolio.holdings[code] = { name: code, qty: 0, avg_price: 0, days_held: 0 };
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
                 h.avg_price = newTotalCost / h.qty;
             } else {
                 if (!portfolio.holdings[code] || portfolio.holdings[code].qty < Number(qty)) {
-                    throw new Error('가상 보유 수량이 부족합니다.');
+                    throw brokerRejection('가상 보유 수량이 부족합니다.');
                 }
                 portfolio.cash += totalCost;
                 portfolio.holdings[code].qty -= Number(qty);
@@ -178,13 +179,20 @@ export async function POST(request: Request) {
             }
         });
     } catch (error: any) {
-        console.error('[API-Order] ❌ 주문 집행 에러:', error.message);
-        
-        // [V8.9.9.39 Robustness] 증권사 거절 사유(msg1 등)가 있을 경우 이를 에러 대신 처리
-        return NextResponse.json({ 
-            success: false, 
+        // **거부와 고장을 가른다.** 2026-09-10까지 여기서 모든 예외가
+        // `rejected:true` + 200이었고, 파이썬 호출부는 그걸 "시장이 거부했다"로
+        // 읽어 경고만 찍고 넘어갔다 — KIS 네트워크 실패도, 코드 버그도.
+        //
+        // 200으로 돌려주던 이유는 "대시보드에서 에러를 보여주려고"였는데,
+        // 두 화면(QuickOrderModal·TradeClient) 다 이미 catch에서
+        // `error.response?.data?.error`를 읽는다. 비-200에서도 메시지는 보인다.
+        const { rejected, status } = classifyOrderFailure(error);
+        console.error(`[API-Order] ❌ 주문 ${rejected ? '거부' : '집행 실패(시스템)'}:`, error.message);
+
+        return NextResponse.json({
+            success: false,
             error: error.message || '거래 처리 중 예상치 못한 오류가 발생했습니다.',
-            rejected: true
-        }, { status: 200 }); // 대시보드에서 가시적으로 에러 메시지를 보여주기 위해 200으로 반환
+            rejected
+        }, { status });
     }
 }

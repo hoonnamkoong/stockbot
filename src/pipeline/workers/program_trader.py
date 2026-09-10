@@ -1129,6 +1129,13 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 res = place_order_via_vercel('buy', code, qty, live_px or decided,
                                              ord_type='market')
             except Exception as e:
+                # 여기로 오는 것은 **시스템 고장뿐이다**(증권사 거절은 예외가 아니라
+                # success=False로 온다 — src/lib/order-error.ts). log_error는 print라
+                # 아무도 안 본다. 돈 경로의 고장은 사람에게 가야 한다.
+                alerts.send_alert_once(
+                    f'order_failed_{code}',
+                    f'[Program] 주문 집행 실패(시스템) — 시장가 전환 {code} {qty}주: {e}',
+                    now_kst)
                 log_error(f'[Program] {code} 시장가 전환 주문 실패: {e}')
                 return False
             if not res.get('success'):
@@ -1387,7 +1394,13 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 failed_codes.add(code)
                 log(f"[Program] 주문 거부 {code}: {res.get('error')}")
         except Exception as e:
+            # 증권사 거절은 위 else 가지로 간다. 여기는 시스템 고장 전용이고,
+            # 그동안 print 하나로 끝나 조용히 지나갔다(2026-09-10 감사).
             failed_codes.add(code)
+            alerts.send_alert_once(
+                f'order_failed_{code}',
+                f'[Program] 주문 집행 실패(시스템) — {side} {code} {qty}주: {e}',
+                now_kst)
             log_error(f'[Program] 주문 집행 실패 {code}: {e}')
 
     # 11. 전략 플래그 머지(체결 성공 종목만) + 원장 저장 + 락 해제

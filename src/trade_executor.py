@@ -81,7 +81,10 @@ def place_order_via_vercel(side, code, qty, price, ord_type='market'):
     
     data = res.json()
     if not data.get('success'):
-        # [V8.9.9.28 Robustness Fix] 시장 사유로 인한 거부 시 특수 로깅
+        # [V8.9.9.28 Robustness Fix] 시장 사유로 인한 거부 시 특수 로깅.
+        # 2026-09-10부터 `rejected`는 **실제로 시장 사유일 때만** 온다 —
+        # 그전까지는 라우트가 모든 예외에 이 플래그를 달아서 KIS 네트워크 실패도
+        # 여기로 왔다(그래서 경고 한 줄로 지나갔다). src/lib/order-error.ts 참고.
         if data.get('rejected'):
             print(f"[TradeExecutor] ⚠️ 시장 사유로 주문 거부됨: {data.get('error')}")
             return data # 실패가 아닌 '거부됨' 데이터를 반환

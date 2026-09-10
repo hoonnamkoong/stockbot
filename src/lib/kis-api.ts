@@ -1,5 +1,6 @@
 /** [V8.9.9.44] KIS Token Recovery Trigger */
 import axios from 'axios';
+import { brokerRejection } from './order-error.ts';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -513,15 +514,21 @@ export function buildOrderRequest(
             });
 
             if (res.data.rt_cd !== '0') {
-                // KIS 서버의 한글 에러 사유(msg1)를 포함하여 반환
-                throw new Error(res.data.msg1 || `KIS 주문 실패 (${res.data.rt_cd})`);
+                // KIS 서버의 한글 에러 사유(msg1)를 포함하여 반환.
+                // **여기만 '증권사가 거절했다'다** — 아래 catch로 오는 네트워크·토큰·
+                // 설정 실패는 시스템 고장이고, 둘을 섞으면 라우트가 고장을 시장
+                // 사유로 적는다(src/lib/order-error.ts 참고).
+                throw brokerRejection(res.data.msg1 || `KIS 주문 실패 (${res.data.rt_cd})`);
             }
 
             return res.data;
         } catch (e: any) {
             const msg = e.response?.data?.msg1 || e.message;
             console.error(`[KIS-API] Order Failed: ${msg}`);
-            throw new Error(msg);
+            // 재포장하면 거절 표시가 사라진다 — 그러면 위에서 가른 것이 무의미해진다.
+            // HTTP 오류에 msg1이 실려 와도 거절로 보지 않는다(EGW00123 같은 인증
+            // 실패가 msg1을 달고 온다). 모르는 것은 고장 쪽이다.
+            throw (e as any)?.brokerRejected ? e : new Error(msg);
         }
     }
 

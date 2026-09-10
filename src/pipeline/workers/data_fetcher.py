@@ -7,13 +7,10 @@
 기존 scraper.py의 Stage 1 로직을 이 클래스로 이전했습니다.
 """
 
-import re
-import requests
 import time
-from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src import alerts
-from src.core import net
+from src.data import naver_api
 from src.pipeline.context import PipelineContext
 from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData
@@ -24,7 +21,9 @@ from src.strategy import analyzer
 # 동시 요청량은 게시글 임계값과 무관해야 한다. 임계값에 묶어두면 오후로 갈수록
 # 네이버에 던지는 동시 요청이 늘어 페이지가 타임아웃으로 조용히 유실된다.
 STOCK_WORKERS = 8   # 동시에 분석할 종목 수
-PAGE_WORKERS = 8    # 종목당 동시에 긁을 토론방 페이지 수
+# 종목당 토론 페이지 상한. 한 페이지가 100글이라 옛 board.naver 40페이지(20글)와
+# 같은 800글 상한이다 — 게시글 수 분포를 이관 전후로 같게 둔다.
+DISCUSSION_MAX_PAGES = 8
 PAGE_RETRIES = 3
 PAGE_RETRY_WAIT = 0.5
 POST_LIMIT = 30       # 종목당 LLM에 넘길 게시글 수 (공감 상위). 2026-07-28: 5 → 30
@@ -298,60 +297,43 @@ class DataFetcherWorker(BaseWorker):
     # ── 내부 수집 메서드들 (기존 scraper.py에서 이전) ──────────────
 
     def _get_stock_details(self, code: str) -> dict:
-        """네이버 외인비중 페이지에서 수급 데이터를 수집합니다."""
+        """네이버 일별 수급(외인·기관) 표에서 수급 데이터를 수집합니다."""
         details = {
             'foreign_rate': 0.0, 'foreign_change': 0.0,
             'foreign_net_buy': 0, 'prev_close': 0, 'prev_foreign_rate': 0.0,
             'current_price': 0, 'open_price': 0, 'day_high': 0, 'day_low': 0,
         }
-        url = f"https://finance.naver.com/item/frgn.naver?code={code}"
-        try:
-            res = net.get(url, policy=net.BULK, target='naver',
-                          headers={'User-Agent': 'Mozilla/5.0'})
-            if res is None:
-                return result        # 못 닿았다. 0으로 지어내지 않는다.
-            soup = BeautifulSoup(res.content, 'html.parser')
-            rows = soup.select('table.type2 tr')
-            data_rows = [
-                r.select('td') for r in rows
-                if len(r.select('td')) == 9 and re.match(r'\d{4}', r.select('td')[0].get_text(strip=True))
-            ]
-            if len(data_rows) >= 2:
-                details['foreign_rate'] = float(data_rows[0][8].get_text().replace('%', '').replace(',', '').strip())
-                prev_rate = float(data_rows[1][8].get_text().replace('%', '').replace(',', '').strip())
-                details['foreign_change'] = round(details['foreign_rate'] - prev_rate, 3)
-                details['inst_net_buy'] = int((data_rows[0][5].get_text().replace(',', '').replace('+', '').strip()) or 0)
-                details['foreign_net_buy'] = int((data_rows[0][6].get_text().replace(',', '').replace('+', '').strip()) or 0)
-                details['prev_close'] = int((data_rows[1][1].get_text().replace(',', '').strip()) or 0)
-                details['prev_foreign_rate'] = prev_rate
+        # [2026-09-11] 옛 item/frgn 표 → 네이버 JSON API(같은 재료, 최신이 앞).
+        # 09-10 이관 뒤 옛 표는 302 끝의 빈 페이지였고, 파서는 예외 없이 아무것도 못 읽었다.
+        rows = naver_api.investor_trend(code)
+        if rows is None:
+            print(f"   [DataFetcher] 외인비중 수집 실패 {code}")   # 못 닿았다. 지어내지 않는다.
+        elif len(rows) >= 2:
+            latest, prev = rows[0], rows[1]
+            if latest['foreign_hold_ratio'] is not None and prev['foreign_hold_ratio'] is not None:
+                details['foreign_rate'] = latest['foreign_hold_ratio']
+                details['foreign_change'] = round(latest['foreign_hold_ratio']
+                                                  - prev['foreign_hold_ratio'], 3)
+                details['prev_foreign_rate'] = prev['foreign_hold_ratio']
+            details['inst_net_buy'] = latest['organ_net'] or 0
+            details['foreign_net_buy'] = latest['foreign_net'] or 0
+            details['prev_close'] = prev['close']
 
-                # 거래상위에서 빠진 종목은 시세를 여기서만 얻을 수 있다 (표 첫 행 = 오늘 종가/현재가)
-                details['current_price'] = int(data_rows[0][1].get_text().replace(',', '').strip() or 0)
+            # 거래상위에서 빠진 종목은 시세를 여기서만 얻을 수 있다 (첫 행 = 오늘 종가/현재가)
+            details['current_price'] = latest['close']
 
-                # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
-                # [Sim5] range_history: 최근 20영업일 종가 (채널 산출용). 동일 페이지라 추가 콜 0.
-                # [Sim9-1] amount_history: 같은 행의 거래량(4열)까지 읽어 거래대금
-                # 이력을 만든다. "거래대금 급증"을 종목 자신의 평균 대비로 재려면
-                # 기준선이 필요한데, 2026-08-26까지 국내에는 그 이력이 아예 없어서
-                # 절대 거래대금의 횡단면 z를 쓰고 있었다(= 대형주 필터로 동작).
-                # 같은 표라 추가 호출 0이다.
-                closes, amounts = [], []
-                for r in data_rows[:20]:
-                    try:
-                        close = int(r[1].get_text().replace(',', '').strip())
-                    except Exception:
-                        continue
-                    closes.append(close)
-                    try:
-                        vol = int(r[4].get_text().replace(',', '').strip())
-                    except Exception:
-                        continue   # 거래량만 깨진 행은 거래대금에서만 뺀다
-                    amounts.append(close * vol)
-                details['sparkline_price'] = closes[:5][::-1]
-                details['range_history'] = closes[::-1]
-                details['amount_history'] = amounts[::-1]
-        except Exception as e:
-            print(f"   [DataFetcher] 외인비중 수집 실패 {code}: {e}")
+            # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
+            # [Sim5] range_history: 최근 20영업일 종가 (채널 산출용). 동일 응답이라 추가 콜 0.
+            # [Sim9-1] amount_history: 같은 행의 거래량까지 읽어 거래대금
+            # 이력을 만든다. "거래대금 급증"을 종목 자신의 평균 대비로 재려면
+            # 기준선이 필요한데, 2026-08-26까지 국내에는 그 이력이 아예 없어서
+            # 절대 거래대금의 횡단면 z를 쓰고 있었다(= 대형주 필터로 동작).
+            # 같은 응답이라 추가 호출 0이다. 거래량만 빈 행은 거래대금에서만 뺀다.
+            closes = [r['close'] for r in rows[:20]]
+            amounts = [r['close'] * r['volume'] for r in rows[:20] if r['volume'] is not None]
+            details['sparkline_price'] = closes[:5][::-1]
+            details['range_history'] = closes[::-1]
+            details['amount_history'] = amounts[::-1]
 
         # KIS 보강. 네이버 파싱과 같은 try에 묶지 않는다 — 2026-08-03에 둘이 한
         # 블록이라 main.naver가 타임아웃 나자 KIS 호출이 실행조차 되지 않았다.
@@ -386,153 +368,63 @@ class DataFetcherWorker(BaseWorker):
             except Exception as e:
                 print(f"   [DataFetcher] KIS 체결강도 조회 실패 {code}: {e}")
 
-        # 2. 호가 잔량 추출 (매도잔량 / 매수잔량)
-        # 메인 페이지의 호가 정보 테이블 탐색
-        try:
-            main_url = f"https://finance.naver.com/item/main.naver?code={code}"
-            main_res = net.get(main_url, policy=net.BULK, target='naver',
-                               headers={'User-Agent': 'Mozilla/5.0'})
-            if main_res is None:
-                raise RuntimeError('네이버 메인 페이지에 닿지 못했다')
-            main_soup = BeautifulSoup(main_res.content, 'html.parser')
-            quote_table = main_soup.select_one("table.type2.type_stock2")
-            if quote_table:
-                # 보통 매도잔량은 상단 합계, 매수잔량은 하단 합계에 위치
-                ask_total = quote_table.select_one("tr.total td.sell") # 매도잔량 합계
-                bid_total = quote_table.select_one("tr.total td.buy")  # 매수잔량 합계
-                if ask_total and bid_total:
-                    ask_v = int(ask_total.get_text().replace(',', '').strip() or 1)
-                    bid_v = int(bid_total.get_text().replace(',', '').strip() or 1)
-                    details['bid_ask_ratio'] = ask_v / bid_v if bid_v > 0 else 1.0
-        except Exception as e:
-            print(f"   [DataFetcher] 미시 데이터(호가) 수집 실패 {code}: {e}")
+        # 2. 호가 잔량 (매도잔량 합계 / 매수잔량 합계) — 옛 item/main 호가표 → 네이버 JSON API
+        quote = naver_api.asking_price(code)
+        if quote is None:
+            print(f"   [DataFetcher] 미시 데이터(호가) 수집 실패 {code}")
+        else:
+            ask_v, bid_v = quote['total_sell'], quote['total_buy']
+            details['bid_ask_ratio'] = ask_v / bid_v if bid_v > 0 else 1.0
 
         return details
 
     def _get_discussion_stats(self, code: str, today_str: str) -> dict:
-        """네이버 토론방에서 오늘 게시글을 전수 스캔합니다."""
-        session = requests.Session()
-        session.headers.update({'User-Agent': 'Mozilla/5.0'})
+        """네이버 종목토론에서 오늘 게시글을 전수 스캔합니다.
+
+        [2026-09-11] 옛 board.naver(page=N HTML)가 09-10에 stock.naver.com으로 302되자
+        표를 못 찾은 파서가 **'글 0건'을 성공으로** 냈다. 지금은 JSON API의 커서
+        페이지를 최신순으로 따라가다 어제 글에 닿으면 멈춘다(src/data/naver_api.py).
+
+        커서라서 다음 페이지를 알려면 앞 페이지 응답이 있어야 한다 — 병렬 스캔은
+        불가능하다. 한 페이지가 실패하면 **다음 커서를 모르므로 거기서 멈추고
+        실패로 센다.** 2026-09-08의 '못 닿는데 max_pages까지 긁는' 증폭(418→34.7% …
+        1473→92.0%)이 구조적으로 생기지 않는다. 실패를 '글 0건'으로 접지 않는다 —
+        하류 LLMAnalyzerWorker에 `수집 실패율 초과 → 기록하지 않습니다` 게이트가 있다.
+
+        실패 **이유**는 계속 남긴다(2026-09-08: 이유 없이 횟수만 남아 429·리셋·타임아웃을
+        못 가렸다). `target`이 'naver_board'인 이유도 그대로다 — 단건 조회와 차단기를 나눈다.
+
+        today_str: ctx.today_display('YYYY.MM.DD'). API의 작성시각은 'YYYY-MM-DDTHH:MM:SS'다.
+        """
+        session = naver_api.new_session()
+        today_iso = today_str.replace('.', '-')
         unique_nids = set()
         new_posts = []
-        max_pages, chunk_size = 40, PAGE_WORKERS
         total_pages = 0
         failed_pages = 0
-        # 실패 이유별 건수. fetch_page가 스레드풀에서 돌아 read-modify-write가
-        # 경합한다 — 락 없이 세면 계측이 조용히 줄어든다(_title_lock과 같은 이유).
-        import threading
         failure_reasons: dict[str, int] = {}
-        reasons_lock = threading.Lock()
 
-        def parse_page(res):
-            soup = BeautifulSoup(res.content, 'html.parser')
-            posts, stop = [], False
-            for row in soup.select('table.type2 tr'):
-                cols = row.select('td')
-                if len(cols) < 5: continue
-                if today_str not in cols[0].get_text(strip=True):
-                    stop = True; break
-                tag = row.select_one('td.title a')
-                if not tag: continue
-                nid = re.search(r'nid=(\d+)', tag['href'])
-                if not nid: continue
-                try: likes = int(cols[4].get_text(strip=True))
-                except: likes = 0
-                writer = cols[2].get_text(strip=True)
-                posts.append({'nid': nid.group(1), 'title': tag.get_text(strip=True),
-                              'likes': likes, 'writer': writer})
-            return posts, stop
-
-        def fetch_page(p_idx):
-            """(posts, stop, ok). 실패한 페이지를 '글 0건'으로 반환하면 게시글 수가 조용히 깎인다.
-
-            실패 **이유**를 남긴다. 2026-09-08에 실패율이 7%~92%로 널뛰었는데
-            로그에는 횟수만 있었다 — 예외를 받지도 않고 버렸기 때문이다. 429(유량
-            제한)·커넥션 리셋·타임아웃은 대응이 전혀 다른데 셋이 구분되지 않았다.
-            이유를 모르는 채 동시성이나 재시도를 건드리면 짐작으로 고치는 것이다.
-
-            [2026-09-09] 그 이유 집계가 답을 줬다 — **실패는 100% ReadTimeout**이다
-            (306/440, 182/461). 429도 커넥션 리셋도 아니다. 네이버가 거부하는 게
-            아니라 제한 시간 안에 응답을 안 준다는 뜻이라, 5초는 짧았다.
-            그래서 타임아웃·재시도·차단기를 `net`에 넘긴다(BULK: read 8초).
-            **호출부는 숫자가 아니라 등급만 고른다.**
-
-            `target`이 'naver_board'인 이유: 단건 호출(종목 정보/메인)과 차단기를
-            나눈다. 페이지 전수 스캔은 8스레드가 수십 번 치는 경로라, 여기서 열린
-            차단기가 단건 조회까지 막으면 종목 정보가 통째로 빈다.
-            """
-            url = f"https://finance.naver.com/item/board.naver?code={code}&page={p_idx}"
-            reasons = {}
-            res = net.get(url, policy=net.SCRAPE, target='naver_board',
-                          session=session, reasons=reasons)
-            if res is not None:
-                posts, stop = parse_page(res)
-                return posts, stop, True
-            with reasons_lock:
+        offset = None
+        for _ in range(DISCUSSION_MAX_PAGES):
+            reasons: dict[str, int] = {}
+            page = naver_api.discussion_page(code, offset, session=session, reasons=reasons)
+            total_pages += 1
+            if page is None:
+                failed_pages += 1
                 for reason, n in (reasons or {'unknown': 1}).items():
                     failure_reasons[reason] = failure_reasons.get(reason, 0) + n
-            return [], False, False
-
-        # [2026-08-11, D1] 1페이지를 먼저 순차로 본다. 오늘 글이 1페이지 안에서
-        # 끝나면(stop=True) 그게 대부분이다 — 병렬 청크(PAGE_WORKERS=8)로 바로
-        # 가면 stop이 1페이지에서 걸려도 나머지 7개가 이미 동시에 나간 뒤라
-        # 종목당 최소 8요청이 낭비됐다(기존 진단 그대로). 1페이지가 꽉 찼을
-        # 때만(= 오늘 글이 더 있을 수 있을 때만) 병렬 전수 스캔으로 확장한다.
-        # 1페이지 조회 자체가 실패하면(ok=False) "다 봤다"를 모르므로 안전하게
-        # 병렬 전수 스캔으로 폴백한다(모르면 스크래핑하는 쪽으로 fail).
-        first_posts, first_stop, first_ok = fetch_page(1)
-        if not first_ok:
-            # 이 순차 시도는 전수 스캔으로 넘어가는 분기에서 집계에 빠져 있었다
-            # (stop이 걸린 분기에서는 total_pages=1로 세어진다). 실제로 나간
-            # 요청이므로 센다 — 안 세면 부하가 과소 보고되고, 실패 이유 합계와도
-            # 어긋난다('실패 16인데 이유 18').
-            total_pages += 1
-            failed_pages += 1
-        if first_ok and first_stop:
-            total_pages = 1
-            for p in first_posts:
+                break
+            posts, offset = page
+            reached_yesterday = False
+            for p in posts:
+                if not p['written_at'].startswith(today_iso):
+                    reached_yesterday = True
+                    break
                 if p['nid'] not in unique_nids:
                     unique_nids.add(p['nid'])
-                    new_posts.append(p)
-        else:
-            for start_p in range(1, max_pages + 1, chunk_size):
-                chunk = range(start_p, min(start_p + chunk_size, max_pages + 1))
-                with ThreadPoolExecutor(max_workers=chunk_size) as ex:
-                    chunk_res = sorted(
-                        [(ex.submit(fetch_page, p), p) for p in chunk],
-                        key=lambda x: x[1]
-                    )
-                    stop_all = False
-                    chunk_ok = 0
-                    for future, _ in chunk_res:
-                        posts, stop, ok = future.result()
-                        total_pages += 1
-                        if not ok:
-                            failed_pages += 1
-                        else:
-                            chunk_ok += 1
-                        for p in posts:
-                            if p['nid'] not in unique_nids:
-                                unique_nids.add(p['nid'])
-                                new_posts.append(p)
-                        if stop: stop_all = True
-                    if stop_all: break
-                    # 청크가 통째로 실패했으면 지금 못 닿는 것이다. 더 긁어도
-                    # 성공하지 않고 부하만 키운다 — 그리고 그 부하가 다음 실패를
-                    # 부른다. `stop`은 "어제 글에 닿았다"는 유일한 종료 신호인데
-                    # 실패한 페이지는 stop을 못 준다. 그래서 못 닿는 동안에는
-                    # 스캔이 멈출 줄을 모르고 max_pages까지 갔다.
-                    #
-                    # 2026-09-08 실측: 같은 날 런들의 (총 페이지, 실패율)이
-                    # 418→34.7% … 1473→92.0%로 단조증가했다. 전멸 상태에서
-                    # 종목당 요청이 27회 예산 대비 123회였다(테스트로 고정).
-                    #
-                    # 이렇게 모은 것은 어차피 버려진다 — LLMAnalyzerWorker에
-                    # `수집 실패율 초과 → 이번 런은 기록하지 않습니다` 게이트가 있다.
-                    # 실패는 실패로 세고(위 failed_pages) 스캔만 멈춘다. '글 0건'으로
-                    # 접으면 게시글 수가 조용히 깎인다.
-                    if not chunk_ok:
-                        break
+                    new_posts.append({k: p[k] for k in ('nid', 'title', 'likes', 'writer')})
+            if reached_yesterday or not posts or not offset:
+                break
 
         # [Sim8] 고유 작성자 수 — 한 사람의 도배와 다수의 관심을 구분하는 축.
         # writer 키는 여기서 떼어낸다. posts는 엑셀·LLM 프롬프트로 흘러가므로

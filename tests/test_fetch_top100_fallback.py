@@ -5,6 +5,8 @@
 종목 구성은 하루 사이 거의 바뀌지 않으므로, 네이버가 막히면 직전 실행이 남긴
 CSV 헤더에서 유니버스를 복원하고 OHLCV는 KIS로 정상 수집한다.
 (복원되는 것은 '어떤 종목을 볼지'뿐이다. 시세는 전부 그날의 KIS 실측이다.)
+
+[2026-09-11] 네이버 조회는 src/data/naver_api.py를 탄다. 못 얻으면 None이다.
 """
 import csv
 import importlib.util
@@ -13,9 +15,13 @@ import sys
 from pathlib import Path
 
 import pytest
-import requests
 
-SCRIPT = Path(__file__).resolve().parent.parent / 'scratch' / 'fetch_kospi_top100.py'
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from src.data import naver_api  # noqa: E402
+
+SCRIPT = ROOT / 'scratch' / 'fetch_kospi_top100.py'
 
 
 def load_module():
@@ -42,12 +48,7 @@ def test_falls_back_to_previous_universe_when_naver_unreachable(monkeypatch, tmp
     mod = load_module()
     monkeypatch.chdir(tmp_path)
     write_previous_csv(tmp_path)
-
-    def boom(*a, **kw):
-        raise requests.exceptions.ConnectTimeout('naver unreachable from runner')
-
-    monkeypatch.setattr(mod.requests, 'get', boom)
-    monkeypatch.setattr(mod.time, 'sleep', lambda *_: None)
+    monkeypatch.setattr(naver_api, 'stock_list', lambda *a, **kw: None)
 
     stocks = mod.fetch_top100_by_trade_amount('token')
 
@@ -60,14 +61,9 @@ def test_raises_when_naver_down_and_no_previous_csv(monkeypatch, tmp_path):
     """복원할 것이 없으면 조용히 빈 목록을 반환하지 않고 그대로 실패한다."""
     mod = load_module()
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(naver_api, 'stock_list', lambda *a, **kw: None)
 
-    def boom(*a, **kw):
-        raise requests.exceptions.ConnectTimeout('naver unreachable from runner')
-
-    monkeypatch.setattr(mod.requests, 'get', boom)
-    monkeypatch.setattr(mod.time, 'sleep', lambda *_: None)
-
-    with pytest.raises(requests.RequestException):
+    with pytest.raises(RuntimeError):
         mod.fetch_top100_by_trade_amount('token')
 
 
@@ -76,18 +72,10 @@ def test_naver_success_path_is_unchanged(monkeypatch, tmp_path):
     mod = load_module()
     monkeypatch.chdir(tmp_path)
     write_previous_csv(tmp_path)
-
-    row = ('<tr><td>1</td><td><a href="/item/main.naver?code=005930">삼성전자</a></td>'
-           '<td>239,500</td><td>1</td><td>2</td></tr>')
-    html = ('<table class="type_2">' + row + '</table>').encode('euc-kr')
-
-    class Res:
-        content = html
-
-    monkeypatch.setattr(mod.requests, 'get', lambda *a, **kw: Res())
-    monkeypatch.setattr(mod.time, 'sleep', lambda *_: None)
+    monkeypatch.setattr(naver_api, 'stock_list', lambda *a, **kw: [
+        {'code': '005930', 'name': '삼성전자', 'price': 239500.0}])
 
     stocks = mod.fetch_top100_by_trade_amount('token')
 
-    assert stocks[0]['code'] == '005930'
-    assert stocks[0]['name'] == '삼성전자'
+    assert stocks == [{'code': '005930', 'name': '삼성전자', 'price': '239500',
+                       'trade_amt': '0'}]

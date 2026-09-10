@@ -80,13 +80,30 @@ def test_HTTP_상태코드는_숫자로_남는다(worker, monkeypatch):
 def test_성공하면_이유가_비어_있다(worker, monkeypatch):
     class _R:
         status_code = 200
-        text = '<table><tbody></tbody></table>'
-        content = text.encode()
+
+        def json(self):
+            return {'result': {'posts': [], 'lastOffset': None}}
 
     _responder(monkeypatch, lambda: _R())
     stats = worker._get_discussion_stats('005930', '2026-09-08')
 
     assert stats['failure_reasons'] == {}
+
+
+def test_리다이렉트_끝의_HTML은_글_0건이_아니라_not_json이다(worker, monkeypatch):
+    """2026-09-10 네이버 이관의 모양이다 — 302를 따라가면 **200**인데 JSON이 아니다.
+    옛 HTML 파서는 이걸 '글 0건'으로 성공 처리해 버즈 파이프라인이 초록인 채 비었다."""
+    class _R:
+        status_code = 200
+
+        def json(self):
+            raise ValueError('Expecting value')
+
+    _responder(monkeypatch, lambda: _R())
+    stats = worker._get_discussion_stats('005930', '2026-09-08')
+
+    assert stats['failure_reasons'] == {'not_json': 1}
+    assert stats['failed_pages'] == 1
 
 
 # ── 이유가 사람에게 도달하는가 ────────────────────────────────────────

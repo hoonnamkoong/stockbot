@@ -24,7 +24,6 @@
 import argparse
 import csv
 import os
-import re
 import sys
 import time
 
@@ -35,7 +34,6 @@ from src.trade.auth import get_access_token, get_base_url, load_env  # noqa: E40
 
 # 하루치 분봉을 덮는 기준시각 4개. 각 호출은 그 시각 이전 120분을 준다.
 FULL_DAY_HOURS = ('153000', '133000', '113000', '093000')
-NAVER_HEADERS = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.naver.com/'}
 
 _session = {}
 
@@ -76,29 +74,18 @@ def kis(tr_id, path, params, timeout=10, retries=3):
 
 
 def cap_universe(sosok, pages):
-    """네이버 시총 상위. sosok 0=KOSPI, 1=KOSDAQ. 페이지당 50종목."""
-    out = []
-    for p in range(1, pages + 1):
-        r = requests.get('https://finance.naver.com/sise/sise_market_sum.naver',
-                         params={'sosok': sosok, 'page': p},
-                         headers=NAVER_HEADERS, timeout=10)
-        from bs4 import BeautifulSoup
-        s = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
-        t = s.select_one('table.type_2')
-        if not t:
-            break
-        for row in t.select('tr'):
-            cells = row.select('td')
-            if len(cells) < 5:
-                continue
-            a = cells[1].select_one('a')
-            if not a or 'code=' not in (a.get('href') or ''):
-                continue
-            code = a['href'].split('code=')[-1]
-            if re.fullmatch(r'\d{6}', code):
-                out.append((code, a.get_text(strip=True)))
-        time.sleep(0.25)
-    return out
+    """네이버 시총 상위(주식만). sosok 0=KOSPI, 1=KOSDAQ. 페이지당 50종목(옛 페이지 단위).
+
+    [2026-09-11] 원천이 sise_market_sum HTML → 네이버 JSON API(src/data/naver_api.py).
+    09-10에 옛 페이지가 302로 옮겨가자 여기가 0종목을 냈고, CSV가 안 만들어져
+    프리마켓이 다음 단계에서 FileNotFoundError로 죽었다. 이제 못 얻으면 여기서 죽는다.
+    """
+    from src.data import naver_api
+    got = naver_api.stock_list('marketValue', 'KOSPI' if sosok == 0 else 'KOSDAQ',
+                               pages * 50)
+    if got is None:
+        raise RuntimeError('네이버 시총 목록을 얻지 못했다')
+    return [(r['code'], r['name']) for r in got]
 
 
 def daily(code, date_from, date_to):

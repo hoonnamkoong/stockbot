@@ -129,65 +129,31 @@ def _load_previous_universe() -> list[dict]:
 
 def fetch_top100_by_trade_amount(_token: str) -> list[dict]:
     """
-    네이버 금융 sise_market_sum 페이지에서 KOSPI 시가총액 상위 100 종목.
+    네이버 시가총액 상위 100 종목(KOSPI, 주식만).
     거래대금 순위(sise_quant)는 ETF/ETN이 상위를 독식하므로 시가총액 순위로 대체.
-    시가총액 상위는 정상 주식만 포함 — ETF/ETN 필터링 불필요.
+
+    [2026-09-11] 원천이 sise_market_sum HTML → 네이버 JSON API(src/data/naver_api.py).
+    09-10에 옛 페이지가 302로 옮겨가자 이 함수가 0종목을 냈고 EOD가 통째로 죽었다.
+    새 목록은 ETF가 섞여 오므로 naver_api가 주식만 거른다.
     """
-    from bs4 import BeautifulSoup
+    from src.data import naver_api
 
-    naver_hdrs = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Referer': 'https://finance.naver.com/',
-    }
-
-    results = []
-    seen_codes: set = set()
-    print("[STEP 1] KOSPI 시가총액 상위 100 종목 수집 중 (네이버 금융)...")
-    try:
-        for page in range(1, 5):
-            url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
-            r = _with_retry(requests.get, url, headers=naver_hdrs, timeout=10)
-            soup = BeautifulSoup(r.content.decode('euc-kr', 'replace'), 'html.parser')
-            table = soup.select_one('table.type_2')
-            if not table:
-                break
-            new_in_page = 0
-            for row in table.select('tr'):
-                cols = row.select('td')
-                if len(cols) < 5:
-                    continue
-                name_tag = cols[1].select_one('a')
-                if not name_tag:
-                    continue
-                name = name_tag.get_text(strip=True)
-                code = name_tag['href'].split('code=')[-1]
-                if not code.isdigit() or code in seen_codes:
-                    continue
-                seen_codes.add(code)
-                price_str = cols[2].get_text(strip=True).replace(',', '')
-                price = int(price_str) if price_str.isdigit() else 0
-                results.append({"code": code, "name": name, "price": str(price), "trade_amt": "0"})
-                new_in_page += 1
-                if len(results) >= 100:
-                    break
-            if len(results) >= 100:
-                break
-            if new_in_page == 0:
-                break
-            time.sleep(0.3)
-    except requests.RequestException as e:
+    print("[STEP 1] KOSPI 시가총액 상위 100 종목 수집 중 (네이버)...")
+    rows = naver_api.stock_list('marketValue', 'KOSPI', 100)
+    if not rows:
         # 2026-08-03: 러너에서 네이버 커넥트 타임아웃 3연속으로 EOD 런 전체가 죽었고,
         # 심9-1이 하루 실행되지 않았으며 CSV도 멈췄다. 시총 상위 구성은 하루 사이
         # 거의 바뀌지 않으므로 직전 실행이 남긴 구성으로 계속한다.
         # 복원되는 것은 '어떤 종목을 볼지'뿐이고, 시세는 전부 오늘 KIS 실측이다.
         previous = _load_previous_universe()
         if not previous:
-            raise
-        print(f"[폴백] 네이버 접속 실패({type(e).__name__}) — 직전 CSV의 {len(previous)}종목으로 진행")
+            raise RuntimeError('네이버 시총 목록을 얻지 못했고, 복원할 직전 CSV도 없다')
+        print(f"[폴백] 네이버 시총 목록 조회 실패 — 직전 CSV의 {len(previous)}종목으로 진행")
         print("       종목 구성은 전 거래일 기준, OHLCV는 오늘 KIS 실측이다.")
         return previous
 
-    results = results[:100]
+    results = [{"code": r["code"], "name": r["name"],
+                "price": str(int(r["price"] or 0)), "trade_amt": "0"} for r in rows]
     print(f"  → {len(results)}개 종목 수집 완료")
     return results
 

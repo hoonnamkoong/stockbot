@@ -375,23 +375,21 @@ def _production_py():
 # 아직 net을 안 쓰는 파일은 여기 적어 두고, 이 목록은 **줄어들기만 한다.**
 _NOT_YET = {
     'src/diagnose_company.py', 'src/diagnose_research.py', 'src/research_scraper.py',
-    'src/trade_executor.py', 'src/data/market_cap_universe.py',
+    'src/trade_executor.py',
     # [2026-09-09] 미국 셋은 `required=`가 생겨 옮겼다 — `raise_for_status()`가
     # 하던 "실패는 예외로 올린다"를 net이 갖게 된 것이 조건이었다.
-    'src/market_calendar.py', 'src/strategy/analyzer.py', 'src/strategy/engine.py',
+    'src/market_calendar.py', 'src/strategy/engine.py',
     'src/strategy/hybrid_advisor_sandbox.py', 'src/trade/auth.py',
     'src/trade/balance.py', 'src/trade/executions.py', 'src/trade/gemini_trade.py',
     'src/trade/kis_data_provider.py', 'src/trade/order_cancel.py',
     'src/trade/realized_pnl.py', 'src/trade/secret_store.py',
-    'src/pipeline/workers/program_trader.py', 'src/pipeline/workers/trade_engine.py',
+    'src/pipeline/workers/program_trader.py',
     'scripts/collect_kis_realtime.py', 'scripts/debug_naver_parsing.py',
     'scripts/diag_kis_provider.py', 'scripts/fetch_kis_history.py',
     'scripts/fetch_us_market.py', 'scripts/migrate_timezone.py',
     'scripts/test_kis.py', 'scripts/token_manager.py', 'scripts/trade_loop.py',
-    # [2026-09-08] 단건 호출 둘은 이 PR에서 옮겼다. 남은 것은 `fetch_page`
-    # 하나인데, **어제 PR #100으로 바꿔서 내일 장중 검증을 기다리는 코드**다.
-    # 검증 전에 다시 쓰면 그 검증이 무의미해진다 — 검증 뒤에 옮긴다.
-    'src/pipeline/workers/data_fetcher.py',
+    # [2026-09-11] 네이버 이관(finance.naver.com → JSON API, src/data/naver_api.py)으로
+    # market_cap_universe·analyzer·trade_engine·data_fetcher의 직접 호출이 사라져 뺐다.
 }
 
 

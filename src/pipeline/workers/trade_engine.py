@@ -83,21 +83,6 @@ def libero_action(after_close: bool, market_hours: bool) -> str | None:
     return None
 
 
-# 네이버 시총 페이지의 열 라벨. 인덱스가 아니라 이 텍스트로 위치를 찾는다 —
-# 고정 인덱스를 5개로 늘리면 네이버가 열 하나를 끼워넣는 순간 5개가 동시에
-# 조용히 틀린다. 2026-08-17 실측: th 13개, td 13개, 인덱스 정렬됨.
-_MARKET_COL_LABELS = {'price': '현재가', 'rate': '등락률',
-                      'cap': '시가총액', 'volume': '거래량'}
-
-
-def resolve_market_columns(header_texts):
-    """헤더 텍스트 → td 인덱스. 하나라도 못 찾으면 None(호출부가 현행 폴백)."""
-    try:
-        return {k: header_texts.index(v) for k, v in _MARKET_COL_LABELS.items()}
-    except ValueError:
-        return None
-
-
 def _quantile(sorted_vals, q):
     """정렬된 값에서 분위수. 선형보간 없이 floor(q·(n-1)) 인덱스.
 
@@ -683,10 +668,9 @@ class TradeEngineWorker(BaseWorker):
         sim.get_universe() 반환 종목에 sparkline + per/pbr 보강.
         DataFetcher를 거치지 않은 종목이므로 별도 enrichment 필요.
         """
-        import re
-        import requests
-        from bs4 import BeautifulSoup
         from concurrent.futures import ThreadPoolExecutor
+        from src.core import net
+        from src.data import naver_api
 
         # get_universe()가 자체적으로 price를 안 준 종목(Sim6 고정 리터럴 등)은
         # fetch_sparkline이 네이버 frgn(일봉) 값으로 price를 채운다 — 장중엔
@@ -700,112 +684,66 @@ class TradeEngineWorker(BaseWorker):
             code = stock.get('code', '')
             if not code:
                 return stock
-            try:
-                url = f"https://finance.naver.com/item/frgn.naver?code={code}"
-                res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-                soup = BeautifulSoup(res.content, 'html.parser')
-                rows = soup.select('table.type2 tr')
-                data_rows = [
-                    r.select('td') for r in rows
-                    if len(r.select('td')) == 9
-                    and re.match(r'\d{4}', r.select('td')[0].get_text(strip=True))
-                ]
-                if data_rows:
-                    # price/current_price는 get_universe()가 이미 KIS 라이브 값으로
-                    # 채워왔다면 덮어쓰지 않는다 — 이 페이지(frgn.naver)는 일봉이라 장중에
-                    # 전일 값에서 멈춰 있을 수 있다(Sim6가 6주간 거래 0건이던 원인과 동일
-                    # 함정). 2026-08-04: 이 덮어쓰기가 Sim4-1의 라이브 판단가를 지워
-                    # 실전 계좌가 하루 종일 매수 0건이었다(check_buy_drift가 계속 차단).
-                    # 유니버스 자체에 price가 없을 때(Sim6 고정 리터럴)만 이 값을 쓴다.
-                    if not stock.get('price'):
-                        price_text = data_rows[0][1].get_text().replace(',', '').strip()
-                        if price_text.isdigit():
-                            stock['price'] = int(price_text)
-                            stock['current_price'] = stock['price']
-                    # 이 표는 20행(20영업일)을 준다. 종가를 전부 뽑아 두고
-                    # sparkline은 그 앞 5개만 쓴다 — 추가 호출 0.
-                    closes = []
-                    for row in data_rows:
-                        try:
-                            closes.append(int(row[1].get_text().replace(',', '').strip()))
-                        except Exception:
-                            pass
-                    if closes:
-                        stock['sparkline_price'] = closes[:5][::-1]   # 오래된→최신 순
-                        # [Sim5] 채널 산출용 20일 종가. 이걸 안 채우면 자체
-                        # 유니버스를 쓰는 심은 `_channel()`이 None을 돌려받아
-                        # **진입이 구조적으로 불가능해진다.** 지금까지 이 필드는
-                        # 스크래퍼 경로(data_fetcher._get_stock_details)에만
-                        # 있었고, 그래서 심5에 자체 유니버스를 달면 조용히
-                        # 매수 0건이 되는 함정이 있었다.
-                        stock.setdefault('range_history', closes[::-1])
-                    if len(data_rows) >= 2:
-                        stock['foreign_rate'] = float(
-                            data_rows[0][8].get_text().replace('%', '').replace(',', '').strip() or 0
-                        )
-                        # [Sim8] foreign_change: info 축 세 항 중 하나. 이게 없으면 횡단면
-                        # z가 퇴화해 info가 전 종목 비고 진입이 원천 차단된다.
-                        # 같은 표의 어제 행이라 추가 콜 0.
-                        prev_rate = float(
-                            data_rows[1][8].get_text().replace('%', '').replace(',', '').strip() or 0
-                        )
+            # [2026-09-11] 옛 item/frgn 표 → 네이버 JSON API(같은 재료, 최신이 앞).
+            # 표를 긁던 코드는 09-10 이관 뒤 표를 못 찾아 아래 필드를 전부 조용히 비웠다.
+            rows = naver_api.investor_trend(code, policy=net.FAST)
+            if rows:
+                # price/current_price는 get_universe()가 이미 KIS 라이브 값으로
+                # 채워왔다면 덮어쓰지 않는다 — 이 표는 일봉이라 장중에
+                # 전일 값에서 멈춰 있을 수 있다(Sim6가 6주간 거래 0건이던 원인과 동일
+                # 함정). 2026-08-04: 이 덮어쓰기가 Sim4-1의 라이브 판단가를 지워
+                # 실전 계좌가 하루 종일 매수 0건이었다(check_buy_drift가 계속 차단).
+                # 유니버스 자체에 price가 없을 때(Sim6 고정 리터럴)만 이 값을 쓴다.
+                if not stock.get('price'):
+                    stock['price'] = rows[0]['close']
+                    stock['current_price'] = stock['price']
+                # 이 표는 20행(20영업일)을 준다. 종가를 전부 뽑아 두고
+                # sparkline은 그 앞 5개만 쓴다 — 추가 호출 0.
+                closes = [r['close'] for r in rows]
+                stock['sparkline_price'] = closes[:5][::-1]   # 오래된→최신 순
+                # [Sim5] 채널 산출용 20일 종가. 이걸 안 채우면 자체
+                # 유니버스를 쓰는 심은 `_channel()`이 None을 돌려받아
+                # **진입이 구조적으로 불가능해진다.** 지금까지 이 필드는
+                # 스크래퍼 경로(data_fetcher._get_stock_details)에만
+                # 있었고, 그래서 심5에 자체 유니버스를 달면 조용히
+                # 매수 0건이 되는 함정이 있었다.
+                stock.setdefault('range_history', closes[::-1])
+                hold_now = rows[0]['foreign_hold_ratio']
+                if len(rows) >= 2 and hold_now is not None:
+                    stock['foreign_rate'] = hold_now
+                    # [Sim8] foreign_change: info 축 세 항 중 하나. 이게 없으면 횡단면
+                    # z가 퇴화해 info가 전 종목 비고 진입이 원천 차단된다.
+                    # 같은 표의 어제 행이라 추가 콜 0.
+                    if rows[1]['foreign_hold_ratio'] is not None:
                         stock.setdefault('foreign_change',
-                                         round(stock['foreign_rate'] - prev_rate, 3))
-                    # [Sim2] 20일 누적 외국인 순매매(거래량 대비 %). 하루짜리 foreign_change와
-                    # 달리 추세를 본다 — 2026-08-20 KOSPI 규칙마이닝 실측: 20일 누적이 매도
-                    # 국면(하위20%, 대략 -5% 이하)이면 그날 하루 반짝 매수는 노이즈였고
-                    # 10일 후에도 시장평균 대비 저조했다(-0.64%p/-1.22%p). 같은 표(frgn.naver
-                    # 20일치)에서 재활용 — 추가 호출 0. 열 인덱스: [4]거래량 [6]외국인순매매량.
-                    ratios = []
-                    for row in data_rows:
-                        try:
-                            vol = float(row[4].get_text().replace(',', '').strip())
-                            net = float(row[6].get_text().replace(',', '').replace('+', '').strip())
-                            if vol > 0:
-                                ratios.append(net / vol * 100)
-                        except Exception:
-                            continue
-                    if ratios:
-                        stock.setdefault('frgn_net_20d', sum(ratios) / len(ratios))
+                                         round(hold_now - rows[1]['foreign_hold_ratio'], 3))
+                # [Sim2] 20일 누적 외국인 순매매(거래량 대비 %). 하루짜리 foreign_change와
+                # 달리 추세를 본다 — 2026-08-20 KOSPI 규칙마이닝 실측: 20일 누적이 매도
+                # 국면(하위20%, 대략 -5% 이하)이면 그날 하루 반짝 매수는 노이즈였고
+                # 10일 후에도 시장평균 대비 저조했다(-0.64%p/-1.22%p). 같은 표(20일치)에서
+                # 재활용 — 추가 호출 0.
+                ratios = [r['foreign_net'] / r['volume'] * 100 for r in rows
+                          if r['volume'] and r['foreign_net'] is not None]
+                if ratios:
+                    stock.setdefault('frgn_net_20d', sum(ratios) / len(ratios))
 
-                    # [Sim12] 기관 20일 누적 수급·20일 평균 거래대금·외인 보유율 5일 변화.
-                    # frgn_net_20d와 같은 표에서 재활용(추가 호출 0). 2026-08-20 KOSPI
-                    # 규칙마이닝: "기관 20일 순매도 + 고PER" 조합이 단독 효과의 4배가
-                    # 넘는 회피 신호였다(fwd_10d -8.78%p/-8.48%p) — 그 게이트의 재료.
-                    orgn_ratios = []
-                    for row in data_rows:
-                        try:
-                            vol = float(row[4].get_text().replace(',', '').strip())
-                            net = float(row[5].get_text().replace(',', '').replace('+', '').strip())
-                            if vol > 0:
-                                orgn_ratios.append(net / vol * 100)
-                        except Exception:
-                            continue
-                    if orgn_ratios:
-                        stock.setdefault('orgn_net_20d', sum(orgn_ratios) / len(orgn_ratios))
+                # [Sim12] 기관 20일 누적 수급·20일 평균 거래대금·외인 보유율 5일 변화.
+                # frgn_net_20d와 같은 표에서 재활용(추가 호출 0). 2026-08-20 KOSPI
+                # 규칙마이닝: "기관 20일 순매도 + 고PER" 조합이 단독 효과의 4배가
+                # 넘는 회피 신호였다(fwd_10d -8.78%p/-8.48%p) — 그 게이트의 재료.
+                orgn_ratios = [r['organ_net'] / r['volume'] * 100 for r in rows
+                               if r['volume'] and r['organ_net'] is not None]
+                if orgn_ratios:
+                    stock.setdefault('orgn_net_20d', sum(orgn_ratios) / len(orgn_ratios))
 
-                    amounts = []
-                    for row in data_rows:
-                        try:
-                            close_v = float(row[1].get_text().replace(',', '').strip())
-                            vol = float(row[4].get_text().replace(',', '').strip())
-                            amounts.append(close_v * vol)
-                        except Exception:
-                            continue
-                    if amounts:
-                        stock.setdefault('amount_ma20', sum(amounts) / len(amounts))
+                amounts = [r['close'] * r['volume'] for r in rows if r['volume'] is not None]
+                if amounts:
+                    stock.setdefault('amount_ma20', sum(amounts) / len(amounts))
 
-                    if len(data_rows) >= 6:
-                        try:
-                            hold_5d_ago = float(
-                                data_rows[5][8].get_text().replace('%', '').replace(',', '').strip() or 0
-                            )
-                            stock.setdefault('frgn_hold_chg_5d',
-                                             round(stock['foreign_rate'] - hold_5d_ago, 3))
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+                if len(rows) >= 6 and 'foreign_rate' in stock \
+                        and rows[5]['foreign_hold_ratio'] is not None:
+                    stock.setdefault('frgn_hold_chg_5d',
+                                     round(stock['foreign_rate'] - rows[5]['foreign_hold_ratio'], 3))
             return stock
 
         with ThreadPoolExecutor(max_workers=10) as ex:
@@ -981,72 +919,31 @@ class TradeEngineWorker(BaseWorker):
         return round(_median(adxs), 1) if adxs else None
 
     def _fetch_top100_breadth(self):
-        """네이버 시총 페이지에서 KOSPI top100 장중 등락률 → 실측 국면 지표.
+        """네이버 시총 상위 KOSPI top100 장중 등락률 → 실측 국면 지표.
 
-        fetch_kospi_top100.py와 동일 소스(sise_market_sum). 표본이 80 미만이면
-        부분 실패로 보고 None (왜곡된 실측으로 채점 오염 방지).
+        fetch_kospi_top100.py와 동일 소스(src.data.naver_api 시총 목록). 표본이 80
+        미만이면 부분 실패로 보고 None (왜곡된 실측으로 채점 오염 방지).
 
         반환: {'breadth','momentum','sample','codes','extra'} 또는 None.
-        `extra`는 OBS_EXTRA의 부분집합이다 — 헤더 해석에 실패하면 등락률에서
-        나오는 열만 담긴다.
+        `extra`는 OBS_EXTRA의 부분집합이다 — 시총·현재가·거래량 중 빈 값이 있으면
+        등락률에서 나오는 열만 담긴다.
+
+        [2026-09-11] 원천이 sise_market_sum HTML 표 → 네이버 JSON API다. 09-10에 옛
+        페이지가 stock.naver.com으로 302되자 표를 못 찾아 None이 됐고, 리베로
+        나우캐스트가 조용히 스킵됐다(src/data/naver_api.py 독스트링).
         """
-        import requests
-        from bs4 import BeautifulSoup
+        from src.core import net
+        from src.data import naver_api
 
-        naver_hdrs = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            'Referer': 'https://finance.naver.com/',
-        }
-        codes, rates = [], []
-        caps, prices, volumes = [], [], []
-        seen: set = set()
-
-        def _num(cols, idx):
-            if idx is None or idx >= len(cols):
-                return None
-            txt = cols[idx].get_text(strip=True).replace(',', '').replace('%', '')
-            try:
-                return float(txt)
-            except ValueError:
-                return None
-
-        for page in range(1, 5):
-            url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
-            res = requests.get(url, headers=naver_hdrs, timeout=10)
-            soup = BeautifulSoup(res.content.decode('euc-kr', 'replace'), 'html.parser')
-            table = soup.select_one('table.type_2')
-            if not table:
-                break
-            # 헤더 해석 실패 시 등락률만 현행 고정 인덱스로 읽는다 — 기존 동작은
-            # 어떤 경우에도 나빠지지 않고, 신규 열만 비게 된다.
-            idx = resolve_market_columns(
-                [th.get_text(strip=True) for th in table.select('thead th')]
-            ) or {'rate': 4, 'price': None, 'cap': None, 'volume': None}
-            for row in table.select('tr'):
-                cols = row.select('td')
-                if len(cols) < 5:
-                    continue
-                name_tag = cols[1].select_one('a')
-                if not name_tag:
-                    continue
-                code = name_tag['href'].split('code=')[-1]
-                if not code.isdigit() or code in seen:
-                    continue
-                rate = _num(cols, idx['rate'])
-                if rate is None:
-                    continue
-                seen.add(code)
-                codes.append(code)
-                rates.append(rate)
-                caps.append(_num(cols, idx['cap']))
-                prices.append(_num(cols, idx['price']))
-                volumes.append(_num(cols, idx['volume']))
-                if len(codes) >= 100:
-                    break
-            if len(codes) >= 100:
-                break
-        if len(codes) < 80:
+        rows = naver_api.stock_list('marketValue', 'KOSPI', 100, policy=net.FAST)
+        rows = [r for r in (rows or []) if r['change_rate'] is not None]
+        if len(rows) < 80:
             return None
+        codes = [r['code'] for r in rows]
+        rates = [r['change_rate'] for r in rows]
+        caps = [r['market_cap'] for r in rows]
+        prices = [r['price'] for r in rows]
+        volumes = [r['volume'] for r in rows]
         bm = self._breadth_momentum(rates)
         if bm is None:
             # 표본은 찼는데 아직 안 움직였다(개장 직후). 여기서 언팩하면 터지고,
@@ -1142,32 +1039,20 @@ class TradeEngineWorker(BaseWorker):
 
     def _fetch_portfolio_prices(self, codes: list) -> dict:
         """
-        Buzz Filter 이탈 종목의 현재가를 네이버 금융에서 직접 조회합니다.
-        DataFetcherWorker._get_stock_details()와 동일한 URL을 사용합니다.
-        frgn.naver 페이지의 첫 번째 데이터 행(data_rows[0][1])이 오늘 종가입니다.
+        Buzz Filter 이탈 종목의 현재가를 네이버에서 직접 조회합니다.
+        네이버 basic API의 closePrice — 장중엔 현재가, 마감 뒤엔 종가다.
+        못 얻은 종목은 넣지 않는다(0을 넣으면 '가격 0'이 된다).
         """
-        import re
-        import requests
-        from bs4 import BeautifulSoup
+        from src.data import naver_api
 
         prices = {}
         for code in codes:
-            try:
-                url = f"https://finance.naver.com/item/frgn.naver?code={code}"
-                res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-                soup = BeautifulSoup(res.content, 'html.parser')
-                rows = soup.select('table.type2 tr')
-                data_rows = [
-                    r.select('td') for r in rows
-                    if len(r.select('td')) == 9
-                    and re.match(r'\d{4}', r.select('td')[0].get_text(strip=True))
-                ]
-                if data_rows:
-                    price_text = data_rows[0][1].get_text().replace(',', '').strip()
-                    prices[code] = int(price_text) if price_text.isdigit() else 0
-                    self.log(f"    {code}: {prices[code]:,}원")
-            except Exception as e:
-                self.log_error(f"    {code} 현재가 조회 실패: {e}")
+            price = naver_api.current_price(code)
+            if price:
+                prices[code] = price
+                self.log(f"    {code}: {prices[code]:,}원")
+            else:
+                self.log_error(f"    {code} 현재가 조회 실패")
         return prices
 
     def _fetch_kis_prices(self, codes: list) -> dict:

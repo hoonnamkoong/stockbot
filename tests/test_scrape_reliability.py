@@ -20,44 +20,45 @@ def chdir_tmp(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
 
-def page_html(post_nids, trailing_old_row=False):
-    rows = []
-    for nid in post_nids:
-        rows.append(
-            f'<tr><td>{TODAY} 09:00</td>'
-            f'<td class="title"><a href="/item/board_read.naver?code=1&nid={nid}">글</a></td>'
-            f'<td>x</td><td>y</td><td>3</td></tr>'
-        )
+def _post(nid, writer='x', day='2026-07-10'):
+    return {'id': str(nid), 'writtenAt': f'{day}T09:00:00', 'title': '글',
+            'recommendCount': 3, 'writer': {'profileId': writer}}
+
+
+def page_json(post_nids, trailing_old_row=False):
+    """종토방 JSON 한 페이지(naver_api.discussion_page가 읽는 모양)."""
+    posts = [_post(nid) for nid in post_nids]
     if trailing_old_row:
-        rows.append(
-            '<tr><td>2026.07.09 23:00</td>'
-            '<td class="title"><a href="/item/board_read.naver?code=1&nid=1">옛글</a></td>'
-            '<td>x</td><td>y</td><td>0</td></tr>'
-        )
-    return f'<table class="type2">{"".join(rows)}</table>'
+        posts.append(_post(1, day='2026-07-09'))
+    return {'result': {'posts': posts, 'lastOffset': None}}
 
 
 class FakeResponse:
-    def __init__(self, html, status_code=200):
-        self.content = html.encode('utf-8')
+    def __init__(self, body, status_code=200):
+        self._body = body
         self.status_code = status_code
+
+    def json(self):
+        return self._body
 
 
 def install_fake_session(monkeypatch, behavior):
-    """behavior(page, attempt) -> FakeResponse/html 문자열 또는 예외를 raise"""
+    """behavior(page, attempt) -> FakeResponse/페이지 dict 또는 예외를 raise.
+
+    page는 커서 순번이다(첫 요청 1, offset=pN이면 N). 가짜 응답의 커서를 다음 순번으로
+    바꿔 넣어, 테스트가 페이지를 번호로 말할 수 있게 한다."""
     attempts = {}
 
-    class FakeSession:
-        def __init__(self):
-            self.headers = {}
+    def fake_get(self, url, **kw):
+        page = int(url.split('offset=p')[-1]) if 'offset=p' in url else 1
+        attempts[page] = attempts.get(page, 0) + 1
+        r = behavior(page, attempts[page])
+        res = r if isinstance(r, FakeResponse) else FakeResponse(r)
+        if isinstance(res._body, dict) and isinstance(res._body.get('result'), dict):
+            res._body['result']['lastOffset'] = f'p{page + 1}'
+        return res
 
-        def get(self, url, timeout=None):
-            page = int(url.split('page=')[-1])
-            attempts[page] = attempts.get(page, 0) + 1
-            r = behavior(page, attempts[page])
-            return r if isinstance(r, FakeResponse) else FakeResponse(r)
-
-    monkeypatch.setattr(data_fetcher.requests, 'Session', FakeSession)
+    monkeypatch.setattr(requests.Session, 'get', fake_get)
     monkeypatch.setattr(data_fetcher.time, 'sleep', lambda *_: None)
     return attempts
 
@@ -73,30 +74,28 @@ def worker():
 
 def test_page_timeout_is_retried_then_succeeds(worker, monkeypatch):
     """1페이지가 타임아웃해도 남은 시도에서 글을 건져야 한다."""
-    # [2026-09-09] 재시도 횟수는 이제 `net`이 정한다(BULK.attempts) — 호출부가
+    # [2026-09-09] 재시도 횟수는 `net`이 정한다(SCRAPE.attempts) — 호출부가
     # 숫자를 갖지 않는 것이 재편의 요점이라, 테스트도 숫자를 박지 않는다.
     # 예전엔 3을 적어 뒀고, 등급이 2로 정하자 이 테스트만 조용히 의미가 달라졌다.
     def behavior(page, attempt):
         if page == 1:
-            if attempt < net.BULK.attempts:
+            if attempt < net.SCRAPE.attempts:
                 raise requests.ReadTimeout('timeout')
-            return page_html(['101', '102'], trailing_old_row=True)
-        return page_html([], trailing_old_row=True)
+            return page_json(['101', '102'], trailing_old_row=True)
+        return page_json([], trailing_old_row=True)
 
     attempts = install_fake_session(monkeypatch, behavior)
     stats = stats_for(worker)
 
     assert stats['recent_posts_count'] == 2
-    assert attempts[1] == net.BULK.attempts
+    assert attempts[1] == net.SCRAPE.attempts
     assert stats['failed_pages'] == 0
 
 
 def test_failed_page_is_reported_not_counted_as_zero(worker, monkeypatch):
     """재시도를 모두 소진한 페이지는 '글 0건'이 아니라 실패로 집계돼야 한다."""
     def behavior(page, attempt):
-        if page == 1:
-            raise requests.ReadTimeout('timeout')
-        return page_html([], trailing_old_row=True)
+        raise requests.ReadTimeout('timeout')
 
     install_fake_session(monkeypatch, behavior)
     stats = stats_for(worker)
@@ -106,11 +105,9 @@ def test_failed_page_is_reported_not_counted_as_zero(worker, monkeypatch):
 
 
 def test_rate_limited_page_is_a_failure_not_an_empty_page(worker, monkeypatch):
-    """429 응답은 파싱하면 '글 0건'처럼 보인다. 실패로 세야 한다."""
+    """429 응답은 '글 0건'처럼 보일 수 있다. 실패로 세야 한다."""
     def behavior(page, attempt):
-        if page == 1:
-            return FakeResponse('<html>429 Too Many Requests</html>', status_code=429)
-        return page_html([], trailing_old_row=True)
+        return FakeResponse({}, status_code=429)
 
     install_fake_session(monkeypatch, behavior)
     stats = stats_for(worker)
@@ -182,26 +179,17 @@ def test_healthy_run_persists_both(monkeypatch):
 
 
 # ── [Sim8] 고유 작성자 수 ──────────────────────────────
-def _rows_with_writers(pairs):
-    """[(nid, 글쓴이)] → 게시판 표 HTML. 실제 컬럼 순서는 날짜/제목/글쓴이/조회/공감/비공감."""
-    rows = "".join(
-        f'<tr><td>{TODAY} 09:00</td>'
-        f'<td class="title"><a href="/item/board_read.naver?code=1&nid={nid}">글</a></td>'
-        f'<td>{writer}</td><td>1</td><td>3</td><td>0</td></tr>'
-        for nid, writer in pairs
-    )
-    old = ('<tr><td>2026.07.09 23:00</td>'
-           '<td class="title"><a href="/item/board_read.naver?code=1&nid=1">옛글</a></td>'
-           '<td>x</td><td>y</td><td>0</td></tr>')
-    return f'<table class="type2">{rows}{old}</table>'
+def _page_with_writers(pairs):
+    """[(nid, 글쓴이)] → 종토방 JSON 한 페이지 + 어제 글 하나(경계)."""
+    posts = [_post(nid, writer=writer) for nid, writer in pairs]
+    posts.append(_post(1, day='2026-07-09'))
+    return {'result': {'posts': posts, 'lastOffset': None}}
 
 
 def test_unique_posters_counts_distinct_writers(worker, monkeypatch):
     """도배(한 사람이 3글)와 관심(3명이 1글씩)을 구분해야 심8의 군중축이 의미를 갖는다."""
     def behavior(page, attempt):
-        if page == 1:
-            return _rows_with_writers([('101', '갑'), ('102', '갑'), ('103', '을')])
-        return _rows_with_writers([])
+        return _page_with_writers([('101', '갑'), ('102', '갑'), ('103', '을')])
 
     install_fake_session(monkeypatch, behavior)
     stats = stats_for(worker)
@@ -213,11 +201,10 @@ def test_unique_posters_counts_distinct_writers(worker, monkeypatch):
 def test_writer_does_not_leak_into_posts(worker, monkeypatch):
     """posts는 엑셀·LLM 프롬프트로 흘러간다. 필요 없는 필드를 실어 보내지 않는다."""
     def behavior(page, attempt):
-        if page == 1:
-            return _rows_with_writers([('101', '갑')])
-        return _rows_with_writers([])
+        return _page_with_writers([('101', '갑')])
 
     install_fake_session(monkeypatch, behavior)
     stats = stats_for(worker)
 
     assert stats['new_posts'] and all('writer' not in p for p in stats['new_posts'])
+    assert all(set(p) == {'nid', 'title', 'likes'} for p in stats['new_posts'])

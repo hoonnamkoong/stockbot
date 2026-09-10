@@ -10,15 +10,15 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-09-10 09:00:35",
+  "last_run": "2026-09-10 09:10:28",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": 1.0,
-  "bull_score": 43.8,
+  "bull_score": 35.4,
   "metrics": {
-    "breadth_score": 52.0,
-    "momentum_score": 0.17,
-    "trend_strength": 20.7,
+    "breadth_score": 34.0,
+    "momentum_score": -0.34,
+    "trend_strength": 19.5,
     "foreign_score": null,
     "volatility_score": null
   },
@@ -37,12 +37,6 @@
   "sample_size": 100,
   "cooldown_codes": {},
   "daily_regime_log": [
-    {
-      "date": "2026-07-28",
-      "regime": "SIDEWAYS",
-      "bull_score": 19.1,
-      "breadth": 8.0
-    },
     {
       "date": "2026-07-29",
       "regime": "BEAR",
@@ -216,6 +210,12 @@
       "regime": "SIDEWAYS",
       "bull_score": 43.1,
       "breadth": 51.0
+    },
+    {
+      "date": "2026-09-10",
+      "regime": "SIDEWAYS",
+      "bull_score": 35.4,
+      "breadth": 34.0
     }
   ],
   "calibration_log": [
@@ -690,39 +690,11 @@
   ],
   "breadth_source": "top100_live",
   "intraday": {
-    "date": "2026-09-09",
+    "date": "2026-09-10",
     "measurements": [
       {
         "t": "09:00",
-        "breadth": 51.0
-      },
-      {
-        "t": "10:00",
-        "breadth": 48.0
-      },
-      {
-        "t": "11:00",
-        "breadth": 53.0
-      },
-      {
-        "t": "12:00",
-        "breadth": 62.0
-      },
-      {
-        "t": "13:00",
-        "breadth": 53.0
-      },
-      {
-        "t": "14:00",
-        "breadth": 56.0
-      },
-      {
-        "t": "15:00",
-        "breadth": 55.0
-      },
-      {
-        "t": "15:30",
-        "breadth": 53.0
+        "breadth": 34.0
       }
     ],
     "predictions": [
@@ -731,312 +703,48 @@
         "target": "10:00",
         "type": "h1",
         "model": "velocity",
-        "value": 51.0,
-        "scored": true
+        "value": 34.0,
+        "scored": false
       },
       {
         "made_at": "09:00",
         "target": "EOD",
         "type": "eod",
         "model": "velocity",
-        "value": 51.0,
-        "scored": true
-      },
-      {
-        "made_at": "09:00",
-        "target": "10:00",
-        "type": "h1",
-        "model": "smoothed_velocity",
-        "value": 51.0,
-        "scored": true
-      },
-      {
-        "made_at": "09:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "smoothed_velocity",
-        "value": 51.0,
-        "scored": true
+        "value": 34.0,
+        "scored": false
       },
       {
         "made_at": "09:00",
         "target": "10:00",
         "type": "h1",
+        "model": "smoothed_velocity",
+        "value": 34.0,
+        "scored": false
+      },
+      {
+        "made_at": "09:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "smoothed_velocity",
+        "value": 34.0,
+        "scored": false
+      },
+      {
+        "made_at": "09:00",
+        "target": "10:00",
+        "type": "h1",
         "model": "naive",
-        "value": 51.0,
-        "scored": true
+        "value": 34.0,
+        "scored": false
       },
       {
         "made_at": "09:00",
         "target": "EOD",
         "type": "eod",
         "model": "naive",
-        "value": 51.0,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "11:00",
-        "type": "h1",
-        "model": "velocity",
-        "value": 45.0,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "velocity",
-        "value": 39.8,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "11:00",
-        "type": "h1",
-        "model": "smoothed_velocity",
-        "value": 45.0,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "smoothed_velocity",
-        "value": 39.8,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "11:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 48.0,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 48.0,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "12:00",
-        "type": "h1",
-        "model": "velocity",
-        "value": 58.0,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "velocity",
-        "value": 64.2,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "12:00",
-        "type": "h1",
-        "model": "smoothed_velocity",
-        "value": 54.0,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "smoothed_velocity",
-        "value": 55.2,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "12:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 53.0,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 53.0,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "13:00",
-        "type": "h1",
-        "model": "velocity",
-        "value": 71.0,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "velocity",
-        "value": 77.7,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "13:00",
-        "type": "h1",
-        "model": "smoothed_velocity",
-        "value": 65.7,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "smoothed_velocity",
-        "value": 68.4,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "13:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 62.0,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 62.0,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "14:00",
-        "type": "h1",
-        "model": "velocity",
-        "value": 44.0,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "velocity",
-        "value": 41.8,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "14:00",
-        "type": "h1",
-        "model": "smoothed_velocity",
-        "value": 53.5,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "smoothed_velocity",
-        "value": 53.6,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "14:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 53.0,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 53.0,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "15:00",
-        "type": "h1",
-        "model": "velocity",
-        "value": 59.0,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "velocity",
-        "value": 58.2,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "15:00",
-        "type": "h1",
-        "model": "smoothed_velocity",
-        "value": 58.0,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "smoothed_velocity",
-        "value": 57.5,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "15:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 56.0,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 56.0,
-        "scored": true
-      },
-      {
-        "made_at": "15:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "velocity",
-        "value": 54.8,
-        "scored": true
-      },
-      {
-        "made_at": "15:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "smoothed_velocity",
-        "value": 55.1,
-        "scored": true
-      },
-      {
-        "made_at": "15:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 55.0,
-        "scored": true
+        "value": 34.0,
+        "scored": false
       }
     ]
   },

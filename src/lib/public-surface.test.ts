@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isOpen } from './route-access.ts';
 
 /**
  * 공개면은 **`/` 한 장뿐이다.**
@@ -35,22 +36,20 @@ function pageRoutes(): string[] {
     return out.sort();
 }
 
-/** 미들웨어가 막는 경로(매처에서 `:path*` 꼬리를 뗀 것). */
+/**
+ * 미들웨어가 막는 페이지 경로.
+ *
+ * 2026-09-10까지 이 함수는 **매처를 파싱했다** — 그때는 매처가 곧 차단 목록이라
+ * 그게 맞았다. 지금은 매처가 전 경로를 덮고 통과 목록이 따로 있어서(fail-closed),
+ * 판정을 그대로 쓴다.
+ */
 function guardedRoutes(): Set<string> {
-    const m = read('src/middleware.ts').match(/matcher:\s*\[([^\]]*)\]/s);
-    assert.ok(m, 'middleware의 matcher를 못 읽었다');
-    return new Set(
-        [...m![1].matchAll(/"([^"]+)"/g)]
-            .map((x) => x[1].replace(/\/:path\*$/, ''))
-    );
+    return new Set(pageRoutes().filter((r) => !isOpen(r)));
 }
 
 test('공개 페이지는 / 하나뿐이다', () => {
-    const guarded = guardedRoutes();
     // `/login`은 로그인 화면 자체라 막을 수 없다(막으면 들어갈 문이 없다).
-    const openRoutes = pageRoutes().filter(
-        (r) => r !== '/login' && ![...guarded].some((g) => r === g || r.startsWith(g + '/'))
-    );
+    const openRoutes = pageRoutes().filter((r) => r !== '/login' && isOpen(r));
     assert.deepEqual(openRoutes, ['/'],
         `공개 페이지가 늘었다: ${openRoutes.join(', ')} — 의도한 것이면 이 테스트를 함께 고칠 것`);
 });
@@ -73,8 +72,12 @@ test('공개 페이지는 주문 경로를 넘기지 않는다', () => {
 
 test('색인 대상은 공개 페이지뿐이다', () => {
     const robots = read('src/app/robots.ts');
+    const disallow = [...(robots.match(/disallow:\s*\[([^\]]*)\]/s)?.[1] ?? '')
+        .matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    assert.ok(disallow.length > 0, 'robots.ts의 disallow를 못 읽었다');
     for (const g of guardedRoutes()) {
-        assert.ok(robots.includes(`'${g}'`),
+        // 접두사로 덮여도 된다 — `/trade`가 `/trade/us`를 같이 막는다.
+        assert.ok(disallow.some((d) => g === d || g.startsWith(d + '/')),
             `robots.ts가 ${g}를 막지 않는다 — 로그인 화면이 검색 결과에 뜬다`);
     }
 });

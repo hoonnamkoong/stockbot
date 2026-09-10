@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 110.41,
+      "peak_price": 110.67,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 262.685,
+      "peak_price": 262.79,
       "is_scaled_out": false
     },
     "VG": {
@@ -32,7 +32,7 @@
       "quantity": 264,
       "avg_price": 14.395,
       "entry_date": "2026-08-27",
-      "peak_price": 15.78,
+      "peak_price": 15.8,
       "is_scaled_out": false
     },
     "RGA": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21049.355000000003,
+  "peak_nav": 21069.545,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -53,8 +53,8 @@
   "cooldown_codes": {},
   "raw_stats": {
     "cash": 1441.295,
-    "total_asset": 21049.355000000003,
-    "profit_rate": 5.246775000000016,
+    "total_asset": 21069.545,
+    "profit_rate": 5.347724999999992,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -63,33 +63,33 @@
     "frequency": 0.3333333333333333,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "NVT": 158.77,
-      "OSCR": 31.84,
-      "PR": 23.81,
-      "IESC": 324.005,
-      "FCFS": 227.33,
-      "TER": 370.52,
-      "HALO": 107.792,
-      "TWLO": 232.765,
-      "APH": 80.36,
-      "BAC": 62.48,
-      "DINO": 110.39,
-      "KEYS": 328.99,
-      "RGA": 246.31,
-      "OVV": 64.405,
-      "EOG": 146.825,
-      "STT": 192.62,
-      "OXY": 61.2,
-      "VG": 15.78,
-      "STX": 859.23,
-      "EPD": 39.53,
-      "PSX": 262.11,
-      "ROKU": 154.16,
+      "EXPD": 190.56,
+      "OSCR": 31.88,
       "ZBRA": 343.105,
-      "FANG": 204.37,
-      "NTAP": 184.77,
-      "ANET": 191.35,
-      "EXPD": 190.58
+      "HALO": 107.87,
+      "TER": 370.19,
+      "RGA": 245.94,
+      "STT": 192.64,
+      "NTAP": 184.84,
+      "PSX": 262.79,
+      "ANET": 191.4,
+      "DINO": 110.67,
+      "IESC": 324.005,
+      "KEYS": 329.27,
+      "TWLO": 233.36,
+      "EOG": 147.0,
+      "ROKU": 154.15,
+      "OXY": 61.265,
+      "OVV": 64.45,
+      "FCFS": 227.33,
+      "BAC": 62.51,
+      "APH": 80.37,
+      "EPD": 39.521,
+      "NVT": 158.98,
+      "FANG": 204.46,
+      "PR": 23.835,
+      "VG": 15.8,
+      "STX": 859.485
     }
   },
   "normalized_stats": {

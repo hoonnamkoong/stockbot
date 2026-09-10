@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { checkPinRateLimit, recordPinFailure, clearPinFailures } from '@/lib/pin-lockout';
 import { placeRealOrder } from '@/lib/kis-api';
 import { authorizeManualOrder } from '@/lib/trade-auth';
 import { kstTimestamp } from '@/lib/kst';
@@ -67,6 +68,22 @@ export async function POST(request: Request) {
             ? null
             : await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
 
+        // PIN 무차별 대입 방어 — **`/api/trade/program`에만 있던 것을 여기도 건다.**
+        // 2026-09-10까지 이 라우트는 무제한이었다: 세션 하나만 있으면 4자리 PIN을
+        // 평균 5,000회면 뚫고, 그 끝은 실계좌 주문이다.
+        //
+        // 웹훅 경로(자동화 엔진)는 PIN을 쓰지 않으므로 잠금 대상이 아니다 —
+        // 걸면 매매 루프가 남의 실패로 멈춘다.
+        if (!isAuthorizedByWebhook) {
+            const pinCheck = await checkPinRateLimit();
+            if (!pinCheck.allowed) {
+                console.error('[API-Order] ❌ PIN 시도 제한 초과');
+                return NextResponse.json(
+                    { success: false, error: `PIN 시도 제한 초과. ${pinCheck.retryAfterMin}분 후 재시도하세요.` },
+                    { status: 429 });
+            }
+        }
+
         const verdict = authorizeManualOrder({
             authHeader,
             webhookSecret,
@@ -75,9 +92,14 @@ export async function POST(request: Request) {
             tradePin: process.env.TRADE_PIN,
         });
         if (!verdict.ok) {
+            // 403만 센다 = 세션은 있는데 PIN이 틀린 경우, 곧 실제로 뚫릴 수 있는 시도다.
+            // 401(세션 없음)까지 세면 세션 없는 아무나가 주인을 잠글 수 있다
+            // (로그인 잠금에서 같은 이유로 신뢰 디바이스 실패만 센다).
+            if (verdict.status === 403) await recordPinFailure();
             console.error(`[API-Order] ❌ Unauthorized order attempt (${verdict.status})`);
             return NextResponse.json({ success: false, error: verdict.error }, { status: verdict.status });
         }
+        if (!isAuthorizedByWebhook) await clearPinFailures();
 
         let result: any;
         const now = kstTimestamp();

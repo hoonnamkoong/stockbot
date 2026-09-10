@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { checkPinRateLimit, recordPinFailure, clearPinFailures } from '@/lib/pin-lockout';
 import { tradeableSims } from '@/lib/sim-registry.generated';
 import { getRealPortfolio } from '@/lib/kis-api';
 import { computeTurnPnl, basisFromPositions, type ProgramTurn, type ProgramPosition, type LastTurnResult, type UnreconciledExit } from '@/lib/program-turn';
@@ -168,69 +169,9 @@ async function freezeTurn(cfgTurn: any, sim: string | null, endedAt: string, sta
     return { ...base, capital, pnl, by_tag: byTag, fees };
 }
 
-// ── PIN 무차별 대입 방어 (파일 기반 카운터, secret repo) ─────────────────
-// 프로그램 매매 ON은 4자리 PIN 하나가 무인 자동매매를 여는 유일한 문 → 브루트포스 방어 필수.
-const PIN_LOCK_PATH = 'program_pin_lockout.json';
-const PIN_MAX_ATTEMPTS = 5;
-const PIN_LOCKOUT_MIN = 10;
-
-async function getPinLock(): Promise<{ sha: string | null; content: { fails: number; locked_until: string | null } }> {
-    const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${PIN_LOCK_PATH}?ref=${SECRET_BRANCH}`;
-    const res = await fetch(url, {
-        headers: { Authorization: `token ${GITHUB_PAT}`, Accept: 'application/vnd.github.v3+json' },
-        cache: 'no-store',
-    });
-    if (res.status === 404) return { sha: null, content: { fails: 0, locked_until: null } };
-    if (!res.ok) return { sha: null, content: { fails: 0, locked_until: null } }; // 조회 실패는 non-blocking
-    const data = await res.json();
-    const content = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
-    return { sha: data.sha, content: { fails: content.fails ?? 0, locked_until: content.locked_until ?? null } };
-}
-
-async function putPinLock(content: any, sha: string | null) {
-    const url = `https://api.github.com/repos/${OWNER}/${SECRET_REPO}/contents/${PIN_LOCK_PATH}`;
-    const body = Buffer.from(JSON.stringify(content, null, 2)).toString('base64');
-    await fetch(url, {
-        method: 'PUT',
-        headers: { Authorization: `token ${GITHUB_PAT}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'pin lockout update', content: body, sha: sha || undefined, branch: SECRET_BRANCH }),
-    });
-}
-
-async function checkPinRateLimit(): Promise<{ allowed: boolean; retryAfterMin: number }> {
-    try {
-        const { content } = await getPinLock();
-        if (content.locked_until) {
-            const until = new Date(content.locked_until).getTime();
-            if (Date.now() < until) {
-                return { allowed: false, retryAfterMin: Math.ceil((until - Date.now()) / 60000) };
-            }
-        }
-        return { allowed: true, retryAfterMin: 0 };
-    } catch {
-        return { allowed: true, retryAfterMin: 0 }; // 조회 실패 시 잠금 판단 불가 → 통과(가용성 우선, PIN 자체가 여전히 방어선)
-    }
-}
-
-async function recordPinFailure(): Promise<void> {
-    try {
-        const { sha, content } = await getPinLock();
-        const fails = content.fails + 1;
-        const locked_until = fails >= PIN_MAX_ATTEMPTS
-            ? new Date(Date.now() + PIN_LOCKOUT_MIN * 60000).toISOString()
-            : content.locked_until;
-        await putPinLock({ fails: fails >= PIN_MAX_ATTEMPTS ? 0 : fails, locked_until }, sha);
-    } catch { /* 카운터 갱신 실패는 non-blocking */ }
-}
-
-async function clearPinFailures(): Promise<void> {
-    try {
-        const { sha, content } = await getPinLock();
-        if (content.fails > 0 || content.locked_until) {
-            await putPinLock({ fails: 0, locked_until: null }, sha);
-        }
-    } catch { /* non-blocking */ }
-}
+// PIN 무차별 대입 방어는 `src/lib/pin-lockout.ts`로 옮겼다 — 같은 4자리 PIN을
+// 검사하는 order·reservation에도 같은 잠금이 걸려야 하는데, 2026-09-10까지
+// 이 파일에만 있었다(실주문 라우트가 무제한이었다는 뜻이다).
 
 export async function GET(request: Request) {
     try {

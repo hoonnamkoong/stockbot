@@ -8,7 +8,7 @@
       "quantity": 19,
       "avg_price": 191.53,
       "entry_date": "2026-08-27",
-      "peak_price": 191.72,
+      "peak_price": 191.775,
       "is_scaled_out": false
     },
     "DINO": {
@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 111.72,
+      "peak_price": 111.82,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 264.295,
+      "peak_price": 264.45,
       "is_scaled_out": false
     },
     "VG": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21089.475,
+  "peak_nav": 21101.739999999998,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -53,8 +53,8 @@
   "cooldown_codes": {},
   "raw_stats": {
     "cash": 1441.295,
-    "total_asset": 21089.475,
-    "profit_rate": 5.447374999999992,
+    "total_asset": 21101.739999999998,
+    "profit_rate": 5.50869999999999,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -63,29 +63,29 @@
     "frequency": 0.3125,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "EOG": 147.69,
-      "STX": 836.38,
-      "EXPD": 191.035,
+      "EXPD": 191.775,
       "FCFS": 227.985,
-      "TWLO": 234.025,
-      "BAC": 63.02,
-      "DINO": 111.72,
-      "NTAP": 193.37,
-      "P": 97.335,
-      "FANG": 203.69,
-      "PR": 23.715,
-      "PSX": 264.295,
-      "KYMR": 118.05,
-      "EPD": 39.4,
-      "CORT": 117.32,
+      "NTAP": 193.74,
+      "KYMR": 117.64,
+      "HALO": 107.68,
+      "PR": 23.7,
       "RGA": 246.55,
-      "STT": 192.18,
-      "FIVE": 243.67,
-      "HALO": 107.62,
-      "VG": 15.57,
-      "OXY": 61.13,
-      "OVV": 63.68,
-      "TER": 379.02
+      "PSX": 264.45,
+      "FANG": 203.72,
+      "EOG": 147.79,
+      "STT": 192.33,
+      "TER": 378.3,
+      "DINO": 111.82,
+      "OVV": 63.725,
+      "FIVE": 243.55,
+      "TWLO": 234.16,
+      "BAC": 63.05,
+      "P": 96.955,
+      "STX": 833.0,
+      "CORT": 117.685,
+      "EPD": 39.42,
+      "VG": 15.54,
+      "OXY": 61.235
     }
   },
   "normalized_stats": {

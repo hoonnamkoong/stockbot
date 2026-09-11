@@ -27,6 +27,31 @@
       "code": "187660",
       "name": "페니트리움바이오",
       "rank": 5
+    },
+    {
+      "code": "203650",
+      "name": "드림시큐리티",
+      "rank": 1
+    },
+    {
+      "code": "003350",
+      "name": "한국화장품제조",
+      "rank": 2
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 3
+    },
+    {
+      "code": "047040",
+      "name": "대우건설",
+      "rank": 4
+    },
+    {
+      "code": "024060",
+      "name": "흥구석유",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "034020",
     "356680",
     "028050",
-    "187660"
+    "187660",
+    "203650",
+    "003350",
+    "000660",
+    "047040",
+    "024060"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "203650",
+      "name": "드림시큐리티",
+      "rank": 1
+    },
+    {
+      "code": "003350",
+      "name": "한국화장품제조",
+      "rank": 2
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 3
+    },
+    {
+      "code": "047040",
+      "name": "대우건설",
+      "rank": 4
+    },
+    {
+      "code": "024060",
+      "name": "흥구석유",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

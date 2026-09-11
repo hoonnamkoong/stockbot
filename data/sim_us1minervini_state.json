@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 111.49,
+      "peak_price": 111.72,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 263.97,
+      "peak_price": 264.295,
       "is_scaled_out": false
     },
     "VG": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21075.43,
+  "peak_nav": 21089.475,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -53,45 +53,45 @@
   "cooldown_codes": {},
   "raw_stats": {
     "cash": 1441.295,
-    "total_asset": 21052.956,
-    "profit_rate": 5.264779999999992,
+    "total_asset": 21089.475,
+    "profit_rate": 5.447374999999992,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
-    "mdd": 0.10663602118676573,
+    "mdd": 0.0,
     "turnover": 0.9279354999999999,
     "frequency": 0.3125,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "BAC": 62.91,
-      "HALO": 107.543,
-      "OXY": 61.18,
-      "FANG": 204.345,
-      "DINO": 111.49,
-      "P": 97.685,
-      "STT": 191.7,
-      "STX": 837.09,
-      "PR": 23.7,
-      "FCFS": 227.77,
-      "NTAP": 193.98,
-      "FIVE": 242.36,
-      "PSX": 263.97,
-      "TER": 378.935,
-      "EXPD": 190.415,
-      "EOG": 147.84,
-      "CORT": 116.975,
-      "TWLO": 233.61,
-      "VG": 15.504,
-      "OVV": 63.715,
-      "EPD": 39.415,
-      "RGA": 246.97,
-      "KYMR": 118.05
+      "EOG": 147.69,
+      "STX": 836.38,
+      "EXPD": 191.035,
+      "FCFS": 227.985,
+      "TWLO": 234.025,
+      "BAC": 63.02,
+      "DINO": 111.72,
+      "NTAP": 193.37,
+      "P": 97.335,
+      "FANG": 203.69,
+      "PR": 23.715,
+      "PSX": 264.295,
+      "KYMR": 118.05,
+      "EPD": 39.4,
+      "CORT": 117.32,
+      "RGA": 246.55,
+      "STT": 192.18,
+      "FIVE": 243.67,
+      "HALO": 107.62,
+      "VG": 15.57,
+      "OXY": 61.13,
+      "OVV": 63.68,
+      "TER": 379.02
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 20.0,
-    "MDD": 99.68009193643971,
+    "MDD": 100.0,
     "거래빈도": 1.5625,
     "자본회전율": 1.8558709999999998
   }

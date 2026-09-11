@@ -27,6 +27,15 @@ on:
         required: false
         default: '0850'
 
+# 한 번에 한 런만. 태스커 dispatch 런과 늦게 발화한 cron 런이 둘 다 장중을
+# 수집하면 11:30에 같은 파일을 push해 한쪽이 add/add로 죽는다(2026-09-11).
+# 순서가 반대면 적게 받은 런이 좋은 파일을 조용히 덮어쓴다. 직렬화하면 나중
+# 런은 수집 창이 닫힌 뒤 시작해 웹소켓에 붙지 않고 끝난다.
+# cancel-in-progress: false — 취소하면 2.5시간째 수집 중인 런이 커밋 전에 죽는다.
+concurrency:
+  group: premarket-data
+  cancel-in-progress: false
+
 jobs:
   collect:
     runs-on: ubuntu-latest
@@ -304,8 +313,10 @@ jobs:
           git add -A data/
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -m "data(intraday): $(date +%Y-%m-%d) 장중 호가·체결 적재"
-          # 이 브랜치의 writer는 이 잡 하나뿐이라 충돌은 사실상 없다. 그래도
-          # 재시도 루프는 남긴다 — 재실행이 겹칠 때 덮어쓰지 않고 얹기 위해서다.
+          # 이 브랜치의 writer는 이 잡 하나뿐이고, 워크플로 concurrency가 런을
+          # 직렬화한다. 그게 없을 때 "충돌은 사실상 없다"고 여겼는데 2026-09-11
+          # 두 런이 겹쳐 같은 파일로 add/add 충돌이 났다. 재시도 루프는 남긴다 —
+          # 재실행이 겹칠 때 덮어쓰지 않고 얹기 위해서다.
           for i in 1 2 3; do
             if git push origin intraday-data; then
               echo "[Deploy] push 성공 (시도 $i)"

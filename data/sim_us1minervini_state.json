@@ -8,7 +8,7 @@
       "quantity": 19,
       "avg_price": 191.53,
       "entry_date": "2026-08-27",
-      "peak_price": 191.775,
+      "peak_price": 192.04,
       "is_scaled_out": false
     },
     "DINO": {
@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 111.82,
+      "peak_price": 112.11,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 264.45,
+      "peak_price": 265.1,
       "is_scaled_out": false
     },
     "VG": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21101.739999999998,
+  "peak_nav": 21130.845,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -53,8 +53,8 @@
   "cooldown_codes": {},
   "raw_stats": {
     "cash": 1441.295,
-    "total_asset": 21101.739999999998,
-    "profit_rate": 5.50869999999999,
+    "total_asset": 21130.845,
+    "profit_rate": 5.654225000000006,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -63,29 +63,29 @@
     "frequency": 0.3125,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "EXPD": 191.775,
-      "FCFS": 227.985,
-      "NTAP": 193.74,
-      "KYMR": 117.64,
-      "HALO": 107.68,
-      "PR": 23.7,
-      "RGA": 246.55,
-      "PSX": 264.45,
-      "FANG": 203.72,
-      "EOG": 147.79,
-      "STT": 192.33,
-      "TER": 378.3,
-      "DINO": 111.82,
-      "OVV": 63.725,
-      "FIVE": 243.55,
-      "TWLO": 234.16,
-      "BAC": 63.05,
-      "P": 96.955,
-      "STX": 833.0,
-      "CORT": 117.685,
+      "FCFS": 228.01,
+      "TWLO": 233.045,
       "EPD": 39.42,
       "VG": 15.54,
-      "OXY": 61.235
+      "STX": 832.91,
+      "OXY": 61.25,
+      "BAC": 63.077,
+      "FIVE": 243.55,
+      "OVV": 63.76,
+      "PSX": 265.1,
+      "NTAP": 194.335,
+      "FANG": 203.97,
+      "CORT": 117.78,
+      "DINO": 112.11,
+      "EOG": 147.845,
+      "EXPD": 192.04,
+      "P": 97.48,
+      "PR": 23.75,
+      "HALO": 107.62,
+      "STT": 192.3,
+      "TER": 377.95,
+      "KYMR": 117.725,
+      "RGA": 246.77
     }
   },
   "normalized_stats": {

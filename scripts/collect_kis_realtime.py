@@ -61,6 +61,10 @@ WS_URL = 'ws://ops.koreainvestment.com:21000'
 MAX_SUBSCRIBE = 40          # KIS 웹소켓 구독 한도(약 41건). 여유를 둔다.
 MAX_DROPS = 10              # 연속 절단 상한. KIS가 계속 거절하면 무한재시도가 된다.
 RECONNECT_WAIT_SEC = 2
+# 구독 요청 간격. 0.05초(초당 20건)였던 2026-09-11에 40건 중 3건만 받아들여졌다 —
+# 앱키 재발급 다음 첫 거래일이었다. 신규 앱키 유량 제한(초당 3건) 아래에서도
+# 전부 들어가는 간격이고, 한도 40건을 다 보내는 데 16초다.
+SUBSCRIBE_GAP_SEC = 0.4
 
 
 def approval_key():
@@ -132,6 +136,7 @@ async def collect(codes, tr_ids, out_path, until_hhmm, key):
 
     n = 0
     drops = 0
+    subs_ok = subs_ng = 0
     try:
         # 끊기면 다시 붙는다. 예전에는 `async with` 하나뿐이라 KIS가 소켓을 한 번만
         # 닫아도(ConnectionClosedError) 예외가 main까지 올라가 잡이 죽었고, 그러면
@@ -148,7 +153,7 @@ async def collect(codes, tr_ids, out_path, until_hhmm, key):
                                 'header': {'approval_key': key, 'custtype': 'P',
                                            'tr_type': '1', 'content-type': 'utf-8'},
                                 'body': {'input': {'tr_id': tr_id, 'tr_key': code}}}))
-                            await asyncio.sleep(0.05)
+                            await asyncio.sleep(SUBSCRIBE_GAP_SEC)
                     print(f'{len(codes)}종목 × {len(tr_ids)}TR = '
                           f'{len(codes)*len(tr_ids)}건 구독 '
                           f'({",".join(tr_ids)}). {until_hhmm}까지 수신.', flush=True)
@@ -166,8 +171,16 @@ async def collect(codes, tr_ids, out_path, until_hhmm, key):
                         if msg.startswith('{'):        # 구독 응답/PINGPONG
                             d = json.loads(msg)
                             body = d.get('body') or {}
-                            if body.get('msg1') and 'SUBSCRIBE' not in str(body.get('msg1')):
-                                print('  [응답]', body.get('msg1'), flush=True)
+                            if body.get('msg1'):
+                                # 성공만 조용히 센다. 예전 필터는 'SUBSCRIBE'가 든 응답을
+                                # 전부 숨겨 "MAX SUBSCRIBE OVER"까지 삼켰다(2026-09-11).
+                                if is_subscribe_success(body):
+                                    subs_ok += 1
+                                else:
+                                    subs_ng += 1
+                                    hdr = d.get('header') or {}
+                                    print('  [응답]', hdr.get('tr_id', ''), hdr.get('tr_key', ''),
+                                          body.get('msg1'), flush=True)
                             if (d.get('header') or {}).get('tr_id') == 'PINGPONG':
                                 await ws.pong(msg)
                             continue
@@ -195,6 +208,8 @@ async def collect(codes, tr_ids, out_path, until_hhmm, key):
     finally:
         f.flush()
         f.close()
+        print(f'구독 응답: 성공 {subs_ok} / 거부 {subs_ng} '
+              f'(접속당 요청 {len(codes) * len(tr_ids)}건)', flush=True)
         print(f'총 {n}건 저장 → {out_path}'
               + (f' (재접속 {drops}회)' if drops else ''), flush=True)
 
@@ -210,6 +225,15 @@ def should_reconnect(now_hhmm: str, until_hhmm: str, drops: int,
     2초마다 재시도하는 바쁜 루프가 된다.
     """
     return now_hhmm < until_hhmm and drops < max_drops
+
+
+def is_subscribe_success(body: dict) -> bool:
+    """구독 응답이 성공인가. 문구는 실측값이다(2026-08-16, TR 3종 모두 이 문구).
+
+    'SUBSCRIBE'가 들어 있는지로 보면 안 된다 — 거부 응답("MAX SUBSCRIBE OVER",
+    "ALREADY IN SUBSCRIBE")에도 같은 단어가 들어 있다.
+    """
+    return body.get('msg1') == 'SUBSCRIBE SUCCESS'
 
 
 def window_state(now_hhmm: str, start_hhmm: str, until_hhmm: str) -> str:

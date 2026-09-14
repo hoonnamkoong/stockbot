@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-09-14 09:30:31",
+  "last_run": "2026-09-14 09:40:28",
   "current_regime": "SIDEWAYS",
-  "instant_regime": "SIDEWAYS",
-  "regime_confidence": 1.0,
-  "bull_score": 26.2,
+  "instant_regime": "BEAR",
+  "regime_confidence": 0.8,
+  "bull_score": 24.8,
   "metrics": {
-    "breadth_score": 16.0,
-    "momentum_score": -1.94,
+    "breadth_score": 13.0,
+    "momentum_score": -2.02,
     "trend_strength": 22.6,
     "foreign_score": null,
     "volatility_score": null
@@ -27,7 +27,7 @@
     "SIDEWAYS",
     "SIDEWAYS",
     "SIDEWAYS",
-    "SIDEWAYS"
+    "BEAR"
   ],
   "recommended_sims": [
     "sim5_sideways",

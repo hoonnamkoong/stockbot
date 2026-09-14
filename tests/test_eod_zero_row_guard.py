@@ -67,3 +67,38 @@ def test_배포_스텝이_행수를_검사한다():
     guard_at = s.index('check_csv_rows.py')
     assert guard_at < s.index('git push'), '가드는 push보다 앞이어야 한다'
     assert guard_at < s.index('cp output/kospi_top100_close.csv'), '가드는 복사보다 앞이어야 한다'
+
+
+def _deploy_and_jobs():
+    with open(WF, encoding='utf-8') as f:
+        wf = yaml.safe_load(f)
+    step = next(s for j in wf['jobs'].values() for s in j.get('steps', [])
+                if 'kospi_top100_close.csv' in (s.get('run') or '') and 'git push' in (s.get('run') or ''))
+    return step['run'], wf['jobs']
+
+
+def test_0행이어도_심_상태_배포는_막지_않는다():
+    """가드를 스텝 맨 앞에서 exit 1로 끊으면 같은 스텝 뒤쪽의 심9-1 상태·심11
+    감시목록 배포까지 죽는다 — 2026-08-05에 겪은 그 사고(심9-1이 매일 매수하고도
+    db-data에 한 번도 반영 못 함)를 0행인 날에 재현하게 된다."""
+    run, _ = _deploy_and_jobs()
+    assert 'sim11_watchlist.json' in run
+    guard = run.index('check_csv_rows.py output/kospi_top100_close.csv')
+    assert guard < run.index('sim11_watchlist.json')
+    # 가드와 심 상태 배포 사이에 종료가 없어야 한다.
+    between = run[guard:run.index('sim11_watchlist.json')]
+    assert 'exit 1' not in between, '0행이면 심 상태까지 못 올린다'
+
+
+def test_0행이면_배포_뒤에_실패로_끝난다():
+    """조용히 넘어가면 안 된다 — 기존 실패 알림(job.status != 'success')이 사람을 부른다."""
+    run, _ = _deploy_and_jobs()
+    assert run.rstrip().endswith('fi'), run[-120:]
+    assert 'exit 1' in run[run.index('git push'):], '종가 0행이 실패로 이어지지 않는다'
+
+
+def test_분봉_잡은_collect_실패에도_돈다():
+    """분봉은 당일치만 조회된다. 종가 CSV 한 파일의 0행이 분봉 하루를 통째로
+    날리면 이 가드가 원래 막으려던 것보다 큰 손실이다."""
+    _, jobs = _deploy_and_jobs()
+    assert 'always()' in str(jobs['minute_bars'].get('if', ''))

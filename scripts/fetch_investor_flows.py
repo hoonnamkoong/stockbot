@@ -76,10 +76,17 @@ def zero_flow_codes(rows, window=30):
     밖은 요청해도 안 고쳐진다 — 거기까지만 본다.
     """
     keep = set(sorted({d for d, _ in rows})[-window:])
-    out = {c for (d, c), r in rows.items()
-           if d in keep and all(float(r.get(k) or 0) == 0
-                                for k in ('prsn_net', 'frgn_net', 'orgn_net'))}
-    return sorted(out)
+    zero, live = set(), set()
+    for (d, c), r in rows.items():
+        if d not in keep:
+            continue
+        if all(float(r.get(k) or 0) == 0 for k in ('prsn_net', 'frgn_net', 'orgn_net')):
+            zero.add(c)
+        else:
+            live.add(c)
+    # 창 내내 0인 종목은 뺀다. ETF처럼 이 TR이 원래 0만 주는 것들이 있고, 그걸
+    # 계속 요청하면 자기치유가 아니라 매 런 붙는 상수 비용이 된다(실측 0.885초/종목).
+    return sorted(zero & live)
 
 
 def main():

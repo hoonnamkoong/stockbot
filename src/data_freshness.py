@@ -103,6 +103,7 @@ def audit(entries: list[dict], last_updated, now_kst: dt.datetime,
             if size is not None and size < e['min_bytes']:
                 findings.append({**e, 'kind': 'small', 'bytes': size,
                                  'sessions': None, 'last': last})
+                continue          # 낡음까지 같이 적으면 같은 파일이 두 줄로 나온다
         if e.get('calendar') == 'us':
             n, approx = _us_sessions_closed_since(last, now_kst), True
         else:

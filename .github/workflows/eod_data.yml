@@ -158,27 +158,38 @@ jobs:
             echo "[KOSPI CSV] 파일 없음 - 배포 스킵"
             exit 1
           fi
-          # 파일이 있어도 **데이터 행이 0이면 배포하지 않는다.** 2026-09-10 16:00에
-          # 네이버 이관으로 0행 CSV(헤더만, 2,201B)가 db-data를 덮었고 런은 초록이었다 —
-          # 다음 날 장중 내내 리베로 trend가 비었다. 빈 걸 덮어쓰느니 직전 파일을 지킨다.
+          # 파일이 있어도 **데이터 행이 0이면 그 CSV는 배포하지 않는다.** 2026-09-10
+          # 16:00에 네이버 이관으로 0행 CSV(헤더만, 2,201B)가 db-data를 덮었고 런은
+          # 초록이었다 — 다음 날 장중 내내 리베로 trend가 비었다. 빈 걸 덮어쓰느니
+          # 직전 파일을 지킨다.
+          #
+          # 여기서 바로 exit 하지 않는 이유: 이 스텝 뒤쪽에 심9-1 상태·심11 감시목록
+          # 배포가 같이 들어 있다. 끊으면 2026-08-05 사고(심9-1이 매일 매수하고도
+          # db-data에 한 번도 반영 못 함)를 0행인 날마다 재현한다. 상태는 올리고,
+          # 실패는 맨 끝에서 낸다.
+          csv_ok=1
           if ! python scripts/check_csv_rows.py output/kospi_top100_close.csv --min 1; then
-            echo "[KOSPI CSV] 데이터 행 0 - 배포 중단(직전 파일 보존). 수집 로그를 확인하라"
-            exit 1
+            echo "[KOSPI CSV] 데이터 행 0 - 종가·OHLCV는 배포에서 제외(직전 파일 보존)"
+            csv_ok=0
           fi
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git clone --branch db-data --depth 1 \
             https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_repo
-          cp output/kospi_top100_close.csv db_repo/data/
-          # OHLCV는 종가 CSV와 같은 호출에서 나온다. 없으면 수집 코드가 퇴행한 것이므로
-          # 조용히 넘기지 않고 로그를 남긴다(종가 배포 자체는 계속한다).
-          if [ -f output/ohlcv_top100.csv ] && python scripts/check_csv_rows.py output/ohlcv_top100.csv --min 1; then
-            cp output/ohlcv_top100.csv db_repo/data/
-          else
-            echo "[OHLCV] 파일 없음 또는 0행 - 종가만 배포한다"
+          if [ "$csv_ok" = 1 ]; then
+            cp output/kospi_top100_close.csv db_repo/data/
+            # OHLCV는 종가 CSV와 같은 호출에서 나온다. 없거나 0행이면 수집이 퇴행한
+            # 것이므로 조용히 넘기지 않고 로그를 남긴다(종가 배포 자체는 계속한다).
+            if [ -f output/ohlcv_top100.csv ] && python scripts/check_csv_rows.py output/ohlcv_top100.csv --min 1; then
+              cp output/ohlcv_top100.csv db_repo/data/
+            else
+              echo "[OHLCV] 파일 없음 또는 0행 - 종가만 배포한다"
+            fi
           fi
           cd db_repo
-          git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv
+          if [ "$csv_ok" = 1 ]; then
+            git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv
+          fi
           # 심9-1 상태·매매기록 + 심11 감시목록. 이걸 안 올리면 매일 백지에서
           # 시작해 보유가 사라지거나(심9-1) 내일 장중 루프가 쓸 pivot이
           # 없어진다(심11). git add는 인자로 받은 경로 중 하나라도 없으면
@@ -197,6 +208,11 @@ jobs:
             echo "[KOSPI CSV] db-data 배포 완료"
           else
             echo "[KOSPI CSV] 변경사항 없음"
+          fi
+          # 심 상태까지 올린 뒤에 실패로 끝낸다 — 기존 실패 알림이 사람을 부른다.
+          if [ "$csv_ok" = 0 ]; then
+            echo "[KOSPI CSV] 종가 0행이라 배포하지 않았다. 수집 로그를 확인하라"
+            exit 1
           fi
 
       # 조건이 `failure()`가 아닌 이유: 잡 타임아웃의 결론은 cancelled인데
@@ -240,7 +256,10 @@ jobs:
   # 감시목록을 두고 dispatcher가 최대 6번 재시도한다.
   minute_bars:
     needs: collect
-    if: needs.collect.outputs.run == 'true'
+    # always(): collect가 실패해도 돈다. 분봉은 **당일치만** 조회되므로 종가 CSV
+    # 한 파일의 0행(위 가드) 때문에 그날 분봉을 통째로 잃으면 원래 막으려던 것보다
+    # 큰 손실이다. 휴장일에는 outputs.run이 'true'가 아니라 그대로 건너뛴다.
+    if: always() && needs.collect.outputs.run == 'true'
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 45

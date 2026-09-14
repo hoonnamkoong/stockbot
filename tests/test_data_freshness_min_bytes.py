@@ -65,3 +65,19 @@ def test_매니페스트에_크기_하한이_설정돼_있다():
     by = {e['path']: e for e in load_manifest()}
     for p in ('data/kospi_top100_close.csv', 'data/premarket_daily.csv'):
         assert by[p].get('min_bytes'), f'{p}에 min_bytes가 없다'
+
+
+def test_글롭_항목에는_하한을_붙이지_않는다():
+    """`sizes.get(path)`는 리터럴 조회다 — 글롭 경로에 min_bytes를 붙이면 조용히
+    검사가 안 된다. 나중에 붙이는 사람이 속지 않게 여기서 막는다."""
+    from src.data_freshness import load_manifest
+    bad = [e['path'] for e in load_manifest() if e.get('min_bytes') and '*' in e['path']]
+    assert not bad, f'글롭 항목에 min_bytes가 붙었다(검사되지 않는다): {bad}'
+
+
+def test_작은_파일은_낡음과_겹쳐도_한_줄로_보고된다():
+    """같은 파일이 '내용 없음'과 '낡음' 두 줄로 나오면 사고 텍스트만 길어진다."""
+    old = dt.datetime(2026, 8, 1, 7, 0, tzinfo=clock.KST)
+    found = audit([_entry(min_bytes=16000)], lambda p: old, NOW, CAL,
+                  sizes={'data/kospi_top100_close.csv': 2201})
+    assert [f['kind'] for f in found] == ['small']

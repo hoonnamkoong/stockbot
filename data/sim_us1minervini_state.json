@@ -8,7 +8,7 @@
       "quantity": 19,
       "avg_price": 191.53,
       "entry_date": "2026-08-27",
-      "peak_price": 193.0,
+      "peak_price": 193.459,
       "is_scaled_out": false
     },
     "DINO": {
@@ -32,7 +32,7 @@
       "quantity": 264,
       "avg_price": 14.395,
       "entry_date": "2026-08-27",
-      "peak_price": 16.185,
+      "peak_price": 16.214,
       "is_scaled_out": false
     },
     "RGA": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 21253.415,
+  "peak_nav": 21308.962,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -53,8 +53,8 @@
   "cooldown_codes": {},
   "raw_stats": {
     "cash": 1441.295,
-    "total_asset": 21253.415,
-    "profit_rate": 6.267075000000004,
+    "total_asset": 21308.962,
+    "profit_rate": 6.544809999999998,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
@@ -63,29 +63,29 @@
     "frequency": 0.2631578947368421,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "EPD": 39.25,
-      "RGA": 250.17,
-      "FIVE": 249.835,
-      "CORT": 113.49,
-      "OXY": 62.648,
-      "OVV": 65.475,
-      "APH": 79.12,
-      "BAC": 62.3,
-      "EXPD": 193.0,
-      "VG": 16.125,
       "FCFS": 227.44,
-      "TER": 341.91,
-      "STT": 189.97,
-      "NVDA": 209.395,
-      "PR": 24.23,
-      "PSX": 262.59,
-      "P": 92.927,
-      "NTAP": 192.75,
-      "DINO": 110.44,
-      "EOG": 150.55,
+      "OVV": 65.48,
+      "EOG": 150.42,
+      "FANG": 209.35,
       "HALO": 107.54,
-      "FANG": 209.163,
-      "TWLO": 226.6
+      "DINO": 110.75,
+      "TWLO": 226.855,
+      "PSX": 263.36,
+      "FIVE": 248.71,
+      "NTAP": 191.5,
+      "CORT": 113.956,
+      "EPD": 39.28,
+      "OXY": 62.691,
+      "APH": 79.12,
+      "NVDA": 209.153,
+      "STT": 189.865,
+      "BAC": 62.28,
+      "EXPD": 193.459,
+      "TER": 343.47,
+      "P": 93.037,
+      "PR": 24.24,
+      "RGA": 250.17,
+      "VG": 16.214
     }
   },
   "normalized_stats": {

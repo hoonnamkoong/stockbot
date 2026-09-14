@@ -56,7 +56,7 @@ jobs:
       actions: write
     steps:
       - name: Checkout content
-        uses: actions/checkout@v3
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
 
       # ── 세션 라우팅 ────────────────────────────────────────────────
       # 태스커는 09:00~08:00 KST(다음날)에 2분 간격으로 `/api/cron`을 부르고,
@@ -163,7 +163,7 @@ jobs:
 
       - name: Set up Python
         if: steps.route.outputs.kr == 'true'
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4.9.1
         with:
           python-version: '3.10'
           cache: 'pip'

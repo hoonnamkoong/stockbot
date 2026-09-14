@@ -262,17 +262,31 @@ class GeminiAgent:
                     
                     if isinstance(parsed, dict) and 'results' in parsed:
                         parsed = parsed['results']
-                        
+
+                    # [보안] 게시글 제목은 아무나 쓸 수 있다. 모델이 준 code를
+                    # 검증 없이 신뢰하면, 공격자가 자기 종목 제목에 지시문을
+                    # 심어 이 배치에 없는(혹은 다른) 종목의 결과를 덮어쓸 수
+                    # 있다. 이번 요청에 실제로 넣은 code만 받아들인다.
+                    requested_codes = {s.get('code') for s in group}
+
+                    def _accept(code, value):
+                        if code in requested_codes:
+                            all_results[code] = value
+                        else:
+                            print(f"[GeminiAgent] ⚠️ 요청하지 않은 code '{code}' 응답을 버립니다 "
+                                  f"(요청: {sorted(c for c in requested_codes if c)})")
+
                     if isinstance(parsed, list):
                         for item in parsed:
                             if isinstance(item, dict):
                                 if 'code' in item:
-                                    all_results[item['code']] = item
+                                    _accept(item['code'], item)
                                 else:
                                     for k, v in item.items():
-                                        all_results[k] = v
+                                        _accept(k, v)
                     elif isinstance(parsed, dict):
-                        all_results.update(parsed)
+                        for k, v in parsed.items():
+                            _accept(k, v)
             except Exception as e:
                 print(f"[GeminiAgent] Group Batch 분석 오류: {e}")
             finally:

@@ -16,6 +16,30 @@ import pandas as pd
 from datetime import datetime, timedelta
 from src.core import clock
 
+# [보안] 네이버 종토방 게시글 제목은 아무나 쓸 수 있고, 그 내용이 posts_summary
+# ·sentiment·keywords 등 문자열 컬럼에 그대로 실려 CSV/XLSX로 저장된다.
+# '='로 시작하면 openpyxl이 그 셀을 수식(data_type='f')으로 저장해 엑셀이
+# 실행하고, '+ - @'는 CSV를 여는 엑셀이 수식으로 오인할 수 있다.
+_FORMULA_PREFIXES = ('=', '+', '-', '@')
+
+
+def _neutralize_formula_cells(df):
+    """문자열 컬럼에서 =+-@로 시작하는 값 앞에 '를 붙여 수식 해석을 막는다.
+
+    숫자 컬럼(dtype이 object가 아닌 컬럼)은 건드리지 않는다 — 음수가
+    문자열로 바뀌면 분석이 깨진다. 어느 컬럼이 '문자열 컬럼'인지는
+    dtype으로 판별하고, 그 안에서도 실제 str 값에만 적용한다(리스트 등
+    비문자열 셀은 그대로 둔다).
+    """
+    df = df.copy()
+    for col in df.columns:
+        if df[col].dtype != object:
+            continue
+        df[col] = df[col].map(
+            lambda v: ("'" + v) if isinstance(v, str) and v.startswith(_FORMULA_PREFIXES) else v
+        )
+    return df
+
 
 def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_time=None):
     """
@@ -34,10 +58,14 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
     now_kst = start_time if start_time else (clock.now_naive())
     timestamp = now_kst.strftime("%Y%m%d_%H")
 
+    # [보안] CSV/XLSX로 나가는 셀만 무력화한다. JSON(4번, 대시보드 표시용)은
+    # 스프레드시트가 아니라 수식 실행 위험이 없으므로 원본 df를 그대로 쓴다.
+    df_safe = _neutralize_formula_cells(df)
+
     # 1. 고정 CSV 저장 (Force Sync)
     try:
         fixed_csv = "data/trending_integrated.csv"
-        df.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
+        df_safe.to_csv(fixed_csv, index=False, encoding='utf-8-sig')
         print(f"\n[Fixed] Data saved to CSV: {os.path.abspath(fixed_csv)}")
         saved_files['csv'] = fixed_csv
     except Exception as e:
@@ -47,11 +75,11 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
     try:
         fixed_xlsx = "data/trending_integrated.xlsx"
         with pd.ExcelWriter(fixed_xlsx, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
+            df_safe.to_excel(writer, sheet_name='Trending_Stocks', index=False)
             if extra_sheets:
                 for sheet_name, sheet_df in extra_sheets.items():
                     if not sheet_df.empty:
-                        sheet_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                        _neutralize_formula_cells(sheet_df).to_excel(writer, sheet_name=sheet_name, index=False)
         print(f"[Fixed] Data saved to Excel: {os.path.abspath(fixed_xlsx)}")
         saved_files['excel'] = fixed_xlsx
     except Exception as e:
@@ -63,7 +91,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
         monthly_xlsx = f"data/trending_integrated_{month_str}.xlsx"
 
         # 데이터 수집 시각 컬럼 추가 (누적 데이터 식별용)
-        df_monthly = df.copy()
+        df_monthly = df_safe.copy()
         df_monthly.insert(0, '데이터_수집시각', now_kst.strftime("%Y-%m-%d %H:%M:%S"))
 
         if os.path.exists(monthly_xlsx):
@@ -90,7 +118,7 @@ def save_data(df, filename_prefix="trending_stocks", extra_sheets=None, start_ti
     try:
         snapshot_xlsx = f"data/trending_integrated_{timestamp}.xlsx"
         with pd.ExcelWriter(snapshot_xlsx, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Trending_Stocks', index=False)
+            df_safe.to_excel(writer, sheet_name='Trending_Stocks', index=False)
         print(f"[Snapshot] Daily snapshot saved: {os.path.basename(snapshot_xlsx)}")
         saved_files['snapshot'] = snapshot_xlsx
 

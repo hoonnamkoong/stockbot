@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Modal, Tabs, Group, Button, Stack, NumberInput, Text, Badge, LoadingOverlay, PinInput, ThemeIcon, Notification } from '@mantine/core';
+import { Modal, Group, Button, Stack, NumberInput, Text, Badge, LoadingOverlay, PinInput, ThemeIcon, Notification } from '@mantine/core';
 import { IconLock, IconShieldLock, IconCheck, IconX } from '@tabler/icons-react';
 import axios from 'axios';
 
@@ -18,13 +18,10 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
     const [code, setCode] = useState(initialCode);
     const [qty, setQty] = useState<number | string>(1);
     const [price, setPrice] = useState<number | string>(0);
-    const [resHour, setResHour] = useState<number | string>(15);
-    const [resMin, setResMin] = useState<number | string>(15);
     const [loading, setLoading] = useState(false);
     const [pin, setPin] = useState('');
     const [pinStage, setPinStage] = useState(false);
     const [notification, setNotification] = useState<{ color: string; msg: string } | null>(null);
-    const [activeTab, setActiveTab] = useState<string | null>('immediate');
     const pinContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -63,21 +60,14 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
 
         setLoading(true);
         try {
-            let res;
-            if (activeTab === 'reservation') {
-                res = await axios.post('/api/trade/reservation', {
-                    code, qty, price, hour: resHour, minute: resMin, side: orderType, pin: pinToUse
-                });
-            } else {
-                res = await axios.post('/api/trade/order', {
-                    code,
-                    name: initialName || code,
-                    qty,
-                    price,
-                    side: orderType,
-                    pin: pinToUse
-                });
-            }
+            const res = await axios.post('/api/trade/order', {
+                code,
+                name: initialName || code,
+                qty,
+                price,
+                side: orderType,
+                pin: pinToUse
+            });
 
             if (res.data.success) {
                 const odno = res.data.data?.ODNO || `SIM-${Date.now()}`;
@@ -128,46 +118,23 @@ export default function QuickOrderModal({ opened, onClose, initialCode, initialN
                 </Notification>
             )}
 
+            {/* 예약 주문 탭은 2026-09 보안 검토로 제거했다 — 저장은 되지만 집행 워크플로가
+                없어(src/trade_executor.py를 부르는 곳이 전혀 돌지 않는 legacy 스크립트뿐)
+                "예약해 뒀다"는 착각만 만들었다. API(/api/trade/reservation)와
+                data/reservations.json은 나중에 배선할 수 있게 남겨 둔다. */}
             {!pinStage ? (
-                <Tabs value={activeTab} onChange={setActiveTab}>
-                    <Tabs.List mb="md">
-                        <Tabs.Tab value="immediate">즉시 주문</Tabs.Tab>
-                        <Tabs.Tab value="reservation">예약 주문</Tabs.Tab>
-                    </Tabs.List>
-
-                    <Tabs.Panel value="immediate">
-                        <Stack>
-                            <Group grow>
-                                <Button color="red" variant={orderType === 'buy' ? 'filled' : 'outline'} onClick={() => setOrderType('buy')}>매수 (BUY)</Button>
-                                <Button color="blue" variant={orderType === 'sell' ? 'filled' : 'outline'} onClick={() => setOrderType('sell')}>매도 (SELL)</Button>
-                            </Group>
-                            <Text size="sm" c="dimmed">종목코드: {code} {initialName ? `(${initialName})` : ''}</Text>
-                            <NumberInput label="수량" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
-                            <NumberInput label="가격 (0 = 시장가)" value={price} onChange={(v) => setPrice(v || 0)} />
-                            <Button size="lg" color={orderType === 'buy' ? 'red' : 'blue'} onClick={handleOrderClick} loading={loading} disabled={loading}>
-                                {orderType === 'buy' ? '매수 주문' : '매도 주문'}
-                            </Button>
-                        </Stack>
-                    </Tabs.Panel>
-
-                    <Tabs.Panel value="reservation">
-                        <Stack>
-                            <Group grow>
-                                <Button color="red" variant={orderType === 'buy' ? 'filled' : 'outline'} onClick={() => setOrderType('buy')}>매수 (BUY)</Button>
-                                <Button color="blue" variant={orderType === 'sell' ? 'filled' : 'outline'} onClick={() => setOrderType('sell')}>매도 (SELL)</Button>
-                            </Group>
-                            <Group grow>
-                                <NumberInput label="시 (Hour)" value={resHour} onChange={setResHour} min={0} max={23} />
-                                <NumberInput label="분 (Minute)" value={resMin} onChange={setResMin} min={0} max={59} />
-                            </Group>
-                            <NumberInput label="수량" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
-                            <NumberInput label="가격 (0 = 시장가)" value={price} onChange={(v) => setPrice(v || 0)} />
-                            <Button size="lg" color="violet" onClick={handleOrderClick} loading={loading} disabled={loading}>
-                                예약 등록
-                            </Button>
-                        </Stack>
-                    </Tabs.Panel>
-                </Tabs>
+                <Stack>
+                    <Group grow>
+                        <Button color="red" variant={orderType === 'buy' ? 'filled' : 'outline'} onClick={() => setOrderType('buy')}>매수 (BUY)</Button>
+                        <Button color="blue" variant={orderType === 'sell' ? 'filled' : 'outline'} onClick={() => setOrderType('sell')}>매도 (SELL)</Button>
+                    </Group>
+                    <Text size="sm" c="dimmed">종목코드: {code} {initialName ? `(${initialName})` : ''}</Text>
+                    <NumberInput label="수량" value={qty} onChange={(v) => setQty(v || 1)} min={1} />
+                    <NumberInput label="가격 (0 = 시장가)" value={price} onChange={(v) => setPrice(v || 0)} />
+                    <Button size="lg" color={orderType === 'buy' ? 'red' : 'blue'} onClick={handleOrderClick} loading={loading} disabled={loading}>
+                        {orderType === 'buy' ? '매수 주문' : '매도 주문'}
+                    </Button>
+                </Stack>
             ) : (
                 <Stack align="center" py="md" ref={pinContainerRef}>
                     <ThemeIcon size={60} radius="xl" color="green" variant="light">

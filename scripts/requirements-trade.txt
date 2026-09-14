@@ -10,6 +10,6 @@
 # 새 의존성을 매매 경로에 들이기 전에 그 비용이 매 사이클 값인지 먼저 볼 것.
 requests==2.31.0
 beautifulsoup4==4.12.3
-pydantic>=2.0
-pyyaml>=6.0
-python-dotenv
+pydantic==2.12.5
+pyyaml==6.0.1
+python-dotenv==1.2.2

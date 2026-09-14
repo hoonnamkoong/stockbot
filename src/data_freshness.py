@@ -84,14 +84,26 @@ def _us_sessions_closed_since(last_kst, now_kst) -> int:
 
 
 def audit(entries: list[dict], last_updated, now_kst: dt.datetime,
-          calendar: dict) -> list[dict]:
-    """결손 목록. last_updated(path) → 마지막 갱신 시각(KST) 또는 None."""
+          calendar: dict, sizes: dict | None = None) -> list[dict]:
+    """결손 목록. last_updated(path) → 마지막 갱신 시각(KST) 또는 None.
+
+    `sizes`(path → 바이트)를 주면 `min_bytes`가 붙은 항목의 **크기 하한**도 본다.
+    갱신 시각만 보면 "돌았는데 빈 걸 배포했다"를 못 잡는다 — 2026-09-10 EOD가
+    헤더만 든 2,201바이트 종가 CSV를 올렸을 때 이 감사는 결손 0건이었다.
+    크기를 모르면(트리에 없으면) 조용히 넘긴다. 측정 불가는 결손이 아니다.
+    """
     findings = []
     for e in entries:
         last = last_updated(e['path'])
         if last is None:
             findings.append({**e, 'kind': 'missing', 'sessions': None})
             continue
+        if e.get('min_bytes') and sizes:
+            size = sizes.get(e['path'])
+            if size is not None and size < e['min_bytes']:
+                findings.append({**e, 'kind': 'small', 'bytes': size,
+                                 'sessions': None, 'last': last})
+                continue          # 낡음까지 같이 적으면 같은 파일이 두 줄로 나온다
         if e.get('calendar') == 'us':
             n, approx = _us_sessions_closed_since(last, now_kst), True
         else:

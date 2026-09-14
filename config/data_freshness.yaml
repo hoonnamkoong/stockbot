@@ -33,6 +33,8 @@ outputs:
     producer: eod_data.yml
     calendar: kr
     max_age_sessions: 1
+    # 2026-09-11 실측 66KB. 하한은 그 1/4 — 헤더만 든 2,201B(09-10 사고)를 잡는다.
+    min_bytes: 16000
     why: 종가 CSV. 리베로 trend(ADX 근사)의 입력이라 끊기면 국면이 굳는다.
 
   - path: data/sim11_watchlist.json
@@ -46,6 +48,8 @@ outputs:
     producer: premarket_data.yml
     calendar: kr
     max_age_sessions: 1
+    # 2026-09-11 실측 868KB.
+    min_bytes: 200000
     why: 프리마켓 적재. 배포 격리 버그로 2주간 db-data에 존재조차 안 했다.
 
   - path: data/us_daily.csv

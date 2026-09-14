@@ -42,20 +42,25 @@ def _api(url: str):
         return json.loads(res.read().decode())
 
 
-def list_tree(log=print) -> list[str] | None:
-    """db-data의 현재 파일 목록. 글롭 항목을 풀 때 쓴다."""
+def list_tree(log=print) -> dict | None:
+    """db-data의 현재 파일 목록 {경로: 바이트}. 글롭 항목을 풀 때 쓴다.
+
+    크기는 트리 응답에 이미 들어 있다 — 크기 하한 검사(min_bytes)를 위해 추가
+    호출을 하지 않는다.
+    """
     try:
         sha = _api(f'https://api.github.com/repos/{_repo()}/branches/{_BRANCH}'
                    )['commit']['sha']
         tree = _api(f'https://api.github.com/repos/{_repo()}/git/trees/{sha}'
                     '?recursive=1')
-        return [t['path'] for t in tree.get('tree', []) if t['type'] == 'blob']
+        return {t['path']: t.get('size')
+                for t in tree.get('tree', []) if t['type'] == 'blob'}
     except (error.URLError, OSError, ValueError, KeyError) as e:
         log(f'[Audit] 파일 목록 조회 실패: {e}')
         return None
 
 
-def make_last_updated(tree: list[str] | None, log=print):
+def make_last_updated(tree: dict | None, log=print):
     """path(글롭 가능) → 마지막 커밋 시각(KST). 없으면 None."""
     def last_updated(pattern: str):
         paths = ([p for p in tree if fnmatch.fnmatch(p, pattern)]
@@ -96,12 +101,14 @@ def _calendar(log=print) -> dict:
 
 
 def format_report(findings: list[dict]) -> str:
-    order = {'missing': 0, 'stale': 1}
-    label = {'missing': '없음', 'stale': '낡음'}
+    order = {'missing': 0, 'small': 1, 'stale': 2}
+    label = {'missing': '없음', 'small': '내용 없음', 'stale': '낡음'}
     lines = ['<b>산출물 신선도 결손</b>', '']
     approx_used = False
     for f in sorted(findings, key=lambda x: order[x['kind']]):
         age = f' ({f["sessions"]}세션)' if f.get('sessions') is not None else ''
+        if f['kind'] == 'small':
+            age = f' ({f["bytes"]:,}B < 하한 {f["min_bytes"]:,}B)'
         star = '*' if f.get('approx') else ''
         lines.append(f'• <code>{f["path"]}</code> — {label[f["kind"]]}{age}{star}')
         lines.append(f'  생산자: {f["producer"]} / {f["why"].strip()}')
@@ -126,7 +133,8 @@ def main(log=print) -> list[dict]:
     entries = load_manifest()
     tree = list_tree(log)
     findings = audit(entries, make_last_updated(tree, log),
-                     now_kst=dt.datetime.now(_KST), calendar=_calendar(log))
+                     now_kst=dt.datetime.now(_KST), calendar=_calendar(log),
+                     sizes=tree)
     log(f'[Audit] 항목 {len(entries)}개 중 결손 {len(findings)}개')
     for f in findings:
         log(f'  - {f["path"]} [{f["kind"]}] {f.get("sessions", "")}')

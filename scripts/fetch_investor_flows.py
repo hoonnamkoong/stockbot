@@ -21,12 +21,14 @@
 """
 import argparse
 import csv
+import datetime as dt
 import os
 import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from scripts.fetch_kis_history import kis  # noqa: E402
+from src.core import clock  # noqa: E402
 
 FIELDS = ['date', 'code', 'close', 'prsn_net', 'frgn_net', 'orgn_net',
           'prsn_buy', 'frgn_buy', 'orgn_buy', 'prsn_sell', 'frgn_sell', 'orgn_sell']
@@ -52,6 +54,41 @@ def fetch(code):
     return out
 
 
+def unsettled_today(now=None):
+    """정규장 마감 전이면 오늘 날짜(YYYYMMDD), 아니면 None.
+
+    장중에 이 TR을 받으면 **오늘 행이 전부 0으로 온다.** 그 세션이 아직 안 끝났으니
+    당연한데, 그걸 저장하면 "0원어치 사고팔았다"가 파일에 남는다 — 조회 실패를 0으로
+    적지 않는다는 규칙과 같은 부류다(2026-09-11: 20260911 행 399개가 전부 0이었다).
+    """
+    now = now or clock.now_naive()
+    return (now.strftime('%Y%m%d')
+            if now.time() < dt.time(*clock.KR_REGULAR_CLOSE) else None)
+
+
+def zero_flow_codes(rows, window=30):
+    """최근 `window`개 날짜 안에 순매수 3종이 전부 0인 행이 남은 종목.
+
+    병합 규칙이 "같은 (date, code)는 새 값으로 덮는다"라서, 장중에 쓰인 0행은 다음
+    날 그 종목을 다시 받으면 고쳐진다 — **유니버스에 남아 있는 동안만.** 2026-09-11에
+    09-10의 0행 44개가 전부 "다음 날 유니버스에서 빠진 종목"이었다. 그래서 유니버스와
+    별개로, 창 안에 0행이 남은 종목을 다시 요청한다. TR이 최근 30거래일만 주므로 창
+    밖은 요청해도 안 고쳐진다 — 거기까지만 본다.
+    """
+    keep = set(sorted({d for d, _ in rows})[-window:])
+    zero, live = set(), set()
+    for (d, c), r in rows.items():
+        if d not in keep:
+            continue
+        if all(float(r.get(k) or 0) == 0 for k in ('prsn_net', 'frgn_net', 'orgn_net')):
+            zero.add(c)
+        else:
+            live.add(c)
+    # 창 내내 0인 종목은 뺀다. ETF처럼 이 TR이 원래 0만 주는 것들이 있고, 그걸
+    # 계속 요청하면 자기치유가 아니라 매 런 붙는 상수 비용이 된다(실측 0.885초/종목).
+    return sorted(zero & live)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--universe', required=True, help='code 컬럼 CSV')
@@ -69,6 +106,16 @@ def main():
                 rows[(r['date'], r['code'])] = r
         print(f'기존 {len(rows)}행에 누적')
 
+    # 유니버스에서 빠진 뒤로 0행이 박제된 종목을 같이 받는다(위 zero_flow_codes 참고).
+    extra = [c for c in zero_flow_codes(rows) if c not in set(codes)]
+    if extra:
+        print(f'0행 잔존 {len(extra)}종목을 재수집 대상에 추가')
+        codes = codes + extra
+
+    skip_date = unsettled_today()
+    if skip_date:
+        print(f'정규장 마감 전 — {skip_date} 행은 저장하지 않는다(전부 0으로 온다)')
+
     fail = []
     for i, code in enumerate(codes):
         got = fetch(code)
@@ -76,6 +123,8 @@ def main():
             fail.append(code)
         else:
             for r in got:
+                if r['date'] == skip_date:
+                    continue
                 rows[(r['date'], r['code'])] = r
         time.sleep(0.12)
         if (i + 1) % 100 == 0:

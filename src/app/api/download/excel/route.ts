@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { validateMonthParam } from '@/lib/url-param-validation';
 
 // [V8.9.9.5] 엑셀 다운로드 API Route
 // GitHub raw URL은 private 레포에서 인증이 필요하므로, 서버사이드에서 받아서 전달
@@ -17,6 +18,15 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month'); // YYYY-MM 형식
+
+    // month를 검증 없이 raw.githubusercontent URL에 보간하면 경로 이탈이 된다.
+    // 값이 있을 때만 형식을 검사한다(없으면 최신 파일로 폴백).
+    if (month !== null) {
+        const validated = validateMonthParam(month);
+        if (!validated.ok) {
+            return NextResponse.json({ success: false, error: validated.error }, { status: 400 });
+        }
+    }
 
     const GITHUB_BASE = 'https://raw.githubusercontent.com/hoonnamkoong/stockbot/db-data/data';
     const FILENAME = month ? `trending_integrated_${month}.xlsx` : 'trending_integrated.xlsx';

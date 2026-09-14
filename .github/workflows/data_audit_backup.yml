@@ -45,7 +45,7 @@ jobs:
       # data_audit.yml을 dispatch하고, 그 전에 오늘 런 이력을 읽는다.
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # 새 판정을 만들지 않는다. trading.yml이 부르는 것과 **같은 스크립트**다 —
       # "오늘 이미 돌았거나 확인 불가면 생략"이 그 안에 이미 있다.

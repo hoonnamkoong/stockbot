@@ -190,7 +190,13 @@ def issue_new_token():
                 return data
             else:
                 # KIS가 응답으로 거부한 것이므로 재시도해도 결과는 같다
-                print(f"[TokenManager] ❌ 발급 실패: {data}")
+                # [Security] public Actions 로그에 응답 전문을 남기지 않는다 — 코드/메시지 요약만.
+                summary = {
+                    'rt_cd': data.get('rt_cd') if isinstance(data, dict) else None,
+                    'msg_cd': data.get('msg_cd') if isinstance(data, dict) else None,
+                    'msg1': data.get('msg1') if isinstance(data, dict) else None,
+                }
+                print(f"[TokenManager] ❌ 발급 실패: {summary}")
                 return None
         except requests.RequestException as e:
             print(f"[TokenManager] ❌ 통신 오류 (시도 {attempt + 1}/{NET_RETRIES}): {e}")

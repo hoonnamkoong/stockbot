@@ -308,6 +308,55 @@ def _release_payload(ledger: dict) -> dict:
     return out
 
 
+def _placed_summary(placed: list) -> str:
+    """이번 사이클에 낸 주문 목록. 사람이 KIS 체결 내역과 대조할 최소 정보만 넣는다
+    (종목·수량·방향). 가격·토큰 등 값은 넣지 않는다 — 알림은 외부로 나간다."""
+    if not placed:
+        return '(이번 사이클 신규 주문 없음)'
+    return '\n'.join(
+        f"- {'매도' if side == 'sell' else '매수'} {code} {qty}주" for code, side, qty in placed)
+
+
+def _save_ledger_or_alert(ledger: dict, sha: str | None, placed: list,
+                          log=print, log_error=print) -> bool:
+    """결과 기록 전용 저장. 실패하면 재시도 1회, 그래도 실패면 사람에게 보낸다.
+
+    주문은 이미 나갔는데 이 기록이 실패하면 pending_orders(odno)·positions·
+    realized_pnl이 통째로 유실되고, 다음 사이클은 그 종목을 안 산 것으로 보고
+    **다시 산다**(2026-07 진흥기업 5연속 매수와 같은 형태). 지금까지 이 경로만
+    log 한 줄로 끝나 Actions 로그 밖으로 나가지 않았다.
+
+    재시도는 fresh sha로 한 번만 — `_write_ledger`의 충돌 재시도는 409/422만
+    덮으므로 5xx·네트워크 실패에는 걸리지 않는다.
+
+    쿨다운은 걸지 않는다: 사람이 체결 내역을 건건이 대조해야 하는 사고다.
+    """
+    ok, _ = _write_ledger(_release_payload(ledger), sha, log)
+    if not ok:
+        fresh, fresh_sha = _read_ledger_fresh(log)
+        if fresh is not None:
+            ok, _ = _write_ledger(_release_payload(ledger), fresh_sha, log)
+    if ok:
+        return True
+    if placed:
+        msg = ('원장 기록이 실패했습니다(재시도 포함). 주문은 이미 나갔는데 '
+               'pending·positions·실현손익이 저장되지 않아, 다음 사이클이 같은 종목을 '
+               '다시 살 수 있습니다 — KIS 체결 내역과 아래 목록을 대조하세요.\n\n'
+               f'{_placed_summary(placed)}')
+    else:
+        # 이번 사이클은 신규 주문이 없어도, settle_pending_orders가 갱신한
+        # pending·positions·실현손익(정산 결과)은 이미 있었을 수 있다. 그걸
+        # 저장하지 못한 것 자체가 사고다 — "주문은 이미 나갔는데"로 시작하면
+        # 안 된다(이번 사이클 신규 주문 없음과 모순).
+        msg = ('원장 기록이 실패했습니다(재시도 포함). 이번 사이클 신규 주문은 없지만, '
+               '정산(체결 확인·미체결 처리)으로 갱신된 pending·positions·실현손익이 '
+               '저장되지 않아 다음 사이클이 이전 상태로 되돌아갈 수 있습니다 — '
+               'KIS 체결 내역과 원장을 직접 대조하세요.')
+    log_error(f'[Program] ⚠ {msg}')
+    alerts.send_alert(f'프로그램 매매 원장 기록 실패\n\n{msg}', log)
+    return False
+
+
 def _release_lock(ledger: dict, sha: str | None, log=print) -> None:
     """락만 비우고 나간다 (주문 없이 중단하는 경로 전용).
 
@@ -1194,7 +1243,11 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
             if code and px:
                 current_prices[code] = float(px)
         for c, p in positions.items():
-            cp = float(real_holdings[c].get('current_price') or 0)
+            # real_holdings는 사이클 앞에서 찍은 잔고 스냅샷이고, positions는 그 뒤
+            # settle_pending_orders가 갱신한 값이다. 그 사이에 체결된 매수는
+            # positions에만 있다 — real_holdings[c]로 읽으면 KeyError가 나고
+            # 이 블록이 try 안이라 손절을 포함한 사이클 전체가 죽는다.
+            cp = float((real_holdings.get(c) or {}).get('current_price') or 0)
             if cp > 0:
                 current_prices.setdefault(c, cp)
                 if cp > p.get('peak_price', 0):
@@ -1267,7 +1320,8 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         stamp_fee_rates(ledger)
         ledger['sim'] = sim_id
         ledger['turn'] = turn
-        _write_ledger(_release_payload(ledger), ledger_sha, log)
+        # 주문은 없었어도 정산 결과(realized_pnl·pending 정리)가 이 기록에 실려 있다.
+        _save_ledger_or_alert(ledger, ledger_sha, [], log, log_error)
         return sim_candidates
 
     # 10. 안전 필터 + 집행
@@ -1276,6 +1330,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     sell_filled = 0   # 매도는 시장가라 이 자리에서 즉시 체결로 본다(설계상 진실)
     buy_placed = 0    # 매수는 지정가라 여기선 접수일 뿐 — 체결은 settle_pending_orders가 확정
     failed_codes: set = set()
+    placed: list = []  # 실제로 나간 주문 (code, side, qty) — 원장 기록 실패 알림의 대조 목록
 
     # 준비 단계(잔고 조회 → 정합 → 유니버스 보강 → 심 실행)에 쓴 시간. 정상은
     # 10초대지만(2026-08-07 실측 Stage 0.5 = 12.4초), KIS나 네이버가 느려지면
@@ -1340,6 +1395,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 side, code, qty, limit_price if side == 'buy' else price,
                 ord_type='limit' if side == 'buy' else 'market')
             if res.get('success'):
+                placed.append((code, side, qty))
                 odno = _extract_odno(res)
                 if not odno:
                     # 추적 불가 = 정산도 취소도 못 한다. 사람 경로로 올린다.
@@ -1434,7 +1490,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         return sim_candidates
     if current_sha:
         ledger_sha = current_sha
-    _write_ledger(_release_payload(ledger), ledger_sha, log)
+    _save_ledger_or_alert(ledger, ledger_sha, placed, log, log_error)
     # "체결"이라 부를 수 있는 건 매도(시장가, 이 자리에서 즉시)뿐이다. 매수는
     # 지정가라 여기선 접수일 뿐 — 체결 확정은 다음 사이클 settle_pending_orders가
     # 한다. 여기서 buy_placed까지 "체결"로 합쳐 세면(finding 3), 배포 후 관찰

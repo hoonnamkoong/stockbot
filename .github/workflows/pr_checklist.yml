@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: 배포 후 검증 지점 확인
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

@@ -7,11 +7,11 @@ import { useDisclosure, useMediaQuery, useInterval } from '@mantine/hooks';
 import { useSearchParams } from 'next/navigation';
 import {
     Container, Title, Text, Paper, Group, Stack, SimpleGrid,
-    Badge, Button, Tabs, TextInput, NumberInput,
+    Badge, Button, TextInput, NumberInput,
     Select, Switch, Notification, LoadingOverlay, Modal, PinInput, Affix, Transition, Box, Divider, Alert
 } from '@mantine/core';
 import { 
-    IconCoin, IconClock, IconChartBar, IconActivity, IconCheck, IconX, 
+    IconCoin, IconChartBar, IconActivity, IconCheck, IconX,
     IconAlertTriangle, IconSearch, IconAdjustments, IconRefresh, 
     IconTimeline, IconAlertCircle, IconTrash, IconPlayerPlay, 
     IconDeviceMobile, IconHistory, IconChevronUp, IconChevronDown, IconPlus, IconDna 
@@ -62,7 +62,6 @@ function TradeContent() {
     const [notification, setNotification] = useState<{ title: string, msg: string, color: string } | null>(null);
     const [geminiBalance, setGeminiBalance] = useState<any>(null);
     const [geminiLoading, setGeminiLoading] = useState(false);
-    const [reservations, setReservations] = useState<any[]>([]);
 
     // Order Form
     const [orderType, setOrderType] = useState<string | null>('buy');
@@ -70,14 +69,10 @@ function TradeContent() {
     const [qty, setQty] = useState<number | string>(1);
     const [price, setPrice] = useState<number | string>(0);
 
-    // Reservation Time
-    const [resHour, setResHour] = useState<number | string>(15);
-    const [resMin, setResMin] = useState<number | string>(15);
-
     // Security (PIN)
     const [pinModalOpen, setPinModalOpen] = useState(false);
     const [pin, setPin] = useState('');
-    const [pendingAction, setPendingAction] = useState<{ isReservation: boolean } | null>(null);
+    const [pendingOrder, setPendingOrder] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     
@@ -87,7 +82,7 @@ function TradeContent() {
 
     // Multi-select for Portfolio
     const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
-    const [bulkActionType, setBulkActionType] = useState<{ type: 'immediate' | 'reservation' } | null>(null);
+    const [bulkOrderPending, setBulkOrderPending] = useState(false);
 
     // 시뮬레이터 리셋
     const [resetCash, setResetCash] = useState<number | ''>(SIM_INITIAL_CASH);
@@ -166,24 +161,15 @@ function TradeContent() {
         } catch (error) {}
     }, []);
 
-    const fetchReservations = useCallback(async () => {
-        if (typeof window === 'undefined') return;
-        try {
-            const res = await axios.get('/api/trade/reservation');
-            setReservations(res.data.data || []);
-        } catch (error) {}
-    }, []);
-
     useEffect(() => {
         if (typeof window === 'undefined') return;
         fetchBalance();
         fetchStocks();
-        fetchReservations();
         fetchSimulationStats();
         fetchHistory();
         const codeParam = searchParams.get('code');
         if (codeParam) setCode(codeParam);
-    }, [searchParams, fetchBalance, fetchStocks, fetchReservations, fetchSimulationStats, fetchHistory]);
+    }, [searchParams, fetchBalance, fetchStocks, fetchSimulationStats, fetchHistory]);
 
     // [V8.9.9.17] PIN 모달 오픈 시 강제 포커스 보강 (다단계 시도)
     useEffect(() => {
@@ -213,30 +199,25 @@ function TradeContent() {
         return () => balancePoller.stop();
     }, [balancePoller]);
 
-    const handleOrder = async (isReservation: boolean) => {
+    const handleOrder = async () => {
         if (!code || !qty) {
             showNotify('Error', '종목과 수량을 입력하세요.', 'red');
             return;
         }
-        setPendingAction({ isReservation });
+        setPendingOrder(true);
         setPin('');
         setPinModalOpen(true);
     };
 
     const confirmOrder = async () => {
-        if (!pendingAction) return;
-        const { isReservation } = pendingAction;
+        if (!pendingOrder) return;
         setPinModalOpen(false);
         setOrderLoading(true);
         try {
-            const endpoint = isReservation ? '/api/trade/reservation' : '/api/trade/order';
-            const payload: any = { code, qty, price, side: orderType, pin };
-            if (isReservation) payload.time = `${resHour}:${resMin}`;
-            const res = await axios.post(endpoint, payload);
+            const res = await axios.post('/api/trade/order', { code, qty, price, side: orderType, pin });
             if (res.data.success) {
-                showNotify('성공', isReservation ? '예약 완료' : '주문 완료', 'green');
+                showNotify('성공', '주문 완료', 'green');
                 fetchBalance();
-                fetchReservations();
                 fetchHistory();
             } else {
                 showNotify('실패', res.data.error, 'red');
@@ -245,24 +226,24 @@ function TradeContent() {
             showNotify('Error', error.response?.data?.error || error.message, 'red');
         } finally {
             setOrderLoading(false);
-            setPendingAction(null);
+            setPendingOrder(false);
         }
     };
 
-    const handleBulkOrder = (isReservation: boolean) => {
+    const handleBulkOrder = () => {
         if (selectedCodes.length === 0) {
             showNotify('Error', '매도할 종목을 선택하세요.', 'red');
             return;
         }
-        setBulkActionType({ type: isReservation ? 'reservation' : 'immediate' });
+        setBulkOrderPending(true);
         setPinModalOpen(true);
     };
 
     const confirmBulkOrder = async () => {
-        if (!bulkActionType || !balance) return;
+        if (!bulkOrderPending || !balance) return;
         setPinModalOpen(false);
         setOrderLoading(true);
-        
+
         let successCount = 0;
         let failCount = 0;
 
@@ -271,18 +252,15 @@ function TradeContent() {
             if (!holding) continue;
 
             try {
-                const isReservation = bulkActionType.type === 'reservation';
-                const endpoint = isReservation ? '/api/trade/reservation' : '/api/trade/order';
-                const payload: any = { 
-                    code: targetCode, 
-                    qty: holding.qty, 
+                const payload: any = {
+                    code: targetCode,
+                    qty: holding.qty,
                     price: 0, // 시장가 전량 매도
-                    side: 'sell', 
-                    pin 
+                    side: 'sell',
+                    pin
                 };
-                if (isReservation) payload.time = `${resHour}:${resMin}`;
-                
-                const res = await axios.post(endpoint, payload);
+
+                const res = await axios.post('/api/trade/order', payload);
                 if (res.data.success) successCount++;
                 else failCount++;
             } catch (e) {
@@ -293,10 +271,9 @@ function TradeContent() {
         showNotify('일괄 처리 결과', `성공: ${successCount}, 실패: ${failCount}`, failCount > 0 ? 'orange' : 'green');
         setSelectedCodes([]);
         fetchBalance();
-        fetchReservations();
         fetchHistory();
         setOrderLoading(false);
-        setBulkActionType(null);
+        setBulkOrderPending(false);
     };
 
     const handleReset = async () => {
@@ -319,17 +296,6 @@ function TradeContent() {
         } finally {
             setResetBusy(false);
             setResetConfirmOpen(false);
-        }
-    };
-
-    const cancelReservation = async (id: string) => {
-        if (!confirm('예약을 취소하시겠습니까?')) return;
-        try {
-            await axios.delete(`/api/trade/reservation?id=${id}`);
-            showNotify('성공', '예약이 취소되었습니다.', 'green');
-            fetchReservations(); // 취소 후 즉시 목록 갱신
-        } catch (error: any) {
-            showNotify('실패', error.response?.data?.error || '취소 중 오류 발생', 'red');
         }
     };
 
@@ -569,11 +535,8 @@ function TradeContent() {
                     />
                     {selectedCodes.length > 0 && (
                         <Group mt="md" grow>
-                            <Button color="red" leftSection={<IconTrash size={16}/>} onClick={() => handleBulkOrder(false)}>
+                            <Button color="red" leftSection={<IconTrash size={16}/>} onClick={() => handleBulkOrder()}>
                                 {selectedCodes.length}건 즉시 매도
-                            </Button>
-                            <Button color="violet" leftSection={<IconClock size={16}/>} onClick={() => handleBulkOrder(true)}>
-                                {selectedCodes.length}건 예약 매도
                             </Button>
                         </Group>
                     )}
@@ -587,52 +550,28 @@ function TradeContent() {
     }
 
     function renderTrading() {
+        // 예약 주문 UI는 2026-09 보안 검토로 제거했다 — 저장은 됐지만 집행 워크플로가
+        // 없어(src/trade_executor.py를 부르는 곳이 돌지 않는 legacy 스크립트뿐)
+        // "예약해 뒀다"는 착각만 만들었다. API(/api/trade/reservation)와
+        // data/reservations.json은 나중에 배선할 수 있게 남겨 둔다.
         return (
             <Paper p="md" withBorder radius="md">
                 <Title order={4} mb="md">Place Order</Title>
-                <Tabs defaultValue="immediate">
-                    <Tabs.List mb="md">
-                        <Tabs.Tab value="immediate">Immediate</Tabs.Tab>
-                        <Tabs.Tab value="reservation">Reservation</Tabs.Tab>
-                    </Tabs.List>
-                    <div style={{ position: 'relative' }}>
-                        <LoadingOverlay visible={orderLoading} zIndex={10} overlayProps={{ radius: 'sm', blur: 2 }} />
-                        <Group mb="sm" grow>
-                            <Button variant={orderType === 'buy' ? 'filled' : 'outline'} color="red" onClick={() => setOrderType('buy')}>BUY</Button>
-                            <Button variant={orderType === 'sell' ? 'filled' : 'outline'} color="blue" onClick={() => setOrderType('sell')}>SELL</Button>
-                        </Group>
-                        <Stack gap="xs">
-                            <Select label="Stock" placeholder="종목 선택" searchable
-                                data={stocks.map(s => ({ value: s.code, label: `${s.name} (${s.code})` }))}
-                                value={code} onChange={(val) => setCode(val || '')} />
-                            <NumberInput label="Quantity" min={1} value={qty} onChange={(val) => setQty(Number(val) || 1)} />
-                            <NumberInput label="Price (0=Market)" min={0} value={price} onChange={(val) => setPrice(Number(val) || 0)} />
-                        </Stack>
-                        <Tabs.Panel value="immediate" pt="md">
-                            <Button fullWidth size="lg" onClick={() => handleOrder(false)} color={orderType === 'buy' ? 'red' : 'blue'}>주문 전송</Button>
-                        </Tabs.Panel>
-                        <Tabs.Panel value="reservation" pt="md">
-                            <Group grow mb="sm">
-                                <NumberInput label="Hour" min={0} max={23} value={resHour} onChange={(val) => setResHour(Number(val) || 15)} />
-                                <NumberInput label="Min" min={0} max={59} value={resMin} onChange={(val) => setResMin(Number(val) || 15)} />
-                            </Group>
-                            <Button fullWidth size="lg" color="violet" onClick={() => handleOrder(true)}>예약 등록</Button>
-                        </Tabs.Panel>
-                    </div>
-                </Tabs>
-                {reservations.length > 0 && (
-                    <Stack mt="xl">
-                        <Text size="sm" fw={700}>Active Reservations</Text>
-                        {reservations.map(r => (
-                            <Paper key={r.id} p="xs" withBorder>
-                                <Group justify="space-between">
-                                    <Text size="xs">{r.time} | {r.code} | {r.side}</Text>
-                                    <Button size="xs" variant="subtle" color="red" onClick={() => cancelReservation(r.id)}>취소</Button>
-                                </Group>
-                            </Paper>
-                        ))}
+                <div style={{ position: 'relative' }}>
+                    <LoadingOverlay visible={orderLoading} zIndex={10} overlayProps={{ radius: 'sm', blur: 2 }} />
+                    <Group mb="sm" grow>
+                        <Button variant={orderType === 'buy' ? 'filled' : 'outline'} color="red" onClick={() => setOrderType('buy')}>BUY</Button>
+                        <Button variant={orderType === 'sell' ? 'filled' : 'outline'} color="blue" onClick={() => setOrderType('sell')}>SELL</Button>
+                    </Group>
+                    <Stack gap="xs" mb="md">
+                        <Select label="Stock" placeholder="종목 선택" searchable
+                            data={stocks.map(s => ({ value: s.code, label: `${s.name} (${s.code})` }))}
+                            value={code} onChange={(val) => setCode(val || '')} />
+                        <NumberInput label="Quantity" min={1} value={qty} onChange={(val) => setQty(Number(val) || 1)} />
+                        <NumberInput label="Price (0=Market)" min={0} value={price} onChange={(val) => setPrice(Number(val) || 0)} />
                     </Stack>
-                )}
+                    <Button fullWidth size="lg" onClick={() => handleOrder()} color={orderType === 'buy' ? 'red' : 'blue'}>주문 전송</Button>
+                </div>
             </Paper>
         );
     }
@@ -664,10 +603,10 @@ function TradeContent() {
             <Modal opened={pinModalOpen} onClose={() => setPinModalOpen(false)} title="Security PIN" centered zIndex={2000}>
                 <Stack align="center" py="md" ref={pinContainerRef}>
                     <Text size="sm">보안 PIN 4자리를 입력하세요.</Text>
-                    <PinInput id="pin-input" data-autofocus length={4} type="number" mask value={pin} onChange={setPin} onComplete={bulkActionType ? confirmBulkOrder : confirmOrder} />
+                    <PinInput id="pin-input" data-autofocus length={4} type="number" mask value={pin} onChange={setPin} onComplete={bulkOrderPending ? confirmBulkOrder : confirmOrder} />
                     <Group mt="md">
                         <Button variant="default" onClick={() => setPinModalOpen(false)}>취소</Button>
-                        <Button color="blue" onClick={bulkActionType ? confirmBulkOrder : confirmOrder} disabled={pin.length !== 4}>확인</Button>
+                        <Button color="blue" onClick={bulkOrderPending ? confirmBulkOrder : confirmOrder} disabled={pin.length !== 4}>확인</Button>
                     </Group>
                 </Stack>
             </Modal>

@@ -88,3 +88,38 @@ test('매도는 지정가를 요청해도 시장가다 — 손절은 체결 자�
   assert.equal(body.ORD_DVSN, '01');
   assert.equal(body.ORD_UNPR, '0');
 });
+
+// --- P2: side/qty 입력 가드 ---
+// 보안 검토에서 실행으로 재현된 결함: side === 'buy' 아니면 전부 'sell'로 떨어져
+// "BUY"·""·"xyz"·null·undefined·0 같은 입력이 전부 실전 시장가 매도(TTTC0801U)가 됐다.
+// 기본값을 없애고 화이트리스트만 통과시킨다.
+test('side가 "buy"/"sell"이 아니면 던진다 — "buy 아니면 sell" 기본값 금지', () => {
+  for (const bad of ['BUY', 'Buy', '', 'xyz', null, undefined, 0] as any[]) {
+    assert.throws(() => buildOrderRequest('005930', 1, bad, REAL),
+      `side=${JSON.stringify(bad)}이 통과하면 안 된다`);
+  }
+});
+
+test('side가 정상값이면 기존과 동일한 tr_id·body', () => {
+  const buyReal = buildOrderRequest('005930', 1, 'buy', REAL);
+  assert.equal(buyReal.trId, 'TTTC0802U');
+  assert.equal(buyReal.body.ORD_DVSN, '01');
+  assert.equal(buyReal.body.ORD_UNPR, '0');
+
+  const sellReal = buildOrderRequest('005930', 1, 'sell', REAL);
+  assert.equal(sellReal.trId, 'TTTC0801U');
+  assert.equal(sellReal.body.ORD_DVSN, '01');
+  assert.equal(sellReal.body.ORD_UNPR, '0');
+});
+
+test('qty가 양의 정수가 아니면 던진다', () => {
+  for (const bad of [0, -5, 1.5, NaN, 1e21, '10'] as any[]) {
+    assert.throws(() => buildOrderRequest('005930', bad, 'buy', REAL),
+      `qty=${JSON.stringify(bad)}이 통과하면 안 된다`);
+  }
+});
+
+test('qty가 정상 범위의 양의 정수면 통과한다', () => {
+  assert.equal(buildOrderRequest('005930', 1, 'buy', REAL).body.ORD_QTY, '1');
+  assert.equal(buildOrderRequest('005930', 10, 'buy', REAL).body.ORD_QTY, '10');
+});

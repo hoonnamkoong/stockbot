@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/cron-auth';
 
 export const dynamic = 'force-dynamic'; // No caching
 
@@ -16,12 +17,20 @@ export async function GET(request: Request) {
         const parsedUrl = urlStr.startsWith('http') ? new URL(urlStr) : new URL(urlStr, 'http://localhost');
         const { searchParams } = parsedUrl;
 
-        // Security check for unauthorized execution
+        // Security check for unauthorized execution.
+        // 헤더(Authorization: Bearer <CRON_SECRET>)가 우선이다. 쿼리스트링 ?secret=은
+        // 태스커 설정을 사용자가 헤더로 바꾸기 전까지 당분간 계속 허용한다 — 지금 끊으면
+        // 실매매 트리거가 멈춘다. 대신 쓸 때마다 deprecated 경고를 로그에 남긴다.
         const CRON_SECRET = process.env.CRON_SECRET;
+        const authHeader = request.headers.get('authorization');
         const secretParam = searchParams.get('secret');
-        if (!CRON_SECRET || secretParam !== CRON_SECRET) {
+        const authVerdict = authorizeCronRequest({ authHeader, secretParam, cronSecret: CRON_SECRET });
+        if (!authVerdict.ok) {
             console.error('[AI Trader] Unauthorized access attempt (Invalid or missing secret)');
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+        if (authVerdict.deprecated) {
+            console.warn('[AI Trader] deprecated: 쿼리스트링 ?secret= 로 인증됨 — 태스커 설정을 Authorization 헤더로 옮겨라.');
         }
 
         if (!GITHUB_PAT) {

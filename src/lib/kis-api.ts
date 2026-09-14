@@ -443,12 +443,27 @@ export async function getVirtualPortfolio(): Promise<PortfolioData> {
  * 떼어낸 이유: 실제 버그가 이 계산에서 났다(시장가 매도에 단가를 실어 KIS가 거부, 683cc55).
  * 네트워크에 붙어 있으면 그 회귀를 테스트로 막을 수 없다. src/lib/kis-order.test.ts가 지킨다.
  */
+// 한 주문에 실을 수 있는 최대 수량. 이 봇의 어떤 종목·어떤 예산으로도 실제
+// 주문이 이 근처에 갈 일이 없다 — 그냥 "터무니없는 값(1e21 등)을 브로커에
+// 보내지 않는다"는 상식적 안전판이다.
+const MAX_ORDER_QTY = 100000;
+
 export function buildOrderRequest(
     code: string,
     qty: number,
     side: 'buy' | 'sell',
     opts: { accountNo: string; isVirtual: boolean; ordType?: 'market' | 'limit'; limitPrice?: number },
 ): { trId: string; body: Record<string, string> } {
+    // side에 기본값을 두지 않는다 — "buy가 아니면 sell"이 실제 사고였다
+    // (side="BUY"·""·"xyz"·null·undefined·0 전부가 실전 시장가 매도로 떨어짐).
+    // 화이트리스트만 통과시킨다. 값은 로그에 싣지 않는다(공격자 입력을 남기지 않는다).
+    if (side !== 'buy' && side !== 'sell') {
+        throw new Error('주문 방향(side) 값이 올바르지 않습니다');
+    }
+    if (!Number.isInteger(qty) || qty <= 0 || qty > MAX_ORDER_QTY) {
+        throw new Error('주문 수량(qty) 값이 올바르지 않습니다');
+    }
+
     // KIS 국내주식 주문 API (TTTC0802U: 매수, TTTC0801U: 매도, V접두사는 모의)
     const trId = side === 'buy'
         ? (opts.isVirtual ? 'VTTC0802U' : 'TTTC0802U')

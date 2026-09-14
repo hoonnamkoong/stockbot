@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { pickWorkflow } from '@/lib/cron-target';
+import { authorizeCronRequest } from '@/lib/cron-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -11,35 +12,34 @@ export async function GET(request: Request) {
     const REPO_NAME = 'stockbot';
 
     try {
-        // Parse debug params
         const urlStr = request.url || '';
         const parsedUrl = urlStr.startsWith('http') ? new URL(urlStr) : new URL(urlStr, 'http://localhost');
         const { searchParams } = parsedUrl;
-        const debugHour = searchParams.get('hour');
-        const debugMinute = searchParams.get('minute');
 
-        // Get current KST time
+        // Get current KST time (실제 시각만 쓴다 — hour/minute 디버그 파라미터는 프로덕션에
+        // 살아 있던 시각 위조 경로였다)
         const now = new Date();
         const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-
-        // Use debug time if provided, otherwise use real time
-        let hour = debugHour ? parseInt(debugHour) : kstTime.getHours();
-        let minute = debugMinute ? parseInt(debugMinute) : kstTime.getMinutes();
+        const hour = kstTime.getHours();
+        const minute = kstTime.getMinutes();
         const dayOfWeek = kstTime.getDay(); // 0=Sun, 6=Sat
 
-        // Allow debug to bypass current time for logs
-        if (debugHour) {
-            console.log(`[Debug] Simulating time: ${hour}:${minute} (Real: ${kstTime.getHours()}:${kstTime.getMinutes()})`);
-        } else {
-            console.log(`[Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST (Day: ${dayOfWeek})`);
-        }
+        console.log(`[Cron] Triggered at ${hour}:${minute.toString().padStart(2, '0')} KST (Day: ${dayOfWeek})`);
 
-        // Security check for unauthorized execution
+        // Security check for unauthorized execution.
+        // 헤더(Authorization: Bearer <CRON_SECRET>)가 우선이다. 쿼리스트링 ?secret=은
+        // 태스커 설정을 사용자가 헤더로 바꾸기 전까지 당분간 계속 허용한다 — 지금 끊으면
+        // 실매매 트리거가 멈춘다. 대신 쓸 때마다 deprecated 경고를 로그에 남긴다.
         const CRON_SECRET = process.env.CRON_SECRET;
+        const authHeader = request.headers.get('authorization');
         const secretParam = searchParams.get('secret');
-        if (!CRON_SECRET || secretParam !== CRON_SECRET) {
+        const authVerdict = authorizeCronRequest({ authHeader, secretParam, cronSecret: CRON_SECRET });
+        if (!authVerdict.ok) {
             console.error('[Cron] Unauthorized access attempt (Invalid or missing secret)');
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+        if (authVerdict.deprecated) {
+            console.warn('[Cron] deprecated: 쿼리스트링 ?secret= 로 인증됨 — 태스커 설정을 Authorization 헤더로 옮겨라.');
         }
 
         // 0. Check if market is open (Mon-Fri only)

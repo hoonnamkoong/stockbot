@@ -158,6 +158,13 @@ jobs:
             echo "[KOSPI CSV] 파일 없음 - 배포 스킵"
             exit 1
           fi
+          # 파일이 있어도 **데이터 행이 0이면 배포하지 않는다.** 2026-09-10 16:00에
+          # 네이버 이관으로 0행 CSV(헤더만, 2,201B)가 db-data를 덮었고 런은 초록이었다 —
+          # 다음 날 장중 내내 리베로 trend가 비었다. 빈 걸 덮어쓰느니 직전 파일을 지킨다.
+          if ! python scripts/check_csv_rows.py output/kospi_top100_close.csv --min 1; then
+            echo "[KOSPI CSV] 데이터 행 0 - 배포 중단(직전 파일 보존). 수집 로그를 확인하라"
+            exit 1
+          fi
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git clone --branch db-data --depth 1 \
@@ -165,10 +172,10 @@ jobs:
           cp output/kospi_top100_close.csv db_repo/data/
           # OHLCV는 종가 CSV와 같은 호출에서 나온다. 없으면 수집 코드가 퇴행한 것이므로
           # 조용히 넘기지 않고 로그를 남긴다(종가 배포 자체는 계속한다).
-          if [ -f output/ohlcv_top100.csv ]; then
+          if [ -f output/ohlcv_top100.csv ] && python scripts/check_csv_rows.py output/ohlcv_top100.csv --min 1; then
             cp output/ohlcv_top100.csv db_repo/data/
           else
-            echo "[OHLCV] 파일 없음 - 종가만 배포한다"
+            echo "[OHLCV] 파일 없음 또는 0행 - 종가만 배포한다"
           fi
           cd db_repo
           git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv

@@ -145,6 +145,20 @@ jobs:
             --daily data/premarket_daily.csv --top 30 \
             --tr H0NXCNT0 --start 0800 --until "${{ github.event.inputs.until || '0850' }}"
 
+      # NXT 원자료(rt_H0NXCNT0_*.csv)는 **intraday 잡이 intraday-data로** 올린다.
+      # db-data가 아닌 이유: trading.yml이 2분마다 depth 1로 받는 핫패스라 ~15MB
+      # 예산에 묶여 있는데 이 아카이브는 무한 누적된다(장중 호가·체결과 같은 이유).
+      # 파일은 이 잡에서 만들어지고 커밋 스텝은 저쪽 잡에 있어 artifact로 넘긴다.
+      # always(): 뒤 스텝이 죽어도 그때까지 받은 체결은 넘긴다 — 당일치만 조회된다.
+      - name: NXT 산출물 넘기기 (intraday 잡으로)
+        if: always() && steps.gate.outputs.open == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxt-premarket
+          path: data/rt_H0NXCNT0_*.csv
+          if-no-files-found: ignore
+          retention-days: 1
+
       - name: 커밋 (db-data)
         # 게이트를 걸지 않는다 — 한국 휴장일에도 미국 지수는 쌓여야 한다.
         # 바뀐 게 없으면 diff --cached가 걸러낸다.
@@ -167,7 +181,7 @@ jobs:
             echo "[Deploy] db-data 클론 실패"; exit 1; }
           mkdir -p db_data_repo/data
           # 여러 경로를 한 줄로 add 하면 하나만 없어도 전체가 실패한다(2026-08-05 사고).
-          for f in data/us_daily.csv data/investor_flows.csv data/nxt_*.csv data/premarket_daily.csv data/premarket_universe.csv data/premarket_news_*.csv; do
+          for f in data/us_daily.csv data/investor_flows.csv data/premarket_daily.csv data/premarket_universe.csv data/premarket_news_*.csv; do
             [ -e "$f" ] && cp "$f" db_data_repo/data/ || echo "없음: $f"
           done
           cd db_data_repo
@@ -256,6 +270,16 @@ jobs:
             --tr H0STCNT0,H0STASP0 --start 0900 --until 1130 \
             -o data/rt_intraday_$(date +%Y%m%d).csv
 
+      # collect 잡이 만든 NXT 체결. 없을 수도 있다(휴장·창 지나 깨어난 런) —
+      # 그때는 받을 게 없을 뿐이라 실패로 보지 않는다.
+      - name: NXT 산출물 받기 (collect 잡에서)
+        if: always() && steps.univ.outputs.ok == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: nxt-premarket
+          path: data/
+
       - name: 커밋 (intraday-data)
         # always(): 2.5시간 세션 중 수집이 끝내 실패해도 그때까지 받은 체결은
         # 남긴다. 체결 데이터는 당일치만 조회되므로 부분이라도 0보다 낫다.
@@ -294,13 +318,13 @@ jobs:
           # 첫 실행에서 115.14MB로 push가 거부됐다(체결 H0STCNT0 + 호가
           # H0STASP0 2TR × 20종목 × 2시간반). rebase 재시도는 파일 크기를
           # 바꾸지 않으므로 3회가 전부 같은 이유로 죽는다.
-          for f in data/rt_intraday_*.csv; do
+          for f in data/rt_intraday_*.csv data/rt_H0NXCNT0_*.csv; do
             [ -e "$f" ] || { echo "없음: $f"; continue; }
             gzip -9 -c "$f" > "intraday_repo/data/$(basename "$f").gz"
           done
           # 압축 후에도 한도를 넘으면 **명시적으로 실패한다.** 조용히 잘리거나
           # push가 거부되는 것보다 낫다 — 실패 알림이 사람을 부른다.
-          for g in intraday_repo/data/rt_intraday_*.csv.gz; do
+          for g in intraday_repo/data/rt_intraday_*.csv.gz intraday_repo/data/rt_H0NXCNT0_*.csv.gz; do
             [ -e "$g" ] || continue
             sz=$(stat -c%s "$g")
             echo "[Deploy] $(basename "$g"): $((sz / 1024 / 1024))MB"

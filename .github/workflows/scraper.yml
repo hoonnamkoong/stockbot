@@ -213,7 +213,7 @@ jobs:
               sim11_watchlist.json|sim_donchian_state.json|sim_donchian_log.json) continue ;;
               trade_history_sim_donchian.csv) continue ;;
               #   premarket_data.yml — 프리마켓·미국지수·수급
-              us_daily.csv|investor_flows.csv|nxt_*.csv) continue ;;
+              us_daily.csv|investor_flows.csv|rt_H0NXCNT0_*.csv) continue ;;
               premarket_daily.csv|premarket_universe.csv|premarket_news_*.csv) continue ;;
               rt_intraday_*.csv) continue ;;
               #   us_trading.yml — US 심 상태·이력

@@ -174,6 +174,13 @@ class KISDataProvider:
     CONN_BREAKER_STREAK = 3
     _conn_fail_streak = 0
 
+    # 거부 사유를 이미 찍은 (tr_id, 코드). 2026-09-11에 체결강도 확보가 27/30 →
+    # 15/30으로 떨어지고 보유 종목 현재가가 측정 불가로 찍혔는데, rt_cd != 0을
+    # 사유 없이 {}로 바꾸는 탓에 **왜 거부당했는지 로그에 한 줄도 없었다.**
+    # 클래스 레벨인 이유는 위 차단기와 같다 — program_trader가 매 호출 새
+    # 인스턴스를 만든다. 사유마다 한 줄이면 충분하다(런 하나가 수백 콜을 돈다).
+    _logged_rejects: set = set()
+
     def _get(self, url: str, tr_id: str, params: dict, timeout: int = READ_TIMEOUT) -> dict:
         """실패하면 {}를 돌려준다 — 없는 값을 0으로 지어내지 않는다.
 
@@ -210,11 +217,30 @@ class KISDataProvider:
                 try:
                     body = r.json()
                 except Exception:
+                    self._log_reject(tr_id, "BAD_JSON", "응답이 JSON이 아니다")
                     return {}
                 if body.get("rt_cd") == "0":
                     return body
+                self._log_reject(tr_id,
+                                 str(body.get("msg_cd") or f'rt_cd={body.get("rt_cd")}'),
+                                 str(body.get("msg1") or ""))
+            else:
+                self._log_reject(tr_id, f"HTTP {r.status_code}", "")
             return {}
         return {}
+
+    @classmethod
+    def _log_reject(cls, tr_id: str, code: str, msg: str) -> None:
+        """거부 사유를 (tr_id, 코드)당 한 번 남긴다. **값은 싣지 않는다.**
+
+        헤더(토큰·앱키)나 파라미터를 같이 찍으면 public 레포의 CI 로그가 새
+        유출 지점이 된다(2026-09-10 .env.production 노출 사고).
+        """
+        key = (tr_id, code)
+        if key in cls._logged_rejects:
+            return
+        cls._logged_rejects.add(key)
+        print(f"[KIS 거부] {tr_id} {code} {msg}".rstrip(), flush=True)
 
     # ──────────────────────────────────────────────────
     # 1. 투자자 추세 추정 (외인/기관 추정 순매수)

@@ -46,6 +46,12 @@ jobs:
         run: |
           git fetch --depth 1 origin db-data 2>/dev/null || echo "[Info] db-data 없음"
           git checkout FETCH_HEAD -- data/us_universe.json 2>/dev/null || echo "[Info] 직전 유니버스 없음 — 폴백 불가"
+          # US Sim1 상태. 보유 종목은 진입 자격을 잃어도 ma50을 실어 줘야 50일선
+          # 이탈 청산이 발화한다(_trend_template_ok가 price > ma50을 요구하므로
+          # 50일선을 깬 종목은 정의상 워치리스트에 못 오른다). 이 파일은 main에
+          # 없고 db-data에만 있다. 한 줄 git checkout에 여러 경로를 묶지 않는다 —
+          # 하나만 없어도 전체가 실패한다.
+          git checkout FETCH_HEAD -- data/sim_us1minervini_state.json 2>/dev/null || echo "[Info] US Sim1 상태 없음 — 보유 종목 청산 지표 생략"
           mkdir -p data
 
       # 워치리스트 수집(최대 40분)보다 **먼저** 돈다 — 뒤에 두면 알림이 그만큼 늦다.

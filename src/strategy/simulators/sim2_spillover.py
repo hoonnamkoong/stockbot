@@ -8,6 +8,15 @@ from datetime import datetime
 MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19
 
+# 타임 스탑 — 청산 3갈래(하드손절 -7%·트레일링 +5% 활성·외인 대량 이탈)가 전부
+# 가격 변동을 요구해서, 매입가 근처 횡보는 어느 갈래도 발화시키지 못한다.
+# 2026-09-15 실측: 5/5 만석 상태로 11일간 매수 0건이었고 그동안 보유 5종목의
+# 손익은 -4.35%~+4.00%, 진입 이래 고점도 최대 +4.00%로 손절선·트레일링 활성선
+# 어느 쪽에도 닿지 않았다. 08-15~09-04에는 1~3거래일마다 청산이 나던 심이다.
+# 14일(달력)은 약 10거래일 — 수급이 붙었으면 결판났을 기간이고, 09-04 진입분
+# (11일차)은 아직 살려 두는 선이다. 달력일 기준은 심5의 TIMEOUT_DAYS와 같다.
+TIMEOUT_DAYS = 14
+
 
 def _fn(funnel, code, reason, **vals):
     """왜 안 샀는지 한 줄 남긴다(전 심 공통 방식).
@@ -118,10 +127,29 @@ class SectorSpilloverSimulator(BaseSimulator):
                     self.sell(code, current_price, reason="[MFHS2] 하드 손절 (-7%)")
                     self.add_cooldown(code, 3)
                     sold_today.add(code)
+                    continue
+
+            # (E) 타임 스탑 — 위 네 갈래는 전부 가격이 움직여야 발화한다.
+            # 횡보로 묶인 슬롯을 돌려주는 유일한 갈래다(심5와 같은 방식).
+            entry_str = p_item.get('entry_date')
+            if entry_str:
+                try:
+                    held_days = (now.date() - datetime.strptime(entry_str, '%Y-%m-%d').date()).days
+                except ValueError:
+                    held_days = None
+                if held_days is not None and held_days >= TIMEOUT_DAYS:
+                    pr = (current_price - avg_price) / avg_price * 100 if avg_price > 0 else 0.0
+                    self.sell(code, current_price,
+                              reason=f"[MFHS2] 타임 스탑 ({TIMEOUT_DAYS}일 경과, {pr:+.1f}%)")
+                    self.add_cooldown(code, 1)
+                    sold_today.add(code)
+                    continue
 
         # 2. 진입 로직 (MFHS2 통합 스코어링 기반 진입)
         target_amount = self.calc_nav(current_prices) * POSITION_WEIGHT
-        held = len(self.state['portfolio']) - len(sold_today)
+        # `sell()`이 이미 portfolio에서 지운다 — sold_today를 또 빼면 청산 종목이
+        # 두 번 세어져 빈 슬롯이 부풀려진다(2종목 손절한 사이클에 7종목을 들고 끝난다).
+        held = len(self.state['portfolio'])
 
         funnel = []
         bought = 0

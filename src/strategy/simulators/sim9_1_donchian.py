@@ -6,7 +6,12 @@ MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19   # 종목당 NAV 대비 비중 (전 심 통일)
 
 CHANNEL_DAYS = 20        # 진입 채널 (원 터틀 System 1)
-EXIT_DAYS = 10           # 청산 채널
+# 청산 채널. 원 터틀 System 1은 20/10이지만 2026-09-15 실측에서 10일은 너무
+# 길었다 — 5/5 만석으로 7거래일간 매수 0건인 동안 돌파+거래대금 게이트를 다
+# 통과하고도 슬롯이 없어 못 산 종목이 하루 6~14건이었고, 보유 중 현대건설은
+# 고점 대비 -7.0%까지 밀렸는데도 10일 저점에 닿지 않아 청산이 안 났다.
+# 고정 익절을 새로 만드는 대신(터틀은 추세를 끝까지 탄다) 채널 길이만 줄인다.
+EXIT_DAYS = 5            # 청산 채널
 ATR_STOP_MULT = 2.0      # 손절 = 진입가 - 2*ATR
 MIN_SAMPLE = 10          # 거래대금 횡단면 z 최소 표본. 미달이면 신호 없음(fail-closed)
 MIN_AMOUNT = 1_000_000_000
@@ -82,7 +87,7 @@ def _atr(hist):
     return sum(diffs) / len(diffs)
 
 
-def decide_donchian(view, candidates, current_prices, funnel=None):
+def decide_donchian(view, candidates, current_prices, funnel=None, notes=None):
     """[Sim9-1] 돈치안 채널 돌파 결정. 순수 함수. Order 리스트 반환."""
     orders = []
     portfolio = view['portfolio']
@@ -90,7 +95,8 @@ def decide_donchian(view, candidates, current_prices, funnel=None):
     cand_by_code = {s.get('code'): s for s in candidates if s.get('code')}
     zamt = _zmap(_surge_pairs(candidates))
 
-    # 1. 청산 — 10일 채널 이탈 또는 2*ATR 손절. 고정 익절 없음(터틀은 추세를 끝까지 탄다).
+    # 1. 청산 — 채널 이탈 또는 2*ATR 손절. 고정 익절 없음(터틀은 추세를 끝까지 탄다).
+    blind = []
     for code in list(portfolio.keys()):
         p = portfolio[code]
         cur = current_prices.get(code, 0)
@@ -99,7 +105,13 @@ def decide_donchian(view, candidates, current_prices, funnel=None):
             continue
         pr = (cur - avg) / avg * 100
 
+        # 청산 근거는 오늘 후보의 range_history에서만 나온다. 보유가 top100 밖으로
+        # 밀리면 ATR 손절·채널 이탈이 **둘 다** 평가되지 않는다. 없는 근거로 팔지는
+        # 않되(그건 옳다), 못 팔았다는 사실은 남긴다 — 진입 루프와 달리 여기엔
+        # `_fn` 기록이 없어서 지금까지 로그에 한 줄도 안 남았다.
         hist = _clean((cand_by_code.get(code) or {}).get('range_history'))
+        if len(hist) < 2:
+            blind.append(code)
         if len(hist) >= 2:
             stop = avg - ATR_STOP_MULT * _atr(hist[-CHANNEL_DAYS:])
             if cur <= stop:
@@ -115,6 +127,10 @@ def decide_donchian(view, candidates, current_prices, funnel=None):
                                'reason': f"[돈치안] {EXIT_DAYS}일 채널 이탈 ({ch_lo:,.0f} 하회, {pr:+.1f}%)",
                                'cooldown': 1, 'mark_partial': False})
                 sold.add(code); continue
+
+    if blind and notes is not None:
+        notes.append(f'⚠️ 보유 {blind} — 오늘 후보에 채널 이력이 없어 '
+                     f'ATR 손절·채널 이탈을 둘 다 평가하지 못했다')
 
     # 2. 진입 — 20일 채널 상단 돌파 + 거래대금 동반.
     # Sim5와 같은 range_history로 정반대 방향을 실험한다(저점 매수 vs 박스 탈출).
@@ -201,9 +217,10 @@ class DonchianBreakoutSimulator(BaseSimulator):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
         funnel = []
+        notes = []
         orders = decide_donchian(self._view(current_prices), candidates,
-                                 current_prices, funnel=funnel)
-        log_funnel('돈치안', candidates, funnel, orders)
+                                 current_prices, funnel=funnel, notes=notes)
+        log_funnel('돈치안', candidates, funnel, orders, details=notes)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

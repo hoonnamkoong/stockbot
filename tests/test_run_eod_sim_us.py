@@ -193,3 +193,47 @@ def test_main_stamps_watchlist_for_nearest_open_session():
          mock.patch('scripts.run_eod_sim_us.alerts.send_alert'):
         eod_main()
     assert saved['date'] == '20260826'
+
+
+# ── 보유 종목의 청산 지표는 진입 자격과 무관하게 실려야 한다 (2026-09-15) ──────
+# US Sim1의 청산 둘 중 하나(50일선 이탈)는 ma50을 **그날 워치리스트에서** 읽는다
+# (us_sim1_minervini.decide_us_minervini). 그런데 워치리스트에 오르려면
+# _trend_template_ok를 통과해야 하고, 그 조건 안에 `price > ma50`이 들어 있다
+# (us_sim1_minervini.py:81). 즉 "50일선을 깬 종목"은 정의상 워치리스트에 못 올라
+# ma50이 None이 되고, 청산 게이트가 구조적으로 발화하지 않는다.
+#
+# 실측(2026-09-11·14·15 db-data): US Sim1 보유 5종목 중 워치리스트에 오른 것은
+# 0개, 거래 이력 전체(5건)가 BUY뿐이고 SELL이 한 건도 없다. 같은 파이프라인의
+# US Sim2는 워치리스트가 300종목이라 보유 5종목이 전부 들어 있고 청산이 실제로
+# 발화했다(09-11 SNDK, 09-14 MU).
+
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_held_symbol_keeps_ma50_even_when_it_fails_entry_filters(mock_sleep):
+    """보유 중인 종목은 진입 자격을 잃어도 ma50을 실은 항목으로 남는다."""
+    closes = [round(200.0 - i * 0.2, 2) for i in range(230)]  # 하락 추세 → 템플릿 탈락
+    bars = _bars(closes, volume=_SIM2_ONLY_VOLUME)
+    universe = [{'symbol': 'PSX', 'name': 'Phillips 66', 'market_cap': 1e11}]
+    out1, _, _ = build_watchlists_for_universe(
+        universe, cik_map={'PSX': '0000000002'},
+        fetch_ohlcv=mock.Mock(return_value=bars),
+        fetch_fundamentals=mock.Mock(),
+        sim1_held={'PSX'})
+
+    assert 'PSX' in out1, '보유 종목이 워치리스트에서 빠져 50일선 이탈 청산이 영영 안 된다'
+    entry = out1['PSX']
+    assert entry['ma50'] == sum(closes[-50:]) / 50
+    # 진입 후보로 되살아나면 안 된다 — 추세 템플릿을 통과하지 않은 종목이다.
+    assert entry['pivot_price'] is None
+
+
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_non_held_symbol_still_excluded_when_it_fails_filters(mock_sleep):
+    """보유가 아니면 종전대로 탈락한다(워치리스트가 넓어지면 안 된다)."""
+    closes = [round(200.0 - i * 0.2, 2) for i in range(230)]
+    bars = _bars(closes, volume=_SIM2_ONLY_VOLUME)
+    universe = [{'symbol': 'PSX', 'name': 'Phillips 66', 'market_cap': 1e11}]
+    out1, _, _ = build_watchlists_for_universe(
+        universe, cik_map={'PSX': '0000000002'},
+        fetch_ohlcv=mock.Mock(return_value=bars),
+        fetch_fundamentals=mock.Mock())
+    assert out1 == {}

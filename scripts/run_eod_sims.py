@@ -20,6 +20,7 @@
 실행: PYTHONPATH=. python scripts/run_eod_sims.py [ohlcv_csv_경로]
 """
 import csv
+import json
 import os
 import re
 import sys
@@ -28,9 +29,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 
 from src.strategy.simulators.kr_calendar import watchlist_target_date  # noqa: E402
 from src.strategy.simulators.sim9_1_donchian import CHANNEL_DAYS  # noqa: E402
+from src.strategy.simulators.sim11_minervini import (  # noqa: E402
+    MA_EXIT_WINDOW as SIM11_MA_EXIT_WINDOW,
+    _sma as _sim11_sma,
+)
 
 DEFAULT_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
                            'output', 'ohlcv_top100.csv')
+DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
 
 # ETF는 유니버스에서 뺀다. ETF라서가 아니라 손절 규격이 안 맞아서다 —
 # 지수 추종 ETF는 변동성이 개별주보다 훨씬 낮아 진입가 - 2*ATR 손절선이
@@ -200,7 +206,8 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
     return out
 
 
-def build_sim11_watchlist(candidates: list[dict], log=print) -> dict[str, dict]:
+def build_sim11_watchlist(candidates: list[dict], log=print,
+                          held_codes=()) -> dict[str, dict]:
     """Sim11 후보들에서 감시 목록(오늘 밤 기준, 내일부터 쓸 pivot_price·ma50)을 만든다.
 
     2026-08-20 재설계: 예전엔 이 자리에서 바로 sim.run()을 불러 그날 종가로
@@ -212,11 +219,56 @@ def build_sim11_watchlist(candidates: list[dict], log=print) -> dict[str, dict]:
     """
     from src.strategy.simulators.sim11_minervini import build_watchlist_entry
     entries: dict[str, dict] = {}
+    # 후보 100 → 감시목록 1이 평상시 값인 심이다. 그 99가 어느 게이트에서
+    # 떨어졌는지 남지 않으면 "KIS가 실적을 안 줬다(결손)"와 "실적이 기준에
+    # 못 미친다(전략)"를 밖에서 구분할 수 없다 — 고치는 곳이 서로 다르다.
+    funnel: list[dict] = []
     for c in candidates:
-        entry = build_watchlist_entry(c)
+        entry = build_watchlist_entry(c, funnel=funnel)
         if entry:
             entries[c['code']] = entry
+            continue
+        # 자격을 잃은 **보유** 종목은 ma50만 실어 남긴다 — 청산 전용 항목.
+        # decide_minervini의 50일선 이탈 청산은 오늘 감시 목록에서 ma50을 읽는데,
+        # 등재 자격인 _trend_template_ok가 `price > ma50`을 요구한다. 그래서
+        # 50일선을 깬 종목은 정의상 목록에 못 오르고, 청산이 필요한 바로 그
+        # 순간에 ma50이 None이 되어 청산이 조용히 건너뛰어졌다(하드손절만 남는다).
+        # pivot_price를 None으로 두어 재매수는 막는다(decide_minervini의 no_pivot).
+        if c['code'] not in held_codes:
+            continue
+        closes_through_today = (c.get('daily_closes') or []) + [float(c.get('price', 0) or 0)]
+        ma50 = _sim11_sma(closes_through_today, SIM11_MA_EXIT_WINDOW)
+        if ma50 is None:
+            log(f"[EOD] 심11 보유 {c['code']} — 종가 표본 부족으로 청산 지표(ma50) 측정 불가")
+            continue
+        entries[c['code']] = {'name': c.get('name', c['code']),
+                              'pivot_price': None, 'ma50': ma50}
+
+    # Actions 로그는 며칠 뒤 사라지므로 diag_id로 db-data에도 남긴다.
+    from src.strategy.simulators.base_simulator import log_funnel
+    log_funnel('미너비니 감시목록', candidates, funnel,
+               buys=len(entries), seen=len(candidates),
+               diag_id='sim11_watchlist', early_exit_breaks=False)
     return entries
+
+
+def load_sim11_holdings(data_dir: str = DEFAULT_DATA_DIR, log=print) -> dict[str, str]:
+    """심11이 지금 보유 중인 {코드: 이름}. 못 읽으면 빈 dict.
+
+    시뮬레이터를 인스턴스화하지 않는다 — BaseSimulator.load_state는 상태 파일이
+    없으면 reset_state로 넘어가 거래 이력 CSV를 지운다. 여기서는 읽기만 한다.
+    파일명 규칙은 BaseSimulator.__init__(sim_<name.lower()>_state.json)와 같다.
+    """
+    path = os.path.join(data_dir, 'sim_minervini_state.json')
+    try:
+        with open(path, encoding='utf-8-sig') as f:
+            portfolio = json.load(f).get('portfolio') or {}
+    except Exception as e:
+        # 조용히 빈 dict로 넘어가면 청산 지표가 빠진 채 런이 초록으로 끝난다.
+        log(f'[EOD] 심11 상태를 못 읽었다({type(e).__name__}: {e}) — '
+            '보유 종목 청산 지표(ma50)가 감시 목록에 실리지 않는다')
+        return {}
+    return {code: (p or {}).get('name', code) for code, p in portfolio.items()}
 
 
 def _run_sim9_1(path: str) -> int:
@@ -250,6 +302,13 @@ def _run_sim11(path: str) -> int:
     if not pairs:
         print(f'[EOD] 심11 유니버스 0건 ({path}) — 감시 목록을 만들지 않는다')
         return 1
+    held = load_sim11_holdings()
+    # 보유 종목이 오늘 top100 밖으로 밀려나면 조회 대상에 아예 없어 ma50을
+    # 만들 수 없다. 조용히 넘어가면 그 종목의 50일선 이탈 청산만 죽는다.
+    missing = [c for c in held if c not in dict(pairs)]
+    if missing:
+        print(f'[EOD] 심11 보유 {missing} — 오늘 top100 유니버스 밖이라 '
+              '청산 지표(ma50)를 만들지 못한다')
     try:
         from src.trade.kis_data_provider import KISDataProvider
         kis = KISDataProvider()
@@ -260,7 +319,7 @@ def _run_sim11(path: str) -> int:
     if not candidates:
         print('[EOD] 심11 후보 0건(전부 조회 실패·이력 부족) — 감시 목록을 만들지 않는다')
         return 1
-    entries = build_sim11_watchlist(candidates, log=print)
+    entries = build_sim11_watchlist(candidates, log=print, held_codes=set(held))
     from src.strategy.simulators.sim11_minervini import save_watchlist
     # 배치를 돌린 날이 아니라 **아직 안 끝난 가장 가까운 세션**을 찍는다.
     # 마감 뒤 16시 배치가 '오늘'을 찍으면 그 키를 읽을 장중 사이클이 없다 —

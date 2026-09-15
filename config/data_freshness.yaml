@@ -43,6 +43,16 @@ outputs:
     max_age_sessions: 1
     why: 심11(미너비니) 감시목록. 없으면 그 세션 매수 판단이 통째로 없다.
 
+  - path: data/sim11_watchlist_diag_*.csv
+    producer: eod_data.yml
+    calendar: kr
+    max_age_sessions: 1
+    why: >
+      심11 감시목록 깔때기(2026-09-15 신설). 후보 100 → 감시목록 1이 평상시 값인
+      심이라, 그 99가 어디서 떨어졌는지가 유일한 진단 재료다. 이게 멈추면
+      "KIS 실적 결손(no_eps)"과 "기준 미달(eps_low)"을 다시 구분할 수 없게 된다.
+      날짜별 파일이라 **반드시 글롭**이다(regime_observations_*.csv와 같은 이유).
+
   # ── 프리마켓 (2026-08-16~08-30 배포가 통째로 실패해 하나도 안 올라왔다) ──
   - path: data/premarket_daily.csv
     producer: premarket_data.yml

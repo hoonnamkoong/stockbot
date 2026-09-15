@@ -261,3 +261,53 @@ def test_get_universe_empty_without_todays_watchlist():
     sim = object.__new__(MinerviniTrendSimulator)
     with mock.patch.object(sim11, 'load_watchlist', return_value={}):
         assert sim.get_universe() == []
+
+
+# ── 감시목록 깔때기 ──────────────────────────────────────
+# 2026-09-15: 심11은 후보 100 → 감시목록 1이 평상시 값인데, 그 99가 어디서
+# 떨어졌는지 어디에도 기록되지 않았다. build_watchlist_entry가 None만 돌려줘서
+# "KIS가 실적을 안 줘서 결손"인지 "실적이 기준 미달"인지 밖에서 구분이 안 됐다.
+# 둘은 고치는 곳이 다르다 — 전자는 수집, 후자는 임계값이다.
+def _reasons(stock):
+    funnel = []
+    build_watchlist_entry(stock, funnel=funnel)
+    return [f['reason'] for f in funnel]
+
+
+def test_missing_earnings_is_not_the_same_reason_as_weak_earnings():
+    """결손과 미달을 가른다 — 이 구분이 이 깔때기의 존재 이유다."""
+    missing = _reasons(_stock(eps_growth_yoy=None))
+    weak = _reasons(_stock(eps_growth_yoy=5.0))
+    assert missing == ['no_eps']
+    assert weak == ['eps_low']
+
+
+def test_missing_revenue_is_not_the_same_reason_as_weak_revenue():
+    assert _reasons(_stock(revenue_growth_yoy=None)) == ['no_revenue']
+    assert _reasons(_stock(revenue_growth_yoy=5.0)) == ['revenue_low']
+
+
+def test_trend_template_records_which_condition_failed():
+    """추세 템플릿은 조건이 7개다 — 뭉뚱그리면 어느 손잡이를 돌릴지 모른다.
+
+    GOOD_CLOSES의 MA50은 195.68, MA150은 171.73이다. 195.0은 그 사이라
+    정배열(price>MA150>MA200)은 통과하고 `price > MA50`에서만 떨어진다 —
+    이 구간이 청산 결함(50일선을 깬 종목은 목록에 못 온다)과 같은 자리다.
+    """
+    assert _reasons(_stock(price=195.0)) == ['below_ma50']
+    assert _reasons(_stock(price=100.0)) == ['not_stacked']
+    assert _reasons(_stock(daily_closes=_rising_closes(120))) == ['short_history']
+
+
+def test_vcp_failure_is_recorded():
+    """VCP만 떨어뜨린다 — 표본 길이는 220으로 맞춰 추세 템플릿을 통과시킨다.
+
+    기존 test_watchlist_entry_none_when_not_contracting은 219일짜리를 넘겨
+    사실은 short_history로 떨어지고 있었다(깔때기를 붙이고서야 보였다).
+    """
+    flat_tail = _rising_closes(200) + [199.5 + (i % 2) * 2.0 for i in range(20)]
+    assert _reasons(_stock(price=201.2, daily_closes=flat_tail)) == ['no_vcp']
+
+
+def test_passing_candidate_leaves_no_funnel_row():
+    assert _reasons(_stock()) == []

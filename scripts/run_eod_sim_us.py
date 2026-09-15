@@ -14,6 +14,7 @@ SEC EDGAR는 US Sim1의 추세 템플릿을 통과한 종목에만 조회한다(
 
     PYTHONPATH=. python scripts/run_eod_sim_us.py
 """
+import json
 import os
 import sys
 import time
@@ -29,7 +30,9 @@ from src.strategy.simulators.us_calendar import watchlist_target_date  # noqa: E
 from src.strategy.simulators.us_sim1_minervini import (  # noqa: E402
     build_watchlist_entry as build_sim1_entry,
     save_watchlist as save_sim1_watchlist,
+    _sma,
     _trend_template_ok,
+    MA_EXIT_WINDOW as SIM1_MA_EXIT_WINDOW,
 )
 from src.strategy.simulators.us_sim2_donchian import (  # noqa: E402
     build_watchlist_entry as build_sim2_entry,
@@ -54,14 +57,21 @@ FUNDAMENTALS_RATE_LIMIT_SLEEP_SEC = 0.15
 YAHOO_RATE_LIMIT_SLEEP_SEC = 0.15
 
 
-def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamentals):
+def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamentals,
+                                  sim1_held=()):
     """오케스트레이션. 네트워크 함수는 주입 — 테스트에서 모킹한다.
 
     반환: (sim1_watchlist, sim2_watchlist, sim3_watchlist). 세 판정은 서로 독립이라
     한쪽이 탈락해도 다른 쪽은 계속 평가한다.
 
     US Sim3(기준선)은 판정이 없다 — 여기서 모은 (심볼, 이름, 평균거래대금)을
-    그대로 정렬해 상위 N을 뽑을 뿐이다. 그래서 추가 네트워크 호출이 0이다."""
+    그대로 정렬해 상위 N을 뽑을 뿐이다. 그래서 추가 네트워크 호출이 0이다.
+
+    sim1_held: US Sim1이 지금 보유 중인 심볼. 진입 자격을 잃어도 ma50만 실은
+    **청산 판정용** 항목으로 워치리스트에 남긴다(pivot_price=None이라 다시 살
+    수는 없다). 안 그러면 50일선 이탈 청산이 구조적으로 발화하지 않는다 —
+    _trend_template_ok가 `price > ma50`을 요구하므로 50일선을 깬 종목은
+    정의상 워치리스트에 못 오르기 때문이다."""
     out1 = {}
     out2 = {}
     liquidity_rows = []
@@ -114,6 +124,13 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
                 })
                 if entry1:
                     out1[symbol] = entry1
+
+        # US Sim1 보유 종목은 위에서 탈락했어도 ma50만 실어 남긴다 — 청산 전용.
+        if symbol in sim1_held and symbol not in out1:
+            ma50 = _sma(closes, SIM1_MA_EXIT_WINDOW)
+            if ma50 is not None:
+                out1[symbol] = {'name': name, 'pivot_price': None, 'ma50': ma50,
+                                'avg_dollar_volume': avg_dollar_volume}
 
         # US Sim2 — 펀더멘털 불필요. 위에서 이미 계산한 평균거래대금으로 후보를 좁힌다.
         entry2 = build_sim2_entry(name, daily_closes, avg_dollar_volume)
@@ -173,6 +190,25 @@ def resolve_universe(path: str) -> tuple[list[dict], bool]:
         return prev, True
 
 
+def load_sim1_holdings(data_dir: str) -> set:
+    """US Sim1이 지금 보유 중인 심볼. 없으면 빈 집합(그날은 종전 동작).
+
+    시뮬레이터를 인스턴스화하지 않는다 — BaseSimulator.load_state는 상태 파일이
+    없으면 reset_state로 넘어가 거래 이력 CSV를 지운다. 여기서는 읽기만 한다.
+    파일명 규칙은 BaseSimulator.__init__(sim_<name.lower()>_state.json)와 같다."""
+    path = os.path.join(data_dir, 'sim_us1minervini_state.json')
+    try:
+        with open(path, encoding='utf-8-sig') as f:
+            held = set((json.load(f).get('portfolio') or {}).keys())
+    except Exception as e:
+        # 조용히 빈 집합으로 넘어가면 청산 지표가 빠진 채 초록으로 끝난다.
+        print(f'[EOD-US] US Sim1 상태를 못 읽었다({type(e).__name__}: {e}) — '
+              '보유 종목 청산 지표(ma50)가 워치리스트에 실리지 않는다')
+        return set()
+    print(f'[EOD-US] US Sim1 보유 {len(held)}종목 — 청산 지표를 워치리스트에 함께 싣는다')
+    return held
+
+
 def _run():
     data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
     universe_path = os.path.join(data_dir, 'us_universe.json')
@@ -186,7 +222,8 @@ def _run():
 
     cik_map = fetch_cik_map()
     watchlist1, watchlist2, watchlist3 = build_watchlists_for_universe(
-        universe, cik_map, fetch_daily_ohlcv, fetch_eps_revenue_growth)
+        universe, cik_map, fetch_daily_ohlcv, fetch_eps_revenue_growth,
+        sim1_held=load_sim1_holdings(data_dir))
     # 아직 안 끝난 가장 가까운 세션 — 장중에 돌리면 오늘치로 찍혀 그 자리에서
     # 쓰인다. 마감 뒤 정규 배치(22:00 UTC)는 지금까지처럼 다음 거래일이다.
     today = watchlist_target_date()

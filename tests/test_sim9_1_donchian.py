@@ -1,6 +1,8 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from src.strategy.simulators.sim9_1_donchian import POSITION_WEIGHT, decide_donchian, MIN_SAMPLE
+from src.strategy.simulators.sim9_1_donchian import (
+    POSITION_WEIGHT, decide_donchian, MIN_SAMPLE, EXIT_DAYS,
+)
 
 # 20일 채널: 저점 900, 상단 1000
 CHANNEL = [900 + (i % 5) * 25 for i in range(19)] + [1000]
@@ -86,8 +88,8 @@ def _held(avg=1050):
     return {'T001': {'name': '돌파주', 'quantity': 10, 'avg_price': avg, 'peak_price': avg}}
 
 
-def test_exit_below_10day_channel_low():
-    """수익 중이라 10일 저점이 진입가 위로 올라온 상태 — 이때 채널 청산이 이익을 잠근다.
+def test_exit_below_channel_low():
+    """수익 중이라 청산 채널 저점이 진입가 위로 올라온 상태 — 이때 채널 청산이 이익을 잠근다.
     (진입 직후 손실 구간에서는 2*ATR 손절이 항상 먼저 걸린다.)"""
     rising = [1000 + 10 * i for i in range(20)]      # 10일 저점 1100, ATR 10 → 손절 980
     orders = decide_donchian(_view(_held(avg=1000)),
@@ -156,3 +158,74 @@ def test_unmeasured_baseline_is_not_treated_as_surge():
     target = _target(amount=3_000_000_000)   # amount_history 없음
     orders = decide_donchian(_view({}), [target] + _surge_filler(), {'T001': 1050})
     assert _buys(orders) == []
+
+
+def test_exit_channel_is_short_enough_to_give_the_slot_back():
+    """청산 채널이 길면 추세가 꺾여도 슬롯이 안 돈다.
+
+    2026-09-15 실측: 심9-1은 5/5 만석으로 7거래일간 매수 0건이었는데, 같은
+    기간 채널돌파+거래대금 게이트를 전부 통과하고도 슬롯이 없어 못 산 종목이
+    하루 6~14건이었다. 보유 중 현대건설은 고점 대비 -7.0%까지 밀렸는데도
+    10일 채널 저점에는 닿지 않아 청산이 안 났다(peak_price는 기록만 되고
+    청산식에 쓰이지 않는다).
+
+    고정 익절을 새로 만들지 않고 터틀의 기존 손잡이(청산 채널 길이)만 줄인다.
+    아래 rising에서 10일 저점은 1100, 5일 저점은 1150이다 — 1140은 그 사이라
+    긴 채널에서는 안 팔리고 짧은 채널에서만 팔린다.
+    """
+    rising = [1000 + 10 * i for i in range(20)]
+    orders = decide_donchian(_view(_held(avg=1000)),
+                             [_target(price=1140, range_history=rising)], {'T001': 1140})
+    s = _sells(orders)
+    assert len(s) == 1 and '채널 이탈' in s[0]['reason'], (
+        f"5일 저점 1150을 하회했는데 청산이 안 났다 (EXIT_DAYS={EXIT_DAYS})")
+
+
+def test_exit_channel_still_rides_a_live_trend():
+    """짧아진 청산 채널이 살아있는 추세까지 잘라내면 안 된다."""
+    rising = [1000 + 10 * i for i in range(20)]
+    orders = decide_donchian(_view(_held(avg=1000)),
+                             [_target(price=1200, range_history=rising)], {'T001': 1200})
+    assert _sells(orders) == []
+
+
+# ── 청산 사각: 보유가 후보에서 빠지면 아무 판정도 못 한다 ────────
+# 2026-09-15 진단에서 US1·심11의 "청산이 후보 목록에 의존해 조용히 죽는" 결함을
+# 고쳤는데, 여기에도 같은 모양이 남아 있다. 청산 루프는 `cand_by_code`에서
+# range_history를 얻으므로 보유가 top100 밖으로 밀리면 ATR 손절·채널 이탈이
+# **둘 다 영구히 평가되지 않고**, 진입 루프와 달리 `_fn` 기록도 없어 로그에 한
+# 줄도 안 남는다. 없는 근거로 파는 건 옳지 않지만, 못 판 사실은 남아야 한다.
+def test_blind_holding_is_reported_even_though_it_is_not_sold():
+    held = {'ZZZ': {'name': 'x', 'quantity': 10, 'avg_price': 1000, 'peak_price': 1000}}
+    notes = []
+
+    orders = decide_donchian(_view(held), _filler(), {'ZZZ': 500}, notes=notes)
+
+    assert _sells(orders) == [], '없는 근거로 팔면 안 된다'
+    assert any('ZZZ' in n for n in notes), f'청산을 평가 못 한 사실이 안 남는다: {notes}'
+
+
+def test_a_holding_with_history_leaves_no_blind_note():
+    """정상 보유는 이 경고를 만들지 않는다 — 상시 뜨는 경고는 아무도 안 본다."""
+    notes = []
+    decide_donchian(_view(_held()), [_target()] + _filler(), {'T001': 1050}, notes=notes)
+    assert notes == []
+
+
+def test_run_reports_the_blind_holding_in_the_funnel_line(tmp_path, capsys):
+    """심 밖으로도 나가야 한다 — decide_ 안에만 있으면 아무도 못 본다."""
+    from src.strategy.simulators.sim9_1_donchian import DonchianBreakoutSimulator
+    s = DonchianBreakoutSimulator(initial_cash=3_000_000)
+    s.state_file = str(tmp_path / 's.json')
+    s.csv_file = str(tmp_path / 's.csv')
+    s.log_file = str(tmp_path / 's.log')
+    s.state = {'initial_cash': 3_000_000, 'cash': 3_000_000, 'invested': 0,
+               'portfolio': {'ZZZ': {'name': 'x', 'quantity': 10, 'avg_price': 1000,
+                                     'peak_price': 1000}},
+               'peak_nav': 3_000_000, 'total_fees': 0, 'history': [3_000_000],
+               'daily_trades': [], 'market_index_healthy': True, 'cooldown_codes': {}}
+
+    s.run(_filler(), {'ZZZ': 500})
+
+    out = capsys.readouterr().out
+    assert 'ZZZ' in out, f'깔때기 줄에 사각이 안 실린다: {out!r}'

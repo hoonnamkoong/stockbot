@@ -18,7 +18,6 @@
 장중에 돌려야 의미 있는 필드가 있다(tick_power, frgn_fake_ntby_qty 등).
 """
 import collections
-import glob
 import os
 import re
 import sys
@@ -95,6 +94,33 @@ def fields_read(path, module_name=None):
     return sorted(found - PORTFOLIO_KEYS)
 
 
+def sim_paths() -> list[tuple[str, str]]:
+    """감사 대상 심 파일 목록. (경로, 모듈명). **매니페스트가 목록의 원천이다.**
+
+    `sim*.py` 글롭으로 훑던 시절엔 은퇴한 심 파일(sim1_original·sim2_conservative·
+    sim3_aggressive — 매니페스트에 없고 마지막 거래가 2026년 4~5월)까지 집었다.
+    감사는 심마다 `get_universe()`를 라이브로 부르므로 죽은 심에 KIS 호출을 태우고,
+    출력에는 현역과 같은 모양의 줄을 찍어 읽는 사람에게 유령을 현역으로 보이게 한다.
+    """
+    import yaml
+
+    manifest = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            '..', 'src', 'strategy', 'strategy_manifest.yaml')
+    with open(manifest, encoding='utf-8') as f:
+        modules = [e['module'].rsplit('.', 1)[-1]
+                   for e in yaml.safe_load(f)['simulators']]
+
+    out = []
+    for name in sorted(modules):
+        if name in SKIP_SIMS:
+            continue
+        path = os.path.join('src', 'strategy', 'simulators', f'{name}.py')
+        if not os.path.exists(path):
+            continue
+        out.append((path, name))
+    return out
+
+
 def load_sim(module_name):
     import importlib
     mod = importlib.import_module(f'src.strategy.simulators.{module_name}')
@@ -130,9 +156,8 @@ def main():
     worker = TradeEngineWorker(ctx, None)
 
     problems = []
-    for path in sorted(glob.glob('src/strategy/simulators/sim*.py')):
-        name = os.path.basename(path)[:-3]
-        if name in SKIP_SIMS or (only and name != only):
+    for path, name in sim_paths():
+        if only and name != only:
             continue
         keys = fields_read(path, name)
         if not keys:

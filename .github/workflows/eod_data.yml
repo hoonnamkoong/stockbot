@@ -176,7 +176,15 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git clone --branch db-data --depth 1 \
             https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_repo
+          # 오늘 봉은 선착순이다. EOD는 매 거래일 두 번 도는데(16:00 태스커 dispatch +
+          # 21~23시 지연 cron) 늦은 런은 16:01 스냅샷 이후에 붙은 시간외단일가(16~18시)·
+          # NXT 애프터마켓(~20시) 체결까지 담는다 — 20260914에 95/100 종목의 종가가
+          # 바뀌었고(중앙 -0.71%) 심11 감시목록이 GS+한화생명에서 한화생명으로 뒤집혔다.
+          # 정본은 정규장 종가이므로, 오늘 행은 먼저 쓴 값을 지키고 과거 행만 갱신한다.
+          # 병합이 실패해도 배포 자체는 막지 않는다(그 경우 종전대로 이번 런 값이 나간다).
           if [ "$csv_ok" = 1 ]; then
+            python scripts/merge_ohlcv_bars.py output/kospi_top100_close.csv               db_repo/data/kospi_top100_close.csv               || echo "[병합] 종가 CSV 병합 실패 — 이번 런 값 그대로 배포한다"
+            python scripts/merge_ohlcv_bars.py output/ohlcv_top100.csv               db_repo/data/ohlcv_top100.csv               || echo "[병합] OHLCV 병합 실패 — 이번 런 값 그대로 배포한다"
             cp output/kospi_top100_close.csv db_repo/data/
             # OHLCV는 종가 CSV와 같은 호출에서 나온다. 없거나 0행이면 수집이 퇴행한
             # 것이므로 조용히 넘기지 않고 로그를 남긴다(종가 배포 자체는 계속한다).
@@ -201,6 +209,15 @@ jobs:
           for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv \
                    sim11_watchlist.json; do
             [ -f "../data/$f" ] && cp "../data/$f" "data/$f" && git add "data/$f"
+          done
+          # 심11 감시목록 깔때기. 날짜가 파일명에 들어가 위 리터럴 목록에 못 넣는다.
+          # 이게 없으면 계측은 도는데 결과가 db-data에 도착하지 않는다 — Actions
+          # 로그는 며칠이면 사라지므로 후보 100→1의 탈락 분포를 소급할 수 없다.
+          for f in ../data/sim11_watchlist_diag_*.csv; do
+            if [ -f "$f" ]; then
+              b="$(basename "$f")"
+              cp "$f" "data/$b" && git add "data/$b"
+            fi
           done
           if ! git diff --cached --quiet; then
             git commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')"

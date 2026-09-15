@@ -196,3 +196,57 @@ def test_workflow_merges_the_wide_close_file_too():
         wf = f.read()
     assert 'kospi_top100_close.csv' in wf.split('merge_ohlcv_bars.py')[1][:400], (
         '종가 CSV는 병합되지 않는다 — 같은 날을 두고 OHLCV와 서로 다른 값을 갖게 된다')
+
+
+# ── 필드마다 확정되는 쪽이 다르다 (2026-09-16 실측) ──────────────
+# 같은 날을 여러 스냅샷에 걸쳐 추적하니 가격과 거래량이 정반대로 움직였다.
+# 삼성전자 20260914: 이른 249000 → 늦은 248500 → **다음 날 확정 249000**(이른 값으로 복귀).
+# SK하이닉스도 1698000 → 1683000 → 1697000. 20260911 행은 여섯 스냅샷 전부 동일하다
+# (이틀 지나면 고정). 즉 **늦은 런의 종가가 이상치이고 다음 날 정정된다.**
+#
+# 반대로 거래량은 늦은 값이 확정이다 — 20260914 거래량은 늦은 커밋 값에서
+# 그 뒤 단 한 종목도(0/99) 바뀌지 않았다. 장 마감 뒤에도 체결이 실제로 쌓이기 때문이다.
+#
+# 그래서 선착순을 전 필드에 걸면 거래량·거래대금이 3~4.5% 낮은 채로 하룻밤 남는다.
+# 가격은 선착순, 수량은 최신 — 필드마다 갈라야 한다.
+VOLUME_FIELDS = ('volume', 'amount')
+
+
+def test_volume_takes_the_latest_value_even_for_today():
+    existing = [_row('20260914', '005930', '249000', volume='1000')]
+    fresh = [_row('20260914', '005930', '248500', volume='1045')]
+
+    merged = merge_rows(existing, fresh, today='20260914')
+
+    assert merged[0]['close'] == '249000', '종가는 먼저 쓴 값이어야 한다'
+    assert merged[0]['volume'] == '1045', '거래량은 늦게 쌓인 값이 확정이다'
+    assert merged[0]['amount'] == '1045', '거래대금도 거래량과 같이 간다'
+
+
+def test_volume_never_goes_backwards_in_the_merge():
+    """늦은 런이 더 작은 거래량을 주면(있을 수 없지만) 큰 쪽을 지킨다."""
+    existing = [_row('20260914', '005930', '249000', volume='2000')]
+    fresh = [_row('20260914', '005930', '248500', volume='1000')]
+
+    merged = merge_rows(existing, fresh, today='20260914')
+
+    assert merged[0]['volume'] == '2000', '거래량이 뒤로 갈 수는 없다'
+
+
+def test_price_fields_still_take_the_earlier_value():
+    """가격 쪽 규칙은 그대로다 — 이 변경이 그걸 건드리면 안 된다."""
+    existing = [_row('20260914', '005930', '100')]
+    fresh = [_row('20260914', '005930', '200')]
+
+    merged = merge_rows(existing, fresh, today='20260914')
+
+    for f in ('open', 'high', 'low', 'close'):
+        assert merged[0][f] == '100', f'{f}는 먼저 쓴 값이어야 한다'
+
+
+def test_wide_close_file_is_unaffected_by_the_volume_rule():
+    """종가 CSV에는 volume 열이 없다 — 열 이름이 우연히 겹치지 않는 한 그대로."""
+    existing = [{'date': '20260914', 'A': '100'}]
+    fresh = [{'date': '20260914', 'A': '99'}]
+
+    assert merge_rows(existing, fresh, today='20260914') == [{'date': '20260914', 'A': '100'}]

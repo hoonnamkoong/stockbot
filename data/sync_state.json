@@ -27,6 +27,31 @@
       "code": "005930",
       "name": "삼성전자",
       "rank": 5
+    },
+    {
+      "code": "062970",
+      "name": "한국첨단소재",
+      "rank": 1
+    },
+    {
+      "code": "096770",
+      "name": "SK이노베이션",
+      "rank": 2
+    },
+    {
+      "code": "158430",
+      "name": "아톤",
+      "rank": 3
+    },
+    {
+      "code": "042700",
+      "name": "한미반도체",
+      "rank": 4
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "028300",
     "014950",
     "000660",
-    "005930"
+    "005930",
+    "062970",
+    "096770",
+    "158430",
+    "042700",
+    "034020"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "062970",
+      "name": "한국첨단소재",
+      "rank": 1
+    },
+    {
+      "code": "096770",
+      "name": "SK이노베이션",
+      "rank": 2
+    },
+    {
+      "code": "158430",
+      "name": "아톤",
+      "rank": 3
+    },
+    {
+      "code": "042700",
+      "name": "한미반도체",
+      "rank": 4
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

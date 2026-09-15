@@ -187,3 +187,45 @@ def test_exit_channel_still_rides_a_live_trend():
     orders = decide_donchian(_view(_held(avg=1000)),
                              [_target(price=1200, range_history=rising)], {'T001': 1200})
     assert _sells(orders) == []
+
+
+# ── 청산 사각: 보유가 후보에서 빠지면 아무 판정도 못 한다 ────────
+# 2026-09-15 진단에서 US1·심11의 "청산이 후보 목록에 의존해 조용히 죽는" 결함을
+# 고쳤는데, 여기에도 같은 모양이 남아 있다. 청산 루프는 `cand_by_code`에서
+# range_history를 얻으므로 보유가 top100 밖으로 밀리면 ATR 손절·채널 이탈이
+# **둘 다 영구히 평가되지 않고**, 진입 루프와 달리 `_fn` 기록도 없어 로그에 한
+# 줄도 안 남는다. 없는 근거로 파는 건 옳지 않지만, 못 판 사실은 남아야 한다.
+def test_blind_holding_is_reported_even_though_it_is_not_sold():
+    held = {'ZZZ': {'name': 'x', 'quantity': 10, 'avg_price': 1000, 'peak_price': 1000}}
+    notes = []
+
+    orders = decide_donchian(_view(held), _filler(), {'ZZZ': 500}, notes=notes)
+
+    assert _sells(orders) == [], '없는 근거로 팔면 안 된다'
+    assert any('ZZZ' in n for n in notes), f'청산을 평가 못 한 사실이 안 남는다: {notes}'
+
+
+def test_a_holding_with_history_leaves_no_blind_note():
+    """정상 보유는 이 경고를 만들지 않는다 — 상시 뜨는 경고는 아무도 안 본다."""
+    notes = []
+    decide_donchian(_view(_held()), [_target()] + _filler(), {'T001': 1050}, notes=notes)
+    assert notes == []
+
+
+def test_run_reports_the_blind_holding_in_the_funnel_line(tmp_path, capsys):
+    """심 밖으로도 나가야 한다 — decide_ 안에만 있으면 아무도 못 본다."""
+    from src.strategy.simulators.sim9_1_donchian import DonchianBreakoutSimulator
+    s = DonchianBreakoutSimulator(initial_cash=3_000_000)
+    s.state_file = str(tmp_path / 's.json')
+    s.csv_file = str(tmp_path / 's.csv')
+    s.log_file = str(tmp_path / 's.log')
+    s.state = {'initial_cash': 3_000_000, 'cash': 3_000_000, 'invested': 0,
+               'portfolio': {'ZZZ': {'name': 'x', 'quantity': 10, 'avg_price': 1000,
+                                     'peak_price': 1000}},
+               'peak_nav': 3_000_000, 'total_fees': 0, 'history': [3_000_000],
+               'daily_trades': [], 'market_index_healthy': True, 'cooldown_codes': {}}
+
+    s.run(_filler(), {'ZZZ': 500})
+
+    out = capsys.readouterr().out
+    assert 'ZZZ' in out, f'깔때기 줄에 사각이 안 실린다: {out!r}'

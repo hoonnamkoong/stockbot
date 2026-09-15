@@ -64,3 +64,21 @@ def test_scraper_does_not_race_the_eod_writer_for_it():
     assert 'sim11_watchlist_diag_*.csv' in blocks[0], (
         'scraper.yml 제외 목록에 심11 감시목록 깔때기가 없다 — '
         'eod_data.yml이 쓴 파일을 옛 사본으로 덮을 수 있다')
+
+
+def test_the_funnel_output_is_watched_for_freshness():
+    """계측은 조용히 멈출 수 있다 — 멈춘 걸 알려주는 경로가 있어야 한다.
+
+    이 파일은 db-data까지 배포되게 배선했지만(위 두 테스트), 배포가 되는 것과
+    '안 나오면 누가 알려주나'는 다른 축이다. 신선도 매니페스트는 글롭을
+    지원한다(`data/regime_observations_*.csv` 선례) — 날짜별 파일이어도 들어간다.
+    """
+    import yaml
+    cfg = os.path.join(os.path.dirname(__file__), '..', 'config', 'data_freshness.yaml')
+    with open(cfg, encoding='utf-8') as f:
+        outputs = yaml.safe_load(f)['outputs']
+
+    paths = [e['path'] for e in outputs]
+    assert 'data/sim11_watchlist_diag_*.csv' in paths, (
+        '심11 감시목록 깔때기가 신선도 감시 대상이 아니다 — '
+        '조용히 안 나와도 아무도 안 알려준다')

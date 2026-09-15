@@ -194,7 +194,7 @@ class DonchianBreakoutSimulator(BaseSimulator):
       묶인 이유는 '차트 데이터 계열'뿐이라 나중에 독립 번호로 옮기는 게 자연스럽다.
     - 진입: 20일 채널(range_history 종가) 상단 돌파 + 거래대금 급증(자기 평균
       대비 배수의 횡단면 z > 0, _surge_pairs 참고) + 거래대금>=10억
-    - 청산: 10일 채널 저점 이탈 / 진입가 - 2*ATR 손절. 고정 익절 없음.
+    - 청산: 5일 채널 저점 이탈 / 진입가 - 2*ATR 손절. 고정 익절 없음.
     - Sim5와 같은 `range_history`를 정반대 방향으로 쓴다(Sim5는 채널 저점 매수).
     - **실행 위치: 장중 루프가 아니라 마감 후 1회**(IS_EOD). scripts/run_eod_sims.py가
       eod_data.yml의 ohlcv_top100.csv로 돌린다 — 백테스트와 같은 유니버스·같은 데이터다.

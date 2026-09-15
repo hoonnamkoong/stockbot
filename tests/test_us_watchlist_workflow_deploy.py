@@ -80,3 +80,20 @@ def test_scraper_does_not_deploy_the_us_universe():
     assert any(fnmatch.fnmatch('us_universe.json', p)
                for p in _scraper_skip_patterns()), \
         'us_universe.json이 scraper.yml 배포 제외 목록에 없다'
+
+
+# ── 보유 종목 청산 지표는 배치가 US Sim1 상태를 읽어야 실린다 (2026-09-15) ────
+# US Sim1의 50일선 이탈 청산은 ma50을 그날 워치리스트에서 읽는데, 워치리스트
+# 진입 자격(_trend_template_ok)에 `price > ma50`이 들어 있어 "50일선을 깬 종목"은
+# 정의상 목록에 못 오른다. 배치가 보유 종목에 한해 ma50을 따로 실어 주려면
+# 상태 파일(data/sim_us1minervini_state.json)이 러너에 있어야 하는데, 이 파일은
+# main이 아니라 db-data에만 있다 — 복원 스텝이 없으면 코드만 고쳐도 무효다.
+
+def test_workflow_restores_sim1_state_for_exit_metrics():
+    with open(WF, encoding='utf-8') as f:
+        text = f.read()
+    restore = text.split('Restore previous universe (db-data)', 1)[1] \
+                  .split('- name:', 1)[0]
+    assert 'sim_us1minervini_state.json' in restore, (
+        'us_eod_watchlist.yml이 US Sim1 상태를 db-data에서 복원하지 않는다 — '
+        '보유 종목 ma50이 워치리스트에 안 실려 50일선 이탈 청산이 영영 발화하지 않는다')

@@ -10,6 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from src.strategy.simulators.base_simulator import get_kst_now
 from src.strategy.simulators.sim2_spillover import SectorSpilloverSimulator
 
 
@@ -36,8 +37,11 @@ def _candidate(code, name, price=1000, frgn_net_20d=None):
 
 
 def _holding(code, qty=10, price=1000):
+    """entry_date는 '오늘' — 이 파일이 보려는 건 외인 수급 게이트이지
+    타임스톱이 아니다(박힌 옛 날짜는 타임스톱에 걸려버린다)."""
     return {'name': code, 'quantity': qty, 'avg_price': price,
-            'entry_date': '2026-08-03', 'peak_price': price, 'is_scaled_out': False}
+            'entry_date': get_kst_now().strftime('%Y-%m-%d'),
+            'peak_price': price, 'is_scaled_out': False}
 
 
 # ── 진입 게이트 ──────────────────────────────────────────────────────

@@ -240,6 +240,9 @@ jobs:
               # 결정 스냅샷은 writer별로 파일이 갈린다 — trading.yml 것은
               # 거기서 배포한다. 여기서 같이 밀면 되돌린다.
               sim6_diag_*.csv|sim9_diag_*.csv|sim12_diag_*.csv|sim13_diag_*.csv|decisions_*_actions-trading.csv) continue ;;
+              # 심11 감시목록 깔때기의 writer는 eod_data.yml이다. 여기서도 밀면
+              # 마감 직후 겹칠 때 옛 사본이 갓 쓰인 파일을 덮는다.
+              sim11_watchlist_diag_*.csv) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done

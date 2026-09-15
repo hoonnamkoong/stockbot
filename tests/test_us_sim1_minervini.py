@@ -115,3 +115,23 @@ def test_calendar_functions_still_reachable_via_this_module():
     assert m.us_trading_date is us_calendar.us_trading_date
     assert m.next_us_trading_date is us_calendar.next_us_trading_date
     assert m.next_us_trading_date(_utc(2026, 8, 24, 22)) == '20260825'
+
+
+# ── 50일선 이탈 청산은 보유 종목의 ma50이 candidates에 실려 있어야 발화한다 ────
+# (2026-09-15) 워치리스트에서 빠진 보유 종목은 cand_by_code에 없어 ma50이 None이
+# 되고, 이 청산은 조용히 건너뛴다. 아래 두 테스트가 그 계약을 고정한다.
+
+def test_ma50_exit_fires_for_held_symbol_carried_as_exit_only():
+    view = {'portfolio': {'PSX': {'avg_price': 243.87}}, 'nav': 20000.0, 'cooldown_codes': {}}
+    candidates = [{'code': 'PSX', 'name': 'Phillips 66', 'price': 240.0,
+                   'pivot_price': None, 'ma50': 250.0, 'avg_dollar_volume': 5e8}]
+    orders = m.decide_us_minervini(view, candidates, {'PSX': 240.0}, funnel=[])
+    assert [o['action'] for o in orders] == ['SELL'], '50일선 이탈 청산이 발화하지 않았다'
+    assert '50일선 이탈' in orders[0]['reason']
+
+
+def test_ma50_exit_silently_skipped_when_held_symbol_absent_from_candidates():
+    """회귀 방지용 — 보유 종목이 candidates에 없으면 청산 판단 자체가 없다."""
+    view = {'portfolio': {'PSX': {'avg_price': 243.87}}, 'nav': 20000.0, 'cooldown_codes': {}}
+    orders = m.decide_us_minervini(view, [], {'PSX': 240.0}, funnel=[])
+    assert orders == []

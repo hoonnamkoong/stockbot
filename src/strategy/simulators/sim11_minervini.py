@@ -53,6 +53,12 @@ def _sma(closes: list[float], window: int) -> float | None:
 
 def _trend_template_ok(price: float, closes: list[float],
                        w52_hgpr: float, w52_lwpr: float) -> bool:
+    """추세 템플릿 통과 여부만. 사유가 필요하면 _trend_template_reject를 쓴다."""
+    return _trend_template_reject(price, closes, w52_hgpr, w52_lwpr) is None
+
+
+def _trend_template_reject(price: float, closes: list[float],
+                           w52_hgpr: float, w52_lwpr: float) -> str | None:
     """미너비니 추세 템플릿(간소화 6항목 — 상대강도 순위는 횡단면 데이터가
     필요해 V1에서 뺐다. docstring 참고).
 
@@ -67,28 +73,28 @@ def _trend_template_ok(price: float, closes: list[float],
     ma150 = _sma(closes, 150)
     ma200 = _sma(closes, 200)
     if ma50 is None or ma150 is None or ma200 is None:
-        return False
+        return 'short_history'
     if len(closes) < 200 + MA200_TREND_LOOKBACK:
-        return False
+        return 'short_history'
     ma200_prior = _sma(closes[:-MA200_TREND_LOOKBACK], 200)
     if ma200_prior is None:
-        return False
+        return 'short_history'
 
     if not (price > ma150 > ma200):
-        return False
+        return 'not_stacked'
     if not (ma50 > ma150 and ma50 > ma200):
-        return False
+        return 'not_stacked'
     if not (price > ma50):
-        return False
+        return 'below_ma50'
     if not (ma200 > ma200_prior):
-        return False
+        return 'ma200_flat'
     if w52_lwpr <= 0 or w52_hgpr <= 0:
-        return False
+        return 'no_52w'
     if price < w52_lwpr * (1 + MIN_ABOVE_52W_LOW_PCT / 100):
-        return False
+        return 'near_52w_low'
     if price < w52_hgpr * (1 - MAX_BELOW_52W_HIGH_PCT / 100):
-        return False
-    return True
+        return 'far_below_52w_high'
+    return None
 
 
 def _vcp_contracting(closes: list[float]) -> bool:
@@ -118,7 +124,7 @@ def _vcp_contracting(closes: list[float]) -> bool:
     return recent_range < prior_range * CONTRACTION_RATIO
 
 
-def build_watchlist_entry(stock: dict) -> dict | None:
+def build_watchlist_entry(stock: dict, funnel=None) -> dict | None:
     """감시 목록 항목 하나를 만든다. 자격 미달이면 None.
 
     stock은 scripts.run_eod_sims.candidates_from_kis_live가 주는 형태다:
@@ -128,28 +134,44 @@ def build_watchlist_entry(stock: dict) -> dict | None:
     반환하는 pivot_price·ma50은 **내일부터** 쓸 기준이다 — 오늘을 '이미 지난
     거래일'로 넣어 계산한다(closes_through_today = daily_closes + [price]).
     """
+    code = stock.get('code', '')
     price = float(stock.get('price', 0) or 0)
     daily_closes = stock.get('daily_closes') or []
     if price <= 0:
+        _fn(funnel, code, 'no_price')
         return None
 
     w52_hgpr = float(stock.get('w52_hgpr', 0) or 0)
     w52_lwpr = float(stock.get('w52_lwpr', 0) or 0)
-    if not _trend_template_ok(price, daily_closes, w52_hgpr, w52_lwpr):
+    rejected = _trend_template_reject(price, daily_closes, w52_hgpr, w52_lwpr)
+    if rejected:
+        _fn(funnel, code, rejected)
         return None
 
+    # 결손(KIS가 값을 안 줌)과 미달(값은 있는데 기준에 못 미침)을 가른다.
+    # 고치는 곳이 다르다 — 전자는 수집, 후자는 임계값이다.
     eps_g = stock.get('eps_growth_yoy')
     rev_g = stock.get('revenue_growth_yoy')
-    if eps_g is None or eps_g < MIN_EPS_GROWTH_YOY:
+    if eps_g is None:
+        _fn(funnel, code, 'no_eps')
         return None
-    if rev_g is None or rev_g < MIN_REVENUE_GROWTH_YOY:
+    if eps_g < MIN_EPS_GROWTH_YOY:
+        _fn(funnel, code, 'eps_low', eps=round(float(eps_g), 1))
+        return None
+    if rev_g is None:
+        _fn(funnel, code, 'no_revenue')
+        return None
+    if rev_g < MIN_REVENUE_GROWTH_YOY:
+        _fn(funnel, code, 'revenue_low', rev=round(float(rev_g), 1))
         return None
 
     closes_through_today = daily_closes + [price]
     if not _vcp_contracting(closes_through_today):
+        _fn(funnel, code, 'no_vcp')
         return None
     ma50 = _sma(closes_through_today, MA_EXIT_WINDOW)
     if ma50 is None:
+        _fn(funnel, code, 'no_ma50')
         return None
 
     return {

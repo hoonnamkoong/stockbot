@@ -281,10 +281,20 @@ class LiberoSimulator(BaseSimulator):
         return max(lo, min(hi, v))
 
     def classify_regime(self, breadth, momentum, trend):
-        """5개 집계 지표로 국면 분류."""
+        """5개 집계 지표로 국면 분류.
+
+        BEAR의 momentum 문턱만 -2.0에서 -1.5로 완화했다(2026-09-15, 사용자 판단).
+        근거: 09-03 이후 12일간 BEAR 출현이 0회였고 Sim6는 그 기간 거래가
+        0건이었다. 관측 281행에서 breadth<=40·trend>=15는 자주 충족됐는데
+        momentum이 -2.0을 넘긴 행은 1행뿐이라, AND 게이트가 사실상 momentum
+        하나로 닫혀 있었다(분포: min -2.02, p10 -1.11, median -0.08).
+        완화하면 09-10(최저 -1.88)·09-11(-1.52)·09-14에 instant BEAR가 생긴다.
+        BULL(+2.0)은 건드리지 않아 문턱이 비대칭이다 — 의도한 것이다.
+        확정 국면은 여전히 _confirm_regime의 5표본 과반 평활을 거친다.
+        """
         if breadth >= 60 and momentum >= 2.0 and trend >= 20:
             return "BULL"
-        if breadth <= 40 and momentum <= -2.0 and trend >= 15:
+        if breadth <= 40 and momentum <= -1.5 and trend >= 15:
             return "BEAR"
         return "SIDEWAYS"
 

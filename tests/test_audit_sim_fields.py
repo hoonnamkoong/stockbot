@@ -49,3 +49,32 @@ def test_전_심에서_추출이_터지지_않는다():
     for path in sorted(glob.glob('src/strategy/simulators/sim*.py')):
         name = os.path.basename(path)[:-3]
         assert isinstance(fields_read(path, name), list), name
+
+
+def test_감사_대상은_매니페스트에_등재된_심뿐이다():
+    """파일 글롭은 은퇴한 심 파일까지 집는다 — 목록의 원천은 매니페스트다.
+
+    `sim1_original.py`·`sim2_conservative.py`·`sim3_aggressive.py`는 매니페스트에
+    없는 죽은 파일인데(마지막 거래 2026년 4~5월), `sim*.py` 글롭이 그대로 집어
+    감사 대상에 넣고 있었다. 감사는 각 심의 `get_universe()`를 **라이브로** 부르므로
+    죽은 심에 KIS 호출을 태우고, 출력에 살아 있는 심과 같은 모양의 줄을 찍는다 —
+    읽는 사람에게는 유령이 현역으로 보인다.
+
+    SKIP_SIMS처럼 손으로 적는 목록은 이 레포에서 여러 번 조용히 낡았다.
+    매니페스트에서 파생하면 심을 추가·은퇴시킬 때 여기를 고칠 일이 없다.
+    """
+    import os
+
+    import yaml
+
+    from scripts.audit_sim_fields import sim_paths
+
+    names = {name for _, name in sim_paths()}
+    manifest = os.path.join('src', 'strategy', 'strategy_manifest.yaml')
+    with open(manifest, encoding='utf-8') as f:
+        registered = {e['module'].rsplit('.', 1)[-1]
+                      for e in yaml.safe_load(f)['simulators']}
+
+    ghosts = sorted(names - registered)
+    assert not ghosts, f'매니페스트에 없는 심이 감사 대상이다: {ghosts}'
+    assert 'sim1_psych' in names, '살아 있는 심이 빠지면 안 된다'

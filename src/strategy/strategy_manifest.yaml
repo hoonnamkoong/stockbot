@@ -252,13 +252,13 @@ simulators:
   - id: "sim9_1_donchian"
     module: "src.strategy.simulators.sim9_1_donchian"
     class: "DonchianBreakoutSimulator"
-    description: "Sim9-1 돈치안 채널 돌파 — 20일 채널 상단 돌파 + 10일 채널 이탈/2*ATR 청산 (Sim5의 정반대)"
+    description: "Sim9-1 돈치안 채널 돌파 — 20일 채널 상단 돌파 + 5일 채널 이탈/2*ATR 청산 (Sim5의 정반대)"
     state_file: "sim_donchian_state.json"
     csv_file: "trade_history_sim_donchian.csv"
     label: "돈치안 돌파 (Sim 9-1)"
     display_order: 95
     ui_key: "sim9_1"
-    short_desc: "20일 채널 상단 돌파 추종 · 10일 채널 이탈 / 2ATR 청산"
+    short_desc: "20일 채널 상단 돌파 추종 · 5일 채널 이탈 / 2ATR 청산"
     chart_group: 4
     color: "lime"
     active: true

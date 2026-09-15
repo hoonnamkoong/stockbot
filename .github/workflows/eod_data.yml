@@ -145,6 +145,13 @@ jobs:
             # 아무도 못 읽는다). 원본은 db-data이고 이미 clone했으니 한 줄이면 된다.
             cp state_repo/data/market_calendar.json data/ 2>/dev/null \
               && echo "[EOD] 휴장일 달력 복원" || echo "[EOD] 달력 없음 — 주말 근사로 진행"
+            # 매매기록은 **append**라 복원이 빠지면 잘린다. 배포 스텝은 이 CSV를
+            # db-data에 덮어쓰는데, 러너의 사본은 매 런 백지에서 시작한다 —
+            # 거래가 난 런마다 누적 이력이 그 런의 거래만 남기고 초기화됐다
+            # (2026-09-16 실측: 상태의 daily_trades 8건 vs CSV 데이터 2행).
+            # 상태 JSON은 심이 통째로 다시 쓰므로 복원만으로 충분하지만 이건 다르다.
+            cp state_repo/data/trade_history_sim_donchian.csv data/ 2>/dev/null \
+              && echo "[EOD] 심9-1 매매기록 복원" || echo "[EOD] 기존 매매기록 없음(최초 실행)"
             rm -rf state_repo
             PYTHONPATH=. python scripts/run_eod_sims.py || echo "[EOD] 실행 실패 — CSV 배포는 계속한다"
           else

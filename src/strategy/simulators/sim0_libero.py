@@ -417,9 +417,13 @@ class LiberoSimulator(BaseSimulator):
     # 실측은 채점 전용 — 예측에 정답을 섞지 않는다(룩어헤드 금지).
     # ──────────────────────────────────────────────────
     MARKET_CLOSE = '15:30'
-    SCORE_LOG_MAX = 1200  # ≈ 24건/일 × 50일 (velocity·smoothed_velocity·naive 세 모델 × 8시간대)
-    EOD_DAMPING = 0.5     # 속도 외삽 감쇠(모멘텀은 마감까지 절반만 이어진다고 가정)
-    VELOCITY_SMOOTH_WINDOW = 4  # 속도를 평균낼 관측 구간 수(약 40분)
+    # 하루 13건(h1 6 + EOD 7) x 약 92거래일. 2026-09-16에 예측 모델을 셋에서
+    # 하나로 줄이면서 생산량이 하루 39건에서 13건이 됐다. 상한을 그대로 둔 것은
+    # 롤링 절단이 초기 표본을 조용히 지우는 걸 막기 위해서다(당시 1133/1200).
+    SCORE_LOG_MAX = 1200
+    # 예측 모델 이름. 로그 스키마의 model 필드가 이 값이며, 미기재 로그의
+    # 기본값도 이것이다(구 로그의 'velocity'/'smoothed_velocity'는 그대로 읽힌다).
+    FORECAST_MODEL = 'naive'
 
     @staticmethod
     def _hour_label(now):
@@ -442,7 +446,7 @@ class LiberoSimulator(BaseSimulator):
         """장중 매 런 호출.
         ① 이 시각 top100 실측 breadth 기록(시간대당 1건)
         ② 도래한 +1h 예측을 실측으로 채점 — 해당 시각 실측이 없으면 backfill(KIS 분봉)로 복원 시도
-        ③ 이 시각 기준 +1h/EOD 예측 생성(최근 속도 외삽, 0~100 클램프)
+        ③ 이 시각 기준 +1h/EOD 예측 생성(naive = 직전 실측값 유지, 0~100 클램프)
         measured_breadth가 None이면 아무것도 하지 않는다(fail-quiet)."""
         if measured_breadth is None:
             return
@@ -477,44 +481,39 @@ class LiberoSimulator(BaseSimulator):
                 continue  # 다음 런에서 재시도 (EOD finalize에서 정리)
             self._append_score({
                 'date': today_str, 'type': 'h1', 'made_at': p['made_at'],
-                'model': p.get('model', 'velocity'),
+                'model': p.get('model', self.FORECAST_MODEL),
                 'target': p['target'], 'pred': p['value'], 'actual': actual,
                 'gap': round(p['value'] - actual, 1),
             })
             p['scored'] = True
 
         # ③ 예측 생성 (시간대당 1회)
-        # 나이브 기준선(naive = 직전 실측값 그대로)을 나란히 적는다. 예측을 채점만
-        # 하고 기준선이 없으면 그 오차가 좋은지 나쁜지 알 수 없다 — "아무것도 하지
-        # 않기"보다 나은지가 속도 외삽의 최소 합격선이다. 채점은 아래 ②·finalize_eod의
-        # 기존 경로를 그대로 타고, 로그의 model 필드로만 갈린다.
+        # **예측 모델은 naive(직전 실측값 유지) 하나다.** 원래는 속도 외삽
+        # (velocity = 마지막값 + 최근 변화율 × 남은 시간 × 감쇠)이 본선이었고
+        # naive는 기준선으로, smoothed_velocity는 단일 구간 노이즈를 평활한
+        # 변형으로 옆에서 같이 채점했다. 2026-09-16에 세 모델이 다 있는 19거래일
+        # (08-20~09-15) 표본으로 판정이 났다 — MAE(낮을수록 좋다):
+        #
+        #     모델                  +1h(n=114)    EOD(n=126)
+        #     naive                     6.91         10.90
+        #     smoothed_velocity         9.80         14.80
+        #     velocity                 10.10         15.64
+        #
+        # 일별 클러스터 t = +2.9~+5.4이고, naive보다 나은 날이 19일 중 1~4일뿐이다.
+        # 속도 외삽은 10분짜리 단일 구간의 노이즈를 남은 시간만큼 늘리는 일을
+        # 하고 있었고, 평활해도 그 방향이 바뀌지 않았다. 그래서 두 velocity 계열을
+        # 예측 경로에서 내렸다(기록은 intraday_score_log에 09-15까지 남아 있다).
         if not any(p['made_at'] == label for p in preds):
-            velocity = meas[-1]['breadth'] - meas[-2]['breadth'] if len(meas) >= 2 else 0.0
-            # velocity는 관측 두 개(약 10분 간격) 사이의 단일 차분이라 노이즈가 크다.
-            # 08-19 실측: 그 노이즈를 남은 시간만큼 그대로 늘리다 보니 velocity 모델이
-            # naive(직전값 유지)보다 못했다(EOD MAE 12.1 vs 8.8). smoothed_velocity는
-            # 최근 VELOCITY_SMOOTH_WINDOW개 구간의 평균 변화율을 써서 단일 구간의
-            # 튐을 상쇄한다 — 감쇠(EOD_DAMPING)는 그대로 둬서 "속도를 평활화한 효과"만
-            # 골라 비교할 수 있게 한다. 아직 표본이 없어 calibration_log(공식 노출값)는
-            # 건드리지 않는다 — naive를 붙였을 때와 같은 방식으로 며칠 나란히 채점만 한다.
-            k = min(self.VELOCITY_SMOOTH_WINDOW, len(meas) - 1)
-            smoothed_velocity = (meas[-1]['breadth'] - meas[-1 - k]['breadth']) / k if k > 0 else 0.0
             last = meas[-1]['breadth']
             next_label = f"{now.hour + 1:02d}:00"
-            hours_left = max(0.0, 15.5 - (now.hour + now.minute / 60.0))
-            for model, h1_value, eod_value in (
-                ('velocity', last + velocity, last + velocity * hours_left * self.EOD_DAMPING),
-                ('smoothed_velocity', last + smoothed_velocity,
-                 last + smoothed_velocity * hours_left * self.EOD_DAMPING),
-                ('naive', last, last),
-            ):
-                if next_label <= '15:00':
-                    preds.append({'made_at': label, 'target': next_label, 'type': 'h1',
-                                  'model': model, 'value': round(self._clamp(h1_value), 1),
-                                  'scored': False})
-                preds.append({'made_at': label, 'target': 'EOD', 'type': 'eod',
-                              'model': model, 'value': round(self._clamp(eod_value), 1),
+            value = round(self._clamp(last), 1)
+            if next_label <= '15:00':
+                preds.append({'made_at': label, 'target': next_label, 'type': 'h1',
+                              'model': self.FORECAST_MODEL, 'value': value,
                               'scored': False})
+            preds.append({'made_at': label, 'target': 'EOD', 'type': 'eod',
+                          'model': self.FORECAST_MODEL, 'value': value,
+                          'scored': False})
 
         self.save_state()
 
@@ -536,10 +535,18 @@ class LiberoSimulator(BaseSimulator):
 
         first_eod_pred = None
         for p in intr['predictions']:
-            model = p.get('model', 'velocity')
+            model = p.get('model', self.FORECAST_MODEL)
             # calibration_log(프론트 갭 차트)는 **예측 모델**의 갭이어야 한다.
-            # 기준선이 그 자리를 차지하면 차트의 의미가 조용히 바뀐다.
-            if p['type'] == 'eod' and model == 'velocity' and first_eod_pred is None:
+            # 2026-09-16까지는 이 조건이 `model == 'velocity'`였다. 예측 모델이
+            # naive로 바뀌었으니 이름을 따라가야 한다 — 상수를 안 쓰고 문자열을
+            # 박아두면 모델이 사라진 뒤 조건이 영원히 거짓이 되고, 갭 차트가
+            # 에러 없이 **갱신만 멈춘다**(그래서 여기서 FORECAST_MODEL을 쓴다).
+            # 값 자체는 바뀌지 않는다: calibration에 들어가는 건 그날 첫 EOD
+            # 예측이고, 그 버킷(09:00)에는 관측이 1개뿐이라 옛 velocity는 0,
+            # smoothed도 k=min(4,0)=0이어서 세 모델의 예측이 전부 last로
+            # 같았다 — db-data 라이브 상태의 22거래일 전부(22/22)에서 그날 첫
+            # 버킷은 09:00이고 세 모델의 EOD 예측이 한 자리도 다르지 않았다.
+            if p['type'] == 'eod' and model == self.FORECAST_MODEL and first_eod_pred is None:
                 first_eod_pred = p['value']
             if p.get('scored'):
                 continue

@@ -45,7 +45,8 @@ log = sim.state['intraday_score_log']
 check('T2a 11시에 10시 +1h 예측 채점', len(log) == 1 and log[0]['type'] == 'h1')
 check('T2b 갭 = 예측(40) - 실측(46) = -6', log[0]['gap'] == -6.0)
 h1_11 = [p for p in sim.state['intraday']['predictions'] if p['type'] == 'h1' and p['made_at'] == '11:00']
-check('T2c 속도 외삽: 11시 +1h 예측 = 46 + (46-40) = 52', h1_11 and h1_11[0]['value'] == 52.0)
+# 2026-09-16: velocity 계열 제거(19거래일 실측에서 naive 압승). 예측은 직전값 유지다.
+check('T2c naive: 11시 +1h 예측 = 직전 실측 46', h1_11 and h1_11[0]['value'] == 46.0)
 
 # ── T3: 같은 시각 중복 호출 → 측정·예측 중복 없음 ──────────────
 n_m = len(sim.state['intraday']['measurements'])
@@ -56,11 +57,14 @@ check('T3 같은 시간대 재실행 시 중복 기록 없음',
       and len(sim.state['intraday']['predictions']) == n_p)
 
 # ── T4: 클램프 0~100 ───────────────────────────────────────────
+# 2026-09-16: velocity 제거 후 예측은 직전 실측(이미 0~100)이라 **상한에 구조적으로
+# 닿지 않는다.** 클램프 자체는 남아 있지만 여기서는 통과만 확인한다 — 상한을
+# 넘길 수 있었던 건 속도 외삽뿐이었다.
 sim2 = fresh_sim()
 sim2.update_nowcast(90.0, now_kst=kst(10))
 sim2.update_nowcast(99.0, now_kst=kst(11))
 h1v = [p for p in sim2.state['intraday']['predictions'] if p['type'] == 'h1' and p['made_at'] == '11:00'][0]['value']
-check('T4 예측 클램프 상한 100', h1v == 100.0)
+check('T4 naive는 실측을 그대로 통과시킨다(클램프 상한에 닿지 않음)', h1v == 99.0)
 
 # ── T5: 15시 런 → +1h 예측 미생성(장 마감 지남), EOD 예측은 생성 ─
 sim3 = fresh_sim()

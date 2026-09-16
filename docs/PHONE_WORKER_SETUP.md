@@ -127,3 +127,170 @@ python scripts/phone_soak.py --report
 | 미통과 | GCP `e2-micro`로 전환. 구멍의 시각을 보고 원인(재부팅·킬·네트워크)을 먼저 적어 둔다 |
 
 미통과라고 실패가 아니다 — **돈을 걸기 전에 알아낸 것이 이 단계의 산출물이다.**
+
+---
+
+# 3단계 — 그림자 운전
+
+2단계(3일 소크)를 2026-09-09에 통과했다. 여기서 하는 일은 하나다:
+
+> **폰이 옛 경로와 같은 결정을 내리는가?**
+
+폰은 **읽기만** 한다. 두 경로가 같은 계좌를 보고 있으므로 폰이 무엇이든 실행하면
+그건 시험이 아니라 **중복 실행**이다. 막는 장치는 `src/trade/shadow.py`에 있고
+층이 둘이다 — 층1은 `STOCKBOT_RUNNER=phone`이면 코드가 무조건 그림자로 판정하는 것,
+층2는 **폰에 `WEBHOOK_SECRET`을 주지 않는 것**이다. 층1만 두면 플래그 실수로
+실주문이 나가고, 층2만 두면 취소 경로(KIS 직접 호출, Vercel 우회)가 열려 있다.
+
+## 3-1. 의존성 (2단계는 표준 라이브러리만 썼다)
+
+```bash
+cd ~/stockbot && git pull
+pip install -r scripts/requirements-trade.txt
+```
+
+스크래퍼 requirements를 쓰지 마라 — pandas·sklearn까지 깔린다. 폰에서는 설치
+시간보다 저장공간·메모리가 문제다.
+
+## 3-2. 환경변수 — **안 주는 것이 핵심이다**
+
+`~/.stockbot_env`를 만든다 (`chmod 600`):
+
+```bash
+cat > ~/.stockbot_env <<'ENV'
+export STOCKBOT_RUNNER=phone        # ← 이게 없으면 3단계가 성립하지 않는다
+export TZ=Asia/Seoul
+export PYTHONPATH=$HOME/stockbot
+export KIS_APP_KEY=...
+export KIS_APP_SECRET=...
+export KIS_ACCOUNT_NO=...
+export KIS_APP_ACCOUNT=...          # KIS_ACCOUNT_NO와 같은 값
+ENV
+chmod 600 ~/.stockbot_env
+```
+
+**주지 않는 것과 그 이유:**
+
+| 변수 | 왜 안 주나 | 안 주면 어떻게 되나 |
+|---|---|---|
+| `WEBHOOK_SECRET` | 층2 방어. 신규 주문(`/api/trade/order`)과 미체결 취소의 열쇠다 | 주문 경로가 애초에 닫힌다 |
+| `GH_PAT` | 비공개 레포(원장) 쓰기 권한이다. 폰이 원장을 건드리면 그림자가 아니다 | `[Program] GH 토큰 없음 → 원장 조회 불가 (fail-closed)` — 프로그램 경로가 안전하게 건너뛰어진다 |
+| `TELEGRAM_BOT_TOKEN` / `CHAT_ID` | 폰과 Actions가 같은 장애를 두 번 알린다 | `send_alert`가 예외를 삼키고 로그만 남긴다 |
+| `DASHBOARD_URL` | 주문을 내는 Vercel 엔드포인트 주소다 | 그림자에서는 쓸 일이 없다 |
+
+> **`STOCKBOT_RUNNER=phone`을 빠뜨리는 것이 이 단계의 유일한 치명적 실수다.**
+> 그러면 결정이 `actions`로 기록돼 **자기 자신과 비교**되고 불일치가 영원히 0으로
+> 나온다. 통과처럼 보이는 실패다. 3-5의 첫 확인이 정확히 이걸 잡는다.
+
+**한계(적어 두고 넘어간다)**: `GH_PAT`을 안 주므로 폰은 **프로그램(실계좌) 판단
+경로를 돌지 않는다.** 이 단계가 비교하는 것은 **페이퍼 심의 판단**이다. 실계좌
+판단까지 대조하려면 비공개 레포 **읽기 전용** 파인그레인드 토큰을 따로 발급해
+`GH_PAT`에 넣어야 한다 — 그러면 `shadow.py`가 주문만 막고 원장은 읽는다.
+4단계(소유권 이전) 전에 그 대조가 필요한지는 별도 판단이다.
+
+## 3-3. 입력을 옛 경로와 맞춘다
+
+폰이 다른 시세를 보면 판단이 갈려도 그건 불일치가 아니라 **입력 차이**다.
+비교기가 그 둘을 나누지만(`input_hash`), 애초에 같은 상태에서 시작해야 한다.
+
+```bash
+cd ~/stockbot
+git fetch origin db-data:db-data          # 토큰 불필요 — public 레포다
+git checkout db-data -- data/
+```
+
+**폰은 db-data에 push하지 않는다.** Actions 쪽 writer와 다투면 lost update가
+난다. `scripts/trade_loop.py` 자체는 배포를 하지 않으므로(배포는 워크플로의
+별 스텝이다) 그냥 안 하면 된다.
+
+## 3-4. 루프 시작
+
+```bash
+cat > ~/.termux/boot/shadow.sh <<'SH'
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+. $HOME/.stockbot_env
+cd $HOME/stockbot
+while :; do
+  git fetch -q origin db-data:db-data 2>/dev/null
+  git checkout -q db-data -- data/ 2>/dev/null
+  python -u scripts/trade_loop.py >> $HOME/shadow.log 2>&1
+  sleep 60
+done
+SH
+chmod +x ~/.termux/boot/shadow.sh
+```
+
+`trade_loop.py`는 한 번 호출에 **두 바퀴**(60초 간격)를 돌고 예산(85초)을 쓰면
+끝난다. 그래서 바깥 `sleep 60`과 합쳐 옛 경로(태스커 2분 트리거)와 비슷한 격자가
+된다. 2단계 소크를 계속 돌리고 있었다면 그건 멈춰도 된다 — 이 루프가 같은 질문에
+답한다.
+
+## 3-5. 첫 확인 (루프 시작 직후, 5분 안에)
+
+```bash
+ls ~/stockbot/data/decisions_*_phone.csv
+```
+
+**이 파일이 생기지 않으면 더 진행하지 마라.** 둘 중 하나다.
+
+1. `STOCKBOT_RUNNER`가 안 걸렸다 → `decisions_*_actions.csv`가 생긴다. 환경변수를 고친다.
+2. 루프가 판단에 도달하지 못했다 → `~/shadow.log`에서 `[준비상태]`와 `깔때기`를 본다.
+
+그리고 그림자가 실제로 걸렸는지:
+
+```bash
+grep -i "그림자\|shadow\|차단" ~/shadow.log | head
+```
+
+## 3-6. 스냅샷을 PC로 옮긴다
+
+**전송을 자동화하지 않는다.** 폰이 스스로 올리려면 git PAT이나
+`WEBHOOK_SECRET`이 필요한데, 둘 다 층2 방어를 뚫는다 — 3단계의 목적과 정면으로
+어긋난다. 5거래일 게이트에는 수동 복사로 충분하다.
+
+Tailscale이 이미 붙어 있으면(2단계 §3):
+
+```bash
+# PC에서
+scp -P 8022 '<user>@<tailscale-ip>:~/stockbot/data/decisions_*_phone.csv' ./shadow_in/
+```
+
+기준선은 db-data에서 받는다. **러너 이름이 `actions`가 아니라
+`actions-trading`이다**(`trading.yml`이 그렇게 띄운다):
+
+```bash
+git fetch origin db-data && git checkout origin/db-data -- data/
+cp data/decisions_*_actions-trading.csv ./shadow_in/
+```
+
+## 3-7. 판정
+
+```bash
+python scripts/compare_shadow_decisions.py --date 20260917 --data-dir ./shadow_in
+```
+
+읽는 법:
+
+- **판단 일치율** — `input_hash`가 같은 `(cycle_id, sim, code)`에서 decision이
+  같은 비율. 이것만이 "같은 결정을 내렸나"의 답이다.
+- **입력 불일치(`input_hash` 다름)** — 둘이 다른 시세를 봤다. 이게 비교 대상의
+  대부분이면 **그림자 비교 자체가 성립하지 않는다** — 같은 입력을 본 순간이 없다.
+  3-3의 상태 동기화나 폰의 시세 경로를 먼저 본다.
+- **평가 미도달(`seen`)** — 조기종료로 판단에 도달하지 못한 행. 분모에서 빠진다.
+  양쪽 다 `seen`인 쌍을 "일치"로 세면 아무도 판단하지 않은 행으로 100%가 만들어진다.
+- **키 모호** — `cycle_id`가 빈 행. 폰이 `scripts/trade_loop.py` 경로를 타지 않으면
+  번호가 안 붙어 조인이 무너진다. 이게 크면 3-4의 실행 명령을 확인한다.
+- **비교 불가** — 종료코드 **2**다. 0이 아니다. 게이트로 쓸 때 0을 통과로 읽으면
+  안 되기 때문이다.
+
+## 3-8. 통과 기준과 그다음
+
+2단계 문서의 표대로 **결정 불일치 0인 거래일 5일**이다. 임계값을 코드가 판정하지
+않는 이유는, 그 기준이 아직 문서에만 있고 숫자로 고정된 적이 없어서다 —
+비교기는 수치만 내고 판정은 사람이 한다.
+
+| 판정 | 다음 |
+|---|---|
+| 5거래일 불일치 0 | 4단계 — `shadow.py`의 `_SHADOW_RUNNERS`에서 `'phone'`을 뺀다. **한 줄이고 리뷰에서 보인다.** 그 전에 실계좌 판단 경로도 대조할지 결정한다(3-2의 한계 참고) |
+| 불일치 발생 | 불일치 행의 `sim`·`reason`을 보고 원인을 적는다. 입력 차이면 3-3, 판단 차이면 그 심의 코드 |

@@ -294,11 +294,75 @@ def _run_sim9_1(path: str) -> int:
     return 0 if stats is not None else 1
 
 
+# 심11 유니버스 상한. 코스피 시총 상위 N을 받아 유동성으로 거른다.
+#
+# 왜 100이 아닌가 — 2026-09-16 깔때기 실측(후보 100 → 감시목록 1):
+#   추세 템플릿 완주 15/100, 그중 실적 게이트가 15 → 2로 **87%를 자른다**.
+#   둘 다 조건이 과해서가 아니라 **성숙 기업이라서**다. 미너비니가 노리는 것은
+#   실적 가속 중인 성장 주도주이고 시총 상위 100은 그 못이 아니다.
+#   그래서 임계값을 낮추지 않고 못을 넓힌다.
+#
+# 왜 400인가 — 2026-09-15 EOD 실측 100종목 109초(약 1.1초/종목). 400이면 7.3분이고
+#   collect 잡 타임아웃 20분 중 현재 사용이 ~2분이라 여유가 있다. 코스피 상장이
+#   ~950종목이라 시총 상위 400이면 사실상 유의미한 전부다. 그 아래는 유동성
+#   필터가 어차피 걸러낸다.
+#
+# ⚠ 코스닥은 뺀다(2026-09-16 사용자 결정). 한국의 성장 주도주는 코스닥에 많이
+#   사는 만큼, 이 제외가 S1의 상한을 낮춘다는 것을 알고 내린 결정이다.
+SIM11_UNIVERSE_LIMIT = 400
+
+
+def sim11_universe(seed_path: str = DEFAULT_CSV,
+                   limit: int = SIM11_UNIVERSE_LIMIT,
+                   log=print) -> list[tuple[str, str]]:
+    """심11이 오늘 들여다볼 (code, name) 목록.
+
+    **CSV가 아니라 코드 목록이 필요하다** — candidates_from_kis_live가 종목별
+    230일 이력을 KIS로 직접 받으므로, ohlcv_top100.csv는 씨앗으로만 쓰여 왔다.
+
+    유동성 미달은 **KIS를 부르기 전에** 버린다. 비용이 드는 건 일봉 조회이지
+    목록이 아니다(네이버는 한 종목당 추가 호출이 없다).
+
+    ETF 제외는 naver_api가 한다(stock_only) — 여기서 또 거르면 규칙이 둘로 갈린다.
+
+    ⚠ `ohlcv_top100.csv`는 이 함수가 바뀌어도 그대로다. 리베로 trend·breadth와
+    심9-1이 그 파일을 먹어서, 그걸 건드리면 국면 판정이 딸려 온다.
+    """
+    from src.data import naver_api
+    from src.strategy.simulators.sim11_minervini import MIN_AMOUNT
+
+    rows = None
+    try:
+        rows = naver_api.stock_list('marketValue', 'KOSPI', limit)
+    except Exception as e:
+        log(f'[EOD] 심11 유니버스 조회 예외({type(e).__name__}: {e})')
+
+    if not rows:
+        # 2026-09-10에 네이버가 302로 옮겨가 EOD가 통째로 죽었다. 목록을 못 받았다고
+        # 심11을 쉬게 하면 못을 넓히려다 있던 것도 잃는다 — 씨앗으로 계속한다.
+        log('[EOD] 심11 유니버스 조회 실패 — 직전 종가 CSV의 종목 구성으로 계속한다')
+        return codes_and_names_from_ohlcv(seed_path)
+
+    seen: dict[str, str] = {}
+    thin = 0
+    for r in rows:
+        code = (r.get('code') or '').strip()
+        if not code or code in seen:
+            continue
+        if float(r.get('amount') or 0) < MIN_AMOUNT:
+            thin += 1
+            continue
+        seen[code] = (r.get('name') or '').strip()
+    log(f'[EOD] 심11 유니버스: 코스피 시총 상위 {len(rows)}종목 중 '
+        f'거래대금 통과 {len(seen)}종목 (유동성 미달 {thin})')
+    return sorted(seen.items())
+
+
 def _run_sim11(path: str) -> int:
     """심11 감시 목록을 하루 1회 갱신한다. 실제 매수/매도는 안 한다 —
     Sim11은 더 이상 IS_EOD가 아니라 장중 1분 루프에서 이 감시 목록을 읽어
     실시간가로 산다(build_sim11_watchlist 참고)."""
-    pairs = codes_and_names_from_ohlcv(path)
+    pairs = sim11_universe(seed_path=path)
     if not pairs:
         print(f'[EOD] 심11 유니버스 0건 ({path}) — 감시 목록을 만들지 않는다')
         return 1

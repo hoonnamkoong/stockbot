@@ -131,7 +131,6 @@ jobs:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
           KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
-          KIS_APP_ACCOUNT: ${{ secrets.KIS_ACCOUNT_NO }}
           GH_PAT: ${{ secrets.GH_PAT }}
           FORCE_RUN: "${{ github.event.inputs.force_run }}"
           REGIME_HINT: "${{ github.event.inputs.regime }}"

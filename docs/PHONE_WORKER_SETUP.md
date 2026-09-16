@@ -142,7 +142,9 @@ python scripts/phone_soak.py --report
 층2는 **폰에 `WEBHOOK_SECRET`을 주지 않는 것**이다. 층1만 두면 플래그 실수로
 실주문이 나가고, 층2만 두면 취소 경로(KIS 직접 호출, Vercel 우회)가 열려 있다.
 
-## 3-1. 의존성 (2단계는 표준 라이브러리만 썼다)
+## 3-1. 의존성 — **여기가 폰 워커의 진짜 첫 관문이다**
+
+2단계는 표준 라이브러리만 썼다. 3단계는 아니고, 그 차이가 생각보다 크다.
 
 ```bash
 cd ~/stockbot && git pull
@@ -151,6 +153,57 @@ pip install -r scripts/requirements-trade.txt
 
 스크래퍼 requirements를 쓰지 마라 — pandas·sklearn까지 깔린다. 폰에서는 설치
 시간보다 저장공간·메모리가 문제다.
+
+### pydantic이 막는다 (2026-09-16 실측)
+
+`pydantic` 2.x는 `pydantic-core`가 **Rust로 짜여 있고 PyPI에 aarch64-android
+휠이 없다.** 소스 빌드로 넘어가고, 거기서 벽이 셋 연달아 선다.
+
+**피할 수 없다** — `trade_engine.py` → `src/data/schemas.py`가 pydantic을 쓴다.
+v1으로 낮추는 것도 안 된다(`field_validator`·`model_validator`는 v2 API다).
+"폰에서만 import를 빼는" 우회는 **그림자 운전의 목적 자체를 깬다** — 같은 코드가
+같은 결정을 내리는지 보는 단계인데 코드가 갈리면 비교가 무의미하다.
+
+벽 셋과 그 답:
+
+| 에러 | 뜻 | 답 |
+|---|---|---|
+| `Rust not found, installing into a temporary directory` | Rust가 없다 | `pkg install rust binutils` |
+| `Target triple not supported by rustup: aarch64-unknown-linux-android` | maturin이 계산한 트리플과 Termux Rust(`aarch64-linux-android`)가 다르다 | `export CARGO_BUILD_TARGET=aarch64-linux-android` |
+| `Failed to determine Android API level` | maturin이 기기 API 레벨을 못 읽는다 | `export ANDROID_API_LEVEL=$(getprop ro.build.version.sdk)` |
+
+한 번에 쓰면:
+
+```bash
+pkg install rust binutils
+pip install maturin
+export CARGO_BUILD_TARGET=aarch64-linux-android
+export ANDROID_API_LEVEL=$(getprop ro.build.version.sdk)   # 추측하지 말고 기기에서 읽는다
+termux-wake-lock                                            # 빌드 중 화면이 꺼져도 안 멈추게
+pip install --no-build-isolation pydantic==2.12.5
+pip install -r scripts/requirements-trade.txt
+```
+
+`--no-build-isolation`이 필요한 이유: pip가 빌드용 새 환경을 만들면 방금 깐
+maturin·Rust를 못 본다. 실제 컴파일이라 **10~30분** 걸린다.
+env 세 개는 **빌드에만** 필요하다 — 루프 실행에는 필요 없다.
+
+### 여기서 멈출지 판단하라
+
+이 절차를 다 따라와서 성공했다면 좋다. 다만 **이건 pydantic 하나로 끝나지 않는다**
+— 매매 경로에 네이티브 의존성이 하나 늘 때마다 같은 벽이 선다.
+
+이 문서 앞머리의 기준을 다시 읽을 것:
+
+> 월 ₩400~2,000을 아끼려고 돈 경로를 불안정한 런타임에 올릴 이유가 없다.
+> **이 판단을 미리 정해 두는 것이 이 단계의 요점이다** — 나중에 "거의 됐는데"로
+> 넘어가지 않기 위해서.
+
+GCP `e2-micro`는 `linux-gnu`라 PyPI 휠이 그냥 맞고 이 문제가 애초에 안 생긴다.
+**다음 네이티브 의존성에서 또 서면 그때는 전환하는 것이 이 계획의 원래 약속이다.**
+
+⚠ 2026-09-16 실측 기기는 **CPython 3.14**였다. 최신 런타임일수록 휠이 없을
+확률이 높다 — Termux python을 굳이 최신으로 올리지 않는 편이 낫다.
 
 ## 3-2. 환경변수 — **안 주는 것이 핵심이다**
 

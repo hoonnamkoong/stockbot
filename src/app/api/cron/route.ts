@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { pickWorkflow } from '@/lib/cron-target';
+import { pickWorkflow, pickSideWorkflows } from '@/lib/cron-target';
 import { authorizeCronRequest } from '@/lib/cron-auth';
 
 export const dynamic = 'force-dynamic';
@@ -61,6 +61,9 @@ export async function GET(request: Request) {
         // 여기 인라인으로 두면 라우트를 node --test로 import할 수 없어 아무도
         // 검증하지 못한다 — 2026-08-07에 정확히 그 모양으로 하루를 잃었다.
         const WORKFLOW_FILE = pickWorkflow(hour, minute);
+        // 주 대상 말고 **추가로** 깨울 워크플로(장중 생존 감시). 주 대상을 갈라
+        // 쓰지 않는다 — 그러면 그 틱의 매매 트리거가 사라진다.
+        const SIDE_WORKFLOWS = pickSideWorkflows(hour, minute);
 
         console.log(`[Cron] Trigger received (${hour}:${minute.toString().padStart(2, '0')} KST). Dispatching ${WORKFLOW_FILE}...`);
 
@@ -72,27 +75,49 @@ export async function GET(request: Request) {
             }, { status: 500 });
         }
 
-        try {
-            const response = await axios.post(
-                `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
-                { ref: 'main' },
-                {
-                    headers: {
-                        Authorization: `Bearer ${GITHUB_PAT}`,
-                        Accept: 'application/vnd.github.v3+json',
-                    },
-                }
-            );
+        const dispatch = (file: string) => axios.post(
+            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${file}/dispatches`,
+            { ref: 'main' },
+            {
+                headers: {
+                    Authorization: `Bearer ${GITHUB_PAT}`,
+                    Accept: 'application/vnd.github.v3+json',
+                },
+            }
+        );
 
+        // 돈 경로가 먼저다. 실패해도 여기서 바로 돌려보내지 않는다 —
+        // **주 대상 dispatch가 실패한 순간이 감시가 가장 필요한 순간이고**,
+        // 이 라우트의 500은 태스커 로그에만 남아 아무에게도 안 보인다.
+        let primaryError: any = null;
+        try {
+            const response = await dispatch(WORKFLOW_FILE);
             console.log(`[Cron] GitHub Actions triggered successfully. Status: ${response.status}`);
         } catch (githubError: any) {
+            primaryError = githubError;
             console.error('[Cron] GitHub API Error:', githubError.message);
             console.error('[Cron] Error details:', githubError.response?.data);
+        }
 
+        // 부수 dispatch 실패는 응답을 바꾸지 않는다. 감시자가 한 틱 안 깨는 것과
+        // 매매 트리거를 실패로 돌려보내는 것은 무게가 다르다.
+        const sideDispatched: string[] = [];
+        for (const file of SIDE_WORKFLOWS) {
+            try {
+                await dispatch(file);
+                sideDispatched.push(file);
+                console.log(`[Cron] Side workflow dispatched: ${file}`);
+            } catch (sideError: any) {
+                console.error(`[Cron] Side dispatch failed (${file}):`, sideError.message);
+            }
+        }
+
+        if (primaryError) {
             return NextResponse.json({
                 error: 'Failed to trigger GitHub Actions',
-                details: githubError.message,
-                githubResponse: githubError.response?.data,
+                details: primaryError.message,
+                githubResponse: primaryError.response?.data,
+                sideDispatched,
                 success: false
             }, { status: 500 });
         }
@@ -101,6 +126,7 @@ export async function GET(request: Request) {
             success: true,
             time: `${hour}:${minute.toString().padStart(2, '0')} KST`,
             dispatched: WORKFLOW_FILE,
+            sideDispatched,
             // 매매 트리거인지 토큰 선발급인지. 스크래핑은 여기서 직접 부르지
             // 않는다 — trading.yml이 10분 격자에서 scraper.yml을 깨운다.
             tradingTriggered: WORKFLOW_FILE === 'trading.yml'

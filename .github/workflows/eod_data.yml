@@ -129,6 +129,7 @@ jobs:
       # 상태를 못 받아오면 실행하지 않는다: 백지 상태로 돌리면 이미 보유 중인
       # 포지션을 잊고 중복 진입하거나 청산 판단을 건너뛴다.
       - name: Run EOD simulators (Sim9-1 Donchian, Sim11 감시목록)
+        id: sims
         if: steps.gate.outputs.run == 'true'
         env:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
@@ -153,9 +154,10 @@ jobs:
             cp state_repo/data/trade_history_sim_donchian.csv data/ 2>/dev/null \
               && echo "[EOD] 심9-1 매매기록 복원" || echo "[EOD] 기존 매매기록 없음(최초 실행)"
             rm -rf state_repo
-            PYTHONPATH=. python scripts/run_eod_sims.py || echo "[EOD] 실행 실패 — CSV 배포는 계속한다"
+            PYTHONPATH=. python scripts/run_eod_sims.py || { echo "[EOD] 실행 실패 — CSV 배포는 계속하고 런은 맨 끝에서 실패시킨다"; echo "sims_ok=0" >> "$GITHUB_OUTPUT"; }
           else
             echo "[EOD] db-data clone 실패 — 심 실행 건너뜀(백지 상태 매매 방지)"
+            echo "sims_ok=0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Deploy CSV to db-data
@@ -236,6 +238,14 @@ jobs:
           # 심 상태까지 올린 뒤에 실패로 끝낸다 — 기존 실패 알림이 사람을 부른다.
           if [ "$csv_ok" = 0 ]; then
             echo "[KOSPI CSV] 종가 0행이라 배포하지 않았다. 수집 로그를 확인하라"
+            exit 1
+          fi
+          # 심 실행 실패도 같은 자리에서 낸다. `|| echo`가 종료코드를 삼켜서
+          # 2026-09-10에 두 심이 다 실패(유니버스 0건)했는데 런은 초록이었고,
+          # 그 결과 09-11 하루 종일 심11이 무장해제되고 심9-1이 미실행됐다.
+          # 신선도 감사는 max_age_sessions:1이라 1세션 지연을 허용해 못 잡는다.
+          if [ "${{ steps.sims.outputs.sims_ok }}" = "0" ]; then
+            echo "[EOD] 심 실행이 실패했다(위 로그 참고). 배포는 끝냈고 런은 실패로 낸다"
             exit 1
           fi
 

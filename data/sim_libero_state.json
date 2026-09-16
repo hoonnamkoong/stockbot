@@ -10,7 +10,7 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-09-16 15:20:41",
+  "last_run": "2026-09-16 15:30:40",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": 1.0,
@@ -722,6 +722,15 @@
       "bull_score": 29.1,
       "regime": "SIDEWAYS",
       "v": 2
+    },
+    {
+      "date": "2026-09-16",
+      "libero_breadth": 28.0,
+      "actual_kospi_breadth": 26.0,
+      "gap": 2.0,
+      "bull_score": 30.9,
+      "regime": "SIDEWAYS",
+      "v": 2
     }
   ],
   "breadth_source": "top100_live",
@@ -755,6 +764,10 @@
       {
         "t": "15:00",
         "breadth": 26.0
+      },
+      {
+        "t": "15:30",
+        "breadth": 26.0
       }
     ],
     "predictions": [
@@ -772,7 +785,7 @@
         "type": "eod",
         "model": "velocity",
         "value": 28.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "09:00",
@@ -788,7 +801,7 @@
         "type": "eod",
         "model": "smoothed_velocity",
         "value": 28.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "09:00",
@@ -804,7 +817,7 @@
         "type": "eod",
         "model": "naive",
         "value": 28.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "10:00",
@@ -820,7 +833,7 @@
         "type": "eod",
         "model": "velocity",
         "value": 46.8,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "10:00",
@@ -836,7 +849,7 @@
         "type": "eod",
         "model": "smoothed_velocity",
         "value": 46.8,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "10:00",
@@ -852,7 +865,7 @@
         "type": "eod",
         "model": "naive",
         "value": 33.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "11:00",
@@ -868,7 +881,7 @@
         "type": "eod",
         "model": "velocity",
         "value": 0.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "11:00",
@@ -884,7 +897,7 @@
         "type": "eod",
         "model": "smoothed_velocity",
         "value": 11.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "11:00",
@@ -900,7 +913,7 @@
         "type": "eod",
         "model": "naive",
         "value": 20.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "12:00",
@@ -916,7 +929,7 @@
         "type": "eod",
         "model": "velocity",
         "value": 50.2,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "12:00",
@@ -932,7 +945,7 @@
         "type": "eod",
         "model": "smoothed_velocity",
         "value": 32.8,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "12:00",
@@ -948,7 +961,7 @@
         "type": "eod",
         "model": "naive",
         "value": 31.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "13:00",
@@ -964,7 +977,7 @@
         "type": "eod",
         "model": "velocity",
         "value": 49.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "13:00",
@@ -980,7 +993,7 @@
         "type": "eod",
         "model": "smoothed_velocity",
         "value": 42.4,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "13:00",
@@ -996,7 +1009,7 @@
         "type": "eod",
         "model": "naive",
         "value": 39.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -1012,7 +1025,7 @@
         "type": "eod",
         "model": "velocity",
         "value": 18.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -1028,7 +1041,7 @@
         "type": "eod",
         "model": "smoothed_velocity",
         "value": 25.9,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -1044,7 +1057,7 @@
         "type": "eod",
         "model": "naive",
         "value": 27.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "15:00",
@@ -1052,7 +1065,7 @@
         "type": "eod",
         "model": "naive",
         "value": 26.0,
-        "scored": false
+        "scored": true
       }
     ]
   },
@@ -12257,6 +12270,196 @@
       "pred": 27.0,
       "actual": 26.0,
       "gap": 1.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 28.0,
+      "actual": 26.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 28.0,
+      "actual": 26.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 28.0,
+      "actual": 26.0,
+      "gap": 2.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 46.8,
+      "actual": 26.0,
+      "gap": 20.8
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 46.8,
+      "actual": 26.0,
+      "gap": 20.8
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 33.0,
+      "actual": 26.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 0.0,
+      "actual": 26.0,
+      "gap": -26.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 11.0,
+      "actual": 26.0,
+      "gap": -15.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 20.0,
+      "actual": 26.0,
+      "gap": -6.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 50.2,
+      "actual": 26.0,
+      "gap": 24.2
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 32.8,
+      "actual": 26.0,
+      "gap": 6.8
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 31.0,
+      "actual": 26.0,
+      "gap": 5.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 26.0,
+      "gap": 23.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 42.4,
+      "actual": 26.0,
+      "gap": 16.4
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 39.0,
+      "actual": 26.0,
+      "gap": 13.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "velocity",
+      "target": "EOD",
+      "pred": 18.0,
+      "actual": 26.0,
+      "gap": -8.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "smoothed_velocity",
+      "target": "EOD",
+      "pred": 25.9,
+      "actual": 26.0,
+      "gap": -0.1
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 27.0,
+      "actual": 26.0,
+      "gap": 1.0
+    },
+    {
+      "date": "2026-09-16",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 26.0,
+      "actual": 26.0,
+      "gap": 0.0
     }
   ]
 }

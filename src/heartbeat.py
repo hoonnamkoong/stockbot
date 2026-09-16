@@ -22,7 +22,11 @@ from src.core import clock
 _KST = clock.KST
 # 루프는 2분 격자로 돌고 한 런이 두 바퀴를 돈다. 15분이면 트리거를 일곱 번
 # 놓친 것이라 정상 지터로 볼 수 없다. 더 좁혀도 발견이 빨라지지는 않는다 —
-# 감시자(heartbeat_watch.yml)가 시간당 한 번 보기 때문이다.
+# 감시자(heartbeat_watch.yml)가 30분 격자로 보기 때문이다(2026-09-16에 시간당
+# 1회 → 30분으로 좁혔다. 그 격자는 알림 통수와 직결돼 있어
+# scripts/check_heartbeat.py 독스트링의 쿨다운 주의를 같이 읽을 것).
+# ⚠ 이 값은 감시자 발화의 **하한**도 정한다 — KR_OPEN + MAX_AGE_MIN 이전에
+# 깨우면 아침 첫 완주가 아직 임계 안에 없어 정상인 날에도 stale이 뜬다.
 MAX_AGE_MIN = 15
 
 OK = 'ok'

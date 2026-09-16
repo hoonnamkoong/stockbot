@@ -216,8 +216,7 @@ export TZ=Asia/Seoul
 export PYTHONPATH=$HOME/stockbot
 export KIS_APP_KEY=...
 export KIS_APP_SECRET=...
-export KIS_ACCOUNT_NO=...
-export KIS_APP_ACCOUNT=...          # KIS_ACCOUNT_NO와 같은 값
+export KIS_ACCOUNT_NO=...          # 하이픈은 있어도 된다 — auth.py가 지우고 8+2로 쪼갠다
 ENV
 chmod 600 ~/.stockbot_env
 ```
@@ -252,9 +251,13 @@ git fetch origin db-data:db-data          # 토큰 불필요 — public 레포�
 git checkout db-data -- data/
 ```
 
-**폰은 db-data에 push하지 않는다.** Actions 쪽 writer와 다투면 lost update가
-난다. `scripts/trade_loop.py` 자체는 배포를 하지 않으므로(배포는 워크플로의
-별 스텝이다) 그냥 안 하면 된다.
+**폰은 db-data에 push하지 않는다.** Actions 쪽 writer와 다투면 lost update가 난다.
+
+⚠ 루프가 `[Deploy] 배포 대상: [...]`을 찍는데 **그건 push가 아니다.**
+`trade_loop.py`에는 `git push`도 `subprocess`도 없다 — `data/.lite_deploy_manifest`에
+"배포했으면 하는 목록"을 적을 뿐이고, 실제 push는 워크플로의 `Deploy state (db-data)`
+스텝이 그 파일을 읽어서 한다(`trading.yml`). **폰에는 그 스텝이 없으니 목록만 쓰이고
+끝난다.** 로그만 보고 놀라지 말 것.
 
 ## 3-4. 루프 시작
 
@@ -290,11 +293,23 @@ ls ~/stockbot/data/decisions_*_phone.csv
 1. `STOCKBOT_RUNNER`가 안 걸렸다 → `decisions_*_actions.csv`가 생긴다. 환경변수를 고친다.
 2. 루프가 판단에 도달하지 못했다 → `~/shadow.log`에서 `[준비상태]`와 `깔때기`를 본다.
 
-그리고 그림자가 실제로 걸렸는지:
+그리고 그림자가 실제로 걸렸는지. **로그를 뒤지지 말고 직접 묻는다** — 그림자
+차단은 주문을 시도할 때만 로그에 찍히므로 장 마감 뒤에는 흔적이 없고,
+`~/shadow.log`는 부팅 스크립트(3-4)를 걸어야 생긴다.
 
 ```bash
-grep -i "그림자\|shadow\|차단" ~/shadow.log | head
+cd ~/stockbot && . ~/.stockbot_env
+python -c "
+from src.trade.shadow import is_shadow
+from src.data.decision_log import runner_name
+print('runner      =', runner_name())
+print('그림자 모드 =', is_shadow())
+"
 ```
+
+기대 출력은 `runner = phone` · `그림자 모드 = True`다.
+`runner`가 `actions`면 환경변수가 안 걸렸고, `그림자 모드`가 `False`면
+**폰이 주문을 낼 수 있는 상태**이므로 그 자리에서 멈춘다.
 
 ## 3-6. 스냅샷을 PC로 옮긴다
 

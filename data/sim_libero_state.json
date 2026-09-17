@@ -10,7 +10,7 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-09-17 15:20:39",
+  "last_run": "2026-09-17 15:30:34",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": 1.0,
@@ -731,6 +731,15 @@
       "bull_score": 30.9,
       "regime": "SIDEWAYS",
       "v": 2
+    },
+    {
+      "date": "2026-09-17",
+      "libero_breadth": 73.0,
+      "actual_kospi_breadth": 57.0,
+      "gap": 16.0,
+      "bull_score": 46.6,
+      "regime": "SIDEWAYS",
+      "v": 2
     }
   ],
   "breadth_source": "top100_live",
@@ -764,6 +773,10 @@
       {
         "t": "15:00",
         "breadth": 49.0
+      },
+      {
+        "t": "15:30",
+        "breadth": 57.0
       }
     ],
     "predictions": [
@@ -781,7 +794,7 @@
         "type": "eod",
         "model": "naive",
         "value": 73.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "10:00",
@@ -797,7 +810,7 @@
         "type": "eod",
         "model": "naive",
         "value": 72.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "11:00",
@@ -813,7 +826,7 @@
         "type": "eod",
         "model": "naive",
         "value": 69.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "12:00",
@@ -829,7 +842,7 @@
         "type": "eod",
         "model": "naive",
         "value": 64.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "13:00",
@@ -845,7 +858,7 @@
         "type": "eod",
         "model": "naive",
         "value": 77.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -861,7 +874,7 @@
         "type": "eod",
         "model": "naive",
         "value": 71.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "15:00",
@@ -869,7 +882,7 @@
         "type": "eod",
         "model": "naive",
         "value": 49.0,
-        "scored": false
+        "scored": true
       }
     ]
   },
@@ -12324,6 +12337,76 @@
       "pred": 71.0,
       "actual": 49.0,
       "gap": 22.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "eod",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 73.0,
+      "actual": 57.0,
+      "gap": 16.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "eod",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 72.0,
+      "actual": 57.0,
+      "gap": 15.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "eod",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 69.0,
+      "actual": 57.0,
+      "gap": 12.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "eod",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 64.0,
+      "actual": 57.0,
+      "gap": 7.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "eod",
+      "made_at": "13:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 77.0,
+      "actual": 57.0,
+      "gap": 20.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "eod",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 71.0,
+      "actual": 57.0,
+      "gap": 14.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "eod",
+      "made_at": "15:00",
+      "model": "naive",
+      "target": "EOD",
+      "pred": 49.0,
+      "actual": 57.0,
+      "gap": -8.0
     }
   ]
 }

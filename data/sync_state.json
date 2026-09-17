@@ -27,6 +27,31 @@
       "code": "005930",
       "name": "삼성전자",
       "rank": 5
+    },
+    {
+      "code": "027360",
+      "name": "아주IB투자",
+      "rank": 1
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 2
+    },
+    {
+      "code": "024060",
+      "name": "흥구석유",
+      "rank": 3
+    },
+    {
+      "code": "034220",
+      "name": "LG디스플레이",
+      "rank": 4
+    },
+    {
+      "code": "008290",
+      "name": "원풍물산",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "043260",
     "201490",
     "034020",
-    "005930"
+    "005930",
+    "027360",
+    "000660",
+    "024060",
+    "034220",
+    "008290"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "027360",
+      "name": "아주IB투자",
+      "rank": 1
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 2
+    },
+    {
+      "code": "024060",
+      "name": "흥구석유",
+      "rank": 3
+    },
+    {
+      "code": "034220",
+      "name": "LG디스플레이",
+      "rank": 4
+    },
+    {
+      "code": "008290",
+      "name": "원풍물산",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

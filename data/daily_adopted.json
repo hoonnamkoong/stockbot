@@ -5,9 +5,13 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 800건 토론 포착",
-        "sentiment": "0",
-        "keywords": []
+        "posts_summary": "대만 증시 상승 및 악재 소멸에 따른 주가 상승 기대감. 미국 금리 인상 가능성 언급.",
+        "sentiment": "1",
+        "keywords": [
+          "대만증시",
+          "악재소멸",
+          "금리인상"
+        ]
       }
     },
     "010170": {
@@ -40,17 +44,21 @@
       "name": "이뮨온시아",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 86건 토론 포착",
-        "sentiment": "0",
-        "keywords": []
+        "posts_summary": "상장폐지 가능성 및 급격한 주가 하락세. 투자자들의 차익 실현 및 부정적 심리 확산.",
+        "sentiment": "-7",
+        "keywords": [
+          "상장폐지",
+          "급락",
+          "차익실현"
+        ]
       }
     },
     "005930": {
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 800건 토론 포착",
-        "sentiment": "0",
+        "posts_summary": "게시글 대부분이 정치적 논쟁으로 이루어져 주가 관련 분석 부재. 반도체 시장 독점 및 국힘 정권 3년 허송세월 언급.",
+        "sentiment": "-3",
         "keywords": []
       }
     },
@@ -71,21 +79,25 @@
       "name": "미투온",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 404건 토론 포착",
-        "sentiment": "0",
-        "keywords": []
+        "posts_summary": "카카오 및 소프트뱅크 인수설 기반의 텐버거 기대감. 대량 거래 동반한 주가 급등 가능성 언급.",
+        "sentiment": "7",
+        "keywords": [
+          "카카오인수",
+          "소프트뱅크",
+          "텐버거"
+        ]
       }
     },
     "004310": {
       "name": "현대약품",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "낙태약 도입 및 탈모치료 관련 수혜 기대감 형성. 예상 매출 1조원 언급.",
-        "sentiment": "5",
+        "posts_summary": "낙태약 및 탈모 치료제 관련 기대감으로 인한 주가 상승 전망. 그러나 주가 급등 후 차익실현 매물 출회 가능성 언급.",
+        "sentiment": "2",
         "keywords": [
           "낙태약",
           "탈모치료",
-          "매출"
+          "수혜주"
         ]
       }
     },
@@ -106,39 +118,51 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 107건 토론 포착",
-        "sentiment": "0",
-        "keywords": []
+        "posts_summary": "중국 디스플레이 산업에 밀린다는 부정적 전망. 높은 부채 비율 및 연이은 하락세로 인한 투자 심리 악화.",
+        "sentiment": "-7",
+        "keywords": [
+          "디스플레이",
+          "중국",
+          "부채"
+        ]
       }
     },
     "027360": {
       "name": "아주IB투자",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 107건 토론 포착",
-        "sentiment": "0",
-        "keywords": []
+        "posts_summary": "스페이스X 관련 이슈 및 프로그램 매수세 유입에 따른 주가 상승 전망. 일부에서는 우주 섹터와 무관하다는 부정적 의견도 존재.",
+        "sentiment": "2",
+        "keywords": [
+          "스페이스X",
+          "프로그램매수",
+          "우주섹터"
+        ]
       }
     },
     "010140": {
       "name": "삼성중공업",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 86건 토론 포착",
-        "sentiment": "0",
-        "keywords": []
+        "posts_summary": "나스닥 반등 및 기관 매수세 유입에 따른 주가 상승 기대감. 60일선 돌파 및 추세 전환 가능성 언급.",
+        "sentiment": "3",
+        "keywords": [
+          "나스닥",
+          "기관매수",
+          "추세전환"
+        ]
       }
     },
     "043260": {
       "name": "성호전자",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "자회사 CPO 생산 장비 수주 및 광통신 섹터 대장주 부각. 루멘텀 급등.",
+        "posts_summary": "자회사 ADST의 CPO 생산장비 수주 및 삼성과의 공급 계약 체결. 3분기 영업이익 대폭 상승.",
         "sentiment": "6",
         "keywords": [
           "CPO",
-          "광통신",
-          "수주"
+          "수주",
+          "공급계약"
         ]
       }
     },
@@ -146,9 +170,13 @@
       "name": "원풍물산",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "[데이터 분석] '시장 주도주' 중심 96건 토론 포착",
-        "sentiment": "0",
-        "keywords": []
+        "posts_summary": "마이크로LED 및 AI 데이터센터 관련 신규 사업 기대감. BPS 대비 주가 저평가 및 상승 가능성 언급.",
+        "sentiment": "4",
+        "keywords": [
+          "마이크로LED",
+          "AI데이터센터",
+          "BPS"
+        ]
       }
     },
     "069540": {

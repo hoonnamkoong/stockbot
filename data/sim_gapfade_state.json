@@ -1,74 +1,13 @@
 {
-  "initial_cash": 2000000,
-  "cash": 1857567.5792999999,
+  "initial_cash": 3000000,
+  "cash": 3000000,
   "invested": 0,
   "portfolio": {},
-  "peak_nav": 2028543.01125,
-  "total_fees": 5828.4207,
+  "peak_nav": 3000000,
+  "total_fees": 0,
   "history": [
-    2000000
+    3000000
   ],
-  "daily_trades": [
-    {
-      "date": "2026-08-19",
-      "is_win": false
-    },
-    {
-      "date": "2026-08-24",
-      "is_win": false
-    },
-    {
-      "date": "2026-09-01",
-      "is_win": false
-    },
-    {
-      "date": "2026-09-03",
-      "is_win": false
-    },
-    {
-      "date": "2026-09-04",
-      "is_win": false
-    },
-    {
-      "date": "2026-09-07",
-      "is_win": false
-    },
-    {
-      "date": "2026-09-14",
-      "is_win": false
-    },
-    {
-      "date": "2026-09-17",
-      "is_win": false
-    }
-  ],
-  "cooldown_codes": {
-    "005690": "2026-08-26",
-    "001770": "2026-09-03",
-    "249420": "2026-09-05",
-    "002710": "2026-09-06",
-    "003060": "2026-09-09",
-    "007540": "2026-09-16",
-    "229640": "2026-09-19"
-  },
-  "raw_stats": {
-    "cash": 1857567.5792999999,
-    "total_asset": 1857567.5792999999,
-    "profit_rate": -7.1216210350000075,
-    "holdings_count": 0,
-    "win_rate": 0.0,
-    "profit_factor": 0.0,
-    "mdd": 8.428484434483057,
-    "turnover": 2.833983,
-    "frequency": 0.5333333333333333,
-    "total_fees": 5828.4207,
-    "current_prices": {}
-  },
-  "normalized_stats": {
-    "승률": 0,
-    "수익팩터": 0.0,
-    "MDD": 74.71454669655083,
-    "거래빈도": 2.6666666666666665,
-    "자본회전율": 5.667966
-  }
+  "daily_trades": [],
+  "cooldown_codes": {}
 }

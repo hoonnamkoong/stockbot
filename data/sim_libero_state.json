@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-09-17 10:51:14",
+  "last_run": "2026-09-17 11:00:35",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": 1.0,
-  "bull_score": 54.4,
+  "bull_score": 52.3,
   "metrics": {
-    "breadth_score": 74.0,
-    "momentum_score": 0.8,
+    "breadth_score": 69.0,
+    "momentum_score": 0.77,
     "trend_strength": 23.5,
     "foreign_score": null,
     "volatility_score": null
@@ -744,6 +744,10 @@
       {
         "t": "10:00",
         "breadth": 72.0
+      },
+      {
+        "t": "11:00",
+        "breadth": 69.0
       }
     ],
     "predictions": [
@@ -769,7 +773,7 @@
         "type": "h1",
         "model": "naive",
         "value": 72.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "10:00",
@@ -777,6 +781,22 @@
         "type": "eod",
         "model": "naive",
         "value": 72.0,
+        "scored": false
+      },
+      {
+        "made_at": "11:00",
+        "target": "12:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 69.0,
+        "scored": false
+      },
+      {
+        "made_at": "11:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 69.0,
         "scored": false
       }
     ]
@@ -12182,6 +12202,16 @@
       "pred": 73.0,
       "actual": 72.0,
       "gap": 1.0
+    },
+    {
+      "date": "2026-09-17",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 72.0,
+      "actual": 69.0,
+      "gap": 3.0
     }
   ]
 }

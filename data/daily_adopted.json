@@ -18,12 +18,11 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 광통신 시장 호재에 따른 주가 상승 기대. 외인 대규모 매수 관찰.",
-        "sentiment": "6",
+        "posts_summary": "미국 광통신주 급등에 따른 국내 광통신 섹터 상승 기대감.",
+        "sentiment": "5",
         "keywords": [
           "광통신",
-          "미국수주",
-          "외인매수"
+          "수주"
         ]
       }
     },
@@ -57,25 +56,20 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 성향 관련 논쟁 및 정치인 관련 언급.",
+        "posts_summary": "정치적 논쟁만 가득한 게시글 내용.",
         "sentiment": "0",
-        "keywords": [
-          "정치",
-          "대선",
-          "주가조작"
-        ]
+        "keywords": []
       }
     },
     "034020": {
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "AI 산업 성장 및 전력 수요 증가 전망에 따른 원전 관련주 부각. 대미 투자 및 금리 인상 변수 언급.",
-        "sentiment": "5",
+        "posts_summary": "미국 금리 인상 및 대미 투자 관련 논의, 원전 섹터 동반 상승 기대.",
+        "sentiment": "2",
         "keywords": [
           "원전",
-          "AI",
-          "금리인상"
+          "금리 인상"
         ]
       }
     },
@@ -83,12 +77,11 @@
       "name": "미투온",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "카카오, 소프트뱅크 등 대형사 인수 가능성 및 10배 상승 기대감. 역사적 거래량 발생.",
+        "posts_summary": "카카오 인수 및 소프트뱅크 투자 관련 루머로 급등 기대감 형성.",
         "sentiment": "7",
         "keywords": [
-          "카카오인수",
-          "소프트뱅크",
-          "텐버거"
+          "카카오 인수",
+          "손정의"
         ]
       }
     },
@@ -122,12 +115,11 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "4분기 전망 및 중국 경쟁 심화 우려. 무능한 경영진과 높은 부채 비중, 목표가 하향 조정 등 악재 지속.",
-        "sentiment": "-8",
+        "posts_summary": "사업 전망 악화 및 경영진 무능 비판, 주가 하락세 지속.",
+        "sentiment": "-6",
         "keywords": [
-          "부채",
-          "경쟁력",
-          "목표가"
+          "전망 악화",
+          "경영진 무능"
         ]
       }
     },
@@ -135,12 +127,11 @@
       "name": "아주IB투자",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "스페이스X 관련주로 부각. 거래량 및 주가 상승 기대감.",
-        "sentiment": "7",
+        "posts_summary": "스페이스X 관련주 부각 및 프로그램 매수세 유입으로 급등 기대.",
+        "sentiment": "6",
         "keywords": [
           "스페이스X",
-          "거래량",
-          "주가상승"
+          "매집봉"
         ]
       }
     },
@@ -148,12 +139,11 @@
       "name": "삼성중공업",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "나스닥 반등, 공매도 세력과의 수급 싸움, 수주 기대감에 따른 단기 상승 전망. 다만, 변동성 고려 필요.",
-        "sentiment": "4",
+        "posts_summary": "신규 수주 기대감 속 개인 투자자들의 매수세 집중.",
+        "sentiment": "3",
         "keywords": [
-          "나스닥",
-          "공매도",
-          "수주"
+          "신규 수주",
+          "추세 전환"
         ]
       }
     },
@@ -173,12 +163,11 @@
       "name": "원풍물산",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미 선다이오드와 방산용 AR 디스플레이 양산 협력. 신사업 본격화.",
+        "posts_summary": "방산용 AR 디스플레이 신사업 본격화 소식에 대한 기대와 우려.",
         "sentiment": "1",
         "keywords": [
-          "AR디스플레이",
           "방산",
-          "신사업"
+          "AR 디스플레이"
         ]
       }
     },
@@ -251,12 +240,23 @@
       "name": "파미셀",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 사기 의혹 및 삼성 인수 루머에 대한 비판. 목표 주가 25000원 언급.",
+        "posts_summary": "주가 조작 및 루머 확산 의혹 제기, 경영진 비판.",
         "sentiment": "-4",
         "keywords": [
-          "주가사기",
-          "삼성인수",
-          "목표주가"
+          "주가 조작",
+          "헛소문"
+        ]
+      }
+    },
+    "457370": {
+      "name": "한켐",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "삼성전기 MLCC 소재 공급 확대 논의 관련 뉴스 부각.",
+        "sentiment": "3",
+        "keywords": [
+          "MLCC",
+          "소재"
         ]
       }
     }

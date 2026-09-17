@@ -56,8 +56,8 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 논쟁만 가득한 게시글 내용.",
-        "sentiment": "0",
+        "posts_summary": "정치적 성향에 따른 주가 언급 및 주가 조작 관련 의혹 제기.",
+        "sentiment": "-2",
         "keywords": []
       }
     },
@@ -240,11 +240,11 @@
       "name": "파미셀",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 조작 및 루머 확산 의혹 제기, 경영진 비판.",
-        "sentiment": "-4",
+        "posts_summary": "허위 사실 유포 및 악질적인 주가 조작 의혹 제기. 관련 기업 인수설 등 루머 기반 분석.",
+        "sentiment": "-3",
         "keywords": [
           "주가 조작",
-          "헛소문"
+          "공시"
         ]
       }
     },
@@ -257,6 +257,18 @@
         "keywords": [
           "MLCC",
           "소재"
+        ]
+      }
+    },
+    "232830": {
+      "name": "아이티센피엔에스",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "양자보안 관련 사업 확장 기대감 속 주가 변동성 관찰. 저평가 인식 및 매수/매도 전략.",
+        "sentiment": "1",
+        "keywords": [
+          "양자보안",
+          "저평가"
         ]
       }
     }

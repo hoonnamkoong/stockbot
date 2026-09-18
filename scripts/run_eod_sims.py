@@ -147,7 +147,8 @@ def codes_and_names_from_ohlcv(path: str) -> list[tuple[str, str]]:
 
 def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
                              history_days: int = 230,
-                             pace_interval: float = 0.1) -> list[dict]:
+                             pace_interval: float = 0.1,
+                             budget_sec: float = 600.0) -> list[dict]:
     """Sim11(미너비니) 후보를 KIS 실시간 조회로 만든다.
 
     종목당 최대 3콜(일봉 페이지네이션 포함 시 더 늘 수 있음)이 필요해
@@ -158,11 +159,16 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
     daily_closes는 **당일을 뺀** 과거 종가다(Sim9-1의 range_history와 같은
     전제 — 당일이 섞이면 돌파 판정이 정의상 성립하지 않는다). 조회 실패·
     이력 부족 종목은 건너뛴다 — 없는 근거로 사지 않는다.
+
+    budget_sec: 전체 조회에 허용할 최대 초. 초과 시 남은 종목을 건너뛰고
+    수집된 후보만 돌려준다. collect 잡의 timeout-minutes(20분)보다 짧게 유지해
+    KIS 응답 지연이 반복돼도 잡 타임아웃으로 런이 취소되지 않도록 한다.
     """
     import time as _time
     out = []
     last_call = 0.0
     today = _time.strftime('%Y%m%d')
+    deadline = _time.monotonic() + budget_sec
 
     def _pace():
         nonlocal last_call
@@ -171,7 +177,12 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
             _time.sleep(wait)
         last_call = _time.monotonic()
 
-    for code, name in pairs:
+    for i, (code, name) in enumerate(pairs):
+        if _time.monotonic() >= deadline:
+            remaining = len(pairs) - i
+            log(f'[EOD][Sim11] 예산 {budget_sec:.0f}초 소진 — '
+                f'남은 {remaining}종목 건너뜀 (수집 완료: {len(out)}종목)')
+            break
         try:
             _pace()
             hist = kis.get_daily_history(code, days=history_days)

@@ -5,12 +5,12 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "200만원 돌파 기대감과 자사주 매입, 기관/외인 쌍끌이 매수에 따른 우상향 전망.",
-        "sentiment": "5",
+        "posts_summary": "주가 상승 목표치 상향 조정 및 꾸준한 매수 의견.",
+        "sentiment": "3",
         "keywords": [
-          "자사주",
-          "외인",
-          "기관"
+          "상승 목표",
+          "매수",
+          "자사주"
         ]
       }
     },
@@ -18,9 +18,12 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 관련 내용 없이 정치 관련 이슈에 대한 부정적이고 감정적인 의견만 게시됨.",
-        "sentiment": "-3",
-        "keywords": []
+        "posts_summary": "정치 관련 기자회견 내용에 대한 비판.",
+        "sentiment": "-1",
+        "keywords": [
+          "기자회견",
+          "정치"
+        ]
       }
     },
     "034020": {
@@ -53,12 +56,12 @@
       "name": "미투온",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "STO 사업 추진 및 미국 코인 거래 허용 호재 언급되나, 주포의 물량 넘김 및 공매도 패배, 나락행 우려 상존.",
-        "sentiment": "-4",
+        "posts_summary": "STO 사업 추진 및 미국 코인 관련 호재, 매수 기회.",
+        "sentiment": "0",
         "keywords": [
           "STO",
-          "코인 테마",
-          "주포 물량"
+          "코인",
+          "호재"
         ]
       }
     },
@@ -92,11 +95,11 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "미국장 원전주 상승 및 중동 전쟁 관련 이슈 속 대차해지 운동.",
-        "sentiment": "1",
+        "posts_summary": "대차해지 운동 동참 호소 및 중동 전쟁 관련 수혜 기대.",
+        "sentiment": "3",
         "keywords": [
-          "원전",
           "대차해지",
+          "중동 전쟁",
           "수주"
         ]
       }
@@ -118,12 +121,12 @@
       "name": "KBI메탈",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "26년말 매출액 및 영업이익 예상치 기반 긍정적 전망. 전환사채 발행에도 상한가 기대감 및 외국인 대규모 매수세 분석.",
-        "sentiment": "7",
+        "posts_summary": "전환사채 발행 및 박스권 돌파 기대, 외국인 투자자 매수.",
+        "sentiment": "2",
         "keywords": [
-          "매출액",
-          "영업이익",
-          "외국인 매수"
+          "전환사채",
+          "박스권 돌파",
+          "외국인"
         ]
       }
     },
@@ -170,12 +173,11 @@
       "name": "대한전선",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "가온전선과의 비교 속 저평가 해소 및 박스권 탈출 시도.",
-        "sentiment": "1",
+        "posts_summary": "가온전선과의 비교 및 저평가 해소 기대.",
+        "sentiment": "2",
         "keywords": [
-          "저평가",
-          "박스권",
-          "가온전선"
+          "가온전선",
+          "저평가"
         ]
       }
     },
@@ -183,12 +185,12 @@
       "name": "삼성E&A",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "4분기 수주 예상액 기반 10만 전자 전망과 외인/기관 매수세.",
-        "sentiment": "3",
+        "posts_summary": "연말 수주 예상액 기반 긍정적 전망 및 우상향 추세 기대.",
+        "sentiment": "4",
         "keywords": [
           "수주",
-          "외인",
-          "공매도"
+          "전망",
+          "우상향"
         ]
       }
     },
@@ -261,12 +263,11 @@
       "name": "광전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 조작 의혹 및 20% 상승 기대감과 8천원대 하락 전망 혼재.",
-        "sentiment": "0",
+        "posts_summary": "주가 조작 의혹 제기 및 보유 물량 매도 의견.",
+        "sentiment": "1",
         "keywords": [
           "주가 조작",
-          "외인",
-          "거래량"
+          "매도"
         ]
       }
     },

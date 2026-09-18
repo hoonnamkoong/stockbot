@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 117.125,
+      "peak_price": 117.24,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 274.54,
+      "peak_price": 274.895,
       "is_scaled_out": false
     },
     "VG": {
@@ -52,34 +52,34 @@
   },
   "raw_stats": {
     "cash": 5068.865,
-    "total_asset": 20995.495,
-    "profit_rate": 4.977474999999995,
+    "total_asset": 21005.759999999995,
+    "profit_rate": 5.028799999999974,
     "holdings_count": 4,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 1.6889252457777397,
+    "mdd": 1.6408595449046868,
     "turnover": 1.109314,
     "frequency": 0.2608695652173913,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "FROG": 91.469,
-      "EXPD": 188.175,
-      "ANET": 198.49,
-      "RGA": 243.86,
-      "PSX": 274.435,
-      "DAR": 66.11,
-      "P": 103.82,
-      "CF": 131.26,
+      "DINO": 117.24,
+      "RGA": 243.29,
+      "DAR": 66.06,
+      "FROG": 91.09,
+      "PSX": 274.895,
       "CORT": 113.75,
-      "VG": 14.35,
-      "DINO": 117.01,
-      "KYMR": 118.22
+      "EXPD": 188.17,
+      "CF": 131.145,
+      "VG": 14.33,
+      "ANET": 198.5,
+      "P": 103.713,
+      "KYMR": 117.97
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 94.93322426266678,
+    "MDD": 95.07742136528594,
     "거래빈도": 1.3043478260869565,
     "자본회전율": 2.218628
   }

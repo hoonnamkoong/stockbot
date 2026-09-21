@@ -3,6 +3,8 @@ import datetime
 from src.strategy.strategy_loader import load_monthly_strategy
 from src.strategy.virtual_portfolio import VirtualPortfolioManager
 # from src.strategy.advisor import GeminiAgent (순환 참조 방지 Lazy Loading)
+from src import alerts
+from src.core import clock
 from src.data import naver_api
 
 class StrategyEngine:
@@ -110,6 +112,17 @@ class StrategyEngine:
         except Exception:
             rows = None
         if rows is None:
+            # 보류가 조용하면 "요즘 안 사네"로만 보인다 — 필터가 꺼졌던 410 사고와
+            # 방향만 반대인 같은 침묵이다. 알림이 터져도 판정은 보류 그대로다.
+            try:
+                alerts.send_alert_once(
+                    'disclosure_unavailable',
+                    f"<b>공시 판정 불가 — 샌드박스 매수 보류</b>\n\n"
+                    f"네이버 공시 조회({code})에 실패했습니다. 조회가 회복될 때까지 "
+                    f"샌드박스 신규 매수가 보류됩니다(src/strategy/engine.py fetch_dart_data).",
+                    now=datetime.datetime.now(clock.KST))
+            except Exception:
+                pass
             return {"reject": True, "reason": "공시 판정 불가 — 매수 보류"}
         today_str = datetime.datetime.now().strftime('%Y%m%d')
         reject_kws = ["전환사채", "신주인수권부사채", "유상증자"]

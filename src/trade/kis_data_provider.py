@@ -6,6 +6,7 @@ KIS API 데이터 공급자 (KISDataProvider)
 - 모든 API 실패 시 빈 dict 반환 → 기존 시뮬레이터 로직 영향 없음
 """
 
+import collections
 import json
 import os
 import time
@@ -188,6 +189,9 @@ class KISDataProvider:
     # 클래스 레벨인 이유는 위 차단기와 같다 — program_trader가 매 호출 새
     # 인스턴스를 만든다. 사유마다 한 줄이면 충분하다(런 하나가 수백 콜을 돈다).
     _logged_rejects: set = set()
+    # 출력은 사유당 한 번이지만 **횟수는 전부** 센다. 한 줄만 남아서는 "HTTP 500이
+    # 몇 종목이었나"를 알 수 없었다(2026-09-18 심11 EOD). 배치가 끝에 읽어 요약한다.
+    reject_counts: collections.Counter = collections.Counter()
 
     def _get(self, url: str, tr_id: str, params: dict, timeout: int = READ_TIMEOUT) -> dict:
         """실패하면 {}를 돌려준다 — 없는 값을 0으로 지어내지 않는다.
@@ -245,6 +249,7 @@ class KISDataProvider:
         유출 지점이 된다(2026-09-10 .env.production 노출 사고).
         """
         key = (tr_id, code)
+        cls.reject_counts[key] += 1
         if key in cls._logged_rejects:
             return
         cls._logged_rejects.add(key)

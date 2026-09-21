@@ -149,7 +149,8 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
                              history_days: int = 230,
                              pace_interval: float = 0.1,
                              budget_sec: float = 600.0,
-                             workers: int = 1) -> list[dict]:
+                             workers: int = 1,
+                             stats: dict | None = None) -> list[dict]:
     """Sim11(미너비니) 후보를 KIS 실시간 조회로 만든다.
 
     종목당 최대 3콜(일봉 페이지네이션 포함 시 더 늘 수 있음)이 필요해
@@ -171,6 +172,13 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
     workers > 1이면 kis는 파일 저장을 끈 제공자(KISDataProvider(persist_disk_cache=False))
     여야 한다 — 일봉·실적 조회가 캐시 **전체**를 같은 파일에 다시 쓰므로 스레드끼리
     겹친다. 끄면 캐시 쓰기는 메모리 사전 대입뿐이고 조회는 requests.get이라 안전하다.
+
+    stats: 주면 결과를 세어 채운다 — target(대상)·candidates(후보)·short_history(이력
+    부족, 신규 상장 등 정상)·failed(재시도 뒤에도 조회 실패)·recovered(재시도로 살림)·
+    skipped_budget(예산 소진으로 손 못 댄 종목). 예전엔 실패와 이력 부족을 똑같이
+    버려 결손이 몇 종목인지 알 수 없었다(2026-09-18 `[KIS 거부] ... HTTP 500` 한 줄).
+    조회 실패(빈 응답·예외)는 본 조회 뒤 예산 안에서 **한 번 더** 부른다 —
+    일시적 HTTP 500·유량제한을 겨냥한다. 이력 부족은 다시 불러도 같아 안 부른다.
     """
     import threading
     import time as _time
@@ -180,6 +188,8 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
     today = _time.strftime('%Y%m%d')
     deadline = _time.monotonic() + budget_sec
     skipped = object()   # 예산 소진으로 손대지 않은 종목
+    failed = object()    # 조회 실패(빈 응답·예외) — 재시도 대상
+    short = object()     # 이력 부족 — 정상, 재시도 안 함
 
     def _pace():
         nonlocal last_call
@@ -196,10 +206,12 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
         try:
             _pace()
             hist = kis.get_daily_history(code, days=history_days)
+            if not hist:
+                return failed
             today_bar = hist[-1] if hist and hist[-1].get('date') == today else None
             closes_before_today = [h['close'] for h in (hist[:-1] if today_bar else hist)]
             if len(closes_before_today) < 220:
-                return None
+                return short
 
             _pace()
             quote = kis.get_price_quote(code) or {}
@@ -222,16 +234,26 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
                 cand['revenue_growth_yoy'] = growth['revenue_growth_yoy']
             return cand
         except Exception as e:
-            log(f'[EOD][Sim11] {code} 조회 실패(건너뜀): {e}')
-            return None
+            log(f'[EOD][Sim11] {code} 조회 실패: {e}')
+            return failed
 
     with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
         results = list(ex.map(_one, pairs))
-    out = [r for r in results if r is not None and r is not skipped]
+        retry_idx = [i for i, r in enumerate(results) if r is failed]
+        if retry_idx:
+            for i, r in zip(retry_idx, ex.map(_one, [pairs[i] for i in retry_idx])):
+                results[i] = r
+    recovered = sum(1 for i in retry_idx if results[i] is not failed and results[i] is not skipped)
+    out = [r for r in results if isinstance(r, dict)]
     remaining = sum(1 for r in results if r is skipped)
     if remaining:
         log(f'[EOD][Sim11] 예산 {budget_sec:.0f}초 소진 — '
             f'남은 {remaining}종목 건너뜀 (수집 완료: {len(out)}종목)')
+    if stats is not None:
+        stats.update(target=len(pairs), candidates=len(out),
+                     short_history=sum(1 for r in results if r is short),
+                     failed=sum(1 for r in results if r is failed),
+                     recovered=recovered, skipped_budget=remaining)
     return out
 
 
@@ -422,6 +444,53 @@ def sim11_universe(seed_path: str = DEFAULT_CSV,
     return sorted(seen.items())
 
 
+SIM11_FAIL_RATIO_ALERT = 0.05   # 재시도 뒤에도 조회 실패가 대상의 이 비율을 넘으면 알린다
+
+
+def sim11_fetch_problems(stats: dict, reject_counts) -> list[str]:
+    """사람에게 알릴 조회 결손. 빈 목록이면 건강하다.
+
+    - 예산 소진: 뒤쪽 종목을 아예 못 봤다(09-18: 315 중 182).
+    - 실패 5% 초과: 재시도로도 못 살렸다 — 일시적이 아니다.
+    - 유량제한(EGW00201) 1건이라도: 4병렬(#133)이 한도를 건드렸다는 뜻이다.
+    """
+    problems = []
+    if stats.get('skipped_budget'):
+        problems.append(f"예산 소진으로 {stats['skipped_budget']}종목 미조회")
+    target = stats.get('target') or 0
+    if target and stats.get('failed', 0) / target > SIM11_FAIL_RATIO_ALERT:
+        problems.append(f"조회 실패 {stats['failed']}/{target}종목(재시도 후)")
+    rate_limited = sum(n for (tr, code), n in reject_counts.items() if code == 'EGW00201')
+    if rate_limited:
+        problems.append(f"KIS 유량제한(EGW00201) {rate_limited}건")
+    return problems
+
+
+def _report_sim11_fetch(stats: dict, reject_counts, log=print) -> None:
+    """요약 한 줄 + 결손이면 알림. 알림이 터져도 배치는 계속한다."""
+    counts = dict(reject_counts)
+    rejects = ', '.join(f'{tr} {code}×{n}' for (tr, code), n in sorted(counts.items())) or '없음'
+    log(f"[EOD][Sim11] 조회 요약: 대상 {stats.get('target', 0)}, 후보 {stats.get('candidates', 0)}, "
+        f"이력부족 {stats.get('short_history', 0)}, 실패 {stats.get('failed', 0)}"
+        f"(재시도로 살림 {stats.get('recovered', 0)}), 예산미조회 {stats.get('skipped_budget', 0)} "
+        f"| KIS 거부: {rejects}")
+    problems = sim11_fetch_problems(stats, counts)
+    if not problems:
+        return
+    try:
+        import datetime as _dt
+        from src import alerts
+        from src.core import clock
+        alerts.send_alert_once(
+            'sim11_eod_fetch',
+            '<b>심11 EOD 후보 조회 결손</b>\n\n' + '\n'.join(f'- {p}' for p in problems)
+            + '\n\n감시 목록이 일부 종목만으로 만들어졌다. eod_data.yml 로그의 '
+              '`[EOD][Sim11] 조회 요약`을 볼 것.',
+            now=_dt.datetime.now(clock.KST), log=log)
+    except Exception as e:
+        log(f'[EOD][Sim11] 결손 알림 실패: {e}')
+
+
 def _run_sim11(path: str) -> int:
     """심11 감시 목록을 하루 1회 갱신한다. 실제 매수/매도는 안 한다 —
     Sim11은 더 이상 IS_EOD가 아니라 장중 1분 루프에서 이 감시 목록을 읽어
@@ -444,7 +513,11 @@ def _run_sim11(path: str) -> int:
     except Exception as e:
         print(f'[EOD] 심11 KIS 초기화 실패 — 실행하지 않는다: {e}')
         return 1
-    candidates = candidates_from_kis_live(pairs, kis, log=print, workers=SIM11_FETCH_WORKERS)
+    fetch_stats: dict = {}
+    candidates = candidates_from_kis_live(pairs, kis, log=print, workers=SIM11_FETCH_WORKERS,
+                                          stats=fetch_stats)
+    # 거부 횟수는 제공자 클래스가 센다(KISDataProvider.reject_counts). 테스트 더블엔 없다.
+    _report_sim11_fetch(fetch_stats, getattr(type(kis), 'reject_counts', {}))
     if not candidates:
         print('[EOD] 심11 후보 0건(전부 조회 실패·이력 부족) — 감시 목록을 만들지 않는다')
         return 1

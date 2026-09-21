@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { pickWorkflow, pickSideWorkflows } from '@/lib/cron-target';
+import { pickWorkflow, pickSideWorkflows, isRouteOpen } from '@/lib/cron-target';
 import { authorizeCronRequest } from '@/lib/cron-auth';
 
 export const dynamic = 'force-dynamic';
@@ -42,8 +42,9 @@ export async function GET(request: Request) {
             console.warn('[Cron] deprecated: 쿼리스트링 ?secret= 로 인증됨 — 태스커 설정을 Authorization 헤더로 옮겨라.');
         }
 
-        // 0. Check if market is open (Mon-Fri only)
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
+        // 0. 이 틱을 받을 장이 있는가. 토요일 오전은 미국 금요일장·워치리스트 창이다
+        //    (src/lib/cron-target.ts isRouteOpen).
+        if (!isRouteOpen(dayOfWeek, hour)) {
             const dayName = dayOfWeek === 0 ? 'Sunday' : 'Saturday';
             console.log(`[Cron] Market closed (${dayName}). Skipping execution.`);
             return NextResponse.json({
@@ -60,10 +61,10 @@ export async function GET(request: Request) {
         // 어느 워크플로로 보낼지는 src/lib/cron-target.ts가 정한다.
         // 여기 인라인으로 두면 라우트를 node --test로 import할 수 없어 아무도
         // 검증하지 못한다 — 2026-08-07에 정확히 그 모양으로 하루를 잃었다.
-        const WORKFLOW_FILE = pickWorkflow(hour, minute);
+        const WORKFLOW_FILE = pickWorkflow(hour, minute, dayOfWeek);
         // 주 대상 말고 **추가로** 깨울 워크플로(장중 생존 감시). 주 대상을 갈라
         // 쓰지 않는다 — 그러면 그 틱의 매매 트리거가 사라진다.
-        const SIDE_WORKFLOWS = pickSideWorkflows(hour, minute);
+        const SIDE_WORKFLOWS = pickSideWorkflows(hour, minute, dayOfWeek);
 
         console.log(`[Cron] Trigger received (${hour}:${minute.toString().padStart(2, '0')} KST). Dispatching ${WORKFLOW_FILE}...`);
 

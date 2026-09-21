@@ -88,16 +88,31 @@ def db_data_writes(name: str) -> set[str]:
     return {n for n in out if n.endswith(('.json', '.csv'))}
 
 
-def scraper_skip_patterns() -> list[str]:
-    """배포 스텝 `case`문의 제외 arm. `a.json|b_*.csv) continue ;;` 형태."""
+def scraper_skip_patterns() -> dict[str, list[str]]:
+    """배포 스텝 `case`문의 제외 arm을 **루프별로**. `a.json|b_*.csv) continue ;;` 형태.
+
+    확장자별로 가르는 이유: `for f in data/*.json` 루프의 arm에 든 `.csv` 이름은
+    영원히 매치되지 않는다. 배포 스텝 전체에서 arm을 긁던 시절, CSV 제외 12개가
+    json 루프에 들어가 있었는데도 이 감사가 초록이었다 — 그동안 스크래퍼가
+    premarket_daily.csv·investor_flows.csv를 런 시작 시점 사본으로 되돌렸다
+    (2026-09-15·16·18 실측).
+    """
     deploy = _source('scraper.yml').split('Deploy Data to db-data branch', 1)[1]
-    return [p.strip() for line in deploy.splitlines() if 'continue' in line
-            for p in line.strip().split(')', 1)[0].split('|')]
+    loops = re.split(r'for f in data/\*\.(json|csv); do', deploy)
+    out: dict[str, list[str]] = {'json': [], 'csv': []}
+    # loops = [앞, 'json', json 본문, 'csv', csv 본문]. 각 본문은 자기 `done`까지만.
+    for ext, body in zip(loops[1::2], loops[2::2]):
+        body = body.split('\n          done', 1)[0]
+        out[ext] += [p.strip() for line in body.splitlines() if 'continue' in line
+                     for p in line.strip().split(')', 1)[0].split('|')]
+    return out
 
 
-def _covered(name: str, patterns: list[str]) -> bool:
-    """글롭 이름은 그 자체가 제외 arm으로 들어가므로 문자열 일치도 인정한다."""
-    return name in patterns or any(fnmatch.fnmatch(name, p) for p in patterns)
+def _covered(name: str, patterns: dict[str, list[str]]) -> bool:
+    """이름의 확장자에 맞는 루프의 arm만 본다. 글롭 이름은 그 자체가 제외 arm으로
+    들어가므로 문자열 일치도 인정한다."""
+    arms = patterns.get(name.rsplit('.', 1)[-1], [])
+    return name in arms or any(fnmatch.fnmatch(name, p) for p in arms)
 
 
 # ── 파서가 살아 있는가 ──────────────────────────────────────────────

@@ -282,6 +282,37 @@ def load_sim11_holdings(data_dir: str = DEFAULT_DATA_DIR, log=print) -> dict[str
     return {code: (p or {}).get('name', code) for code, p in portfolio.items()}
 
 
+def load_previous_sim11_watchlist(path: str | None = None) -> list[str]:
+    """직전 배치가 만든 감시 목록의 종목코드. 없거나 못 읽으면 빈 목록 —
+    조회 순서 힌트일 뿐이라 배치를 멈출 이유가 아니다."""
+    if path is None:
+        from src.strategy.simulators.sim11_minervini import WATCHLIST_PATH
+        path = WATCHLIST_PATH
+    try:
+        with open(path, encoding='utf-8-sig') as f:
+            return list((json.load(f).get('entries') or {}).keys())
+    except Exception:
+        return []
+
+
+def prioritize_sim11_pairs(pairs: list[tuple[str, str]], held: dict[str, str],
+                           previous: list[str]) -> list[tuple[str, str]]:
+    """조회 순서: 보유 종목 → 직전 감시 목록 → 나머지.
+
+    candidates_from_kis_live는 예산이 다하면 뒤쪽을 버린다. 유니버스가 코드순이라
+    매일 같은 뒤쪽 절반이 잘렸고 그 안에 보유 종목이 있었다(2026-09-18: 한화생명
+    088350 미처리 → 50일선 이탈 청산 지표 없음). 청산 지표가 먼저다.
+
+    보유 종목은 유니버스 밖이어도 넣는다 — 시총·유동성에서 밀려났다고 청산을
+    건너뛸 수는 없다. 직전 감시 목록은 매수 후보라 오늘 유니버스에 있을 때만.
+    """
+    names = dict(pairs)
+    head: list[tuple[str, str]] = [(c, names.get(c) or n) for c, n in held.items()]
+    head += [(c, names[c]) for c in previous if c in names and c not in held]
+    first = {c for c, _ in head}
+    return head + [(c, n) for c, n in pairs if c not in first]
+
+
 def _run_sim9_1(path: str) -> int:
     candidates = candidates_from_ohlcv(path)
     if not candidates:
@@ -378,12 +409,12 @@ def _run_sim11(path: str) -> int:
         print(f'[EOD] 심11 유니버스 0건 ({path}) — 감시 목록을 만들지 않는다')
         return 1
     held = load_sim11_holdings()
-    # 보유 종목이 오늘 top100 밖으로 밀려나면 조회 대상에 아예 없어 ma50을
-    # 만들 수 없다. 조용히 넘어가면 그 종목의 50일선 이탈 청산만 죽는다.
-    missing = [c for c in held if c not in dict(pairs)]
-    if missing:
-        print(f'[EOD] 심11 보유 {missing} — 오늘 top100 유니버스 밖이라 '
-              '청산 지표(ma50)를 만들지 못한다')
+    # 보유 종목은 유니버스 밖이어도 맨 앞에서 조회한다 — 예산에 잘려도, 시총
+    # 순위에서 밀려나도 50일선 이탈 청산 지표(ma50)는 만들어야 한다.
+    universe_size = len(pairs)
+    pairs = prioritize_sim11_pairs(pairs, held, load_previous_sim11_watchlist())
+    if held:
+        print(f'[EOD] 심11 보유 {list(held)} — 우선 조회')
     try:
         from src.trade.kis_data_provider import KISDataProvider
         kis = KISDataProvider()
@@ -401,7 +432,7 @@ def _run_sim11(path: str) -> int:
     # 심11이 08-20 배포 이래 매수 0건이던 원인이다(2026-08-27 확인).
     target = watchlist_target_date()
     save_watchlist(entries, target)
-    print(f'[EOD] 심11 감시 목록 갱신: 유니버스 {len(pairs)}종목, 후보 {len(candidates)}종목, '
+    print(f'[EOD] 심11 감시 목록 갱신: 유니버스 {universe_size}종목, 후보 {len(candidates)}종목, '
           f'감시 목록 {len(entries)}종목 (날짜 {target})')
     return 0
 

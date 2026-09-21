@@ -153,6 +153,14 @@ jobs:
             # 상태 JSON은 심이 통째로 다시 쓰므로 복원만으로 충분하지만 이건 다르다.
             cp state_repo/data/trade_history_sim_donchian.csv data/ 2>/dev/null \
               && echo "[EOD] 심9-1 매매기록 복원" || echo "[EOD] 기존 매매기록 없음(최초 실행)"
+            # 심11 보유 종목(읽기 전용 — writer는 trading.yml이고 여기서 배포하지 않는다)과
+            # 직전 감시 목록. 둘 다 조회 순서를 정한다: 보유 → 직전 목록 → 나머지.
+            # 상태가 없으면 보유를 몰라 50일선 이탈 청산 지표가 안 실린다 — 09-15에
+            # 넣은 그 경로가 이 복원이 없어 운영에서 한 번도 돌지 않았다(2026-09-21 확인).
+            cp state_repo/data/sim_minervini_state.json data/ 2>/dev/null \
+              && echo "[EOD] 심11 상태 복원" || echo "[EOD] 심11 상태 없음"
+            cp state_repo/data/sim11_watchlist.json data/ 2>/dev/null \
+              && echo "[EOD] 직전 심11 감시 목록 복원" || echo "[EOD] 직전 심11 감시 목록 없음"
             rm -rf state_repo
             PYTHONPATH=. python scripts/run_eod_sims.py || { echo "[EOD] 실행 실패 — CSV 배포는 계속하고 런은 맨 끝에서 실패시킨다"; echo "sims_ok=0" >> "$GITHUB_OUTPUT"; }
           else

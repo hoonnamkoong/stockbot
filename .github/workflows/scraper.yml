@@ -205,18 +205,12 @@ jobs:
               # [소유권] 아래는 전부 **다른 워크플로가 유일 writer**다. 이 런은
               # 시작할 때 db-data의 data/ 전체를 체크아웃하므로(위 Fetch 스텝),
               # 제외하지 않으면 남의 산출물을 런 시작 시점 사본으로 되돌린다.
-              # tests/test_workflow_file_ownership.py가 워크플로 파일을 파싱해
-              # 이 목록의 누락을 자동으로 잡는다.
+              # tests/test_db_data_writer_ownership.py가 워크플로 파일을 파싱해
+              # 이 목록의 누락을 자동으로 잡는다. CSV는 아래 csv 루프에 있다.
               #   eod_data.yml — EOD 배치(심9-1·심11)
-              kospi_top100_close.csv|ohlcv_top100.csv|minute_*.csv) continue ;;
               sim11_watchlist.json|sim_donchian_state.json|sim_donchian_log.json) continue ;;
-              trade_history_sim_donchian.csv) continue ;;
-              #   premarket_data.yml — 프리마켓·미국지수·수급
-              us_daily.csv|investor_flows.csv|rt_H0NXCNT0_*.csv) continue ;;
-              premarket_daily.csv|premarket_universe.csv|premarket_news_*.csv) continue ;;
-              rt_intraday_*.csv) continue ;;
-              #   us_trading.yml — US 심 상태·이력
-              sim_us*_state.json|trade_history_sim_us*.csv) continue ;;
+              #   us_trading.yml — US 심 상태
+              sim_us*_state.json) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done
@@ -242,6 +236,19 @@ jobs:
               # 심11 감시목록 깔때기의 writer는 eod_data.yml이다. 여기서도 밀면
               # 마감 직후 겹칠 때 옛 사본이 갓 쓰인 파일을 덮는다.
               sim11_watchlist_diag_*.csv) continue ;;
+              # [소유권] 다른 워크플로가 유일 writer인 CSV. 2026-09-21까지 이 arm들이
+              # 위 json 루프에 들어가 있어 한 번도 매치되지 않았다 — 프리마켓이
+              # 11:42에 올린 정상 봉을 41초 뒤 이 cp가 08:50 사본(거래량 0)으로
+              # 되돌렸다(09-15·16·18). EOD 산출물은 시간대가 안 겹쳐 무사했을 뿐이다.
+              #   eod_data.yml — EOD 배치(심9-1·심11)
+              kospi_top100_close.csv|ohlcv_top100.csv|minute_*.csv) continue ;;
+              trade_history_sim_donchian.csv) continue ;;
+              #   premarket_data.yml — 프리마켓·미국지수·수급
+              us_daily.csv|investor_flows.csv|rt_H0NXCNT0_*.csv) continue ;;
+              premarket_daily.csv|premarket_universe.csv|premarket_news_*.csv) continue ;;
+              rt_intraday_*.csv) continue ;;
+              #   us_trading.yml — US 심 이력
+              trade_history_sim_us*.csv) continue ;;
             esac
             cp "$f" db_data_repo/data/ 2>/dev/null || true
           done

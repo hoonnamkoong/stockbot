@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { RESET_TARGETS, RESET_CSV_HEADER, buildResetState, validateCash } from './sim-reset-targets.ts';
+import {
+  RESET_TARGETS, RESET_CSV_HEADER, RESET_EPOCH_FILE, buildResetState, buildResetEpoch, validateCash,
+} from './sim-reset-targets.ts';
 
 // 매니페스트와의 대조는 tests/test_sim_registry_consistency.py가 한다(pytest 스위트에서
 // 실제로 돌아간다). 여기서는 목록 자체의 형식 불변식만 본다 — 개수를 박아두면
@@ -48,4 +50,13 @@ test('validateCash 경계값', () => {
   assert.equal(validateCash(3_000_000.5).ok, false);
   assert.equal(validateCash('3000000').ok, false);
   assert.equal(validateCash(NaN).ok, false);
+});
+
+test('리셋 표지는 가드가 읽는 형식', () => {
+  // scripts/reset_epoch_guard.py가 reset_id와 files를 읽는다. 파일명에 경로가 있으면 거부한다.
+  assert.equal(RESET_EPOCH_FILE, 'sim_reset_epoch.json');
+  const e = buildResetEpoch(3_000_000, ['sim_bull_state.json'], new Date('2026-09-21T07:00:00Z'));
+  assert.equal(e.reset_id, '2026-09-21T07:00:00.000Z');
+  assert.deepEqual(e.files, ['sim_bull_state.json']);
+  assert.notEqual(buildResetEpoch(1, [], new Date(1)).reset_id, buildResetEpoch(1, [], new Date(2)).reset_id);
 });

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { RESET_TARGETS, RESET_CSV_HEADER, buildResetState, validateCash } from '@/lib/sim-reset-targets';
+import {
+  RESET_TARGETS, RESET_CSV_HEADER, RESET_EPOCH_FILE, buildResetState, buildResetEpoch, validateCash,
+} from '@/lib/sim-reset-targets';
 import { commitFilesAtomically } from '@/lib/github-tree-commit';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +28,9 @@ export async function POST(request: Request) {
     { path: `data/${t.stateFile}`, content: stateJson },
     { path: `data/${t.csvFile}`, content: RESET_CSV_HEADER },
   ]));
+  // 런 도중 리셋이 배포에 되돌려지지 않게 표지를 같은 커밋에 싣는다(sim-reset-targets.ts).
+  const epoch = buildResetEpoch(v.value, RESET_TARGETS.flatMap(t => [t.stateFile, t.csvFile]));
+  files.push({ path: `data/${RESET_EPOCH_FILE}`, content: JSON.stringify(epoch, null, 2) });
 
   try {
     await commitFilesAtomically({

@@ -114,3 +114,27 @@ def test_price_quote_unaffected_still_instance_scoped(tmp_path):
         KISDataProvider().get_price_quote('005930')
         KISDataProvider().get_price_quote('005930')
         assert get_mock.call_count == 2
+
+
+# ── 파일 저장을 끄는 옵션 (2026-09-21, 심11 EOD) ─────────────────────
+# _set_disk_cache는 쓸 때마다 캐시 **전체**를 JSON으로 다시 쓴다. 심11 EOD가 315종목
+# × (일봉 230봉 + 실적)을 넣으면 파일이 9MB까지 크고 누적 저장이 ~169초(종목 수의
+# 제곱)였다. EOD는 이 파일을 복원도 배포도 안 해 아무도 다시 안 읽는다 — 순수 낭비고,
+# 병렬 조회에서는 스레드들이 같은 파일을 동시에 쓰는 경합 지점이다.
+
+def test_저장을_끄면_파일을_안_쓰지만_메모리_캐시는_산다(tmp_path):
+    with _redirect_cache_file(tmp_path), \
+         mock.patch.object(KISDataProvider, '_get', side_effect=_fake_profit_ratio_get) as get_mock:
+        p = KISDataProvider(persist_disk_cache=False)
+        p.get_finance_profit_ratio('005930')
+        p.get_finance_profit_ratio('005930')
+        assert get_mock.call_count == 1               # 메모리에서 왔다
+        assert not (tmp_path / "kis_financial_cache.json").exists()
+
+
+def test_기본값은_예전처럼_파일에_쓴다(tmp_path):
+    """실전 경로 호출부 10곳은 인자 없이 만든다 — 그 동작이 바뀌면 안 된다."""
+    with _redirect_cache_file(tmp_path), \
+         mock.patch.object(KISDataProvider, '_get', side_effect=_fake_profit_ratio_get):
+        KISDataProvider().get_finance_profit_ratio('005930')
+        assert (tmp_path / "kis_financial_cache.json").exists()

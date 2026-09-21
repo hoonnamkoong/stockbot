@@ -18,7 +18,8 @@ exit 1 하던 EOD·프리마켓뿐이고, 종토방·수급·국면 breadth는 *
 
 같은 데이터를 m.stock.naver.com의 JSON API가 준다. 네이버 호출은 여기로 모은다 —
 또 옮기면 고칠 곳이 이 파일 하나다.
-(아직 살아 있는 옛 페이지: item/sise_day, item/sise_time, item/news_news, item/news_notice)
+(남아 있던 옛 페이지 item/sise_day·sise_time·news_news·news_notice도 2026-09-17~18
+사이 전부 HTTP 410이 됐다 — 뉴스·공시는 news_page·disclosures로 옮겼다.)
 
 ## 계약
 
@@ -26,6 +27,8 @@ exit 1 하던 EOD·프리마켓뿐이고, 종토방·수급·국면 breadth는 *
 이번 사고의 모양이었다. 빈 리스트는 "정상적으로 비었다"(장 시작 전 거래량 순위 등)만
 뜻한다. 값이 없는 필드도 None이다 — 0으로 채우지 않는다.
 """
+import html
+
 import requests
 
 from src.core import net
@@ -202,6 +205,55 @@ def discussion_page(code, offset=None, *, session=None, reasons=None):
             'written_at': written,
         })
     return out, result.get('lastOffset')
+
+
+NEWS_PAGE_SIZE = 50   # 실측 상한 근처. 100은 서버가 JSON이 아닌 응답을 준다.
+
+
+def news_page(code, page, *, session=None, reasons=None):
+    """종목 뉴스 한 페이지(최신순). 목록 끝이면 `[]`, 못 얻으면 None.
+
+    행: dt('YYYY.MM.DD HH:MM' — 옛 item/news_news 표와 같은 형식이라 premarket_news
+        CSV가 이관 전후로 이어진다), src(언론사), title(HTML 엔티티를 푼 제목).
+    """
+    d = _json(f'{_BASE}/api/news/stock/{code}?pageSize={NEWS_PAGE_SIZE}&page={page}',
+              policy=net.SCRAPE, target='naver_news', session=session, reasons=reasons)
+    if not isinstance(d, list):
+        _note(reasons, 'bad_shape')
+        return None
+    out = []
+    for group in d:
+        items = group.get('items') if isinstance(group, dict) else None
+        if not isinstance(items, list):
+            _note(reasons, 'bad_shape')
+            return None
+        for it in items:
+            stamp = str(it.get('datetime') or '')
+            if len(stamp) != 12 or not stamp.isdigit():
+                continue
+            out.append({'dt': f'{stamp[:4]}.{stamp[4:6]}.{stamp[6:8]} {stamp[8:10]}:{stamp[10:]}',
+                        'src': it.get('officeName') or '',
+                        'title': html.unescape(it.get('title') or '')})
+    return out
+
+
+def disclosures(code, *, policy=net.FAST):
+    """종목 공시(최신순, 거래소 KOSCOM 공시 — 전환사채·유상증자 결정 포함).
+    공시가 없으면 `[]`, 못 얻으면 None.
+
+    행: date(YYYYMMDD), title.
+    """
+    d = _json(f'{_BASE}/api/stock/{code}/disclosure?pageSize=20&page=1', policy=policy,
+              target='naver')
+    if not isinstance(d, list):
+        return None
+    out = []
+    for r in d:
+        stamp = str(r.get('datetime') or '') if isinstance(r, dict) else ''
+        if len(stamp) < 10:
+            continue
+        out.append({'date': stamp[:10].replace('-', ''), 'title': r.get('title') or ''})
+    return out
 
 
 def asking_price(code, *, policy=net.BULK):

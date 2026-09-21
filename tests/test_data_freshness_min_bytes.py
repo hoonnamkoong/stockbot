@@ -67,12 +67,35 @@ def test_매니페스트에_크기_하한이_설정돼_있다():
         assert by[p].get('min_bytes'), f'{p}에 min_bytes가 없다'
 
 
-def test_글롭_항목에는_하한을_붙이지_않는다():
-    """`sizes.get(path)`는 리터럴 조회다 — 글롭 경로에 min_bytes를 붙이면 조용히
-    검사가 안 된다. 나중에 붙이는 사람이 속지 않게 여기서 막는다."""
+# ── 글롭 항목 (2026-09-21) ──────────────────────────────────────────
+# 예전에는 `sizes.get(path)` 리터럴 조회라 글롭에 min_bytes를 붙이면 조용히 검사가
+# 빠졌고, 그래서 금지했다. 그런데 날짜별 파일이 바로 그 사고를 냈다 — 09-18부터
+# premarket_news_YYYYMMDD.csv가 헤더만 든 22바이트로 매일 "갱신"됐다(평소 100~200KB).
+# 이제 글롭이면 **이름이 가장 뒤인** 매치의 크기를 본다. 날짜가 이름에 든 파일에서는
+# 그게 최신 날짜다 — 날짜 없는 글롭에 붙이면 의미가 없다.
+
+def _news(**kw):
+    return _entry(path='data/premarket_news_*[0-9].csv', **kw)
+
+
+def test_글롭은_최신_날짜_파일의_크기를_본다():
+    sizes = {'data/premarket_news_20260917.csv': 125371,
+             'data/premarket_news_20260918.csv': 22,
+             'data/premarket_news_20260918_coverage.csv': 500}
+    found = audit([_news(min_bytes=20000)], lambda p: FRESH, NOW, CAL, sizes=sizes)
+    assert len(found) == 1 and found[0]['kind'] == 'small' and found[0]['bytes'] == 22
+
+
+def test_글롭의_최신_파일이_충분하면_결손이_아니다():
+    sizes = {'data/premarket_news_20260917.csv': 22,
+             'data/premarket_news_20260918.csv': 125371}
+    assert audit([_news(min_bytes=20000)], lambda p: FRESH, NOW, CAL, sizes=sizes) == []
+
+
+def test_뉴스에_크기_하한이_걸려_있다():
     from src.data_freshness import load_manifest
-    bad = [e['path'] for e in load_manifest() if e.get('min_bytes') and '*' in e['path']]
-    assert not bad, f'글롭 항목에 min_bytes가 붙었다(검사되지 않는다): {bad}'
+    by = {e['path']: e for e in load_manifest()}
+    assert by['data/premarket_news_*[0-9].csv'].get('min_bytes')
 
 
 def test_작은_파일은_낡음과_겹쳐도_한_줄로_보고된다():

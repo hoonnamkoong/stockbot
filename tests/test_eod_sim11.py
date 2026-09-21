@@ -182,12 +182,12 @@ def test_watchlist_is_stamped_with_next_session_not_batch_day(tmp_path, monkeypa
 
     monkeypatch.setattr(m, 'WATCHLIST_PATH', str(tmp_path / 'wl.json'))
     monkeypatch.setattr(r, 'codes_and_names_from_ohlcv', lambda p: [('005930', '삼성전자')])
-    monkeypatch.setattr(r, 'candidates_from_kis_live', lambda pairs, kis, log=None: [
+    monkeypatch.setattr(r, 'candidates_from_kis_live', lambda pairs, kis, log=None, **kw: [
         {'code': '005930', 'name': '삼성전자'}])
     monkeypatch.setattr(r, 'build_sim11_watchlist', lambda c, log=None, held_codes=(): {
         '005930': {'name': '삼성전자', 'pivot_price': 1000.0, 'ma50': 900.0}})
     monkeypatch.setattr(r, 'KISDataProvider', object, raising=False)
-    monkeypatch.setattr('src.trade.kis_data_provider.KISDataProvider', lambda: object())
+    monkeypatch.setattr('src.trade.kis_data_provider.KISDataProvider', lambda **kw: object())
     monkeypatch.setattr(r, 'watchlist_target_date', lambda: '20260828')
 
     assert r._run_sim11('irrelevant.csv') == 0

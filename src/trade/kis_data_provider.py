@@ -45,8 +45,15 @@ class KISDataProvider:
     # (=파이프라인 런)를 넘어선 공유(E7)를 담당한다.
     _disk_cache: dict[str, tuple[float, object]] = {}
     _disk_cache_loaded = False
+    # 인스턴스 기본값(__init__의 persist_disk_cache). __new__로 만든 테스트 더블도 예전처럼 쓴다.
+    _persist = True
 
-    def __init__(self):
+    def __init__(self, persist_disk_cache: bool = True):
+        # False면 디스크 캐시를 메모리에만 둔다(파일을 안 쓴다). _set_disk_cache는 쓸 때마다
+        # 캐시 **전체**를 다시 쓰는데, 심11 EOD 배치(315종목 × 일봉 230봉)에서는 파일이
+        # 9MB까지 크고 누적 저장이 ~169초(종목 수의 제곱)였다 — 그 러너는 이 파일을
+        # 복원도 배포도 안 해 아무도 다시 안 읽는다. 기본값은 예전 동작 그대로다.
+        self._persist = persist_disk_cache
         self._cache: dict[str, tuple[float, dict]] = {}  # key → (ts, data)
         self._token: Optional[str] = None
         self._base_url: Optional[str] = None
@@ -124,7 +131,8 @@ class KISDataProvider:
     def _set_disk_cache(self, key: str, data):
         KISDataProvider._ensure_disk_cache_loaded()
         KISDataProvider._disk_cache[key] = (time.time(), data)
-        self._persist_disk_cache()
+        if self._persist:
+            self._persist_disk_cache()
 
     def _persist_disk_cache(self):
         """쓰기 실패는 조용히 넘어간다 — 캐시는 성능 최적화이지 정합성의

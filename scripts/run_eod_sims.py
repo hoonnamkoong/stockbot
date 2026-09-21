@@ -148,7 +148,8 @@ def codes_and_names_from_ohlcv(path: str) -> list[tuple[str, str]]:
 def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
                              history_days: int = 230,
                              pace_interval: float = 0.1,
-                             budget_sec: float = 600.0) -> list[dict]:
+                             budget_sec: float = 600.0,
+                             workers: int = 1) -> list[dict]:
     """Sim11(미너비니) 후보를 KIS 실시간 조회로 만든다.
 
     종목당 최대 3콜(일봉 페이지네이션 포함 시 더 늘 수 있음)이 필요해
@@ -163,33 +164,42 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
     budget_sec: 전체 조회에 허용할 최대 초. 초과 시 남은 종목을 건너뛰고
     수집된 후보만 돌려준다. collect 잡의 timeout-minutes(20분)보다 짧게 유지해
     KIS 응답 지연이 반복돼도 잡 타임아웃으로 런이 취소되지 않도록 한다.
+
+    workers: 동시에 조회할 종목 수. 종목당 ~4초의 대부분이 페이싱이 아니라 미국
+    러너→KIS 왕복 지연이라(2026-09-21 실측) 순차로는 315종목이 ~21분이다.
+    결과는 입력 순서를 지킨다 — 호출부가 보유 종목을 앞에 둔다(prioritize_sim11_pairs).
+    workers > 1이면 kis는 파일 저장을 끈 제공자(KISDataProvider(persist_disk_cache=False))
+    여야 한다 — 일봉·실적 조회가 캐시 **전체**를 같은 파일에 다시 쓰므로 스레드끼리
+    겹친다. 끄면 캐시 쓰기는 메모리 사전 대입뿐이고 조회는 requests.get이라 안전하다.
     """
+    import threading
     import time as _time
-    out = []
+    from concurrent.futures import ThreadPoolExecutor
     last_call = 0.0
+    pace_lock = threading.Lock()
     today = _time.strftime('%Y%m%d')
     deadline = _time.monotonic() + budget_sec
+    skipped = object()   # 예산 소진으로 손대지 않은 종목
 
     def _pace():
         nonlocal last_call
-        wait = last_call + pace_interval - _time.monotonic()
-        if wait > 0:
-            _time.sleep(wait)
-        last_call = _time.monotonic()
+        with pace_lock:
+            wait = last_call + pace_interval - _time.monotonic()
+            if wait > 0:
+                _time.sleep(wait)
+            last_call = _time.monotonic()
 
-    for i, (code, name) in enumerate(pairs):
+    def _one(pair):
+        code, name = pair
         if _time.monotonic() >= deadline:
-            remaining = len(pairs) - i
-            log(f'[EOD][Sim11] 예산 {budget_sec:.0f}초 소진 — '
-                f'남은 {remaining}종목 건너뜀 (수집 완료: {len(out)}종목)')
-            break
+            return skipped
         try:
             _pace()
             hist = kis.get_daily_history(code, days=history_days)
             today_bar = hist[-1] if hist and hist[-1].get('date') == today else None
             closes_before_today = [h['close'] for h in (hist[:-1] if today_bar else hist)]
             if len(closes_before_today) < 220:
-                continue
+                return None
 
             _pace()
             quote = kis.get_price_quote(code) or {}
@@ -199,7 +209,7 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
             price = today_bar['close'] if today_bar else quote.get('price', 0)
             amount = today_bar['amount'] if today_bar else quote.get('amount', 0)
             if not price:
-                continue
+                return None
 
             cand = {
                 'code': code, 'name': name, 'price': price, 'amount': amount,
@@ -210,10 +220,18 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
                 cand['eps_growth_yoy'] = growth['eps_growth_yoy']
             if 'revenue_growth_yoy' in growth:
                 cand['revenue_growth_yoy'] = growth['revenue_growth_yoy']
-            out.append(cand)
+            return cand
         except Exception as e:
             log(f'[EOD][Sim11] {code} 조회 실패(건너뜀): {e}')
-            continue
+            return None
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        results = list(ex.map(_one, pairs))
+    out = [r for r in results if r is not None and r is not skipped]
+    remaining = sum(1 for r in results if r is skipped)
+    if remaining:
+        log(f'[EOD][Sim11] 예산 {budget_sec:.0f}초 소진 — '
+            f'남은 {remaining}종목 건너뜀 (수집 완료: {len(out)}종목)')
     return out
 
 
@@ -353,6 +371,10 @@ def _run_sim9_1(path: str) -> int:
 #   사는 만큼, 이 제외가 S1의 상한을 낮춘다는 것을 알고 내린 결정이다.
 SIM11_UNIVERSE_LIMIT = 400
 
+# 심11 후보 동시 조회 수. 종목당 ~5콜 / ~4초라 4개면 초당 ~5콜 — KIS 유량제한(20건/초)의
+# 1/4이다. 315종목 순차 ~21분 → ~5분(2026-09-21 실측 기반 추정, 배포 후 스텝 소요로 확인).
+SIM11_FETCH_WORKERS = 4
+
 
 def sim11_universe(seed_path: str = DEFAULT_CSV,
                    limit: int = SIM11_UNIVERSE_LIMIT,
@@ -417,11 +439,12 @@ def _run_sim11(path: str) -> int:
         print(f'[EOD] 심11 보유 {list(held)} — 우선 조회')
     try:
         from src.trade.kis_data_provider import KISDataProvider
-        kis = KISDataProvider()
+        # 파일 저장을 끈다 — 이 러너는 캐시 파일을 다시 안 읽고, 병렬 조회에서는 경합한다.
+        kis = KISDataProvider(persist_disk_cache=False)
     except Exception as e:
         print(f'[EOD] 심11 KIS 초기화 실패 — 실행하지 않는다: {e}')
         return 1
-    candidates = candidates_from_kis_live(pairs, kis, log=print)
+    candidates = candidates_from_kis_live(pairs, kis, log=print, workers=SIM11_FETCH_WORKERS)
     if not candidates:
         print('[EOD] 심11 후보 0건(전부 조회 실패·이력 부족) — 감시 목록을 만들지 않는다')
         return 1

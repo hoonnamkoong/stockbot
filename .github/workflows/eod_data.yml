@@ -135,6 +135,9 @@ jobs:
           KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
           KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
           GH_PAT: ${{ secrets.GH_PAT }}
+          # 심11 후보 조회 결손 알림(scripts/run_eod_sims.py _report_sim11_fetch).
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           mkdir -p data
           if git clone --branch db-data --depth 1 \

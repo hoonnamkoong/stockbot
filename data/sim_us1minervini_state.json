@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 4812.166999999999,
-  "invested": 14876.79,
+  "cash": 929.2669999999985,
+  "invested": 18759.690000000002,
   "portfolio": {
     "EXPD": {
       "name": "Expeditors International of Washington, Inc. Common Stock",
@@ -34,6 +34,14 @@
       "entry_date": "2026-09-21",
       "peak_price": 203.91,
       "is_scaled_out": false
+    },
+    "P": {
+      "name": "Everpure, Inc. Class A common stock",
+      "quantity": 35,
+      "avg_price": 110.94,
+      "entry_date": "2026-09-21",
+      "peak_price": 110.94,
+      "is_scaled_out": false
     }
   },
   "peak_nav": 21356.184999999998,
@@ -56,37 +64,37 @@
     "VG": "2026-09-24"
   },
   "raw_stats": {
-    "cash": 4812.166999999999,
-    "total_asset": 20768.292,
-    "profit_rate": 3.8414600000000063,
-    "holdings_count": 4,
+    "cash": 929.2669999999985,
+    "total_asset": 20826.102000000003,
+    "profit_rate": 4.130510000000013,
+    "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 2.752799715866839,
-    "turnover": 1.483908,
-    "frequency": 0.3076923076923077,
+    "mdd": 2.482105301110639,
+    "turnover": 1.6780529999999998,
+    "frequency": 0.34615384615384615,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "EXPD": 190.45,
-      "CF": 126.415,
-      "FIVE": 237.835,
-      "DAR": 65.16,
-      "DINO": 115.94,
-      "PSX": 271.505,
-      "FTNT": 171.02,
-      "ANET": 203.12,
-      "VG": 13.52,
-      "P": 109.16,
+      "CF": 126.635,
+      "DAR": 65.27,
       "KYMR": 118.3,
-      "FROG": 94.609,
-      "CORT": 112.37
+      "FIVE": 237.96,
+      "PSX": 272.3,
+      "ANET": 203.66,
+      "VG": 13.531,
+      "FROG": 94.57,
+      "FTNT": 171.84,
+      "CORT": 112.38,
+      "P": 110.94,
+      "EXPD": 191.815,
+      "DINO": 116.195
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 91.74160085239949,
-    "거래빈도": 1.5384615384615385,
-    "자본회전율": 2.967816
+    "MDD": 92.55368409666808,
+    "거래빈도": 1.7307692307692308,
+    "자본회전율": 3.3561059999999996
   }
 }

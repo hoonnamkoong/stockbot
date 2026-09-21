@@ -3,8 +3,7 @@ import datetime
 from src.strategy.strategy_loader import load_monthly_strategy
 from src.strategy.virtual_portfolio import VirtualPortfolioManager
 # from src.strategy.advisor import GeminiAgent (순환 참조 방지 Lazy Loading)
-import requests
-from bs4 import BeautifulSoup
+from src.data import naver_api
 
 class StrategyEngine:
     """
@@ -103,19 +102,18 @@ class StrategyEngine:
     def fetch_dart_data(self, code):
         # [I/O 전담] DART 데이터 수집 로직
         # (기존 advisor.py에서 이관된 공시 파싱 로직)
+        # 못 봤으면 통과가 아니라 보류다. 옛 item/news_notice가 2026-09-17~18 HTTP 410이
+        # 됐는데 그 페이지를 파싱해 "특이 공시 없음"을 돌려줘 필터가 조용히 꺼졌다.
+        # 예외 경로("모니터링 일시 중단")도 원래 통과였다.
         try:
-            url = f"https://finance.naver.com/item/news_notice.naver?code={code}"
-            res = requests.get(url, timeout=5)
-            soup = BeautifulSoup(res.text, 'html.parser')
-            today_str = datetime.datetime.now().strftime('%Y.%m.%d')
-            reject_kws = ["전환사채", "신주인수권부사채", "유상증자"]
-            
-            for row in soup.select('tr'):
-                date_td = row.select_one('.date')
-                title_a = row.select_one('.title a')
-                if date_td and title_a and today_str in date_td.get_text():
-                    text = title_a.get_text()
-                    if any(k in text for k in reject_kws):
-                        return {"reject": True, "reason": f"DART 악재({text})"}
-            return {"reject": False, "reason": "특이 공시 없음"}
-        except: return {"reject": False, "reason": "DART 모니터링 일시 중단"}
+            rows = naver_api.disclosures(code)
+        except Exception:
+            rows = None
+        if rows is None:
+            return {"reject": True, "reason": "공시 판정 불가 — 매수 보류"}
+        today_str = datetime.datetime.now().strftime('%Y%m%d')
+        reject_kws = ["전환사채", "신주인수권부사채", "유상증자"]
+        for r in rows:
+            if r['date'] == today_str and any(k in r['title'] for k in reject_kws):
+                return {"reject": True, "reason": f"DART 악재({r['title']})"}
+        return {"reject": False, "reason": "특이 공시 없음"}

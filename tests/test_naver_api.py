@@ -244,3 +244,54 @@ def test_현재가(monkeypatch):
     _serve(monkeypatch, lambda url, n: _Res({'closePrice': '269,000'}))
 
     assert na.current_price('005930') == 269000
+
+
+# ── 종목 뉴스·공시 (2026-09-21 이관) ─────────────────────────────
+# item/news_news·item/news_notice가 09-17~18 사이 HTTP 410이 됐다. 뉴스 적재는
+# 09-18부터 0건, engine의 공시 필터는 410 페이지를 "특이 공시 없음"으로 읽었다.
+
+def _news(*items):
+    """실측 모양: 기사 하나씩 든 그룹의 목록."""
+    return [{'total': 1, 'items': [it]} for it in items]
+
+
+def test_뉴스는_옛_CSV와_같은_시각_형식으로_준다(monkeypatch):
+    _serve(monkeypatch, lambda url, n: _Res(_news(
+        {'datetime': '202609211822', 'officeName': '파이낸셜뉴스',
+         'title': '삼성·SK &quot;소부장&quot; 러브콜'})))
+
+    assert na.news_page('005930', 1) == [
+        {'dt': '2026.09.21 18:22', 'src': '파이낸셜뉴스', 'title': '삼성·SK "소부장" 러브콜'}]
+
+
+def test_뉴스_끝_페이지는_None이_아니라_빈_목록이다(monkeypatch):
+    _serve(monkeypatch, lambda url, n: _Res([]))
+    assert na.news_page('043260', 30) == []
+
+
+@pytest.mark.parametrize('body', [{'items': []}, [{'total': 1}], None])
+def test_뉴스_모양이_다르면_None이다(monkeypatch, body):
+    _serve(monkeypatch, lambda url, n: _Res(body))
+    assert na.news_page('005930', 1) is None
+
+
+def test_뉴스_HTML_응답은_None이다(monkeypatch):
+    _serve(monkeypatch, lambda url, n: _Res(html=True))
+    assert na.news_page('005930', 1) is None
+
+
+def test_공시(monkeypatch):
+    calls = _serve(monkeypatch, lambda url, n: _Res([
+        {'itemCode': '043260', 'title': '성호전자(주) 전환사채권발행결정(제21회차)',
+         'datetime': '2026-08-31T17:05:11', 'author': 'KOSCOM'}]))
+
+    assert na.disclosures('043260') == [
+        {'date': '20260831', 'title': '성호전자(주) 전환사채권발행결정(제21회차)'}]
+    assert '/api/stock/043260/disclosure' in calls[0]
+
+
+def test_공시가_없으면_빈_목록_못_얻으면_None(monkeypatch):
+    _serve(monkeypatch, lambda url, n: _Res([]))
+    assert na.disclosures('005930') == []
+    _serve(monkeypatch, lambda url, n: _Res(html=True))
+    assert na.disclosures('005930') is None

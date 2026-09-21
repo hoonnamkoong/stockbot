@@ -62,6 +62,17 @@ outputs:
     min_bytes: 200000
     why: 프리마켓 적재. 배포 격리 버그로 2주간 db-data에 존재조차 안 했다.
 
+  - path: data/premarket_news_*[0-9].csv
+    producer: premarket_data.yml
+    calendar: kr
+    max_age_sessions: 1
+    # 2026-09-14~17 실측 103~198KB. 09-18부터 옛 item/news_news가 410이라 헤더만 든
+    # 22바이트가 매일 올라왔는데 이 매니페스트에 없어 아무도 몰랐다.
+    # 글롭은 이름이 가장 뒤인(=최신 날짜) 파일의 크기를 본다. `[0-9].csv`로 끝나야
+    # 같은 날의 `_coverage.csv`(항상 31줄)가 안 걸린다.
+    min_bytes: 20000
+    why: 개장 전 뉴스 제목(급증배수 상위 30). 과거 조회가 7일뿐이라 끊기면 못 되살린다.
+
   - path: data/us_daily.csv
     producer: premarket_data.yml
     calendar: kr

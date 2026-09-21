@@ -17,6 +17,7 @@
 정상인데도 정지처럼 보인다. 결정과 무관하게 매번 나와야 하는 산출물만 본다.
 """
 import datetime as dt
+import fnmatch
 import os
 
 import yaml
@@ -83,6 +84,19 @@ def _us_sessions_closed_since(last_kst, now_kst) -> int:
     return n
 
 
+def _size_of(pattern: str, sizes: dict) -> int | None:
+    """리터럴이면 그 파일, 글롭이면 **이름이 가장 뒤인** 매치의 크기.
+
+    날짜가 이름에 든 파일(premarket_news_YYYYMMDD.csv)에서는 그게 최신 날짜다.
+    09-18부터 그 파일이 헤더만 든 22바이트로 매일 "갱신"됐는데, 글롭이라 크기를
+    못 봐 감사가 초록이었다.
+    """
+    if '*' not in pattern:
+        return sizes.get(pattern)
+    matches = sorted(p for p in sizes if fnmatch.fnmatch(p, pattern))
+    return sizes[matches[-1]] if matches else None
+
+
 def audit(entries: list[dict], last_updated, now_kst: dt.datetime,
           calendar: dict, sizes: dict | None = None) -> list[dict]:
     """결손 목록. last_updated(path) → 마지막 갱신 시각(KST) 또는 None.
@@ -99,7 +113,7 @@ def audit(entries: list[dict], last_updated, now_kst: dt.datetime,
             findings.append({**e, 'kind': 'missing', 'sessions': None})
             continue
         if e.get('min_bytes') and sizes:
-            size = sizes.get(e['path'])
+            size = _size_of(e['path'], sizes)
             if size is not None and size < e['min_bytes']:
                 findings.append({**e, 'kind': 'small', 'bytes': size,
                                  'sessions': None, 'last': last})

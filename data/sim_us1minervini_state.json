@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 5068.865,
-  "invested": 14802.779999999999,
+  "cash": 4812.166999999999,
+  "invested": 14876.79,
   "portfolio": {
     "EXPD": {
       "name": "Expeditors International of Washington, Inc. Common Stock",
@@ -27,12 +27,12 @@
       "peak_price": 276.015,
       "is_scaled_out": false
     },
-    "VG": {
-      "name": "Venture Global, Inc. Class A common stock",
-      "quantity": 264,
-      "avg_price": 14.395,
-      "entry_date": "2026-08-27",
-      "peak_price": 16.285,
+    "ANET": {
+      "name": "Arista Networks, Inc. Common Stock",
+      "quantity": 19,
+      "avg_price": 203.91,
+      "entry_date": "2026-09-21",
+      "peak_price": 203.91,
       "is_scaled_out": false
     }
   },
@@ -45,42 +45,48 @@
     {
       "date": "2026-09-18",
       "is_win": false
+    },
+    {
+      "date": "2026-09-21",
+      "is_win": false
     }
   ],
   "cooldown_codes": {
-    "RGA": "2026-09-21"
+    "RGA": "2026-09-21",
+    "VG": "2026-09-24"
   },
   "raw_stats": {
-    "cash": 5068.865,
-    "total_asset": 20916.645000000004,
-    "profit_rate": 4.583225000000021,
+    "cash": 4812.166999999999,
+    "total_asset": 20810.842,
+    "profit_rate": 4.054210000000003,
     "holdings_count": 4,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 2.0581391292498807,
-    "turnover": 1.109314,
-    "frequency": 0.25,
+    "mdd": 2.5535600108352554,
+    "turnover": 1.483908,
+    "frequency": 0.3076923076923077,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "CORT": 109.59,
-      "FROG": 92.44,
-      "RGA": 244.91,
-      "P": 105.21,
-      "CF": 128.21,
-      "DAR": 64.82,
-      "VG": 14.175,
-      "EXPD": 189.74,
-      "DINO": 115.84,
-      "ANET": 197.91,
-      "PSX": 273.24,
-      "KYMR": 117.22
+      "DAR": 65.565,
+      "FIVE": 236.38,
+      "FTNT": 169.84,
+      "VG": 13.703,
+      "CF": 126.755,
+      "P": 104.58,
+      "PSX": 272.22,
+      "KYMR": 117.75,
+      "CORT": 110.29,
+      "EXPD": 191.815,
+      "ANET": 203.91,
+      "DINO": 115.7,
+      "FROG": 94.095
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 93.82558261225036,
-    "거래빈도": 1.25,
-    "자본회전율": 2.218628
+    "MDD": 92.33931996749423,
+    "거래빈도": 1.5384615384615385,
+    "자본회전율": 2.967816
   }
 }

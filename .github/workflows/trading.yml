@@ -269,6 +269,9 @@ jobs:
             rm -rf db_data_repo
             git clone --depth 1 --branch db-data "$REPO_URL" db_data_repo || return 2
             mkdir -p db_data_repo/data
+            # 이 런이 도는 사이 대시보드 리셋이 들어왔으면 리셋된 심 파일은 올리지
+            # 않는다 — 2026-09-17 리셋을 2분 뒤 이 스텝이 되돌렸다(dd1810e52).
+            python3 scripts/reset_epoch_guard.py db_data_repo/data || return 4
             copied=0
             while IFS= read -r name; do
               [ -n "$name" ] || continue

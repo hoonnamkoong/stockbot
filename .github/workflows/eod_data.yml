@@ -164,6 +164,9 @@ jobs:
               && echo "[EOD] 심11 상태 복원" || echo "[EOD] 심11 상태 없음"
             cp state_repo/data/sim11_watchlist.json data/ 2>/dev/null \
               && echo "[EOD] 직전 심11 감시 목록 복원" || echo "[EOD] 직전 심11 감시 목록 없음"
+            # 런 시작 시점의 리셋 표지. 배포 때 최신본과 비교해 그 사이 리셋이
+            # 들어왔으면 심9-1 상태를 올리지 않는다(scripts/reset_epoch_guard.py).
+            cp state_repo/data/sim_reset_epoch.json data/ 2>/dev/null || true
             rm -rf state_repo
             PYTHONPATH=. python scripts/run_eod_sims.py || { echo "[EOD] 실행 실패 — CSV 배포는 계속하고 런은 맨 끝에서 실패시킨다"; echo "sims_ok=0" >> "$GITHUB_OUTPUT"; }
           else
@@ -214,6 +217,9 @@ jobs:
               echo "[OHLCV] 파일 없음 또는 0행 - 종가만 배포한다"
             fi
           fi
+          # 이 런이 도는 사이 대시보드 리셋이 들어왔으면 리셋된 심 파일(심9-1)을
+          # 로컬에서 지워 아래 cp가 건너뛰게 한다 — 런 시작 시점 사본이 리셋을 되돌린다.
+          python scripts/reset_epoch_guard.py db_repo/data data
           cd db_repo
           if [ "$csv_ok" = 1 ]; then
             git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv

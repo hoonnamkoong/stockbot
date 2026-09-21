@@ -30,6 +30,31 @@ export const TOKEN_REFRESH_HOUR_KST = 7;
  */
 export const TOKEN_REFRESH_WINDOW_MIN = 2;
 
+/** Date.getDay() 값. */
+export const SUNDAY = 0;
+export const SATURDAY = 6;
+
+/**
+ * 토요일은 이 시(KST) 전까지만 트리거를 받는다.
+ *
+ * 미국 금요일장은 KST로 **토요일** 00:00~05:00(서머타임 해제 시 ~06:00)에 걸쳐 있고,
+ * 그 장의 워치리스트 배치 창은 토요일 07:00~15:00이다(session_gate의
+ * US_WATCHLIST_CLOSE_HHMM — tests/test_cron_weekend_gate.py가 둘을 묶는다).
+ * 라우트가 토·일을 통째로 막던 시절, 매주 금요일 미국장이 앞 1시간 30분만
+ * 돌았다(2026-09-04·09-11·09-18 실측: UTC 15시 이후 태스커 발화 0).
+ *
+ * 토요일에 국내 매매가 열리지는 않는다 — session_router의 국내 창(kr·eod·audit·
+ * premarket)이 전부 주말을 거부한다. 이 게이트는 "발화할 이유가 있는가"만 본다.
+ */
+export const SATURDAY_CLOSE_HOUR_KST = 15;
+
+/** 이 틱을 받을 이유가 있는가. 일요일은 어느 장의 창도 없다. */
+export function isRouteOpen(dayOfWeek: number, hourKst: number): boolean {
+  if (dayOfWeek === SUNDAY) return false;
+  if (dayOfWeek === SATURDAY) return hourKst < SATURDAY_CLOSE_HOUR_KST;
+  return true;
+}
+
 /**
  * 이 시각에 dispatch할 워크플로 파일명.
  *
@@ -38,8 +63,10 @@ export const TOKEN_REFRESH_WINDOW_MIN = 2;
  * 여기를 scraper.yml로 되돌리면 실전 매매가 통째로 멈춘다 — 스크래퍼는
  * 자기를 부르지 않기 때문이다.
  */
-export function pickWorkflow(hourKst: number, minuteKst: number): string {
-  if (hourKst === TOKEN_REFRESH_HOUR_KST && minuteKst < TOKEN_REFRESH_WINDOW_MIN) {
+export function pickWorkflow(hourKst: number, minuteKst: number, dayOfWeek = 1): string {
+  // 토요일 07:00은 국내장이 없다 — KIS 토큰을 새로 발급할 이유가 없다.
+  if (dayOfWeek !== SATURDAY &&
+      hourKst === TOKEN_REFRESH_HOUR_KST && minuteKst < TOKEN_REFRESH_WINDOW_MIN) {
     return 'token_refresh.yml';
   }
   return 'trading.yml';
@@ -114,10 +141,11 @@ export const HEARTBEAT_WINDOW_MIN = 2;
  * 그 틱의 매매 트리거가 사라진다 — 07시대 30틱이 전부 token_refresh.yml로
  * 가서 한 시간의 매매 트리거를 잃은 2026-09-02와 같은 모양이다.
  *
- * 요일 게이트는 여기 없다. 라우트가 주말을 먼저 걸러 이 함수까지 오지
- * 않으며, 설령 오더라도 heartbeat.judge가 주말을 off_session으로 본다.
+ * 토요일 오전은 미국장 때문에 라우트를 통과하지만 국내 감시 대상이 없다 —
+ * 깨워도 heartbeat.judge가 off_session을 찍을 뿐이라 여기서 거른다.
  */
-export function pickSideWorkflows(hourKst: number, minuteKst: number): string[] {
+export function pickSideWorkflows(hourKst: number, minuteKst: number, dayOfWeek = 1): string[] {
+  if (dayOfWeek === SATURDAY || dayOfWeek === SUNDAY) return [];
   const t = hourKst * 60 + minuteKst;
   const open = HEARTBEAT_OPEN_HHMM[0] * 60 + HEARTBEAT_OPEN_HHMM[1];
   const close = HEARTBEAT_CLOSE_HHMM[0] * 60 + HEARTBEAT_CLOSE_HHMM[1];

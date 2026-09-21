@@ -6,6 +6,10 @@ import {
   pickSideWorkflows,
   TOKEN_REFRESH_HOUR_KST,
   HEARTBEAT_WORKFLOW,
+  isRouteOpen,
+  SATURDAY,
+  SUNDAY,
+  SATURDAY_CLOSE_HOUR_KST,
 } from './cron-target.ts';
 
 // 태스커 → /api/cron → workflow_dispatch. 대상 워크플로가 실재하지 않거나
@@ -140,4 +144,40 @@ test('감시는 2분 격자의 어느 위상에서도 세션당 12회 이상 깨
       );
     }
   }
+});
+
+// ── 요일 게이트 (2026-09-21) ────────────────────────────────────────
+// 라우트가 토·일을 통째로 막아, 매주 미국 금요일장이 KST 토 00:00부터 끊겼다.
+
+test('토요일 오전은 미국 금요일장·워치리스트 창이라 트리거를 받는다', () => {
+  for (const hour of [0, 3, 5, 7, 14]) {
+    assert.equal(isRouteOpen(SATURDAY, hour), true, `토 ${hour}시`);
+  }
+});
+
+test('토요일 오후와 일요일은 받지 않는다', () => {
+  assert.equal(isRouteOpen(SATURDAY, SATURDAY_CLOSE_HOUR_KST), false);
+  assert.equal(isRouteOpen(SATURDAY, 23), false);
+  for (let hour = 0; hour < 24; hour++) {
+    assert.equal(isRouteOpen(SUNDAY, hour), false, `일 ${hour}시`);
+  }
+});
+
+test('평일은 전부 받는다', () => {
+  for (let day = 1; day <= 5; day++)
+    for (let hour = 0; hour < 24; hour++)
+      assert.equal(isRouteOpen(day, hour), true, `${day}요일 ${hour}시`);
+});
+
+test('토요일 07:00은 토큰을 새로 발급하지 않는다 — 국내장이 없다', () => {
+  assert.equal(pickWorkflow(TOKEN_REFRESH_HOUR_KST, 0, SATURDAY), 'trading.yml');
+  assert.equal(pickWorkflow(TOKEN_REFRESH_HOUR_KST, 0, 1), 'token_refresh.yml');
+});
+
+test('토요일에는 장중 생존 감시를 깨우지 않는다', () => {
+  for (let hour = 0; hour < 24; hour++)
+    for (let minute = 0; minute < 60; minute++)
+      assert.deepEqual(pickSideWorkflows(hour, minute, SATURDAY), [], `토 ${hour}:${minute}`);
+  // 평일 같은 시각에는 깨운다 — 위 단언이 빈 함수로 통과하지 않게.
+  assert.deepEqual(pickSideWorkflows(10, 0, 1), [HEARTBEAT_WORKFLOW]);
 });

@@ -27,6 +27,31 @@
       "code": "000660",
       "name": "SK하이닉스",
       "rank": 5
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 1
+    },
+    {
+      "code": "486990",
+      "name": "노타",
+      "rank": 2
+    },
+    {
+      "code": "950260",
+      "name": "인제니아테라퓨틱스(Reg.S)",
+      "rank": 3
+    },
+    {
+      "code": "047040",
+      "name": "대우건설",
+      "rank": 4
+    },
+    {
+      "code": "000500",
+      "name": "가온전선",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "001440",
     "007810",
     "005930",
-    "000660"
+    "000660",
+    "034020",
+    "486990",
+    "950260",
+    "047040",
+    "000500"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 1
+    },
+    {
+      "code": "486990",
+      "name": "노타",
+      "rank": 2
+    },
+    {
+      "code": "950260",
+      "name": "인제니아테라퓨틱스(Reg.S)",
+      "rank": 3
+    },
+    {
+      "code": "047040",
+      "name": "대우건설",
+      "rank": 4
+    },
+    {
+      "code": "000500",
+      "name": "가온전선",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

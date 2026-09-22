@@ -18,12 +18,64 @@
       "name": "가온전선",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "나스닥 및 미국 증시 상승, 구리 가격 상승, AI 관련주 강세에 따른 가온전선 주가 상승 기대감. 40만원 돌파 및 52주 신고가 도전 언급.",
+        "posts_summary": "신고가 랠리 기대감 및 전력주 강세. AI 관련주 및 국제유가 하락 수혜.",
         "sentiment": "7",
         "keywords": [
-          "나스닥",
-          "구리가격",
-          "AI관련주"
+          "신고가",
+          "전력주",
+          "AI"
+        ]
+      }
+    },
+    "005930": {
+      "name": "삼성전자",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "3분기 영업이익 호조 및 30만 전자 돌파 기대감. 미 증시 반도체주 급등.",
+        "sentiment": "3",
+        "keywords": [
+          "영업이익",
+          "반도체",
+          "미증시"
+        ]
+      }
+    },
+    "007810": {
+      "name": "코리아써키트",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "GDDR7 기판 공급망 합류 뉴스 기반 급등. 개인 투자자 매도 압력 존재.",
+        "sentiment": "6",
+        "keywords": [
+          "GDDR7",
+          "기판",
+          "공급망"
+        ]
+      }
+    },
+    "034020": {
+      "name": "두산에너빌리티",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "미국 SMR 사업 추진 확정 및 공급 계약 체결. 차세대 KDDX 전기추진 시스템 공급 계약.",
+        "sentiment": "4",
+        "keywords": [
+          "SMR",
+          "공급 계약",
+          "KDDX"
+        ]
+      }
+    },
+    "010170": {
+      "name": "대한광통신",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "AI 데이터 관련 낙관론 및 미국 광통신주 급등 수혜 기대. 코스닥 대장주 급등 출발.",
+        "sentiment": "5",
+        "keywords": [
+          "AI",
+          "광통신",
+          "코스닥"
         ]
       }
     }

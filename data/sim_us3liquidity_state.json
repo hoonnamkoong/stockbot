@@ -8,7 +8,7 @@
       "quantity": 4,
       "avg_price": 938.84,
       "entry_date": "2026-08-27",
-      "peak_price": 1092.183,
+      "peak_price": 1093.41,
       "is_scaled_out": false
     },
     "NVDA": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 22083.375,
+  "peak_nav": 22092.095,
   "total_fees": 17.7648,
   "history": [
     20000
@@ -57,42 +57,42 @@
   },
   "raw_stats": {
     "cash": 2235.1949999999997,
-    "total_asset": 22081.367,
-    "profit_rate": 10.406834999999992,
+    "total_asset": 22092.095,
+    "profit_rate": 10.460475000000006,
     "holdings_count": 5,
     "win_rate": 0,
     "profit_factor": 1.0,
-    "mdd": 0.009092813032435622,
+    "mdd": 0.0,
     "turnover": 0.8882399999999999,
     "frequency": 0.17857142857142858,
     "total_fees": 17.7648,
     "current_prices": {
-      "MRNA": 184.28,
-      "MRVL": 264.615,
-      "TSM": 451.42,
-      "CRM": 232.9,
-      "GOOG": 347.93,
-      "TSLA": 379.75,
-      "DELL": 550.01,
-      "MU": 1092.183,
-      "MSFT": 498.34,
-      "META": 739.005,
-      "AVGO": 364.43,
-      "PLTR": 184.23,
-      "AMD": 618.9,
-      "INTC": 122.72,
-      "SNDK": 1889.48,
-      "ORCL": 149.946,
-      "NVDA": 229.25,
-      "AMZN": 255.055,
-      "GOOGL": 352.11,
-      "AAPL": 340.3
+      "MSFT": 498.52,
+      "AVGO": 364.435,
+      "TSM": 450.97,
+      "META": 738.75,
+      "AMZN": 255.16,
+      "MRNA": 184.17,
+      "GOOGL": 352.195,
+      "GOOG": 347.935,
+      "MRVL": 264.61,
+      "AMD": 620.63,
+      "SNDK": 1890.29,
+      "ORCL": 150.125,
+      "PLTR": 184.29,
+      "AAPL": 340.26,
+      "MU": 1093.41,
+      "NVDA": 229.44,
+      "CRM": 232.775,
+      "TSLA": 379.65,
+      "DELL": 549.815,
+      "INTC": 122.755
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 20.0,
-    "MDD": 99.9727215609027,
+    "MDD": 100.0,
     "거래빈도": 0.8928571428571429,
     "자본회전율": 1.7764799999999998
   }

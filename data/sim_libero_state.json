@@ -10,23 +10,23 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-09-23 12:50:41",
+  "last_run": "2026-09-23 13:01:12",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": 0.6,
-  "bull_score": 29.3,
+  "bull_score": 29.4,
   "metrics": {
     "breadth_score": 22.0,
-    "momentum_score": -1.45,
+    "momentum_score": -1.4,
     "trend_strength": 22.2,
     "foreign_score": null,
     "volatility_score": null
   },
   "regime_history": [
     "SIDEWAYS",
+    "BEAR",
+    "BEAR",
     "SIDEWAYS",
-    "BEAR",
-    "BEAR",
     "SIDEWAYS"
   ],
   "recommended_sims": [
@@ -788,6 +788,10 @@
       {
         "t": "12:00",
         "breadth": 20.0
+      },
+      {
+        "t": "13:00",
+        "breadth": 22.0
       }
     ],
     "predictions": [
@@ -845,7 +849,7 @@
         "type": "h1",
         "model": "naive",
         "value": 20.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "12:00",
@@ -854,19 +858,26 @@
         "model": "naive",
         "value": 20.0,
         "scored": false
+      },
+      {
+        "made_at": "13:00",
+        "target": "14:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 22.0,
+        "scored": false
+      },
+      {
+        "made_at": "13:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 22.0,
+        "scored": false
       }
     ]
   },
   "intraday_score_log": [
-    {
-      "date": "2026-07-13",
-      "type": "h1",
-      "made_at": "11:00",
-      "target": "12:00",
-      "pred": 11.0,
-      "actual": 44.0,
-      "gap": -33.0
-    },
     {
       "date": "2026-07-13",
       "type": "h1",
@@ -12573,6 +12584,16 @@
       "pred": 27.0,
       "actual": 20.0,
       "gap": 7.0
+    },
+    {
+      "date": "2026-09-23",
+      "type": "h1",
+      "made_at": "12:00",
+      "model": "naive",
+      "target": "13:00",
+      "pred": 20.0,
+      "actual": 22.0,
+      "gap": -2.0
     }
   ]
 }

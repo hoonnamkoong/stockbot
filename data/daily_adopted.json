@@ -5,12 +5,12 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 릴레이테라퓨틱스 상승 및 FDA 승인 기대감 기반 주가 상승 전망.",
+        "posts_summary": "미국 릴레이테라퓨틱스 상승, 간암 및 담관암 신약 FDA 승인 기대감.",
         "sentiment": "4",
         "keywords": [
+          "신약",
           "FDA",
-          "릴레이테라퓨틱스",
-          "간암"
+          "승인"
         ]
       }
     },
@@ -18,11 +18,12 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "JP모건의 HBM 1위 인정 및 개인 매도 자제 시 상승 전망.",
+        "posts_summary": "JP모건의 HBM 1위 인정, 개인 매도 자제 시 상승 전망.",
         "sentiment": "3",
         "keywords": [
           "HBM",
-          "JP모건"
+          "배당",
+          "상승"
         ]
       }
     },
@@ -30,11 +31,12 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "공매도 세력의 파산 관련 언급 및 대차해지 운동 독려.",
-        "sentiment": "-8",
+        "posts_summary": "공매도 세력의 파산 가능성 언급과 대차 해지 운동 독려.",
+        "sentiment": "-5",
         "keywords": [
           "공매도",
-          "대차해지"
+          "대차",
+          "파산"
         ]
       }
     },
@@ -42,11 +44,12 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "국내 증시 및 외인 매도세에 대한 불신과 함께 상승 기대감 언급.",
-        "sentiment": "1",
+        "posts_summary": "국내 증시 전반에 대한 불신과 외인 매도세 언급, 마이크론과의 비교.",
+        "sentiment": "-2",
         "keywords": [
+          "국장",
           "외인",
-          "국장"
+          "반도체"
         ]
       }
     },
@@ -54,12 +57,12 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "미국 원전 2기 확정 소식에도 불구하고 주가 하락 및 매도세 관측.",
+        "posts_summary": "미국 원전 수주 확정에도 불구하고 하락세 지속, 외인/기관/연기금 매도.",
         "sentiment": "-7",
         "keywords": [
           "원전",
           "SMR",
-          "외인"
+          "하락"
         ]
       }
     },
@@ -67,11 +70,12 @@
       "name": "엑스게이트",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 양자 관련주 급등에 따른 기대감. 아이온큐 급등 및 양자 보안 관련 소식.",
-        "sentiment": "5",
+        "posts_summary": "미국 양자 관련주 급등, 양자 보안 기술의 상용화 가능성과 공매도 세력 언급.",
+        "sentiment": "8",
         "keywords": [
           "양자",
-          "아이온큐"
+          "보안",
+          "공매도"
         ]
       }
     },
@@ -104,11 +108,12 @@
       "name": "삼성E&A",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 하락 및 횡보에 대한 불만과 함께 추가 매수 의견 제시.",
-        "sentiment": "-5",
+        "posts_summary": "LNG 플랜트 5조 수주에도 불구하고 주가 하락, 6개월 보유에 대한 회의감.",
+        "sentiment": "-4",
         "keywords": [
           "LNG",
-          "원전"
+          "수주",
+          "주가"
         ]
       }
     },
@@ -194,11 +199,12 @@
       "name": "미투온",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "급락 및 물량 떠넘기기에 대한 우려와 함께 전량 매도 의견 표출.",
+        "posts_summary": "급격한 하락과 물량 떠넘기기 의혹, 상폐 및 단기 거래장에 대한 부정적 전망.",
         "sentiment": "-6",
         "keywords": [
-          "주포",
-          "유증"
+          "급락",
+          "물량",
+          "단타"
         ]
       }
     },
@@ -232,12 +238,12 @@
       "name": "레메디",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "스페이스X 및 NASA 선정, 인도 수주 등 호재 기반 주가 급등 전망.",
-        "sentiment": "6",
+        "posts_summary": "스페이스X 및 NASA 선정, 11조원 휴대용 X-ray 시장 도전 및 인도발 수주 재료 부각.",
+        "sentiment": "7",
         "keywords": [
           "X-ray",
           "스페이스X",
-          "NASA"
+          "수주"
         ]
       }
     }

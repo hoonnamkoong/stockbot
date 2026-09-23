@@ -5,12 +5,11 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "간암 및 담관암 신약 FDA 승인 초읽기 및 글로벌 블록버스터 기대감이 고조되며, 공매도 세력에 대한 언급도 있습니다.",
-        "sentiment": "7",
+        "posts_summary": "미국 릴레이테라퓨틱스 주가 상승 및 간암/담관암 신약 FDA 허가 기대감.",
+        "sentiment": "2",
         "keywords": [
-          "FDA",
-          "신약",
-          "간암"
+          "신약 허가",
+          "FDA"
         ]
       }
     },
@@ -18,8 +17,8 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "대통령 관련 언급이 다수 포함되었으며, 주가 상승을 기대하는 개인 투자자들의 심리가 나타납니다.",
-        "sentiment": "1",
+        "posts_summary": "주가 상승 및 하락에 대한 상반된 전망과 정치 관련 언급이 혼재된 게시글.",
+        "sentiment": "0",
         "keywords": []
       }
     },
@@ -64,11 +63,10 @@
       "name": "엑스게이트",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 양자 관련주 급등 소식과 함께 국내 양자 보안 테마의 상승 가능성을 언급하며 긍정적인 전망을 보이고 있습니다.",
-        "sentiment": "5",
+        "posts_summary": "미국 양자 관련주 급등에 따른 주가 상승 기대 및 양자 보안 관련 기술 언급.",
+        "sentiment": "3",
         "keywords": [
-          "양자",
-          "보안"
+          "양자 보안"
         ]
       }
     },
@@ -89,12 +87,11 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "LG디스플레이 유리기판 사업 및 게이밍 OLED 관련 신규 기술 언급. 일부 투자자 매수세 유입 및 목표가 상향 기대.",
+        "posts_summary": "키움증권의 매매 행태 분석과 유리 기판, 게이밍 OLED 등 신사업 관련 언급.",
         "sentiment": "2",
         "keywords": [
-          "유리기판",
-          "OLED",
-          "커스텀 공정"
+          "유리 기판",
+          "게이밍 OLED"
         ]
       }
     },
@@ -154,11 +151,10 @@
       "name": "셀리드",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "셀리드 유상증자 및 경영권 변경 관련 해명 요구. 항암백신 AI 기업 뉴스 언급과 함께 주가 약세에 대한 불만 표출.",
-        "sentiment": "-4",
+        "posts_summary": "유상증자 및 경영권 변경 관련 이슈와 항암백신 AI 기업으로의 전환 가능성 언급.",
+        "sentiment": "0",
         "keywords": [
           "유상증자",
-          "경영권 변경",
           "항암백신"
         ]
       }
@@ -192,12 +188,9 @@
       "name": "미투온",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "주가 급락에 대한 불만과 단타성 거래에 대한 비판적인 시각이 나타나며, 상폐 가능성까지 언급하고 있습니다.",
-        "sentiment": "-6",
-        "keywords": [
-          "주가조작",
-          "단타"
-        ]
+        "posts_summary": "주가 급락에 대한 불만과 물량 떠넘기기에 대한 의혹 제기.",
+        "sentiment": "-4",
+        "keywords": []
       }
     },
     "001440": {
@@ -230,12 +223,11 @@
       "name": "레메디",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "스페이스X 및 NASA 선정, 인도발 수주 재료 등 다수의 호재를 바탕으로 10조원 규모의 휴대용 X-Ray 시장 선점 및 시총 1조원 돌파를 기대하고 있습니다.",
-        "sentiment": "8",
+        "posts_summary": "스페이스X 선정 및 NASA 우주 임무 적합 장비 선정 기반의 포터블 X-Ray 시장 도전 및 주가 급등.",
+        "sentiment": "7",
         "keywords": [
-          "스페이스X",
-          "NASA",
-          "X-ray"
+          "포터블 X-Ray",
+          "스페이스X"
         ]
       }
     },
@@ -243,12 +235,11 @@
       "name": "삼기에너지솔루션즈",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "삼기에너지솔루션즈의 미국 특허 플렉시블 PCB, AI 데이터센터 공급 확대 뉴스 언급. ESS 및 NVIDIA 관련 기대감 표출.",
-        "sentiment": "7",
+        "posts_summary": "미국 특허 플렉시블 PCB 확보 및 AI 데이터센터향 공급 확대 소식 기반의 주가 상승 기대.",
+        "sentiment": "1",
         "keywords": [
           "플렉시블 PCB",
-          "AI 데이터센터",
-          "미국 특허"
+          "AI 데이터센터"
         ]
       }
     },
@@ -269,11 +260,10 @@
       "name": "나라스페이스테크놀로지",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "초소형위성 관련 국방과제 수주 사실을 바탕으로 우주 항공 대장주로의 성장을 기대하며 긍정적인 분위기를 보이고 있습니다.",
-        "sentiment": "4",
+        "posts_summary": "초소형 위성 국방과제 주관 및 우주 항공 테마 상승 기대감.",
+        "sentiment": "3",
         "keywords": [
-          "초소형위성",
-          "우주항공"
+          "초소형 위성"
         ]
       }
     }

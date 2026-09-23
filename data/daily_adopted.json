@@ -18,25 +18,20 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 발언과 함께 주가 상승 기대감이 혼재되어 있으며, 배당 관련 문의가 나타납니다.",
-        "sentiment": "1",
-        "keywords": [
-          "배당",
-          "상승",
-          "정치"
-        ]
+        "posts_summary": "총선 관련 정치적 발언과 함께 주가 상승 기대 언급.",
+        "sentiment": "2",
+        "keywords": []
       }
     },
     "047040": {
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "공매도 세력과의 갈등 심화. 공매도 파산 가능성 및 대차 해지 운동 촉구.",
-        "sentiment": "-5",
+        "posts_summary": "공매도 세력과의 전쟁 선포 및 파산 기대감 표출.",
+        "sentiment": "-7",
         "keywords": [
           "공매도",
-          "대차",
-          "주가 조작"
+          "대차해지"
         ]
       }
     },
@@ -44,12 +39,11 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "증시 전반에 대한 불신과 함께, 반도체 섹터의 부진 및 기관 매도에 대한 부정적 의견이 많습니다.",
-        "sentiment": "-2",
+        "posts_summary": "국내 증시 신뢰도 하락 및 SK하이닉스 주가 부진에 대한 불만 토로.",
+        "sentiment": "-4",
         "keywords": [
-          "반도체",
-          "국장",
-          "기관"
+          "ADR",
+          "반도체"
         ]
       }
     },
@@ -57,12 +51,11 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "미국 원전 수주 기대감에도 불구하고, 외인·기관 매도 및 차트 붕괴 우려가 제기됩니다.",
-        "sentiment": "-3",
+        "posts_summary": "원전 관련 호재에도 불구하고 주가 하락 및 외인/기관 매도세 우려.",
+        "sentiment": "-5",
         "keywords": [
           "원전",
-          "수주",
-          "매도"
+          "SMR"
         ]
       }
     },
@@ -83,12 +76,11 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "2만원 돌파 기대감과 함께 단기적인 상승 및 외국인 수급 변화에 대한 언급이 있습니다.",
-        "sentiment": "2",
+        "posts_summary": "추석 연휴 전 주가 상승 기대감 및 단타 세력의 이탈 촉구.",
+        "sentiment": "3",
         "keywords": [
-          "2만원",
-          "상승",
-          "외국인"
+          "쇼티지",
+          "광통신"
         ]
       }
     },
@@ -96,12 +88,11 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "유리 기판 사업 관련 긍정적 내용과 함께, 증권사 리포트 및 외국인 수급에 대한 불신이 교차합니다.",
-        "sentiment": "0",
+        "posts_summary": "유리기판 사업 관련 긍정적 전망과 함께 키움증권의 매매 패턴 분석.",
+        "sentiment": "1",
         "keywords": [
           "유리기판",
-          "리포트",
-          "외국인"
+          "디스플레이"
         ]
       }
     },
@@ -174,12 +165,11 @@
       "name": "스카이랩스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "타임지 선정 소식에도 불구하고 주가 부진에 대한 실망감이 나타나며, 향후 추세에 대한 관망세가 짙습니다.",
-        "sentiment": "-1",
+        "posts_summary": "타임지 선정 및 헬스케어 기술 관련 기대감, 주가 상승 전망.",
+        "sentiment": "4",
         "keywords": [
-          "타임지",
-          "주가 부진",
-          "추세"
+          "헬스케어",
+          "타임지"
         ]
       }
     },
@@ -200,13 +190,9 @@
       "name": "미투온",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "급격한 주가 하락 및 물량 떠넘기기에 대한 불만. 단기 세력에 의한 시장 형성 우려.",
+        "posts_summary": "주가 급락 및 물량 넘기기에 대한 불만 표출.",
         "sentiment": "-6",
-        "keywords": [
-          "급락",
-          "물량 떠넘기기",
-          "단타"
-        ]
+        "keywords": []
       }
     },
     "001440": {
@@ -239,12 +225,12 @@
       "name": "레메디",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "NASA 선정 및 스페이스X 협력에 따른 초소형 X-ray 기술력 검증. 인도발 수주 재료와 함께 시총 1조 기대감 고조.",
-        "sentiment": "9",
+        "posts_summary": "스페이스X, NASA 선정 등 복합적인 호재로 인한 급등 기대감.",
+        "sentiment": "8",
         "keywords": [
-          "X-ray",
+          "스페이스X",
           "NASA",
-          "스페이스X"
+          "엑스레이"
         ]
       }
     }

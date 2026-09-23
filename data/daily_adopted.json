@@ -18,12 +18,11 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "삼성전자 주가 30만 돌파 및 9월, 10월 예상 주가 전망. 외인 기관 쌍끌이 매수 관측.",
-        "sentiment": "1",
+        "posts_summary": "대선 관련 정치적 발언과 함께 주가 상승 기대감 표출. 외인·기관 쌍끌이 매수 언급.",
+        "sentiment": "2",
         "keywords": [
-          "주가 전망",
-          "외인 매수",
-          "쌍끌이"
+          "반도체 랠리",
+          "외인기관"
         ]
       }
     },
@@ -43,12 +42,11 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "ADR 대비 부진한 주가 흐름에 대한 불만 고조.  증권사 및 정부 정책 비판.",
-        "sentiment": "-6",
+        "posts_summary": "정부 정책 및 외국인 매매에 대한 불만 속에서 주가 부진에 대한 답답함 표출. 자사주 매입 기대감 언급.",
+        "sentiment": "-3",
         "keywords": [
           "ADR",
-          "주가 관리",
-          "불만"
+          "자사주 매입"
         ]
       }
     },
@@ -56,12 +54,11 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "한국형 원전 2기 미국 수출 확정, 소형SMR 기대감 있으나 재료 소멸 및 주가 조작 의혹 제기. 외인 숏 포지션 관측.",
-        "sentiment": "-7",
+        "posts_summary": "미국 원전 수출 관련 호재 언급에도 불구하고 주가 하락에 대한 불안감과 불신 표출.",
+        "sentiment": "-5",
         "keywords": [
-          "원전 수출",
-          "SMR",
-          "주가 조작"
+          "원전",
+          "SMR"
         ]
       }
     },
@@ -95,11 +92,11 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "키움증권의 매매 행태 및 목표주가 하향 리포트에 대한 의혹 제기. 유리 기판 사업 등 신규 사업 언급.",
+        "posts_summary": "주가 조작 및 허수 매도에 대한 불만과 함께, 신규 사업(유리 기판) 및 실적 개선 가능성 언급.",
         "sentiment": "0",
         "keywords": [
-          "키움증권",
-          "유리 기판"
+          "유리기판",
+          "실적"
         ]
       }
     },
@@ -237,10 +234,10 @@
       "name": "레메디",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "NASA 선정 초소형 엑스레이 발생기 'Xcam6' 및 스페이스X 관련 소식. 포터블 X-Ray 시장 성장 기대.",
-        "sentiment": "5",
+        "posts_summary": "NASA 및 스페이스X 선정, 11조원 규모 포터블 X-Ray 시장 진출 가능성. 기술력 기반 실적 성장 기대감.",
+        "sentiment": "7",
         "keywords": [
-          "NASA",
+          "X-Ray",
           "스페이스X"
         ]
       }
@@ -249,12 +246,11 @@
       "name": "삼기에너지솔루션즈",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "삼기에너지솔루션즈, 美 특허 플렉시블PCB AI 데이터센터향 공급 확대. 엔비디아 ESS 파트너 선정.",
-        "sentiment": "4",
+        "posts_summary": "미국 특허(플렉시블 PCB) 및 AI 데이터센터, ESS 관련 사업 강화 기대감. 엔비디아 및 LG엔솔 관련 언급.",
+        "sentiment": "3",
         "keywords": [
-          "플렉시블 PCB",
-          "AI 데이터센터",
-          "ESS"
+          "ESS",
+          "AI 데이터센터"
         ]
       }
     },

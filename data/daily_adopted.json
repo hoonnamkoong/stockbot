@@ -5,12 +5,11 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "간암 신약 FDA 허가 임박 및 리보세라닙 승인 기대감.",
-        "sentiment": "1",
+        "posts_summary": "간암 및 담관암 신약 FDA 허가 임박에 따른 주가 급등 기대.",
+        "sentiment": "2",
         "keywords": [
-          "FDA",
-          "리보세라닙",
-          "간암"
+          "간암",
+          "FDA"
         ]
       }
     },
@@ -18,12 +17,9 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치 관련 언급 다수, 일부 매수/매도 의견 혼재.",
-        "sentiment": "-2",
-        "keywords": [
-          "주가",
-          "매매"
-        ]
+        "posts_summary": "정치적 언급과 주가 관련 기대가 혼재된 의견.",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "047040": {
@@ -43,12 +39,11 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "국내 증시 및 하이닉스 주가 관리 방식에 대한 불신과 부정적 전망.",
+        "posts_summary": "주가 관리 및 국장 불신에 대한 불만이 강하게 표출된 의견.",
         "sentiment": "-3",
         "keywords": [
-          "주가조작",
-          "레버리지",
-          "외국인"
+          "반도체",
+          "국장"
         ]
       }
     },
@@ -56,12 +51,11 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "원전 사업 관련 호재에도 불구하고 주가 하락 및 부정적 전망.",
-        "sentiment": "-5",
+        "posts_summary": "미국향 원전 수주 기대와 주가 하락에 대한 불만이 혼재된 의견.",
+        "sentiment": "-2",
         "keywords": [
           "원전",
-          "SMR",
-          "주가하락"
+          "SMR"
         ]
       }
     },
@@ -95,12 +89,11 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "키움증권의 매수·매도 공방 속에서 주가 상승 기대감과 함께 '물량 넘기기', '가짜 외인' 등 의혹이 제기됨. 유리 기판 사업 등 신사업에 대한 언급도 있음.",
-        "sentiment": "0",
+        "posts_summary": "주가 부양을 위한 세력 개입 의혹과 유리 기판 사업 성장 전망이 혼재된 의견.",
+        "sentiment": "1",
         "keywords": [
-          "매매주체",
-          "실적",
-          "신사업"
+          "유리기판",
+          "디스플레이"
         ]
       }
     },
@@ -160,12 +153,11 @@
       "name": "셀리드",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "잦은 유상증자와 경영권 변경에 대한 부정적 시각 및 주가 우려.",
-        "sentiment": "-5",
+        "posts_summary": "유상증자 및 경영권 변경에 대한 불신과 항암 백신 사업에 대한 기대가 혼재된 의견.",
+        "sentiment": "-4",
         "keywords": [
           "유상증자",
-          "경영권변경",
-          "주가"
+          "항암백신"
         ]
       }
     },
@@ -238,12 +230,47 @@
       "name": "레메디",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "스페이스X 및 NASA 선정, 인도발 수주 등 강력한 호재와 함께 11조원 규모의 시장 도전에 대한 기대감이 고조되고 있으며, 공매도 세력에 대한 압박이 커지고 있음.",
+        "posts_summary": "스페이스X 선정 및 NASA 협업 기반 휴대용 X-Ray 시장 확대에 따른 급등 전망.",
         "sentiment": "8",
         "keywords": [
-          "스페이스X",
-          "NASA",
-          "수주"
+          "X-Ray",
+          "스페이스X"
+        ]
+      }
+    },
+    "419050": {
+      "name": "삼기에너지솔루션즈",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "미국 특허 기반 AI 데이터센터향 플렉시블 PCB 공급 확대에 따른 급등 전망.",
+        "sentiment": "7",
+        "keywords": [
+          "플렉시블PCB",
+          "AI데이터센터"
+        ]
+      }
+    },
+    "046970": {
+      "name": "우리로",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "주가 변동성에 대한 혼란과 기대감이 혼재된 의견.",
+        "sentiment": "0",
+        "keywords": [
+          "양자",
+          "빛샘"
+        ]
+      }
+    },
+    "478340": {
+      "name": "나라스페이스테크놀로지",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "초소형 위성 국방 과제 수주 및 투자경고 지정에 따른 주가 급등 기대.",
+        "sentiment": "6",
+        "keywords": [
+          "초소형위성",
+          "투자경고"
         ]
       }
     }

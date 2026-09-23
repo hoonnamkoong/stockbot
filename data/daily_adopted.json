@@ -18,20 +18,25 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "총선 관련 정치적 발언과 함께 주가 상승 기대 언급.",
-        "sentiment": "2",
-        "keywords": []
+        "posts_summary": "정치적 발언과 함께 주가 상승 및 배당 관련 질문이 혼재됨.",
+        "sentiment": "0",
+        "keywords": [
+          "배당",
+          "주가",
+          "분석"
+        ]
       }
     },
     "047040": {
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "공매도 세력과의 전쟁 선포 및 파산 기대감 표출.",
-        "sentiment": "-7",
+        "posts_summary": "공매도 세력의 파산 및 자금 부족을 주장하며 주가 부양을 기대하는 의견이 다수.",
+        "sentiment": "1",
         "keywords": [
           "공매도",
-          "대차해지"
+          "대차",
+          "주가조작"
         ]
       }
     },
@@ -39,10 +44,11 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "국내 증시 신뢰도 하락 및 SK하이닉스 주가 부진에 대한 불만 토로.",
-        "sentiment": "-4",
+        "posts_summary": "국내 증시와 주가 관리 방식에 대한 불신이 강하게 나타나며, 반도체 시장과의 연동성 부족을 지적.",
+        "sentiment": "-2",
         "keywords": [
-          "ADR",
+          "주가",
+          "국장",
           "반도체"
         ]
       }
@@ -51,11 +57,12 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "원전 관련 호재에도 불구하고 주가 하락 및 외인/기관 매도세 우려.",
-        "sentiment": "-5",
+        "posts_summary": "원전 관련 호재에도 불구하고 주가 하락에 대한 불만과 차트 분석이 제시됨.",
+        "sentiment": "-1",
         "keywords": [
           "원전",
-          "SMR"
+          "차트",
+          "주가"
         ]
       }
     },
@@ -63,12 +70,12 @@
       "name": "엑스게이트",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 양자 관련주 급등 소식이 전해지며 긍정적인 기대감이 형성되고 있습니다.",
-        "sentiment": "3",
+        "posts_summary": "미국 증시의 양자 관련주 급등 소식과 함께 엑스게이트의 상승 기대감이 나타남.",
+        "sentiment": "2",
         "keywords": [
-          "양자",
+          "양자보안",
           "급등",
-          "기대"
+          "공매도"
         ]
       }
     },
@@ -76,11 +83,12 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "추석 연휴 전 주가 상승 기대감 및 단타 세력의 이탈 촉구.",
-        "sentiment": "3",
+        "posts_summary": "명절 전 주가 상승 기대감과 함께 단기 수익을 노리는 의견이 제시됨.",
+        "sentiment": "0",
         "keywords": [
-          "쇼티지",
-          "광통신"
+          "주포",
+          "단타",
+          "급등"
         ]
       }
     },
@@ -88,11 +96,12 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "유리기판 사업 관련 긍정적 전망과 함께 키움증권의 매매 패턴 분석.",
-        "sentiment": "1",
+        "posts_summary": "키움증권의 매매 행태와 주가 하락에 대한 불만이 제기되며, 일부 긍정적 전망도 존재.",
+        "sentiment": "0",
         "keywords": [
-          "유리기판",
-          "디스플레이"
+          "주가조작",
+          "외인",
+          "전망"
         ]
       }
     },
@@ -152,12 +161,12 @@
       "name": "셀리드",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "유상증자 및 경영권 변경에 대한 혼란 속에서, 일부는 매수를 시도하고 일부는 우려를 표합니다.",
-        "sentiment": "0",
+        "posts_summary": "유상증자, 최대주주 변경 등 부정적인 이슈가 부각되며 주가 하락 및 불안감이 나타남.",
+        "sentiment": "-1",
         "keywords": [
           "유상증자",
-          "경영권",
-          "매수"
+          "주가",
+          "대주주"
         ]
       }
     },
@@ -165,11 +174,12 @@
       "name": "스카이랩스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "타임지 선정 및 헬스케어 기술 관련 기대감, 주가 상승 전망.",
-        "sentiment": "4",
+        "posts_summary": "타임지 선정 소식과 함께 주가 상승에 대한 기대감이 있으나, 거래량 부족 및 주가 하락에 대한 우려도 존재.",
+        "sentiment": "1",
         "keywords": [
-          "헬스케어",
-          "타임지"
+          "타임지",
+          "헬스테크",
+          "주가"
         ]
       }
     },
@@ -225,12 +235,12 @@
       "name": "레메디",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "스페이스X, NASA 선정 등 복합적인 호재로 인한 급등 기대감.",
-        "sentiment": "8",
+        "posts_summary": "스페이스X, NASA 선정 등 긍정적인 재료가 부각되며 주가 급등에 대한 기대감이 높음.",
+        "sentiment": "3",
         "keywords": [
           "스페이스X",
           "NASA",
-          "엑스레이"
+          "재료"
         ]
       }
     }

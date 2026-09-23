@@ -27,6 +27,31 @@
       "code": "201490",
       "name": "미투온",
       "rank": 5
+    },
+    {
+      "code": "478340",
+      "name": "나라스페이스테크놀로지",
+      "rank": 1
+    },
+    {
+      "code": "046970",
+      "name": "우리로",
+      "rank": 2
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 3
+    },
+    {
+      "code": "028300",
+      "name": "HLB",
+      "rank": 4
+    },
+    {
+      "code": "010170",
+      "name": "대한광통신",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "356680",
     "005930",
     "034220",
-    "201490"
+    "201490",
+    "478340",
+    "046970",
+    "000660",
+    "028300",
+    "010170"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "478340",
+      "name": "나라스페이스테크놀로지",
+      "rank": 1
+    },
+    {
+      "code": "046970",
+      "name": "우리로",
+      "rank": 2
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 3
+    },
+    {
+      "code": "028300",
+      "name": "HLB",
+      "rank": 4
+    },
+    {
+      "code": "010170",
+      "name": "대한광통신",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

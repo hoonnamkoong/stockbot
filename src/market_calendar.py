@@ -129,5 +129,8 @@ def refresh_calendar(base_date: str) -> dict:
         raise RuntimeError("KIS 토큰 캐시가 없다")
 
     days = fetch_calendar(token, app_key, app_secret, base_date)
-    save_calendar(days)
+    # 지난 날짜는 합쳐 남긴다. 응답은 오늘부터라 통째로 덮으면 어제 휴장이
+    # 사라지고, 신선도 감사가 그 날을 평일로 근사해 추석 연휴(2026-09-24)를
+    # 세션으로 셌다. 겹치는 날은 새 응답이 이긴다.
+    save_calendar({**load_calendar(), **days})
     return days

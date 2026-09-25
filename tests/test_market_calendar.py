@@ -191,6 +191,23 @@ def test_refresh_calendar_fetches_and_saves(monkeypatch, tmp_path):
     assert mc.load_calendar(path=path) == {'20260717': 'N'}
 
 
+def test_refresh_calendar_keeps_past_days(monkeypatch, tmp_path):
+    """응답은 오늘부터만 온다 — 어제 휴장이 덮여 사라지면 안 된다."""
+    path = str(tmp_path / 'market_calendar.json')
+    mc.save_calendar({'20260924': 'N', '20260925': 'Y'}, path=path)
+    monkeypatch.setenv('KIS_APP_KEY', 'KEY')
+    monkeypatch.setenv('KIS_APP_SECRET', 'SECRET')
+    monkeypatch.setattr(mc, 'load_access_token', lambda *a, **k: 'TOKEN')
+    monkeypatch.setattr(mc, 'CALENDAR_PATH', path)
+    monkeypatch.setattr(mc, 'fetch_calendar',
+                        lambda *a, **k: {'20260925': 'N', '20260928': 'Y'})
+
+    mc.refresh_calendar('20260925')
+
+    assert mc.load_calendar(path=path) == {
+        '20260924': 'N', '20260925': 'N', '20260928': 'Y'}
+
+
 def test_module_imports_without_requests(monkeypatch):
     """달력을 '읽기'만 하는 쪽은 requests 없이도 import된다.
 

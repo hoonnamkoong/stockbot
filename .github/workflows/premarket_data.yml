@@ -40,6 +40,9 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    # intraday 잡이 같은 휴장 판정을 따른다(아래 intraday의 if 참조).
+    outputs:
+      open: ${{ steps.gate.outputs.open }}
     env:
       PYTHONPATH: ${{ github.workspace }}
       TZ: Asia/Seoul
@@ -223,6 +226,11 @@ jobs:
 
   intraday:
     needs: collect
+    # 휴장일에는 돌지 않는다. 예전엔 db-data에 유니버스 파일이 있느냐만 봤는데,
+    # 전날 파일이 남아 있어 추석 연휴(2026-09-24·25)에 07:21부터 11:30까지
+    # 기다리다 180분 타임아웃에 잘렸다. 평소엔 collect가 08:50까지 붙잡아 줘서
+    # 예산 안에 들었을 뿐이다.
+    if: needs.collect.outputs.open == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:

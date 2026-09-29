@@ -21,23 +21,25 @@ def test_bull_score_drops_foreign_and_reweights():
     assert sim.calc_bull_score(100, 0, 100) == 82.5
 
 
-def test_injected_metrics_drive_bull_regime(tmp_path):
+def test_injected_metrics_drive_bull_score(tmp_path):
+    # 2026-09-29부터 국면은 6단계 판정(regime6)이 정한다. 주입 실측은 bull_score만 움직인다.
     sim = _libero(tmp_path)
     sim.live_market_metrics = {'breadth': 70, 'momentum': 3.0, 'trend': 30, 'sample': 100}
-    # 국면 확정은 스무딩(5회 과반)이라 instant_regime로 검증
     candidates = [{'code': '1', 'change_rate': '+1.0%', 'sparkline_price': [100, 101, 102]}]
     sim.run(candidates)
-    assert sim.state['instant_regime'] == 'BULL'
+    # 70*0.4 + (50+3*5)*0.35 + 30*0.25 = 58.25
+    assert sim.state['bull_score'] == pytest.approx(58.2, abs=0.1)
     assert sim.state['breadth_source'] == 'top100_live'
 
 
-def test_injected_weak_metrics_trigger_bear(tmp_path):
+def test_injected_weak_metrics_drive_bull_score_down(tmp_path):
     sim = _libero(tmp_path)
-    # 진짜 하락장: breadth 낮고 momentum 음수, trend 존재 → 버즈풀이었으면 못 잡던 BEAR
+    # 버즈 후보는 상승(+2%)이어도 top100 실측이 약하면 실측을 쓴다
     sim.live_market_metrics = {'breadth': 30, 'momentum': -3.0, 'trend': 20, 'sample': 100}
     candidates = [{'code': '1', 'change_rate': '+2.0%', 'sparkline_price': [100, 90, 80]}]
     sim.run(candidates)
-    assert sim.state['instant_regime'] == 'BEAR'
+    # 30*0.4 + (50-3*5)*0.35 + 20*0.25 = 29.25
+    assert sim.state['bull_score'] == pytest.approx(29.2, abs=0.1)
 
 
 def test_injected_metrics_with_none_trend_falls_back_to_buzz_adx(tmp_path):

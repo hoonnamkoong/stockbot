@@ -26,6 +26,7 @@ const loadLiberoHistory = createBucketCache(async () => {
     let calibrationLog: any[] = [];
     let intraday: any = null;
     let intradayScoreLog: any[] = [];
+    let regime6: string | null = null;   // 6단계 확정 국면(정본). libero_log 항목에도 regime6가 있다.
     try {
         // 국면 상태 파일명은 매니페스트의 분석기 심에서 온다(여기 적지 않는다).
         const res = await fetch(dbDataUrl(ANALYZERS[0].stateFile), { cache: 'no-store' });
@@ -35,6 +36,7 @@ const loadLiberoHistory = createBucketCache(async () => {
             calibrationLog = s.calibration_log ?? [];
             intraday = s.intraday ?? null;
             intradayScoreLog = s.intraday_score_log ?? [];
+            regime6 = s.regime6 ?? null;
             // daily_regime_log 없으면 regime_history + last_run으로 근사 구성
             if (liberoLog.length === 0 && s.regime_history?.length > 0 && s.last_run) {
                 const lastDate = new Date(s.last_run.replace(' ', 'T'));
@@ -107,6 +109,7 @@ const loadLiberoHistory = createBucketCache(async () => {
         calibration_log: calibrationLog,
         intraday,
         intraday_score_log: intradayScoreLog,
+        regime6,
     };
 });
 

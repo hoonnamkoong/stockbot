@@ -17,6 +17,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.strategy.simulators.sim0_libero import LiberoSimulator
 
 
+def _bull_closes(n_rows=30, n=100):
+    """90종목 매일 +1%, 10종목 −1% — 6단계 판정이 매우상승(→ BULL)이 되는 종가 행렬."""
+    rows = [[100 * 1.01 ** t if i < 90 else 100 * 0.99 ** t for i in range(n)]
+            for t in range(n_rows)]
+    return {'dates': [f'2026-08-{t + 1:02d}' for t in range(n_rows)],
+            'codes': [f'{i:06d}' for i in range(n)], 'rows': rows}
+
+
 def _sim(tmp_path):
     s = LiberoSimulator()
     s.state_file = str(tmp_path / "libero.json")
@@ -27,9 +35,11 @@ def _sim(tmp_path):
 
 
 def test_regime_updates_from_live_metrics_without_candidates(tmp_path):
-    """candidates=[]라도 live_market_metrics가 있으면 국면을 계산해야 한다."""
+    """candidates=[]라도 live_market_metrics가 있으면 bull_score·metrics를 계산해야 한다.
+    (국면 자체는 2026-09-29부터 종가 CSV + 장중 현재가(regime6_inputs)에서 온다.)"""
     s = _sim(tmp_path)
     s.live_market_metrics = {'breadth': 83.0, 'momentum': 3.5, 'trend': 45.0, 'sample': 100}
+    s.regime6_inputs = {'closes': _bull_closes(), 'live': None}
     result = s.run([], current_prices={})
     assert result['current_regime'] in ('BULL', 'SIDEWAYS', 'BEAR')
     assert result['metrics']['breadth_score'] == 83.0
@@ -40,15 +50,18 @@ def test_bull_regime_reachable_without_candidates(tmp_path):
     """국면 산출식 자체가 candidates 없이도 BULL까지 도달할 수 있어야 한다."""
     s = _sim(tmp_path)
     s.live_market_metrics = {'breadth': 90.0, 'momentum': 5.0, 'trend': 80.0, 'sample': 100}
+    s.regime6_inputs = {'closes': _bull_closes(), 'live': None}
     result = s.run([], current_prices={})
-    assert result['instant_regime'] == 'BULL'
+    assert result['current_regime'] == 'BULL'
 
 
 def test_no_candidates_and_no_metrics_keeps_previous_regime(tmp_path):
     """candidates도 없고 라이브 실측도 없으면 — 여전히 판단 불가, 직전 국면 유지."""
     s = _sim(tmp_path)
-    s.state['current_regime'] = 'BULL'
     s.live_market_metrics = None
+    s.regime6_inputs = {'closes': _bull_closes(), 'live': None}
+    assert s.run([], current_prices={})['current_regime'] == 'BULL'
+    s.regime6_inputs = None           # 다음 런: 종가 CSV도 라이브도 없다
     result = s.run([], current_prices={})
     assert result['current_regime'] == 'BULL'  # 갱신되지 않고 그대로
 

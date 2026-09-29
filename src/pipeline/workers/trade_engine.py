@@ -139,6 +139,9 @@ class TradeEngineWorker(BaseWorker):
     # 자르지 않으면서 잘림만 막는 자리다.
     SYNC_STAGE_DEADLINE_SEC = 100
 
+    # top100 종가 wide CSV. 리베로 trend와 6단계 국면이 함께 읽는다.
+    TOP100_CLOSE_CSV = 'output/kospi_top100_close.csv'
+
     def __init__(self, ctx: PipelineContext, storage: StorageManager):
         super().__init__(ctx)
         self.storage = storage
@@ -322,14 +325,13 @@ class TradeEngineWorker(BaseWorker):
         (needs_buzz=dynamic)이 이 결과를 읽으므로, 스크래핑 전에 매매를
         내보내려면 스크래핑 전에 국면도 갱신돼 있어야 한다.
 
-        사이클당 한 번만 불러야 한다 — regime_history가 호출마다 누적되므로
-        두 번 부르면 국면 평활(smoothing)이 같은 순간을 두 번 반영해 왜곡된다.
+        사이클당 한 번만 부르는 것이 원칙이다(writer는 trade_loop 하나).
 
-        같은 이유로 **호출 주기를 바꾸는 것은 알고리즘을 바꾸는 것이다.**
-        국면은 최근 5회 관측의 과반으로 확정되므로(sim0_libero._confirm_regime),
-        주기가 곧 평활 시간상수다: 10분 주기면 50분치, 1분 주기면 5분치가 된다.
-        더 자주 부르려면 history 창 크기(현재 5)도 함께 키워야 하고, 그건 별도
-        검증이 필요한 변경이다.
+        [2026-09-29] 국면은 6단계 판정(sim0_libero.advance_regime6)이 정한다.
+        확정 규칙이 **일 단위**(같은 단계 2일 연속)라 호출 주기는 더 이상 평활
+        시간상수가 아니다 — 같은 날 여러 번 불러도 '어제까지 확정 + 오늘 원시
+        단계'로 다시 계산될 뿐 후보 일수가 쌓이지 않는다. 옛 5런 최빈값
+        (_confirm_regime)은 폐기됐다. regime_history는 표시용 최근 5개다.
 
         비용은 제약이 아니다 — 라이브 경로(_fetch_top100_breadth)는 네이버 시총
         페이지 최대 4장이고 실측 3.7초다. "종목당 1콜 ~100콜"은 런 결측을 사후
@@ -359,6 +361,13 @@ class TradeEngineWorker(BaseWorker):
             'trend': self._top100_trend_from_csv(),  # None이면 Sim0가 버즈 ADX로 폴백(candidates=[]라 0.0)
             'sample': live_breadth['sample'],
         } if live_breadth else None
+        # 6단계 국면 입력: 종가 CSV(trend와 같은 파일, trading.yml이 db-data에서 복사)
+        # + 장중 현재가. 라이브가 없어도 CSV는 넘긴다 — 지난 날은 종가로 커밋한다.
+        from src.strategy.simulators import sim0_libero
+        sim.regime6_inputs = {
+            'closes': sim0_libero.load_top100_closes(self.TOP100_CLOSE_CSV),
+            'live': live_breadth.get('live') if live_breadth else None,
+        }
 
         try:
             result = sim.run([], current_prices={})
@@ -956,6 +965,9 @@ class TradeEngineWorker(BaseWorker):
         return {
             'breadth': bm[0], 'momentum': bm[1], 'sample': len(codes), 'codes': codes,
             'extra': market_extras(rates, _clean(caps), _clean(prices), _clean(volumes)),
+            # 리베로 6단계 국면의 장중 행. 현재가가 없는 종목은 뺀다(0으로 채우지 않는다).
+            'live': {r['code']: {'price': r['price'], 'change_rate': r['change_rate']}
+                     for r in rows if r['price']},
         }
 
     def _append_regime_observation(self, now_kst, live_breadth) -> None:

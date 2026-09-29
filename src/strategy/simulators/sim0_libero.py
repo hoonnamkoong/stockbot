@@ -1,5 +1,6 @@
 import statistics
 
+from .. import regime_state as rs
 from .base_simulator import BaseSimulator, get_kst_now
 
 
@@ -257,6 +258,311 @@ def classify_by_score(bull_score, theta_bull, theta_bear):
     return "SIDEWAYS"
 
 
+# ──────────────────────────────────────────────────
+# 6단계 국면(권장안 R) — 정본. current_regime(3단계)은 여기서 파생된다.
+# 설계서: docs/superpowers/specs/2026-09-29-libero-regime6-design.md §4
+# 상수는 표본 내(2023-06~2025-06)에서 정하고 동결한 값이다. 바꾸면 설계서의
+# 평가(§5)가 더는 이 코드를 설명하지 않는다.
+# ──────────────────────────────────────────────────
+R6_LOOKBACK_ROWS = 21      # 종가 행 수(20일선 + 여유 1행). 미만이면 판정 불가
+R6_AB_WIN = 20             # ab20: 20일선(오늘 포함 20행) 위 종목 비율
+R6_RET_WIN = 10            # ret10: 균등지수 10일 수익률
+R6_RET_SCALE = 0.06        # ret10 정규화(±6%에서 포화)
+R6_VOL_WIN = 10            # vol10: 균등지수 일간수익 10일 표본표준편차(%)
+R6_VOL_HI = 0.98           # 횡보에서 vol10 > 0.98이면 강한횡보
+R6_D_CUTS = (-0.90, -0.40, 0.40, 0.90)   # 방향 5단계 대칭 문턱
+R6_BAND = 0.05             # 히스테리시스 폭
+R6_CONFIRM_DAYS = 2        # 같은 이동 후보가 2일 연속이면 확정
+R6_MIN_SAMPLE = 80         # 종목 표본 하한(라이브 top100 가드와 같은 값)
+R6_INTRADAY_FROM = '10:00'  # 이 시각 전에는 전일 확정값 유지(설계서 §4.4·§5.5)
+# CSV 마지막 행이 '전일 종가'인지 확인하는 허용오차. 네이버 등락률로 되돌린
+# 전일 종가와 CSV 값의 상대 차이. 표본의 80% 이상이 맞아야 붙인다.
+R6_PREV_CLOSE_TOL = 0.005
+R6_PREV_CLOSE_MIN_RATIO = 0.8
+
+_R6_LABEL_BY_LEVEL = {-2: rs.STRONG_BEAR, -1: rs.BEAR, 1: rs.BULL, 2: rs.STRONG_BULL}
+
+
+def load_top100_closes(path):
+    """종가 wide CSV(`date,005930_삼성전자,...` / 행 `YYYYMMDD,가격,...`) → dict.
+
+    반환: {'dates': ['YYYY-MM-DD'], 'codes': ['005930', ...], 'rows': [[float|None]]}
+    읽지 못하면 None. 빈 칸·숫자 아님은 None 칸이다(0으로 채우지 않는다).
+    """
+    import csv as _csv
+    try:
+        with open(path, 'r', encoding='utf-8-sig') as f:
+            lines = list(_csv.reader(f))
+    except Exception:
+        return None
+    if len(lines) < 2:
+        return None
+    header = lines[0]
+    ncol = len(header) - 1
+    codes = [h.split('_', 1)[0].strip() for h in header[1:]]
+    dates, rows = [], []
+    for r in lines[1:]:
+        if not r or len(r[0].strip()) != 8:
+            continue
+        d = r[0].strip()
+        row = []
+        for j in range(ncol):
+            v = r[j + 1].strip() if j + 1 < len(r) else ''
+            try:
+                x = float(v)
+                row.append(x if x > 0 else None)
+            except ValueError:
+                row.append(None)
+        dates.append(f'{d[:4]}-{d[4:6]}-{d[6:]}')
+        rows.append(row)
+    return {'dates': dates, 'codes': codes, 'rows': rows}
+
+
+def regime6_metrics(rows):
+    """종가 행렬(마지막 행 = 판정일 t, 장중이면 현재가) → (지표 dict, None) 또는 (None, 사유).
+
+    ab20  = 100 × #{P_t > SMA20} / #{SMA20 계산 가능}
+    ret10 = 균등지수 10일 수익률, vol10 = 균등지수 일간수익 10일 표본표준편차(%)
+    D     = 0.5·(ab20−50)/25 + 0.5·clip(ret10/0.06, −1, 1)
+    """
+    if len(rows) < R6_LOOKBACK_ROWS:
+        return None, f'close_csv rows<{R6_LOOKBACK_ROWS} ({len(rows)})'
+    rows = rows[-R6_LOOKBACK_ROWS:]
+    n = len(rows[-1])
+
+    ew = []
+    for t in range(len(rows) - R6_VOL_WIN, len(rows)):
+        prev, cur = rows[t - 1], rows[t]
+        rets = [cur[i] / prev[i] - 1 for i in range(n)
+                if prev[i] is not None and cur[i] is not None]
+        if len(rets) < R6_MIN_SAMPLE:
+            return None, f'return sample<{R6_MIN_SAMPLE} ({len(rets)})'
+        ew.append(sum(rets) / len(rets))
+
+    above = with_sma = 0
+    for i in range(n):
+        win = [r[i] for r in rows[-R6_AB_WIN:]]
+        if any(x is None for x in win):
+            continue
+        with_sma += 1
+        if win[-1] > sum(win) / len(win):
+            above += 1
+    if with_sma < R6_MIN_SAMPLE:
+        return None, f'sma20 sample<{R6_MIN_SAMPLE} ({with_sma})'
+
+    ab20 = 100.0 * above / with_sma
+    level = 1.0
+    for e in ew[-R6_RET_WIN:]:
+        level *= 1 + e
+    ret10 = level - 1
+    vol10 = statistics.stdev(ew[-R6_VOL_WIN:]) * 100
+    d = 0.5 * (ab20 - 50) / 25 + 0.5 * max(-1.0, min(1.0, ret10 / R6_RET_SCALE))
+    return {'D': d, 'ab20': ab20, 'ret10': ret10, 'vol10': vol10}, None
+
+
+def direction_level(d):
+    """D → 방향 단계 −2..+2(대칭 문턱, 경계는 위 단계에 포함)."""
+    level = -2
+    for cut in R6_D_CUTS:
+        if d >= cut:
+            level += 1
+    return level
+
+
+def regime6_label(level, vol10):
+    """방향 단계 + vol10 → 6단계 문자열. 횡보인데 vol10을 모르면 None."""
+    if level is None:
+        return None
+    if level != 0:
+        return _R6_LABEL_BY_LEVEL[level]
+    if vol10 is None:
+        return None
+    return rs.STRONG_SIDEWAYS if vol10 > R6_VOL_HI else rs.WEAK_SIDEWAYS
+
+
+def regime6_step(state, d, date):
+    """하루치 판정을 확정 상태에 반영한다 → (새 상태, 원시 단계).
+
+    state: {'level','candidate','candidate_days','confirmed_since'}.
+    원시 단계가 확정 단계와 다르면 D를 확정 쪽으로 0.05 당겨 다시 본다. 그래도
+    다를 때만 이동 후보이고, 같은 후보가 2일 연속이면 확정한다.
+    d가 None(판정 불가일)이면 후보를 끊는다 — 증거 없이 국면을 바꾸지 않는다.
+    (연구 라벨러는 결측일에 후보를 유지한다. 운영은 더 보수적인 쪽을 택했다.)
+    """
+    s = dict(state)
+    if d is None:
+        s['candidate'], s['candidate_days'] = None, 0
+        return s, None
+    raw = direction_level(d)
+    cur = s['level']
+    target = raw
+    if raw != cur:
+        target = direction_level(d - R6_BAND if raw > cur else d + R6_BAND)
+    if target == cur:
+        s['candidate'], s['candidate_days'] = None, 0
+        return s, raw
+    days = s['candidate_days'] + 1 if s.get('candidate') == target else 1
+    if days >= R6_CONFIRM_DAYS:
+        s.update(level=target, candidate=None, candidate_days=0, confirmed_since=date)
+    else:
+        s.update(candidate=target, candidate_days=days)
+    return s, raw
+
+
+def _live_row(closes, live):
+    """장중 현재가 행을 만든다. CSV 마지막 행이 전일 종가가 아니면 (None, 사유).
+
+    네이버 등락률로 전일 종가를 되돌려(현재가 / (1 + 등락률)) CSV 마지막 행과
+    맞춰 본다. 달력 없이 'CSV가 낡았다'를 잡는 방법이다 — 낡은 행에 오늘 현재가를
+    붙이면 이틀치 변화가 하루 수익으로 들어간다.
+    """
+    last = closes['rows'][-1]
+    row, compared, matched = [], 0, 0
+    for code, q in zip(closes['codes'], last):
+        v = live.get(code) or {}
+        p, rate = v.get('price'), v.get('change_rate')
+        row.append(float(p) if p else None)
+        if p and rate is not None and q:
+            compared += 1
+            implied_prev = float(p) / (1 + float(rate) / 100)
+            if abs(implied_prev / q - 1) <= R6_PREV_CLOSE_TOL:
+                matched += 1
+    if compared < R6_MIN_SAMPLE:
+        return None, f'live sample<{R6_MIN_SAMPLE} ({compared})'
+    if matched < compared * R6_PREV_CLOSE_MIN_RATIO:
+        return None, (f'csv last row({closes["dates"][-1]}) is not previous close '
+                      f'({matched}/{compared} match)')
+    return row, None
+
+
+def advance_regime6(prev, closes, live, now):
+    """6단계 국면을 한 런만큼 진행한다. 순수 함수(파일·네트워크 없음).
+
+    prev:   직전 런이 남긴 상태({'base','today'}) 또는 None
+            base  = 마지막으로 **끝난 날**까지 반영한 확정 상태(date 포함)
+            today = 오늘 장중에 마지막으로 계산한 판정(다음 날 커밋용)
+    closes: load_top100_closes() 결과 또는 None
+    live:   {code: {'price','change_rate'}} 또는 None(수집 실패)
+    now:    KST datetime
+
+    확정 규칙은 일 단위다(설계서 §4.4). 오늘 장중 판정은 언제나
+    `어제까지의 확정 상태 + 오늘 원시 단계`로 다시 계산한다 — 같은 날 여러 런이
+    쌓여 후보 일수를 올리지 않는다. 지난 날은 CSV 종가로 커밋하고, CSV에 그날이
+    없을 때만 그날 마지막 장중 판정을 쓴다.
+    """
+    today = now.strftime('%Y-%m-%d')
+    hhmm = now.strftime('%H:%M')
+    prev = prev or {}
+    base = dict(prev['base']) if prev.get('base') else None
+    stored = prev.get('today')
+    reasons = []
+
+    csv_ok = closes is not None and len(closes.get('rows') or []) >= R6_LOOKBACK_ROWS
+    if closes is None:
+        reasons.append('close_csv unreadable')
+    elif not csv_ok:
+        reasons.append(f'close_csv rows<{R6_LOOKBACK_ROWS} ({len(closes.get("rows") or [])})')
+
+    def _commit(b, d, m):
+        """d일의 판정 m(None=판정 불가)을 확정 상태 b에 반영."""
+        if b is None:
+            if m is None:
+                return None
+            lv = direction_level(m['D'])
+            return {'date': d, 'level': lv, 'candidate': None, 'candidate_days': 0,
+                    'confirmed_since': d, 'vol10': m['vol10'], 'metrics': m}
+        nb, _ = regime6_step(b, None if m is None else m['D'], d)
+        nb['date'] = d
+        nb['vol10'] = b.get('vol10') if m is None else m['vol10']
+        nb['metrics'] = m      # 판정 불가일이면 None — 그날 지표를 지어내지 않는다
+        return nb
+
+    # ① 끝난 날 커밋 — CSV 종가가 정본
+    if csv_ok:
+        for i, d in enumerate(closes['dates']):
+            if d >= today or (base is not None and d <= base['date']):
+                continue
+            if i + 1 < R6_LOOKBACK_ROWS:
+                continue
+            m, _ = regime6_metrics(closes['rows'][i + 1 - R6_LOOKBACK_ROWS:i + 1])
+            if base is None and m is None:
+                continue
+            base = _commit(base, d, m)
+    if (stored and base is not None and base['date'] < stored['date'] < today):
+        base = _commit(base, stored['date'], stored.get('metrics'))
+
+    # ② 오늘 판정
+    m_today, source = None, None
+    if csv_ok and closes['dates'][-1] == today:
+        m_today, why = regime6_metrics(closes['rows'])
+        source = 'close_csv'
+        if why:
+            reasons.append(why)
+    elif hhmm < R6_INTRADAY_FROM:
+        pass
+    elif not live:
+        reasons.append('live top100 unavailable')
+    elif csv_ok and closes['dates'][-1] < today:
+        row, why = _live_row(closes, live)
+        if why:
+            reasons.append(why)
+        else:
+            m_today, why = regime6_metrics(closes['rows'][-(R6_LOOKBACK_ROWS - 1):] + [row])
+            source = 'live'
+            if why:
+                reasons.append(why)
+
+    fresh = m_today is not None
+    if fresh:
+        new_today = {'date': today, 'source': source, 'metrics': m_today}
+    elif stored and stored.get('date') == today and hhmm >= R6_INTRADAY_FROM:
+        new_today = stored           # 오늘 앞선 런의 판정을 유지
+        m_today, source = stored['metrics'], stored.get('source')
+    else:
+        new_today = stored if stored and stored.get('date') == today else None
+
+    # ③ 출력
+    raw = None
+    m_shown = m_today
+    if m_today is not None:
+        cur, raw = (regime6_step(base, m_today['D'], today) if base is not None
+                    else (_commit(None, today, m_today), direction_level(m_today['D'])))
+        vol10 = m_today['vol10']
+    else:
+        cur, vol10 = base, (base or {}).get('vol10')
+        if base is not None and base.get('metrics'):
+            m_shown, source = base['metrics'], f"prev_confirmed:{base['date']}"
+
+    if fresh:
+        status = 'ok'
+    elif hhmm < R6_INTRADAY_FROM and not reasons and base is not None:
+        status = 'hold_pre10'
+    else:
+        status = 'stale'
+    if hhmm < R6_INTRADAY_FROM and not fresh:
+        reasons.insert(0, f'before {R6_INTRADAY_FROM}: previous confirmed kept')
+
+    level = cur['level'] if cur else None
+    cand = cur.get('candidate') if cur else None
+    shown = m_shown or {}
+    return {
+        'state': {'base': base, 'today': new_today},
+        'regime6': regime6_label(level, vol10),
+        'level': level,
+        'candidate': regime6_label(cand, vol10) if cand is not None else None,
+        'candidate_days': cur.get('candidate_days', 0) if cur else 0,
+        'confirmed_since': cur.get('confirmed_since') if cur else None,
+        'raw_level': raw,
+        'status': status,
+        'metrics': {
+            'D': shown.get('D'), 'ab20': shown.get('ab20'),
+            'ret10': shown.get('ret10'), 'vol10': vol10,
+            'source': source,
+            'reason': '; '.join(reasons) or None,
+        },
+    }
+
+
 class LiberoSimulator(BaseSimulator):
     """
     [Sim 0] 리베로 (Libero) — 시장 국면 감지기 + 전략 추천.
@@ -280,55 +586,98 @@ class LiberoSimulator(BaseSimulator):
     def _clamp(v, lo=0.0, hi=100.0):
         return max(lo, min(hi, v))
 
-    def classify_regime(self, breadth, momentum, trend):
-        """5개 집계 지표로 국면 분류.
-
-        BEAR의 momentum 문턱만 -2.0에서 -1.5로 완화했다(2026-09-15, 사용자 판단).
-        근거: 09-03 이후 12일간 BEAR 출현이 0회였고 Sim6는 그 기간 거래가
-        0건이었다. 관측 281행에서 breadth<=40·trend>=15는 자주 충족됐는데
-        momentum이 -2.0을 넘긴 행은 1행뿐이라, AND 게이트가 사실상 momentum
-        하나로 닫혀 있었다(분포: min -2.02, p10 -1.11, median -0.08).
-        완화하면 09-10(최저 -1.88)·09-11(-1.52)·09-14에 instant BEAR가 생긴다.
-        BULL(+2.0)은 건드리지 않아 문턱이 비대칭이다 — 의도한 것이다.
-        확정 국면은 여전히 _confirm_regime의 5표본 과반 평활을 거친다.
-        """
-        if breadth >= 60 and momentum >= 2.0 and trend >= 20:
-            return "BULL"
-        if breadth <= 40 and momentum <= -1.5 and trend >= 15:
-            return "BEAR"
-        return "SIDEWAYS"
-
     def calc_bull_score(self, breadth, momentum, trend):
         """0(극단 약세)~100(극단 강세). breadth/momentum/trend를 가중합. foreign 제거(top100 소스 없음)."""
         momentum_n = self._clamp(50 + momentum * 5)   # 0%→50, +10%→100, -10%→0
         trend_n = self._clamp(trend)                  # ADX 근사 0~100
         return round(breadth * 0.40 + momentum_n * 0.35 + trend_n * 0.25, 1)
 
-    def _confirm_regime(self, history):
-        """최근 국면 히스토리에서 최빈 국면과 신뢰도를 반환.
-        5회 표본에서 과반(3) 미만이면 방향 불명확 → SIDEWAYS로 보수 확정."""
-        if not history:
-            return "SIDEWAYS", 0.0
-        counts = {r: history.count(r) for r in set(history)}
-        top = max(counts, key=counts.get)
-        confidence = round(counts[top] / len(history), 2)
-        if len(history) >= 3 and counts[top] < (len(history) // 2 + 1):
-            return "SIDEWAYS", confidence
-        return top, confidence
+    def _update_regime6(self, now):
+        """6단계 국면을 갱신하고 current_regime 등 파생 필드를 state에 쓴다.
+
+        입력은 trade_engine이 주입하는 `regime6_inputs`
+        ({'closes': load_top100_closes(...), 'live': {code: {price, change_rate}}})다.
+        없으면 판정 불가 — 직전 확정값을 유지하고, 그것도 없으면 None이다.
+        SIDEWAYS로 채우지 않는다(모르는 것과 횡보는 다르다).
+        """
+        inputs = getattr(self, 'regime6_inputs', None) or {}
+        out = advance_regime6(self.state.get('regime6_state'), inputs.get('closes'),
+                              inputs.get('live'), now)
+        m = out['metrics']
+        regime6 = out['regime6']
+        regime3 = rs.to_regime3(regime6)
+        raw = out['raw_level']
+        # instant_regime = 오늘 원시 방향 단계(미확정)의 3단계. 10시 전·판정 불가면 None.
+        instant = None if raw is None else ('BEAR' if raw < 0 else 'BULL' if raw > 0 else 'SIDEWAYS')
+        history = list(self.state.get('regime_history', []))
+        if instant is not None:
+            history = (history + [instant])[-5:]
+        self.state.update({
+            'regime6_state': out['state'],
+            'regime6': regime6,
+            'regime6_level': out['level'],
+            'regime6_candidate': out['candidate'],
+            'regime6_candidate_days': out['candidate_days'],
+            'regime6_confirmed_since': out['confirmed_since'],
+            'regime6_status': out['status'],
+            'regime6_metrics': {
+                'D': None if m['D'] is None else round(m['D'], 4),
+                'ab20': None if m['ab20'] is None else round(m['ab20'], 1),
+                'ret10': None if m['ret10'] is None else round(m['ret10'] * 100, 2),  # %
+                'vol10': None if m['vol10'] is None else round(m['vol10'], 3),        # %
+                'raw_level': raw,
+                'source': m['source'],
+                'judged_at': now.strftime('%Y-%m-%d %H:%M:%S'),
+                'reason': m['reason'],
+            },
+            'current_regime': regime3,
+            'instant_regime': instant,
+            # 옛 5런 최빈값 신뢰도는 새 판정에 대응하는 값이 없다 — 지어내지 않는다.
+            'regime_confidence': None,
+            'regime_history': history,
+            'recommended_sims': self.REGIME_TO_SIMS.get(regime3, []),
+        })
+        if m['reason']:
+            print(f"[Libero] 6단계 국면 {out['status']}: {m['reason']}")
 
     def run(self, candidates, current_prices=None):
-        # breadth/momentum/trend는 top100 라이브 실측(live_market_metrics)만으로도
-        # 산출 가능하다 — candidates(버즈 후보)는 foreign·volatility(둘 다 표시 전용,
-        # calc_bull_score 미사용)에만 쓰인다. 그래서 candidates가 비어도 라이브
-        # 실측이 있으면 국면을 판단한다. 스크래핑을 기다리지 않고 매매를 먼저
-        # 내보내는 순서(needs_buzz=false 경로)의 입력이 이 판단이다.
-        # 둘 다 없을 때만 판단 불가 — 직전 국면 유지, 타임스탬프만 갱신.
-        metrics = getattr(self, 'live_market_metrics', None)
-        if not candidates and not metrics:
-            self.state['last_run'] = get_kst_now().strftime('%Y-%m-%d %H:%M:%S')
-            self.save_state()
-            return self.state
+        # 국면(regime6 → current_regime)은 top100 종가 CSV + 장중 현재가로만
+        # 정한다(_update_regime6). breadth/momentum/trend는 bull_score·metrics
+        # 표시용으로만 남아 있다 — 국면 판정에는 쓰지 않는다.
+        #
+        # bull_score 입력: top100 라이브 실측(live_market_metrics) 우선, 없으면
+        # candidates(버즈 후보) 폴백. 둘 다 없으면 bull_score·metrics는 직전 값을 둔다.
+        now = get_kst_now()
+        self._update_regime6(now)
 
+        metrics = getattr(self, 'live_market_metrics', None)
+        if candidates or metrics:
+            self._update_bull_score(candidates, metrics)
+
+        # 날짜별 판단 로그 (최근 30일 유지, 하루 1행). 같은 날 뒤 런은 regime·regime6를
+        # 최신 값으로 덮는다 — 10시 전 첫 런은 늘 전일 확정값이라, 첫 런만 남기면 로그가
+        # 하루씩 밀린다. bull_score·breadth는 종전대로 그날 첫 값이다.
+        today_str = now.strftime('%Y-%m-%d')
+        daily_log = list(self.state.get('daily_regime_log', []))
+        if not daily_log or daily_log[-1].get('date') != today_str:
+            daily_log.append({
+                'date': today_str,
+                'bull_score': self.state.get('bull_score'),
+                'breadth': (self.state.get('metrics') or {}).get('breadth_score'),
+            })
+            daily_log = daily_log[-30:]
+        daily_log[-1] = {**daily_log[-1], 'regime': self.state.get('current_regime'),
+                         'regime6': self.state.get('regime6')}
+
+        self.state.update({
+            'last_run': now.strftime('%Y-%m-%d %H:%M:%S'),
+            'daily_regime_log': daily_log,
+        })
+        self.save_state()
+        return self.state
+
+    def _update_bull_score(self, candidates, metrics):
+        """bull_score·metrics(표시용) 갱신. 계산식은 종전 그대로다."""
         ups = 0
         period_changes, adxs, foreigns, dailies = [], [], [], []
         for s in candidates:
@@ -369,33 +718,8 @@ class LiberoSimulator(BaseSimulator):
             foreign = None
             volatility = None
 
-        instant_regime = self.classify_regime(breadth, momentum, trend)
-        bull_score = self.calc_bull_score(breadth, momentum, trend)
-
-        # 국면 지속성(Smoothing): 최근 5회 중 과반 확정으로 False signal 방지
-        history = list(self.state.get('regime_history', []))
-        history.append(instant_regime)
-        history = history[-5:]
-        confirmed_regime, confidence = self._confirm_regime(history)
-
-        # 날짜별 판단 로그 (최근 30일 유지, 하루 1회만 기록)
-        today_str = get_kst_now().strftime('%Y-%m-%d')
-        daily_log = list(self.state.get('daily_regime_log', []))
-        if not daily_log or daily_log[-1].get('date') != today_str:
-            daily_log.append({
-                'date': today_str,
-                'regime': confirmed_regime,
-                'bull_score': bull_score,
-                'breadth': breadth,
-            })
-            daily_log = daily_log[-30:]
-
         self.state.update({
-            'last_run': get_kst_now().strftime('%Y-%m-%d %H:%M:%S'),
-            'current_regime': confirmed_regime,
-            'instant_regime': instant_regime,
-            'regime_confidence': confidence,
-            'bull_score': bull_score,
+            'bull_score': self.calc_bull_score(breadth, momentum, trend),
             'metrics': {
                 'breadth_score': breadth,
                 'momentum_score': momentum,
@@ -403,14 +727,9 @@ class LiberoSimulator(BaseSimulator):
                 'foreign_score': foreign,
                 'volatility_score': volatility,
             },
-            'regime_history': history,
-            'recommended_sims': self.REGIME_TO_SIMS.get(confirmed_regime, []),
             'sample_size': breadth_sample,
             'breadth_source': breadth_source,
-            'daily_regime_log': daily_log,
         })
-        self.save_state()
-        return self.state
 
     # ──────────────────────────────────────────────────
     # 나우캐스트: 시간당 실측 기록 + (+1h/EOD) 예측 + 채점

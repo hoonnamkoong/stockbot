@@ -154,13 +154,13 @@ simulators:
   - id: "sim5_sideways"
     module: "src.strategy.simulators.sim5_sideways_swing"
     class: "SidewaysSwingSimulator"
-    description: "레인지 저점형 - 20일 채널 저점 +3% 이내 진입 + 상단 근접 후 트레일링 (고정익절 없음)"
+    description: "레인지 저점형 - 20일 채널 저점 +3% 이내 + RSI2<15 과매도 진입, RSI2>70·-5% 손절·10일 청산 (리베로 약한횡보·하락·매우하락에서만 진입)"
     state_file: "sim_sideways_state.json"
     csv_file: "trade_history_sim_sideways.csv"
     label: "추세 눌림목형 (Sim 5)"
     display_order: 50
     ui_key: "sim5"
-    short_desc: "20일 채널 저점 +3% 이내 진입 · 상단 근접 후 트레일링"
+    short_desc: "채널 저점+RSI2 과매도 진입 · RSI2>70/-5%/10일 청산 · 약한횡보+하락계만"
     chart_group: 2
     color: "yellow"
     active: true
@@ -323,3 +323,22 @@ simulators:
     tradeable: false  # 신규(2026-08-22), 예비 백테스트뿐(단일 5개월 구간, 32~43건,
                       # 국면게이트는 인과적 재검증 완료) — 페이퍼 관찰 단계
     needs_buzz: false  # KIS 등락률 순위 자체 유니버스 — 60초 매매 루프에서 돈다
+
+  - id: "sim14_squeeze_breakout"
+    module: "src.strategy.simulators.sim14_squeeze_breakout"
+    class: "SqueezeBreakoutSimulator"
+    description: "Sim14 수축 돌파형 — 강한횡보 전용. 전일 밴드폭(4σ/MA20) 60일 하위 10% + 장중 20일 고가 돌파, MA10 이탈/-5%/10거래일 청산"
+    state_file: "sim_squeeze_state.json"
+    csv_file: "trade_history_sim_squeeze.csv"
+    label: "수축 돌파형 (Sim 14)"
+    display_order: 140
+    ui_key: "sim14"
+    short_desc: "강한횡보 전용 · 밴드폭 수축 후 20일 고가 돌파 · MA10 이탈/-5%/10일 청산"
+    chart_group: 5
+    color: "pink"  # Mantine 팔레트 중 심에 안 쓰인 유일한 이름(SIM_CHART_HEX에 이미 있다)
+    active: true
+    tradeable: false  # 신규(2026-09-29), 설계서 docs/superpowers/specs/2026-09-29-new-sideways-sim-design.md
+                      # W5 — top100 강한횡보 n=168 t=+2.67이지만 설계 구간 단독 t=1.74,
+                      # 두꺼운 꼬리(중앙값 음) — 페이퍼 관찰 단계
+    needs_buzz: false  # top100 일봉(data/ohlcv_top100.csv)으로 지표를 만들고 실시간가는
+                       # _enrich_universe가 채운다 — 60초 매매 루프에서 돈다

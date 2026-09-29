@@ -1,24 +1,57 @@
 from datetime import datetime
 
+from ..regime_state import BEAR, STRONG_BEAR, WEAK_SIDEWAYS, REGIME6_LABEL_KO, read_regime6
 from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 
 # base 순수 헬퍼(Task 3 @staticmethod) 재사용
 _parse_change_rate = BaseSimulator.parse_change_rate
 _cooldown_active = BaseSimulator.cooldown_active
 
+# 정본: docs/superpowers/specs/2026-09-29-sim5-regime-optimization.md §7(상수)·§8(의사코드)·§9(게이트).
 MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19  # 종목당 NAV 대비 비중 (0.19 × 5 = 최대 95% 투입)
 
-# 레인지 채널 파라미터 (백테스트로 확정)
-MIN_HISTORY = 10          # 채널 산출 최소 일수
+# 레인지 채널 + 과매도 진입
+MIN_HISTORY = 20          # 채널·RSI2 최소 일수. 10일 채널은 성과가 더 나빴다(설계서 B1)
 MIN_WIDTH_PCT = 8.0       # 채널 폭 하한(%): 미달=수수료 대비 무의미 셋업 → 스킵
 LOW_ZONE = 0.03           # 채널 저점 +3% 이내에서만 진입
-TRAIL_ARM_RATIO = 0.98    # 고점(peak)이 채널 상단의 98% 도달 시 트레일링 발동
-TRAIL_CALLBACK_PCT = 2.0  # 발동 후 고점 대비 -2% 하락 시 청산
-STOP_PCT = -3.0           # 하드 손절
-TIMEOUT_DAYS = 7          # 타임 스탑
+DAILY_CRASH_PCT = -2.0    # 당일 등락이 이 값 이하면 떨어지는 칼 → 스킵
 MIN_AMOUNT = 1_000_000_000
+ENTRY_RSI2_MAX = 15.0     # 진입은 RSI2 < 15 (저점 근접만으로는 '하락 추세 진행 중'을 못 가른다)
 
+# 청산 (채널 상단 트레일링은 2026-09-29 폐지 — 설계서 §4)
+EXIT_RSI2_MIN = 70.0      # RSI2 > 70 과열 청산
+STOP_PCT = -5.0           # 하드 손절. −3%는 모든 격자 칸에서 가장 나빴다(§4.3·§9.4)
+TIMEOUT_DAYS = 10         # 타임 스탑(달력일)
+
+# 신규 진입을 허용하는 리베로 6단계 국면(§9, 09-29 사용자 확정). 청산은 국면과 무관.
+# ⚠ 6단계 'BEAR'는 '하락' 하나다(3단계 BEAR와 철자만 같다) — 매우하락은 따로 적는다.
+ALLOWED_REGIMES6 = frozenset({WEAK_SIDEWAYS, BEAR, STRONG_BEAR})
+
+
+def entry_allowed(regime6) -> bool:
+    """신규 진입 게이트. None(판정 불가)·모르는 값은 막는다(fail-closed)."""
+    return regime6 in ALLOWED_REGIMES6
+
+
+def rsi2(closes):
+    """Wilder RSI, 기간 2(α=1/2 지수평활). closes는 과거→최신, 마지막이 현재가.
+
+    연구 하네스(r3_lib.rsi2 = pandas ewm(alpha=0.5, adjust=False))와 같은 값이다.
+    하락분 평균이 0이면 100(연구 구현은 50으로 채웠다 — 과매도 판정엔 영향 없음, §7).
+    값이 2개 미만이면 None(계산 불가)이다.
+    """
+    if not closes or len(closes) < 2:
+        return None
+    up = dn = None
+    for k in range(1, len(closes)):
+        d = closes[k] - closes[k - 1]
+        u, v = max(d, 0), max(-d, 0)
+        up = u if up is None else 0.5 * up + 0.5 * u
+        dn = v if dn is None else 0.5 * dn + 0.5 * v
+    if dn == 0:
+        return 100.0
+    return 100 - 100 / (1 + up / dn)
 
 
 def _fn(funnel, code, reason, **vals):
@@ -33,26 +66,54 @@ def _fn(funnel, code, reason, **vals):
         return
     funnel.append({'code': code, 'reason': reason, **vals})
 
+
+def _hist(range_history):
+    """range_history(직전 20일 종가, 과거→최신)에서 양수만. 부족하면 None."""
+    hist = [h for h in (range_history or []) if h and h > 0]
+    return hist if len(hist) >= MIN_HISTORY else None
+
+
 def _channel(range_history):
     """range_history(20일 종가) → (low, high, width_pct). 이력 부족 시 None."""
-    hist = [h for h in (range_history or []) if h and h > 0]
-    if len(hist) < MIN_HISTORY:
+    hist = _hist(range_history)
+    if not hist:
         return None
     low, high = min(hist), max(hist)
-    if low <= 0:
-        return None
     return low, high, (high - low) / low * 100
 
 
-def decide_sideways(view, candidates, current_prices, funnel=None):
-    """[Sim5] 레인지 저점 진입 + 트레일링 청산 결정. 순수 함수. Order 리스트 반환."""
+def _sort_key(stock):
+    """채널 저점 대비 현재가 비율(price/low) 오름차순, 동률은 코드순(설계서 §1·§8).
+
+    채널이나 가격이 없는 후보는 맨 뒤로 보낸다 — 버리지 않고 루프에서 이유를 남긴다.
+    """
+    code = str(stock.get('code') or '')
+    ch = _channel(stock.get('range_history'))
+    try:
+        price = float(stock.get('price') or 0)
+    except (TypeError, ValueError):
+        price = 0
+    if not ch or price <= 0:
+        return (float('inf'), code)
+    return (price / ch[0], code)
+
+
+def decide_sideways(view, candidates, current_prices, funnel=None, *, allow_entry):
+    """[Sim5] 레인지 저점 + RSI2 과매도 진입 / 손절·RSI2 과열·타임스탑 청산. 순수 함수.
+
+    allow_entry: 신규 진입 허용 여부(국면 게이트). **필수 인자다** — 기본값을 두면
+      호출자가 게이트를 잊었을 때 조용히 '진입 허용'이 된다. 심5 run()은
+      entry_allowed(read_regime6())를, 심10은 자체 3단계 라우팅이 게이트라 True를 넘긴다.
+      청산은 이 값과 무관하게 항상 돈다.
+    """
     orders = []
     portfolio = view['portfolio']
     today = get_kst_now().date()
     sold = set()
     cand_by_code = {s.get('code'): s for s in candidates}
+    exit_no_hist = []
 
-    # 1. 청산: 손절 / 트레일링(peak가 채널상단 근접 시 발동) / 타임스탑. 고정 익절 없음.
+    # 1. 청산: 국면과 무관하게 항상. 손절 → RSI2 과열 → 타임스탑. 고정 익절·트레일링 없음.
     for code in list(portfolio.keys()):
         p = portfolio[code]
         cur = current_prices.get(code, 0)
@@ -68,13 +129,15 @@ def decide_sideways(view, candidates, current_prices, funnel=None):
                            'reason': f"[레인지] 하드 손절 ({pr:.1f}%)", 'cooldown': 3, 'mark_partial': False})
             sold.add(code); continue
 
-        # 트레일링: 고점이 채널 상단에 근접(=상단 스윙/돌파)했을 때만 발동, 콜백 시 잠금
-        peak = p.get('peak_price', avg)
-        ch = _channel((cand_by_code.get(code) or {}).get('range_history'))
-        if ch and peak >= ch[1] * TRAIL_ARM_RATIO:
-            if cur <= peak * (1 - TRAIL_CALLBACK_PCT / 100):
+        # 후보 밖(이력 없음)이면 RSI2는 판정 불가 — '과열 아님'과 섞지 않고 건너뛴다.
+        hist = _hist((cand_by_code.get(code) or {}).get('range_history'))
+        if hist is None:
+            exit_no_hist.append(code)
+        else:
+            r = rsi2(hist + [cur])
+            if r is not None and r > EXIT_RSI2_MIN:
                 orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
-                               'reason': f"[레인지] 트레일링 청산 (고점대비 -{TRAIL_CALLBACK_PCT:.0f}%, +{pr:.1f}%)",
+                               'reason': f"[레인지] RSI2 과열 청산 (RSI2 {r:.0f}, {pr:+.1f}%)",
                                'cooldown': 2, 'mark_partial': False})
                 sold.add(code); continue
 
@@ -88,12 +151,23 @@ def decide_sideways(view, candidates, current_prices, funnel=None):
                     sold.add(code); continue
             except ValueError:
                 pass
+    if exit_no_hist:
+        # 깔때기(funnel)는 '후보가 왜 탈락했나'의 장부라 보유 종목을 넣으면 회계가
+        # 깨진다(미설명 음수). 판정 불가는 여기서 따로 한 줄 남긴다.
+        print(f"[레인지] RSI2 청산 판정 불가(이력 없음) {len(exit_no_hist)}종목: "
+              f"{', '.join(exit_no_hist)} — 손절·타임스탑만 적용")
 
-    # 2. 진입: 넓은 채널 + 저점 근접 + 당일 급락 아님
+    # 2. 진입 게이트(국면). 막혀도 위 청산은 이미 끝났다.
+    if not allow_entry:
+        for stock in candidates:
+            _fn(funnel, stock.get('code'), 'regime_gate')
+        return orders
+
+    # 3. 진입: 넓은 채널 + 저점 근접 + 당일 급락 아님 + RSI2 과매도
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len(portfolio) - len(sold)
     near_low_pcts = []  # 채널폭 통과 후보의 '저점 대비 %' — 진단용(아래 참고)
-    for stock in candidates:
+    for stock in sorted(candidates, key=_sort_key):
         code = stock['code']
         if held >= MAX_HOLDINGS:
             _fn(funnel, code, 'max_holdings', held=held)
@@ -120,14 +194,14 @@ def decide_sideways(view, candidates, current_prices, funnel=None):
         if amount < MIN_AMOUNT:
             _fn(funnel, code, 'amount', amount=amount)
             continue
-        ch = _channel(stock.get('range_history'))
-        if not ch:
+        hist = _hist(stock.get('range_history'))
+        if not hist:
             # range_history가 없거나 짧다 = 채널을 못 만든다. 전략 미달이 아니라
             # **입력 결손**이라 따로 센다 — 이게 후보 전량이면 배선 문제다.
             _fn(funnel, code, 'no_channel')
             continue
-        low, high, width_pct = ch
-        # 조건 셋을 한 `if`로 묶으면 "안 샀다"만 남고 어느 게이트가 막았는지
+        low, high, width_pct = _channel(hist)
+        # 조건을 한 `if`로 묶으면 "안 샀다"만 남고 어느 게이트가 막았는지
         # 사라진다. 심4-1이 같은 형태로 하루 종일 침묵했던 적이 있다.
         if width_pct < MIN_WIDTH_PCT:
             _fn(funnel, code, 'narrow_channel', width=width_pct)
@@ -137,8 +211,12 @@ def decide_sideways(view, candidates, current_prices, funnel=None):
             _fn(funnel, code, 'not_near_low', above_low_pct=(price / low - 1) * 100)
             continue
         daily_change = _parse_change_rate(stock)
-        if daily_change <= -2.0:
+        if daily_change <= DAILY_CRASH_PCT:
             _fn(funnel, code, 'daily_crash', change=daily_change)
+            continue
+        r = rsi2(hist + [price])
+        if r is None or r >= ENTRY_RSI2_MAX:
+            _fn(funnel, code, 'rsi2_not_oversold', rsi2=r)
             continue
         qty = int(target_amount / price)
         if qty <= 0:
@@ -146,7 +224,7 @@ def decide_sideways(view, candidates, current_prices, funnel=None):
             continue
         orders.append({'action': 'BUY', 'code': code, 'name': stock['name'], 'price': price,
                        'quantity': qty, 'cooldown': None,
-                       'reason': f"[레인지] 저점 매수 (채널폭 {width_pct:.1f}%, 저점 {low:.0f})"})
+                       'reason': f"[레인지] 저점+과매도 (채널폭 {width_pct:.1f}%, RSI2 {r:.0f})"})
         held += 1
 
     # 진단(2026-08-05): 진입 신호가 며칠째 안 나오는 게 '저점 근처인데 다른 조건에
@@ -167,15 +245,22 @@ def decide_sideways(view, candidates, current_prices, funnel=None):
 
 class SidewaysSwingSimulator(BaseSimulator):
     """
-    [Sim 5] 레인지 스윙형 (Range-Swing + Breakout Ride)
+    [Sim 5] 레인지 저점 + 과매도 확인형 (평균회귀)
     ※ 클래스/상태파일명은 레거시('Sideways')를 유지하되 전략은 재정의됨.
        구 '추세 눌림목(+4% 고정익절)'은 목표가가 종목 실제 변동폭과 무관해 "이겨봐야 수수료"
        셋업까지 잡아 수수료에 알파가 잠식됨(2026-07 실측). 레인지 폭에 비례한 스윙으로 전환.
-    - 진입: range_history(20일 종가) 채널 폭>=8% + 채널 저점 +3% 이내 + 당일 급락 아님.
-            (좁은 채널은 수수료 대비 무의미 → 원천 스킵)
-    - 청산: 하드손절 -3% / 트레일링(peak가 채널상단 근접 시 발동, 콜백 2%) / 7일 타임스탑.
-            고정 익절 없음 → 상단 돌파 시 승자를 계속 라이딩.
+    - 2026-09-29 재설계(docs/superpowers/specs/2026-09-29-sim5-regime-optimization.md):
+      저점 근접만으로 사면 '박스 바닥'과 '하락 추세 진행 중'을 못 가려 −3% 손절에 절반이
+      걸렸다. RSI2 과매도 확인을 더하고, 청산을 RSI2 과열로 바꾸고, 손절·보유기간을 넓혔다.
+    - 진입: range_history(직전 20일 종가) 채널 폭>=8% + 채널 저점 +3% 이내 + 당일 등락 > −2%
+            + RSI2(이력+현재가) < 15 + 거래대금 >= 10억. 후보는 price/low 오름차순으로 채운다.
+    - 청산: 하드손절 −5% / RSI2 > 70 / 10달력일 타임스탑. 고정 익절·트레일링 없음.
+    - 국면 게이트는 run()에 있다: 리베로 6단계가 약한횡보·하락·매우하락일 때만 신규 진입.
+      강한횡보·상승·매우상승·판정 불가(None)면 진입만 막고 **청산은 계속한다**
+      (심6와 다르다 — 심6의 비 BEAR 경로는 국면 청산이라 None에서 멈춰야 하지만,
+      심5의 청산은 국면을 보지 않는 손절·타임스탑이라 멈추면 손실이 방치된다).
     - 데이터: range_history는 5일 sparkline_price와 별개 필드(파리티 위해 양 환경 동일 채움).
+      ⚠ 장중 range_history 첫 행이 당일 미완성 봉일 수 있다(날짜가 없어 여기서 못 거른다).
     """
     def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Sideways", initial_cash)
@@ -210,13 +295,23 @@ class SidewaysSwingSimulator(BaseSimulator):
         except Exception:
             return None
 
+    def _read_regime6(self):
+        """리베로 6단계 확정 국면. 판정 불가면 None(→ 신규 진입 금지).
+
+        페이퍼(trade_engine._run_simulators)와 실전(program_trader)이 같은 run()을
+        부르므로 같은 파일(self.data_dir의 국면 상태)을 같은 방식으로 읽는다.
+        """
+        return read_regime6(self.data_dir)
+
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
+        regime6 = self._read_regime6()
         funnel = []
-        orders = decide_sideways(self._view(current_prices), candidates,
-                                 current_prices, funnel=funnel)
-        log_funnel('레인지', candidates, funnel, orders)
+        orders = decide_sideways(self._view(current_prices), candidates, current_prices,
+                                 funnel=funnel, allow_entry=entry_allowed(regime6))
+        log_funnel('레인지', candidates, funnel, orders,
+                   regime=REGIME6_LABEL_KO.get(regime6, '판정불가'))
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

@@ -27,7 +27,7 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
   { id: 'sim_risk', uiKey: 'sim3', label: '가치 페어형 (Sim 3)', shortDesc: '추세 돌파 / 횡보 반등 + 트레일링', color: 'red', chartGroup: 1, stateFile: 'sim_risk_state.json', csvFile: 'trade_history_sim_risk.csv', tradeable: true },
   { id: 'sim4_bull', uiKey: 'sim4', label: '상승 모멘텀형 (Sim 4)', shortDesc: '주도주 탑승·불타기, 고정익절 없이 라이딩', color: 'green', chartGroup: 2, stateFile: 'sim_bull_state.json', csvFile: 'trade_history_sim_bull.csv', tradeable: true },
   { id: 'sim4_bull_daytrading', uiKey: 'sim4_daytrading', label: '상승 단타형 (Sim 4-1)', shortDesc: '상승률 상위 단기 회전 — 분할 익절(+5%/+10%) · 2일/5일 강제청산', color: 'teal', chartGroup: 2, stateFile: 'sim_bulldaytrade_state.json', csvFile: 'trade_history_sim_bulldaytrade.csv', tradeable: true },
-  { id: 'sim5_sideways', uiKey: 'sim5', label: '추세 눌림목형 (Sim 5)', shortDesc: '20일 채널 저점 +3% 이내 진입 · 상단 근접 후 트레일링', color: 'yellow', chartGroup: 2, stateFile: 'sim_sideways_state.json', csvFile: 'trade_history_sim_sideways.csv', tradeable: true },
+  { id: 'sim5_sideways', uiKey: 'sim5', label: '추세 눌림목형 (Sim 5)', shortDesc: '채널 저점+RSI2 과매도 진입 · RSI2>70/-5%/10일 청산 · 약한횡보+하락계만', color: 'yellow', chartGroup: 2, stateFile: 'sim_sideways_state.json', csvFile: 'trade_history_sim_sideways.csv', tradeable: true },
   { id: 'sim6_bear', uiKey: 'sim6', label: '하락 줍줍형 (Sim 6)', shortDesc: 'KODEX 인버스 추세추종 (Sim0 BEAR 게이트) · 트레일링 -10%', color: 'cyan', chartGroup: 3, stateFile: 'sim_bear_state.json', csvFile: 'trade_history_sim_bear.csv', tradeable: true },
   { id: 'sim8_accumulation', uiKey: 'sim8', label: '선행 매집형 (Sim 8)', shortDesc: '52주 앵커 구간 외인·기관 선매수 포착 + 매집/돌파 2단 피라미딩', color: 'indigo', chartGroup: 3, stateFile: 'sim_accumulation_state.json', csvFile: 'trade_history_sim_accumulation.csv', tradeable: false },
   { id: 'sim9_gap_fade', uiKey: 'sim9', label: '갭소진 반등 (Sim 9)', shortDesc: '갭 +7% 후 장중 -6% 저가권 마감을 14:30~15:20 매수 · 익일 청산', color: 'orange', chartGroup: 4, stateFile: 'sim_gapfade_state.json', csvFile: 'trade_history_sim_gapfade.csv', tradeable: false },
@@ -36,6 +36,7 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
   { id: 'sim11_minervini', uiKey: 'sim11', label: '미너비니 추세형 (Sim 11)', shortDesc: '추세 템플릿 + 실적 가속(EPS·매출) + VCP 압축 돌파', color: 'gray', chartGroup: 5, stateFile: 'sim_minervini_state.json', csvFile: 'trade_history_sim_minervini.csv', tradeable: false },
   { id: 'sim12_regime_dual', uiKey: 'sim12', label: '국면이원 반등/추세형 (Sim 12)', shortDesc: 'BULL=모멘텀 지속 / SIDEWAYS·BEAR=급락반등(거래대금+기관수급 확인)', color: 'dark', chartGroup: 5, stateFile: 'sim_regimedual_state.json', csvFile: 'trade_history_sim_regimedual.csv', tradeable: false },
   { id: 'sim13_theme_cascade', uiKey: 'sim13', label: '테마 캐스케이드 (Sim 13)', shortDesc: '테마모멘텀+ADX/거래대금서프라이즈+외국인수급 이벤트탐지, PER게이트+그룹집중상한', color: '#a1662f', chartGroup: 5, stateFile: 'sim_themecascade_state.json', csvFile: 'trade_history_sim_themecascade.csv', tradeable: false },
+  { id: 'sim14_squeeze_breakout', uiKey: 'sim14', label: '수축 돌파형 (Sim 14)', shortDesc: '강한횡보 전용 · 밴드폭 수축 후 20일 고가 돌파 · MA10 이탈/-5%/10일 청산', color: 'pink', chartGroup: 5, stateFile: 'sim_squeeze_state.json', csvFile: 'trade_history_sim_squeeze.csv', tradeable: false },
 ];
 
 /** 국면 분석기(매매 없음). 성과 목록에 오르지 않고 국면 표시로만 쓰인다. */

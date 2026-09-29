@@ -28,9 +28,10 @@ NAV = 3_000_000
 BIG_AMOUNT = 50_000_000_000
 # ADX가 20~60에 들도록 지그재그. 완전 단조 상승은 ADX 100이라 상한(60)에 걸린다.
 ZIGZAG = [1000, 1080, 1000, 1080, 1120]
-# 박스권: 저점 900 / 고점 1100 (폭 22% >= 8%)
-BOX = [900, 1100, 950, 1080, 900, 1100, 960, 1050, 900,
-       1100, 940, 1090, 900, 1100, 930, 1070, 900, 1100, 920]
+# 박스권 20일: 저점 900 / 고점 1100 (폭 22% >= 8%). 끝이 900으로 흘러내려
+# 현재가 900에서 RSI2 과매도(약 6 < 15) — 심5 진입 조건(2026-09-29)을 만족한다.
+BOX = [1000, 1100, 950, 1080, 1000, 1100, 960, 1050, 980, 1100,
+       940, 1090, 1000, 1100, 1050, 1000, 960, 930, 910, 900]
 
 
 def _view(cash=NAV):
@@ -65,7 +66,7 @@ def test_sim4_1_daytrade_can_buy():
 # ── 심5 레인지 (박스권 저점) ─────────────────────────────────────────
 
 def _box(i):
-    return {'code': f'{i:06d}', 'name': f'박스{i}', 'price': 920,
+    return {'code': f'{i:06d}', 'name': f'박스{i}', 'price': 900,
             'amount': BIG_AMOUNT, 'range_history': list(BOX),
             'change_rate': '+0.50%'}
 
@@ -77,10 +78,11 @@ def test_sim5_range_can_buy():
     )
     cands = [_box(i) for i in range(MAX_HOLDINGS + 3)]
 
-    b = _buys(decide_sideways(_view(), cands, {c['code']: 920 for c in cands}))
+    b = _buys(decide_sideways(_view(), cands, {c['code']: 900 for c in cands},
+                              allow_entry=True))
 
     assert len(b) == MAX_HOLDINGS
-    assert b[0]['quantity'] == int(NAV * POSITION_WEIGHT / 920)
+    assert b[0]['quantity'] == int(NAV * POSITION_WEIGHT / 900)
 
 
 # ── 심6 인버스 (1종목 특례) ──────────────────────────────────────────

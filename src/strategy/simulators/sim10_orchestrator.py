@@ -96,7 +96,9 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         if regime == "BULL":
             orders = decide_bull_daytrade(self._view(current_prices), candidates, current_prices)
         elif regime == "SIDEWAYS":
-            orders = decide_sideways(self._view(current_prices), candidates, current_prices)
+            # 심10의 게이트는 위 3단계 라우팅이다 — 심5의 6단계 진입 게이트는 적용하지 않는다.
+            orders = decide_sideways(self._view(current_prices), candidates, current_prices,
+                                     allow_entry=True)
         else:  # BEAR: 인버스 ETF 추세추종 + 직전 국면 잔여 보유 청산
             orders = decide_sim6(self._view(current_prices), candidates, current_prices)
             inverse_codes = {e['code'] for e in INVERSE_UNIVERSE}

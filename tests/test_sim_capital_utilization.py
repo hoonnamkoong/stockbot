@@ -115,9 +115,10 @@ def _momentum_candidates(n):
 
 
 def _range_candidates(n):
-    """Sim5 진입 조건(채널폭>=8%, 저점 +3% 이내, 당일 급락 아님)을 모두 만족."""
-    return [{'code': f'R{i}', 'name': f'레인지{i}', 'price': 1_020, 'amount': 5_000_000_000,
-             'range_history': [1000, 1020, 1040, 1060, 1080, 1100, 1050, 1030, 1010, 1000],
+    """Sim5 진입 조건(20일 채널폭>=8%, 저점 +3% 이내, 당일 급락 아님, RSI2<15)을 모두 만족."""
+    return [{'code': f'R{i}', 'name': f'레인지{i}', 'price': 1_000, 'amount': 5_000_000_000,
+             'range_history': [1000, 1020, 1040, 1060, 1080, 1100, 1050, 1030, 1010, 1000,
+                               1040, 1080, 1100, 1090, 1070, 1060, 1040, 1025, 1010, 1000],
              'change_rate': '+0.5%'}
             for i in range(n)]
 
@@ -133,7 +134,8 @@ def test_sim4_1_fills_to_95pct():
 
 def test_sim5_fills_to_95pct():
     cands = _range_candidates(10)
-    orders = decide_sideways(_view(), cands, {c['code']: 1_020 for c in cands})
+    orders = decide_sideways(_view(), cands, {c['code']: 1_000 for c in cands},
+                             allow_entry=True)
     buys = [o for o in orders if o['action'] == 'BUY']
     spent = sum(o['quantity'] * o['price'] for o in buys)
     assert len(buys) == sim5_sideways_swing.MAX_HOLDINGS

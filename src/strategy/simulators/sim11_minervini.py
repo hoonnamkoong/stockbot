@@ -21,7 +21,11 @@ MIN_REVENUE_GROWTH_YOY = 15.0  # SEPA 실적 가속 필터 — 매출 전년동�
 
 CONTRACTION_WINDOW = 10       # VCP 압축 판정 구간(최근 vs 그 이전)
 PIVOT_WINDOW = 20             # 돌파 기준 최근 고점 탐색 구간
-CONTRACTION_RATIO = 0.7       # 최근 구간 변동폭이 이전 구간의 70% 미만이면 압축으로 본다
+# 최근 구간 변동폭이 이전 구간의 85% 미만이면 압축으로 본다.
+# 2026-09-29 0.7→0.85: 운영 감시목록이 2~3종목으로 말라 리셋(09-21) 후 거래 0건.
+# 야후 3년 백테스트(기술조건만, 2023-07~2026-09)에서 거래당 +1.68%→+2.46%,
+# 일별 클러스터 t 1.27→2.42 (docs/superpowers/specs/2026-09-29-sim11-profit-analysis.md).
+CONTRACTION_RATIO = 0.85
 
 # EOD 배치(scripts/run_eod_sims.py)가 쓰고, get_universe()가 읽는다. 하루에
 # 한 번만 갱신되는 파일이라 다른 심의 state_file과 달리 db-data 배포 목록에

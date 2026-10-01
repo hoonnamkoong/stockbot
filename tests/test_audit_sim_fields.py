@@ -14,11 +14,14 @@
 """
 from scripts.audit_sim_fields import FIELD_RE, PORTFOLIO_KEYS, fields_read
 
-SIM6 = 'src/strategy/simulators/sim6_bear_hedge.py'
+# 심6은 2026-10-01 GTAA-KR5로 재목적화돼 change_rate·sparkline_price를 더는 읽지 않는다.
+# 같은 접근 형태(헬퍼 parse_change_rate 경유 + sparkline 직접)를 가진 심4-1을 표본으로 쓴다.
+SPECIMEN = 'src/strategy/simulators/sim4_bull_daytrading.py'
+SPECIMEN_NAME = 'sim4_bull_daytrading'
 
 
 def test_직접_읽는_필드는_그대로_잡는다():
-    keys = fields_read(SIM6, 'sim6_bear_hedge')
+    keys = fields_read(SPECIMEN, SPECIMEN_NAME)
     assert 'price' in keys
     assert 'sparkline_price' in keys
 
@@ -30,14 +33,14 @@ def test_헬퍼를_통한_간접_접근도_잡는다():
     읽는다). 하지만 그건 후보 필드 접근이 아니라 추출기가 안 보는 자리다 —
     파일만 훑는 옛 방식으로는 못 잡았다는 것을 그대로 확인한다.
     """
-    file_only = set(FIELD_RE.findall(open(SIM6, encoding='utf-8').read())) - PORTFOLIO_KEYS
+    file_only = set(FIELD_RE.findall(open(SPECIMEN, encoding='utf-8').read())) - PORTFOLIO_KEYS
     assert 'change_rate' not in file_only, (
         '전제가 깨졌다 — 파일만 훑어도 잡힌다면 이 테스트는 무의미')
-    assert 'change_rate' in fields_read(SIM6, 'sim6_bear_hedge')
+    assert 'change_rate' in fields_read(SPECIMEN, SPECIMEN_NAME)
 
 
 def test_보유_포지션_키는_후보_감사_대상이_아니다():
-    keys = fields_read(SIM6, 'sim6_bear_hedge')
+    keys = fields_read(SPECIMEN, SPECIMEN_NAME)
     for k in ('avg_price', 'peak_price', 'quantity'):
         assert k not in keys, f'{k}는 포트폴리오에서 읽는다 — 유니버스 결손이 아니다'
 

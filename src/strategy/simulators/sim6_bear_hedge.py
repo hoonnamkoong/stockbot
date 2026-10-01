@@ -1,168 +1,259 @@
-from ..regime_state import read_regime
-from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, log_funnel
+from . import kr_calendar
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, get_kst_now, log_funnel
 
-# base 순수 헬퍼 재사용
-_parse_change_rate = BaseSimulator.parse_change_rate
-_cooldown_active = BaseSimulator.cooldown_active
-
-# 인버스 ETF 고정 유니버스 (검증 2026-07-21: 유동성 7,887억, 주문 호환 OK).
-# 2X(252670)는 변동성 감쇠 심각(52주 -93%)이라 제외. 1x만 사용.
-INVERSE_UNIVERSE = [
-    {'code': '114800', 'name': 'KODEX 인버스'},
+# [Sim6] GTAA-KR5 상시 방어형 자산배분 (2026-10-01 재목적화, 관찰 심).
+# 근거: docs/superpowers/specs/2026-10-01-bear-strategy-external-research.md §6.3(다-1).
+# 1997~ 연 9.5%·샤프 0.64·MDD −17%(코스피 0.35·−64%), 2026 여름 −40% 급락 때 −11.8%.
+# 기대치는 "하락장에서 번다"가 아니라 "덜 잃는다"다 — 상승장에선 코스피에 크게 진다.
+# 구 인버스 추세추종(114800)은 R6 연구에서 현금보다 나은 후보가 없어 폐기됐다
+# (docs/superpowers/specs/2026-10-01-sim6-bear-redesign.md).
+ASSETS = [
+    {'code': '069500', 'name': 'KODEX 200'},
+    {'code': '360750', 'name': 'TIGER 미국S&P500'},
+    {'code': '148070', 'name': 'KIWOOM 국고채10년'},
+    {'code': '411060', 'name': 'ACE KRX금현물'},
+    {'code': '305080', 'name': 'TIGER 미국채10년선물'},
 ]
+# 현금성 ETF. 459580(주당 약 107만원)은 300만원 NAV에서 정수 절사 오차가 커서 안 쓴다.
+# 488770(약 10.6만원)보다 단가가 낮아(약 5.8만원) 절사 잔여가 작은 357870을 쓴다.
+CASH_ETF = {'code': '357870', 'name': 'TIGER CD금리투자KIS'}
 
-# 파라미터: 하락장 데이터 백테스트로 재튜닝(2026-07-21). 인버스는 변동성 커서
-# 타이트 청산은 휩쏘로 수익 유실(구 -5%/-7% → 6~7월 -11.5%). 쉬운 진입 + 느슨한 청산으로
-# 하락장 캡처 +9%대(단순보유 +20%의 절반). ★ standalone 알파 없음 — Sim0 게이팅 전제.
-MAX_HOLDINGS = 1
-ENTRY_RATIO = 0.95       # 진입 시 가용현금의 95%(하락 확신 국면 전제).
-                         # 버퍼 5%는 전 심 통일 — 종목 수만 1종목 특례다.
-TRAIL_CALLBACK_PCT = 10.0  # 고점 대비 -10% 하락 시 청산 (느슨 — 휩쏘 방지)
-STOP_PCT = -12.0         # 하드 손절 (파국 방지용, 넓게)
-REENTRY_COOLDOWN = 1     # 청산 후 1일 쿨다운(추세 지속 시 재진입)
+ASSET_WEIGHT = 0.20      # 자산당 목표 비중(NAV 기준)
+SMA_MONTHS = 10          # 10개월 이동평균 = 직전 완결 월말 종가 10개
+# 목표 대비 차이가 NAV의 5%p 미만이면 건드리지 않는다(미세 리밸런스 방지).
+# 연구 문서에 밴드 값이 명시되지 않아 정한 값이다. 신호가 바뀐 자산(목표 0)은 밴드와
+# 무관하게 전량 매도한다.
+REBALANCE_BAND = 0.05
+HISTORY_DAYS = 260       # 10개 완결 월 + 이번 달 일부 ≈ 230거래일 이상
+SESSION_START_MIN = 9 * 60
+SESSION_END_MIN = 15 * 60 + 30
+
+_UNIVERSE_CODES = {a['code'] for a in ASSETS} | {CASH_ETF['code']}
 
 
 def _fn(funnel, code, reason, **vals):
-    """왜 안 샀는지 한 줄 남긴다(심4-1·심9와 같은 방식).
-
-    2026-08-20 감사: 08-19 리베로가 하루 종일 BEAR로 판정했는데도 매수가
-    0건이었다. 원인(고정 유니버스 현재가가 네이버 일봉에 박제)은 사후에
-    가격 스냅샷을 대조해서야 찾아냈다 — 이 심은 유니버스가 1종목뿐이라
-    "가격>MA5"와 "당일상승" 중 어느 쪽이 막았는지 로그 한 줄이면 됐을
-    일이었다. 다음 BEAR 구간부터는 추측 없이 바로 확정한다.
-    """
+    """왜 주문이 없었는지 한 줄 남긴다(다른 심과 같은 방식)."""
     if funnel is None:
         return
     funnel.append({'code': code, 'reason': reason, **vals})
 
 
-def decide_sim6(view, candidates, current_prices, funnel=None):
-    """[Sim6] 인버스 ETF 추세추종 결정. 순수 함수. Order 리스트 반환.
+def _prev_month(month):
+    y, mo = int(month[:4]), int(month[4:])
+    return f'{y - 1}12' if mo == 1 else f'{y}{mo - 1:02d}'
 
-    Sim4(상승모멘텀)의 미러: 인버스 ETF 자체의 상승 추세(=시장 하락 추세)를 타고,
-    트레일링으로 하락을 라이딩한다. 시장 국면은 직접 판단하지 않는다(인버스 가격 추세만 봄).
+
+def trend_signal(history, month):
+    """직전 완결 월말 종가 vs 10개월 이동평균 → ('above'|'below'|None, info).
+
+    month(YYYYMM)의 봉은 쓰지 않는다 — 진행 중인 달이라 룩어헤드다. 판정 불가는
+    None과 사유다(지어낸 값으로 판정하지 않는다):
+      no_history    이력이 비었다(조회 실패)
+      stale_history 직전 달 봉이 없다(낡은 캐시·결손) — 더 옛 월말로 판정하지 않는다
+      short_history 완결 월이 10개 미만
+      gap_history   최근 10개 월 사이가 비었다
+      bad_close     월말 종가가 0 이하
+    '아래면 현금'이므로 종가 == 평균은 'above'다.
     """
-    orders = []
+    month_end = {}
+    for row in sorted(history or [], key=lambda r: r.get('date', '')):
+        ym = str(row.get('date', ''))[:6]
+        if len(ym) == 6 and ym < month:
+            month_end[ym] = row.get('close', 0)
+    if not month_end:
+        return None, {'reason': 'no_history'}
+    months = sorted(month_end)
+    if months[-1] != _prev_month(month):
+        return None, {'reason': 'stale_history', 'last_month': months[-1]}
+    if len(months) < SMA_MONTHS:
+        return None, {'reason': 'short_history', 'months': len(months)}
+    window = months[-SMA_MONTHS:]
+    for older, newer in zip(window, window[1:]):
+        if _prev_month(newer) != older:
+            return None, {'reason': 'gap_history', 'missing_before': newer}
+    closes = [float(month_end[ym]) for ym in window]
+    if min(closes) <= 0:
+        return None, {'reason': 'bad_close'}
+    close, sma = closes[-1], sum(closes) / len(closes)
+    return ('below' if close < sma else 'above'), {'close': close, 'sma': round(sma, 2)}
+
+
+def decide_gtaa(view, current_prices, signals, prev_signals, funnel=None):
+    """[Sim6] GTAA-KR5 리밸런스 주문. 순수 함수. 매도 먼저, 매수 나중.
+
+    signals: {자산코드: 'above'|'below'} — 판정 불가 자산은 키가 없다.
+    prev_signals: 지난 리밸런스의 신호. 판정 불가 자산은 '비중 변경 없음'이라
+      그 자산 주문을 내지 않고, 지난달 '아래'였으면 그 몫의 현금성 ETF도 유지한다.
+    현재가가 없는(0·결손) 종목은 주문하지 않는다.
+    """
     portfolio = view['portfolio']
-    sold = set()
+    nav = view['nav']
+    weight_value = nav * ASSET_WEIGHT
 
-    # 1. 청산: 하드손절 / 트레일링(고점 대비 콜백). 고정 익절 없음(추세 라이딩).
-    for code in list(portfolio.keys()):
-        p = portfolio[code]
-        cur = current_prices.get(code, 0)
-        if cur <= 0:
+    targets = {}
+    cash_slots = 0
+    for a in ASSETS:
+        code = a['code']
+        sig = signals.get(code)
+        if sig is None:
+            _fn(funnel, code, 'signal_unknown_keep')
+            if prev_signals.get(code) == 'below':
+                cash_slots += 1
             continue
-        avg = p.get('avg_price', 0)
-        if avg <= 0:
+        targets[code] = weight_value if sig == 'above' else 0.0
+        if sig == 'below':
+            cash_slots += 1
+    targets[CASH_ETF['code']] = weight_value * cash_slots
+
+    names = {a['code']: a['name'] for a in ASSETS + [CASH_ETF]}
+    sells, buys = [], []
+    for code, target in targets.items():
+        held = portfolio.get(code, {}).get('quantity', 0)
+        px = current_prices.get(code, 0) or 0
+        if px <= 0:
+            if held or target > 0:
+                _fn(funnel, code, 'no_price')
             continue
-        pr = (cur - avg) / avg * 100
+        if target <= 0:
+            if held > 0:
+                sells.append({'action': 'SELL', 'code': code, 'price': px, 'quantity': None,
+                              'reason': '[GTAA] 10개월선 아래 — 현금성으로 전환',
+                              'cooldown': None, 'mark_partial': False})
+            else:
+                _fn(funnel, code, 'below_sma')
+            continue
+        diff = target - held * px
+        if abs(diff) < nav * REBALANCE_BAND:
+            _fn(funnel, code, 'within_band', diff=round(diff))
+            continue
+        if diff < 0:
+            qty = int(-diff / px)
+            if qty > 0:
+                sells.append({'action': 'SELL', 'code': code, 'price': px, 'quantity': qty,
+                              'reason': '[GTAA] 비중 초과분 축소', 'cooldown': None,
+                              'mark_partial': False})
+            continue
+        buys.append((code, diff, px))
 
-        if pr <= STOP_PCT:
-            orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
-                           'reason': f"[인버스] 하드 손절 ({pr:.1f}%)", 'cooldown': REENTRY_COOLDOWN, 'mark_partial': False})
-            sold.add(code); continue
+    sell_net = 1 - BaseSimulator.SELL_FEE_RATE - BaseSimulator.SELL_TAX_RATE
+    available = view['cash']
+    for o in sells:
+        qty = portfolio[o['code']]['quantity'] if o['quantity'] is None else o['quantity']
+        available += qty * o['price'] * sell_net
 
-        peak = p.get('peak_price', avg)
-        if cur <= peak * (1 - TRAIL_CALLBACK_PCT / 100):
-            orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
-                           'reason': f"[인버스] 트레일링 청산 (고점대비 -{TRAIL_CALLBACK_PCT:.0f}%, {pr:+.1f}%)",
-                           'cooldown': REENTRY_COOLDOWN, 'mark_partial': False})
-            sold.add(code); continue
-
-    # 2. 진입: 인버스 ETF가 상승 추세(현재가 > 이동평균 + 당일 상승)일 때만.
-    held = len(portfolio) - len(sold)
-    for stock in candidates:
-        # 보유 상한도 **안 산 이유**다. 2026-09-01에 실전 심이 이 갈래를 기록하지
-        # 않아 "후보 30 중 23만 설명되는" 로그가 나왔고, 그날 매매 0건의 원인을
-        # 소급 추론해야 했다. 여기서 끊기면 뒤 후보는 평가조차 안 되므로,
-        # 몇 개를 안 봤는지가 남아야 후보 수와 탈락 수의 합이 맞는다.
-        if held >= MAX_HOLDINGS:
-            _fn(funnel, '_gate', 'max_holdings', held=held)
-            break
-        code = stock['code']
-        if code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):
-            _fn(funnel, code, 'held_or_cooldown'); continue
-        price = float(stock.get('price', 0))
-        if price <= 0:
-            _fn(funnel, code, 'no_price'); continue
-        sparkline = stock.get('sparkline_price', [])
-        if len(sparkline) < 3:
-            _fn(funnel, code, 'no_sparkline'); continue
-        ma = sum(sparkline) / len(sparkline)
-        daily_change = _parse_change_rate(stock)
-        # 쉬운/빠른 진입: 인버스가 MA5 상회 + 당일 상승. (모멘텀 확인 대기 시 고점 못 잡음)
-        # 두 조건을 나눠서 세는 이유는 위 _fn 독스트링과 같다 — 한 if로 묶으면
-        # 어느 쪽이 막았는지 로그에 안 남는다.
-        if price <= ma:
-            _fn(funnel, code, 'below_ma', price=price, ma=round(ma, 1), change_rate=daily_change); continue
-        if daily_change <= 0:
-            _fn(funnel, code, 'daily_down', price=price, ma=round(ma, 1), change_rate=daily_change); continue
-        invest = view['cash'] * ENTRY_RATIO
-        qty = int(invest / price)
+    orders = list(sells)
+    buy_cost = 1 + BaseSimulator.BUY_FEE_RATE
+    for code, diff, px in buys:      # 자산 순서대로, 현금성 ETF가 마지막(잔여를 흡수)
+        qty = int(min(diff, available / buy_cost) / px)
         if qty <= 0:
-            _fn(funnel, code, 'qty_zero', price=price, cash=view['cash']); continue
-        orders.append({'action': 'BUY', 'code': code, 'name': stock.get('name', code), 'price': price,
+            _fn(funnel, code, 'qty_zero', price=px, cash=round(available))
+            continue
+        available -= qty * px * buy_cost
+        orders.append({'action': 'BUY', 'code': code, 'name': names[code], 'price': px,
                        'quantity': qty, 'cooldown': None,
-                       'reason': "[인버스] 하락 추세추종 매수 (MA5 상회 + 당일 상승)"})
-        held += 1
+                       'reason': '[GTAA] 목표 비중 20% 맞춤' if code != CASH_ETF['code']
+                       else f'[GTAA] 현금성 대기 ({cash_slots}개 자산 몫)'})
+    return orders
+
+
+def legacy_exits(view, current_prices, funnel=None):
+    """유니버스 밖 보유(구 인버스 심의 114800 등)는 전량 청산. 가격 없으면 보류."""
+    orders = []
+    for code in list(view['portfolio'].keys()):
+        if code in _UNIVERSE_CODES:
+            continue
+        px = current_prices.get(code, 0) or 0
+        if px <= 0:
+            _fn(funnel, code, 'legacy_no_price')
+            continue
+        orders.append({'action': 'SELL', 'code': code, 'price': px, 'quantity': None,
+                       'reason': '[GTAA] 유니버스 밖 레거시 청산', 'cooldown': None,
+                       'mark_partial': False})
     return orders
 
 
 class BearHedgeSimulator(BaseSimulator):
     """
-    [Sim 6] 하락장 인버스 ETF 추세추종형 (Bear-Inverse-Trend)
-    ※ 클래스/상태파일명은 레거시('Bear')를 유지하되 전략은 재정의됨.
-       구 '데드캣 반등 롱'은 하락장에 롱으로 반등에 베팅 = 코인플립(2026-06~07 승률 47.6%,
-       수수료로 -0.42%/건). 현물 롱 시스템의 하락 수익 정공법 = 인버스 ETF 추세추종으로 전환.
-    - 유니버스: KODEX 인버스(114800) 고정 (검증: 유동성·주문 호환 OK, 2X는 감쇠로 제외).
-    - 진입: 현재가 > 이동평균(sparkline 평균) AND 당일 등락률 > 0 → 하락에 순방향 베팅.
-      1종목(MAX_HOLDINGS)만, 가용현금의 95%(ENTRY_RATIO).
-    - 청산: 트레일링(고점 대비 -10%) / 하드손절 -12%. 청산 후 쿨다운 1일(추세 지속 시 재진입).
-      진입 직후엔 트레일링(-10%)이 하드손절(-12%)보다 항상 먼저 걸린다 — 하드손절은
-      두 선을 한 번에 건너뛰는 갭하락 전용 안전판이다(그래서 넓게 잡았다).
-    - 국면 게이팅은 run()에 있다: Sim0(리베로)의 current_regime을 읽어 BEAR일 때만 매매하고,
-      비 BEAR면 보유분을 전량 청산한다. 순수 함수 decide_sim6 자체는 국면을 보지 않으며,
-      Sim10도 BEAR 국면에서 같은 함수를 재사용한다.
+    [Sim 6] 방어형 자산배분 GTAA-KR5 (관찰 심, tradeable=false)
+    ※ 클래스·모듈·상태파일명(sim_bear_*)은 레거시 이름을 유지한다 — 바꾸면 매니페스트
+       id·ui_key·배포 목록·대시보드가 끊긴다. 전략은 2026-10-01에 재정의됐다.
+    - 유니버스: 069500·360750·148070·411060·305080 + 현금성 357870 (고정 리터럴, price 없음
+      → _enrich_universe가 KIS 실시간가로 채운다).
+    - 국면(리베로)과 무관하게 상시 운용한다.
+    - 월 1회: 그 달 첫 거래일 정규장(09:00~15:30) 첫 사이클에 리밸런스. 같은 달 중복 없음
+      (state['gtaa_rebalanced_month']). 신호는 직전 완결 월말 종가로만(룩어헤드 금지).
+    - 일봉 이력은 KIS get_daily_history(1일 디스크 캐시)를 리밸런스가 필요할 때만 조회.
+      5자산 전부 판정 불가면 그 달을 소모하지 않고 다음 사이클에 다시 시도한다.
     """
     def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Bear", initial_cash)
 
     def get_universe(self):
-        """인버스 ETF 고정 유니버스 (스크리너로는 못 잡음 — 하락장엔 ETF가 오름)."""
-        return [dict(e) for e in INVERSE_UNIVERSE]
+        return [dict(e) for e in ASSETS + [CASH_ETF]]
 
-    def _read_regime(self):
-        """Sim0(리베로)의 현재 국면 판단을 읽는다. 자체 판단이 아니라 Sim0 출력을 소비.
+    @staticmethod
+    def _fetch_history(code):
+        """KIS 일봉. 실패는 빈 리스트(판정 불가) — 지어낸 이력으로 판정하지 않는다."""
+        try:
+            from src.trade.kis_data_provider import KISDataProvider
+            return KISDataProvider().get_daily_history(code, days=HISTORY_DAYS)
+        except Exception:
+            return []
 
-        인버스 ETF는 standalone 알파가 없다(국면 전환이 타이밍 신호를 휩쏨). 상승장에서
-        인버스 매수 = 손실이므로, Sim0가 BEAR로 판단할 때만 매매한다.
+    @staticmethod
+    def _is_trading_day(yyyymmdd):
+        from src import market_calendar
+        return kr_calendar.is_open(market_calendar.load_calendar(), yyyymmdd)
 
-        판단할 수 없으면 None이다 — 파일 없음·파싱 실패·알 수 없는 값을 SIDEWAYS로
-        뭉개면 '국면이 아니다'와 구분이 안 되고, 비 BEAR 경로는 곧 청산이라
-        일시적 파일 오류가 실제 시장가 매도가 된다.
-        """
-        return read_regime(self.data_dir)[0]
+    def _rebalance_gate(self, now):
+        month = now.strftime('%Y%m')
+        if self.state.get('gtaa_rebalanced_month') == month:
+            return None, 'already_rebalanced'
+        mins = now.hour * 60 + now.minute
+        if not (SESSION_START_MIN <= mins < SESSION_END_MIN):
+            return None, 'outside_session'
+        if not self._is_trading_day(now.strftime('%Y%m%d')):
+            return None, 'not_trading_day'
+        return month, None
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        regime = self._read_regime()
-        if regime is None:
-            # 판단 불가 — 매수도 청산도 하지 않고 다음 사이클을 기다린다.
-            self.save_state(current_prices)
-            return self.calculate_stats(current_prices)
-        if regime == "BEAR":
-            funnel = []
-            orders = decide_sim6(self._view(current_prices), candidates, current_prices, funnel=funnel)
-            log_funnel('Sim6', candidates, funnel, orders, diag_id='sim6')
-        else:
-            # 비(非)하락장: 인버스 매수 금지 + 보유분 전량 청산(국면 이탈)
-            orders = [{'action': 'SELL', 'code': code, 'price': current_prices.get(code, 0),
-                       'quantity': None, 'reason': "[인버스] 국면 이탈 청산(비 BEAR)",
-                       'cooldown': 1, 'mark_partial': False}
-                      for code in list(self.state["portfolio"].keys())
-                      if current_prices.get(code, 0) > 0]
+        funnel = []
+        orders = legacy_exits(self._view(current_prices), current_prices, funnel)
         self._apply(orders, current_prices)
+
+        now = get_kst_now()
+        month, why = self._rebalance_gate(now)
+        if month is None:
+            _fn(funnel, '_gate', why)
+        else:
+            signals, infos = {}, {}
+            for a in ASSETS:
+                sig, info = trend_signal(self._fetch_history(a['code']), month)
+                infos[a['code']] = dict(info, signal=sig)
+                if sig is None:
+                    _fn(funnel, a['code'], f"signal_{info['reason']}")
+                else:
+                    signals[a['code']] = sig
+            actionable = [c for c in signals if (current_prices.get(c, 0) or 0) > 0]
+            if not actionable:
+                # 전부 판정 불가(또는 판정된 자산의 가격이 전부 결손) — 이번 달을
+                # 소모하지 않는다. 다음 사이클이 다시 시도한다.
+                _fn(funnel, '_gate', 'rebalance_deferred')
+            else:
+                prev = self.state.get('gtaa_signals', {})
+                rebalance = decide_gtaa(self._view(current_prices), current_prices,
+                                        signals, prev, funnel)
+                self._apply(rebalance, current_prices)
+                orders += rebalance
+                self.state['gtaa_signals'] = {a['code']: signals.get(a['code'], prev.get(a['code']))
+                                              for a in ASSETS}
+                self.state['gtaa_rebalanced_month'] = month
+                self.state['gtaa_last_rebalance'] = {
+                    'date': now.strftime('%Y-%m-%d %H:%M'), 'assets': infos}
+
+        buys = sum(1 for o in orders if o['action'] == 'BUY')
+        log_funnel('Sim6', candidates, funnel, orders, seen=buys + len(funnel), diag_id='sim6')
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)
-

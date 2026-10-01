@@ -123,23 +123,7 @@ def test_sim10_sees_the_hint(tmp_path, monkeypatch):
     assert sim._read_regime() == ('BEAR', 71.0)
 
 
-def test_sim6_sees_the_hint(tmp_path, monkeypatch):
-    from src.strategy.simulators.sim6_bear_hedge import BearHedgeSimulator
-    monkeypatch.setenv('REGIME_HINT', 'BEAR')
-    sim = BearHedgeSimulator.__new__(BearHedgeSimulator)
-    sim.data_dir = _write(tmp_path, {'current_regime': 'BULL', 'bull_score': 71.0})
-    assert sim._read_regime() == 'BEAR'
-
-
 # ── 소비자가 계약을 유지하는가 ────────────────────────────────────────
-
-def test_sim6_returns_regime_only(tmp_path):
-    """Sim6의 _read_regime은 여전히 스칼라다(run()이 그렇게 쓴다)."""
-    from src.strategy.simulators.sim6_bear_hedge import BearHedgeSimulator
-    sim = BearHedgeSimulator.__new__(BearHedgeSimulator)
-    sim.data_dir = _write(tmp_path, {'current_regime': 'BEAR', 'bull_score': 10})
-    assert sim._read_regime() == 'BEAR'
-
 
 def test_sim10_returns_tuple_and_keeps_its_bull_score_default(tmp_path):
     """Sim10은 튜플이고, 국면을 아는데 점수만 없으면 기록용 50.0으로 채운다."""

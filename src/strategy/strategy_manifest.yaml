@@ -170,18 +170,18 @@ simulators:
   - id: "sim6_bear"
     module: "src.strategy.simulators.sim6_bear_hedge"
     class: "BearHedgeSimulator"
-    description: "하락장 인버스형 - KODEX 인버스 추세추종(Sim0 BEAR 게이트) + 트레일링 -10%"
-    state_file: "sim_bear_state.json"
+    description: "방어형 자산배분 GTAA-KR5 - 코스피·S&P500·국고10·금·미국채 각 20%, 월말 10개월선 아래 자산은 현금성 ETF로 (국면 무관 상시, 월 1회)"
+    state_file: "sim_bear_state.json"   # 레거시 이름 유지(심 id·배포 목록·대시보드 연속성)
     csv_file: "trade_history_sim_bear.csv"
-    label: "하락 줍줍형 (Sim 6)"
+    label: "방어형 자산배분 (Sim 6)"
     display_order: 60
     ui_key: "sim6"
-    short_desc: "KODEX 인버스 추세추종 (Sim0 BEAR 게이트) · 트레일링 -10%"
+    short_desc: "GTAA-KR5 5자산×20% · 10개월선 아래면 현금성 · 월 1회 (관찰)"
     chart_group: 3
     color: "cyan"
     active: true
-    tradeable: true
-    needs_buzz: false  # 인버스 ETF 고정 유니버스 (스크리너 불필요)
+    tradeable: false  # 10-01 관찰 강등 — 다음 약세장 한 번을 페이퍼로 통과한 뒤 승격 판단
+    needs_buzz: false  # ETF 6종 고정 유니버스 (스크리너 불필요)
 
   - id: "sim4_bull_daytrading"
     module: "src.strategy.simulators.sim4_bull_daytrading"

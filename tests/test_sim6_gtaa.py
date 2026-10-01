@@ -292,6 +292,105 @@ def test_partial_history_failure_keeps_failed_asset(tmp_path, monkeypatch):
     assert s.state['gtaa_rebalanced_month'] == '202610'
 
 
+# ── 일부 자산 판정 불가 → 같은 달 그 자산만 재시도 (I6 결함 2) ─────────
+UST = '305080'
+
+
+def test_partial_failure_records_pending_asset(tmp_path, monkeypatch):
+    good = _hist([100] * 9 + [200])
+    s, calls = _sim(tmp_path, monkeypatch, OCT1,
+                    history=lambda code: [] if code == UST else list(good))
+    s.run(_cands(), _prices())
+    assert set(s.state['portfolio']) == set(CODES) - {UST}
+    assert s.state['gtaa_rebalanced_month'] == '202610'
+    assert s.state['gtaa_pending'] == [UST]
+    # 결손 자산 몫(20%)은 현금으로 남는다 — 현금성 ETF로도 안 산다.
+    assert CASH not in s.state['portfolio']
+    assert s.state['cash'] >= NAV * ASSET_WEIGHT * 0.99
+
+
+def test_pending_asset_retried_alone_in_same_month(tmp_path, monkeypatch):
+    good = _hist([100] * 9 + [200])
+    fail = {'on': True}
+    s, calls = _sim(tmp_path, monkeypatch, OCT1,
+                    history=lambda code: [] if (code == UST and fail['on']) else list(good))
+    s.run(_cands(), _prices())
+    before = {c: dict(p) for c, p in s.state['portfolio'].items()}
+
+    fail['on'] = False
+    calls.clear()
+    monkeypatch.setattr(m, 'get_kst_now', lambda: dt.datetime(2026, 10, 1, 10, 0, tzinfo=KST))
+    s.run(_cands(), _prices(12_000))       # 가격이 움직여도 다른 자산은 안 건드린다
+    assert calls == [UST]                  # KIS 조회는 미처리 자산에만
+    assert s.state['portfolio'][UST]['quantity'] > 0
+    for c, p in before.items():
+        assert s.state['portfolio'][c]['quantity'] == p['quantity']
+    assert s.state['gtaa_pending'] == []
+    assert s.state['gtaa_signals'][UST] == 'above'
+
+    calls.clear()
+    s.run(_cands(), _prices())             # 다 처리됐으니 더 조회하지 않는다
+    assert calls == []
+
+
+def test_pending_asset_resolved_below_buys_its_cash_etf_slot(tmp_path, monkeypatch):
+    good = _hist([100] * 9 + [200])
+    down = _hist([200] * 9 + [100])
+    fail = {'on': True}
+    s, calls = _sim(tmp_path, monkeypatch, OCT1,
+                    history=lambda code: ([] if fail['on'] else list(down)) if code == UST
+                    else list(good))
+    s.run(_cands(), _prices())
+    assert CASH not in s.state['portfolio']
+    fail['on'] = False
+    s.run(_cands(), _prices())
+    assert UST not in s.state['portfolio']
+    q = s.state['portfolio'][CASH]['quantity']
+    assert q == int(NAV * ASSET_WEIGHT / 10_000) or q == int(NAV * ASSET_WEIGHT / 10_000) - 1
+
+
+def test_pending_still_failing_stays_pending_without_orders(tmp_path, monkeypatch):
+    good = _hist([100] * 9 + [200])
+    s, calls = _sim(tmp_path, monkeypatch, OCT1,
+                    history=lambda code: [] if code == UST else list(good))
+    s.run(_cands(), _prices())
+    before = {c: dict(p) for c, p in s.state['portfolio'].items()}
+    calls.clear()
+    s.run(_cands(), _prices())
+    assert calls == [UST]                  # 사이클당 미처리 자산 수만큼 1회
+    assert s.state['gtaa_pending'] == [UST]
+    assert {c: p['quantity'] for c, p in s.state['portfolio'].items()} ==         {c: p['quantity'] for c, p in before.items()}
+
+
+def test_pending_is_reset_next_month(tmp_path, monkeypatch):
+    good = _hist([100] * 9 + [200])
+    s, calls = _sim(tmp_path, monkeypatch, OCT1,
+                    history=lambda code: [] if code == UST else list(good))
+    s.run(_cands(), _prices())
+    assert s.state['gtaa_pending'] == [UST]
+
+    nov = dt.datetime(2026, 11, 2, 9, 30, tzinfo=KST)
+    monkeypatch.setattr(m, 'get_kst_now', lambda: nov)
+    good_nov = _hist([100] * 9 + [200], month='202611')
+    monkeypatch.setattr(BearHedgeSimulator, '_fetch_history',
+                        lambda self, code: (calls.append(code), list(good_nov))[1])
+    calls.clear()
+    s.run(_cands(), _prices())
+    assert set(calls) == set(CODES)        # 새 달은 5자산 전부 다시 판정
+    assert s.state['gtaa_rebalanced_month'] == '202611'
+    assert s.state['gtaa_pending'] == []
+    assert UST in s.state['portfolio']
+
+
+def test_all_failed_does_not_record_pending(tmp_path, monkeypatch):
+    s, calls = _sim(tmp_path, monkeypatch, OCT1, history=[])
+    s.run(_cands(), _prices())
+    assert 'gtaa_rebalanced_month' not in s.state
+    calls.clear()
+    s.run(_cands(), _prices())
+    assert set(calls) == set(CODES)        # 다음 사이클은 5자산 전부 재시도
+
+
 def test_legacy_inverse_is_liquidated_on_first_run(tmp_path, monkeypatch):
     """114800(구 인버스 심 잔여)은 유니버스 밖 — 월 게이트와 무관하게 첫 런에서 청산."""
     s, _ = _sim(tmp_path, monkeypatch, dt.datetime(2026, 10, 1, 8, 0, tzinfo=KST))

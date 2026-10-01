@@ -507,7 +507,8 @@ class KISDataProvider:
         반환 원소: {'date','open','high','low','close','volume','amount'}.
         디스크 캐시 TTL_DAILY(1일) — 일봉은 그날 하루 안 바뀐다(당일 진행 중인
         봉은 이 TR에 안 잡힌다 — 최근 거래일까지의 확정 봉만 온다).
-        실패·결손은 빈 리스트다(있는 만큼만 주고 지어내지 않는다).
+        실패·결손은 빈 리스트다(있는 만큼만 주고 지어내지 않는다). 중간 페이지가
+        실패하면 받은 만큼 돌려주되 캐시하지 않는다(다음 호출이 다시 조회한다).
         """
         key = f"daily_hist_{code}_{days}"
         cached = self._get_disk_cached(key, self.TTL_DAILY)
@@ -516,6 +517,11 @@ class KISDataProvider:
 
         all_rows: dict[str, dict] = {}
         end_date = datetime.now().strftime("%Y%m%d")
+        # 한 콜이라도 실패({})했으면 결과를 캐시하지 않는다. 실패를 TTL 1일로
+        # 박제하면 같은 날 다시 물어도 복구되지 않는다(심6 월 리밸런스·심11 재시도).
+        # "KIS가 정상 응답했는데 더 줄 행이 없음"(신규 상장)은 실패가 아니라
+        # 정상적으로 짧은 것이라 캐시한다.
+        fetch_failed = False
         for _ in range(3):   # 최대 3콜 ≈ 300거래일. days=250이면 3콜로 충분.
             body = self._get(
                 "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
@@ -524,6 +530,9 @@ class KISDataProvider:
                  "FID_INPUT_DATE_1": "19000101", "FID_INPUT_DATE_2": end_date,
                  "FID_PERIOD_DIV_CODE": "D", "FID_ORG_ADJ_PRC": "0"},
             )
+            if not body:
+                fetch_failed = True
+                break
             rows = body.get("output2") or []
             new_dates = [r.get("stck_bsop_date") for r in rows
                         if r.get("stck_bsop_date") not in all_rows]
@@ -558,7 +567,8 @@ class KISDataProvider:
                 continue
         parsed.sort(key=lambda x: x["date"])
         result = parsed[-days:]
-        self._set_disk_cache(key, result)
+        if not fetch_failed:
+            self._set_disk_cache(key, result)
         return result
 
     # ──────────────────────────────────────────────────

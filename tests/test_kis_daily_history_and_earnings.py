@@ -134,6 +134,75 @@ def test_result_is_cached_across_instances(tmp_path):
         assert get_mock.call_count == 2   # 디스크 캐시에서 왔으니 늘지 않는다
 
 
+# ── 실패한 조회는 캐시하지 않는다 (I6 결함 1) ─────────────────
+# _get은 실패를 {}로 돌려준다. 그걸 캐시하면(TTL 1일) 같은 날 다시 물어도
+# 복구되지 않는다. 반면 KIS가 정상 응답했는데 더 줄 행이 없는 것(신규 상장)은
+# '정상적으로 짧음'이라 캐시해도 된다.
+def _pages(*pages):
+    calls = {'n': 0}
+
+    def fake_get(url, tr_id, params, timeout=5):
+        i = calls['n']
+        calls['n'] += 1
+        return pages[i] if i < len(pages) else {'output2': []}
+    return fake_get, calls
+
+
+def _p(start_day, n, month='202608'):
+    return {'rt_cd': '0', 'output2': [_bar(f'{month}{start_day - i:02d}', 100 - i) for i in range(n)]}
+
+
+def test_all_pages_ok_is_cached(tmp_path):
+    fake, calls = _pages(_p(28, 10), _p(18, 10, ), _p(8, 5))
+    with _redirect_cache_file(tmp_path),          mock.patch.object(KISDataProvider, '_get', side_effect=fake):
+        hist = KISDataProvider().get_daily_history('005930', days=25)
+        assert len(hist) == 25
+        n = calls['n']
+        KISDataProvider().get_daily_history('005930', days=25)
+        assert calls['n'] == n            # 캐시에서 왔다
+
+
+def test_first_page_failure_is_not_cached_and_retries(tmp_path):
+    fake, calls = _pages({}, _p(19, 2))
+    with _redirect_cache_file(tmp_path),          mock.patch.object(KISDataProvider, '_get', side_effect=fake):
+        assert KISDataProvider().get_daily_history('005930', days=250) == []
+        assert 'daily_hist_005930_250' not in KISDataProvider._disk_cache
+        # 같은 날 두 번째 호출은 다시 KIS를 부른다 — 복구된 값을 받는다.
+        hist = KISDataProvider().get_daily_history('005930', days=250)
+    assert [h['date'] for h in hist] == ['20260818', '20260819']
+
+
+def test_second_page_failure_returns_first_page_but_not_cached(tmp_path):
+    fake, calls = _pages(_p(28, 10), {})
+    with _redirect_cache_file(tmp_path),          mock.patch.object(KISDataProvider, '_get', side_effect=fake):
+        hist = KISDataProvider().get_daily_history('005930', days=25)
+        assert len(hist) == 10            # 반환 계약은 그대로 — 있는 만큼
+        assert calls['n'] == 2
+        assert 'daily_hist_005930_25' not in KISDataProvider._disk_cache
+        KISDataProvider().get_daily_history('005930', days=25)
+        assert calls['n'] > 2             # 캐시가 없으니 다시 부른다
+
+
+def test_third_page_failure_is_not_cached(tmp_path):
+    fake, calls = _pages(_p(28, 10), _p(18, 10), {})
+    with _redirect_cache_file(tmp_path),          mock.patch.object(KISDataProvider, '_get', side_effect=fake):
+        hist = KISDataProvider().get_daily_history('005930', days=25)
+    assert len(hist) == 20
+    assert 'daily_hist_005930_25' not in KISDataProvider._disk_cache
+
+
+def test_short_but_ok_history_is_cached(tmp_path):
+    """신규 상장 — KIS가 정상 응답했지만 더 줄 행이 없다. 실패가 아니다."""
+    fake, calls = _pages(_p(19, 3), {'rt_cd': '0', 'output2': []})
+    with _redirect_cache_file(tmp_path),          mock.patch.object(KISDataProvider, '_get', side_effect=fake):
+        hist = KISDataProvider().get_daily_history('005930', days=250)
+        assert len(hist) == 3
+        assert 'daily_hist_005930_250' in KISDataProvider._disk_cache
+        n = calls['n']
+        KISDataProvider().get_daily_history('005930', days=250)
+        assert calls['n'] == n
+
+
 # ── get_earnings_growth ───────────────────────────────────
 def _quarter(yymm, eps, grs=0.0):
     return {'stac_yymm': yymm, 'eps': str(eps), 'grs': str(grs)}

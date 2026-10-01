@@ -381,6 +381,11 @@ class BaseSimulator:
         self.save_state()
         return True
 
+    @classmethod
+    def sell_tax_rate(cls, code):
+        """매도 거래세율. 면세 ETF(fees.TAX_EXEMPT_ETF_CODES)면 0, 아니면 이 심의 세율."""
+        return 0.0 if code in fees.TAX_EXEMPT_ETF_CODES else cls.SELL_TAX_RATE
+
     def sell(self, code, price, quantity=None, reason=""):
         """매도 로직: 포트폴리오 즉시 업데이트 및 저장"""
         if code not in self.state['portfolio']: return False
@@ -389,7 +394,7 @@ class BaseSimulator:
         q_to_sell = min(q_to_sell, p_item['quantity'])
         gross = q_to_sell * price
         fee = gross * self.SELL_FEE_RATE
-        tax = gross * self.SELL_TAX_RATE
+        tax = gross * self.sell_tax_rate(code)
         net = gross - fee - tax
         self.state['total_fees'] = self.state.get('total_fees', 0) + (fee + tax)
         avg_price = p_item.get('avg_price', 0)

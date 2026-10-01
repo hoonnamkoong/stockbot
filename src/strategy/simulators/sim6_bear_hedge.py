@@ -139,10 +139,12 @@ def decide_gtaa(view, current_prices, signals, prev_signals, funnel=None, only=N
             continue
         buys.append((code, diff, px))
 
-    sell_net = 1 - BaseSimulator.SELL_FEE_RATE - BaseSimulator.SELL_TAX_RATE
     available = view['cash']
     for o in sells:
         qty = portfolio[o['code']]['quantity'] if o['quantity'] is None else o['quantity']
+        # sell()과 같은 세율 — ETF는 거래세 면제. 갈리면 계획한 매수가 현금 부족으로 빠진다.
+        sell_net = (1 - BaseSimulator.SELL_FEE_RATE
+                    - BaseSimulator.sell_tax_rate(o['code']))
         available += qty * o['price'] * sell_net
 
     orders = list(sells)

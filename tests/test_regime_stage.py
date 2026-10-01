@@ -44,18 +44,46 @@ def _libero(tmp_path):
     return s
 
 
+def _bull_closes(n_rows=30, n=100):
+    rows = [[100 * 1.01 ** t if i < 90 else 100 * 0.99 ** t for i in range(n)]
+            for t in range(n_rows)]
+    return {'dates': [f'2026-07-{t + 1:02d}' for t in range(n_rows)],
+            'codes': [f'{i:06d}' for i in range(n)], 'rows': rows}
+
+
 def test_run_regime_stage_returns_regime_from_live_breadth(tmp_path):
     w = _worker(tmp_path)
     sim = _libero(tmp_path)
+    live = {'005930': {'price': 270000.0, 'change_rate': 1.2}}
     with mock.patch.object(w, '_fetch_top100_breadth', return_value={
              'breadth': 83.0, 'momentum': 3.5, 'sample': 100, 'codes': ['005930'], 'extra': {},
+             'live': live,
          }), \
          mock.patch.object(w, '_top100_trend_from_csv', return_value=45.0), \
+         mock.patch('src.strategy.simulators.sim0_libero.load_top100_closes',
+                    return_value=_bull_closes()) as load, \
          mock.patch('src.strategy.registry.get_analyzer_simulator', return_value=sim), \
          mock.patch.object(w, '_append_regime_observation'):
         regime = w.run_regime_stage()
-    assert regime in ('BULL', 'SIDEWAYS', 'BEAR')
+    assert regime == 'BULL'
     assert sim.state['current_regime'] == regime
+    # 6단계 입력: 종가 CSV(리베로 trend와 같은 파일) + 장중 현재가
+    load.assert_called_once_with('output/kospi_top100_close.csv')
+    assert sim.regime6_inputs['live'] == live
+
+
+def test_run_regime_stage_without_live_still_feeds_closes(tmp_path):
+    """라이브 수집이 실패해도 종가 CSV는 넘긴다 — 지난 날 커밋은 종가로 해야 한다."""
+    w = _worker(tmp_path)
+    sim = _libero(tmp_path)
+    with mock.patch.object(w, '_fetch_top100_breadth', return_value=None), \
+         mock.patch('src.strategy.simulators.sim0_libero.load_top100_closes',
+                    return_value=_bull_closes()), \
+         mock.patch('src.strategy.registry.get_analyzer_simulator', return_value=sim), \
+         mock.patch.object(w, '_append_regime_observation'):
+        regime = w.run_regime_stage()
+    assert regime == 'BULL'
+    assert sim.regime6_inputs['live'] is None
 
 
 def test_run_regime_stage_returns_none_when_analyzer_load_fails(tmp_path):

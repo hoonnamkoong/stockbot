@@ -95,6 +95,20 @@ def test_vcp_no_contraction_when_recent_range_is_not_narrower():
     assert _vcp_contracting(wide_tail) is False
 
 
+def _ratio_tail(recent_width: float) -> list[float]:
+    """이전 10일 폭 20.0(종가 200 기준) 뒤에 최근 10일 폭 recent_width를 붙인다."""
+    prior = [190.0 + (i % 2) * 20.0 for i in range(9)] + [200.0]
+    recent = [200.0 - recent_width + (i % 2) * recent_width for i in range(9)] + [200.0]
+    return _rising_closes(200) + prior + recent
+
+
+def test_vcp_ratio_is_085():
+    """2026-09-29 0.7→0.85. 폭 비율 0.8은 이제 압축, 0.9는 여전히 아님."""
+    assert sim11.CONTRACTION_RATIO == 0.85
+    assert _vcp_contracting(_ratio_tail(16.0)) is True    # 0.80 < 0.85 (0.7 기준이면 False)
+    assert _vcp_contracting(_ratio_tail(18.0)) is False   # 0.90 >= 0.85
+
+
 def test_vcp_needs_enough_history():
     assert _vcp_contracting([100.0] * 15) is False
 

@@ -149,3 +149,50 @@ def test_sim10_returns_tuple_and_keeps_its_bull_score_default(tmp_path):
     assert sim._read_regime() == ('BULL', 50.0)
     sim.data_dir = _write(tmp_path, {'current_regime': 'BANANA', 'bull_score': 99})
     assert sim._read_regime() == (None, None)
+
+
+# ── 전일 확정 6단계(심 게이트 공용) ────────────────────────────────────
+# 심5·심10·Sim14의 6단계 진입 게이트는 모두 이 값을 읽는다(10-01 사용자 결정).
+# 상태 파일의 `regime6`는 10시 이후 오늘 장중 판정이 섞일 수 있어 연구 하네스의
+# t−1 라벨 게이트와 어긋난다 — 그래서 `regime6_state.base`에서 라벨을 다시 만든다.
+from src.strategy import regime_state as rs  # noqa: E402
+
+
+@pytest.mark.parametrize('base,expected', [
+    ({'date': '2026-09-28', 'level': 1, 'vol10': 1.5}, 'BULL'),
+    ({'date': '2026-09-28', 'level': 2, 'vol10': 0.1}, 'STRONG_BULL'),
+    ({'date': '2026-09-28', 'level': -1, 'vol10': 1.5}, 'BEAR'),
+    ({'date': '2026-09-28', 'level': -2, 'vol10': 1.5}, 'STRONG_BEAR'),
+    ({'date': '2026-09-28', 'level': 0, 'vol10': 1.5}, 'STRONG_SIDEWAYS'),
+    ({'date': '2026-09-28', 'level': 0, 'vol10': 0.5}, 'WEAK_SIDEWAYS'),
+])
+def test_regime6_confirmed_labels_base(tmp_path, base, expected):
+    d = _write(tmp_path, {'regime6': None, 'regime6_state': {'base': base, 'today': None}})
+    assert rs.read_regime6_confirmed(d) == expected
+
+
+def test_regime6_confirmed_ignores_intraday_regime6(tmp_path):
+    """장중 regime6가 강한횡보여도 전일 확정(base)이 약한횡보면 약한횡보다."""
+    d = _write(tmp_path, {'regime6': 'STRONG_SIDEWAYS',
+                          'regime6_state': {'base': {'level': 0, 'vol10': 0.5}, 'today': None}})
+    assert rs.read_regime6_confirmed(d) == 'WEAK_SIDEWAYS'
+
+
+@pytest.mark.parametrize('payload', [
+    {'regime6': 'WEAK_SIDEWAYS'},                                   # base 없음(장중 값만 있어도)
+    {'regime6_state': {'base': None}},
+    {'regime6_state': 'BANANA'},
+    {'regime6_state': {'base': 'BANANA'}},
+    {'regime6_state': {'base': {'level': 0, 'vol10': None}}},       # 횡보인데 vol10 모름
+    {'regime6_state': {'base': {'level': None, 'vol10': 1.0}}},
+    {'regime6_state': {'base': {'level': 7, 'vol10': 1.0}}},        # 모르는 단계
+    {'regime6_state': {'base': {'level': 0, 'vol10': 'x'}}},        # 깨진 값
+])
+def test_regime6_confirmed_none_when_undeterminable(tmp_path, payload):
+    assert rs.read_regime6_confirmed(_write(tmp_path, payload)) is None
+
+
+def test_regime6_confirmed_none_on_missing_or_corrupt_file(tmp_path):
+    assert rs.read_regime6_confirmed(str(tmp_path)) is None
+    (tmp_path / regime_state_filename()).write_text('{깨진 JSON', encoding='utf-8')
+    assert rs.read_regime6_confirmed(str(tmp_path)) is None

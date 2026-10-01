@@ -12,9 +12,14 @@ import { IconDna, IconTrendingUp, IconActivity } from '@tabler/icons-react';
 import {
   SIM_REGISTRY, chartHex, isPaper, simsInChartGroup, type SimRegistryEntry,
 } from '@/lib/sim-registry.generated';
+import { regime6Label } from '@/lib/regime6';
 
 interface LiberoInfo {
   current_regime: string | null;
+  regime6?: string | null;
+  regime6_candidate?: string | null;
+  regime6_candidate_days?: number | null;
+  regime6_status?: string | null;
   bull_score: number | null;
   regime_confidence: number | null;
   recommended_sims: string[];
@@ -323,6 +328,8 @@ export default function StrategyRadarChart() {
 
   const regime = libero?.current_regime ?? null;
   const regimeStyle = regime ? REGIME_STYLE[regime] : null;
+  const regime6Ko = regime6Label(libero?.regime6);
+  const candidate6Ko = regime6Label(libero?.regime6_candidate);
 
   return (
     <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -342,6 +349,20 @@ export default function StrategyRadarChart() {
               <Badge color={regimeStyle.color} variant="filled" size="lg">{regimeStyle.label}</Badge>
             ) : (
               <Badge color="gray" variant="light" size="lg">분석 대기</Badge>
+            )}
+            {/* 6단계가 정본이다 — 위 3단계 배지는 여기서 파생된다 */}
+            {regime6Ko ? (
+              <Badge color={regimeStyle?.color ?? 'gray'} variant="light" size="lg">{regime6Ko}</Badge>
+            ) : (
+              <Badge color="gray" variant="outline" size="lg">6단계 측정 불가</Badge>
+            )}
+            {candidate6Ko && (
+              <Text size="xs" c="dimmed">
+                전환 후보 {candidate6Ko}{libero?.regime6_candidate_days ? ` (${libero.regime6_candidate_days}일째)` : ''}
+              </Text>
+            )}
+            {libero?.regime6_status === 'stale' && (
+              <Text size="xs" c="orange">판정 불가 — 직전 확정 유지</Text>
             )}
             {libero?.bull_score != null && (
               <Text size="sm">방향성 점수 <b>{libero.bull_score.toFixed(1)}</b>/100</Text>

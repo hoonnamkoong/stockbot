@@ -70,6 +70,12 @@ const loadStats = createBucketCache(async () => {
             const s = await res.json();
             results.libero = {
                 current_regime: s.current_regime ?? null,
+                // 6단계 국면(정본). current_regime은 여기서 파생된 3단계다.
+                regime6: s.regime6 ?? null,
+                regime6_candidate: s.regime6_candidate ?? null,
+                regime6_candidate_days: s.regime6_candidate_days ?? null,
+                regime6_status: s.regime6_status ?? null,
+                regime6_metrics: s.regime6_metrics ?? null,
                 bull_score: s.bull_score ?? null,
                 regime_confidence: s.regime_confidence ?? null,
                 recommended_sims: s.recommended_sims ?? [],

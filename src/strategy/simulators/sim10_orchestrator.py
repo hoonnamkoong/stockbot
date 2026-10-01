@@ -1,7 +1,7 @@
-from ..regime_state import read_regime
+from ..regime_state import read_regime, read_regime6_confirmed
 from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
 from .sim4_bull_daytrading import decide_bull_daytrade
-from .sim5_sideways_swing import decide_sideways
+from .sim5_sideways_swing import decide_sideways, entry_allowed
 from .sim6_bear_hedge import decide_sim6, INVERSE_UNIVERSE
 
 
@@ -96,7 +96,11 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         if regime == "BULL":
             orders = decide_bull_daytrade(self._view(current_prices), candidates, current_prices)
         elif regime == "SIDEWAYS":
-            orders = decide_sideways(self._view(current_prices), candidates, current_prices)
+            # 3단계 SIDEWAYS 안에도 강한횡보가 있다 — 심5와 같은 6단계 진입 게이트를 건다
+            # (10-01 결정). 전일 확정값이라 심5·Sim14와 같다. 판정 불가면 진입 없음, 청산은 항상.
+            # 페이퍼·실전(program_trader)이 같은 run()·같은 self.data_dir을 읽는다.
+            orders = decide_sideways(self._view(current_prices), candidates, current_prices,
+                                     allow_entry=entry_allowed(read_regime6_confirmed(self.data_dir)))
         else:  # BEAR: 인버스 ETF 추세추종 + 직전 국면 잔여 보유 청산
             orders = decide_sim6(self._view(current_prices), candidates, current_prices)
             inverse_codes = {e['code'] for e in INVERSE_UNIVERSE}

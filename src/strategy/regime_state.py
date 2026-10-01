@@ -19,6 +19,36 @@ from src.strategy.registry import get_sim_registry
 
 VALID_REGIMES = ('BULL', 'SIDEWAYS', 'BEAR')
 
+# 6단계 국면 — **정본**이다(2026-09-29, docs/superpowers/specs/2026-09-29-libero-regime6-design.md).
+# 위의 3단계(current_regime)는 to_regime3()로 여기서 파생된다.
+#
+# ⚠ 'BEAR'·'BULL'은 3단계 값과 철자가 같지만 뜻이 좁다 — 6단계의 'BEAR'는 '하락'
+# 하나이고 '매우하락'(STRONG_BEAR)을 포함하지 않는다. 약세 전체를 보려면
+# to_regime3(r6) == 'BEAR'로 비교할 것.
+STRONG_BEAR = 'STRONG_BEAR'
+BEAR = 'BEAR'
+WEAK_SIDEWAYS = 'WEAK_SIDEWAYS'
+STRONG_SIDEWAYS = 'STRONG_SIDEWAYS'
+BULL = 'BULL'
+STRONG_BULL = 'STRONG_BULL'
+VALID_REGIMES6 = (STRONG_BEAR, BEAR, WEAK_SIDEWAYS, STRONG_SIDEWAYS, BULL, STRONG_BULL)
+
+REGIME6_LABEL_KO = {
+    STRONG_BEAR: '매우하락', BEAR: '하락', WEAK_SIDEWAYS: '약한횡보',
+    STRONG_SIDEWAYS: '강한횡보', BULL: '상승', STRONG_BULL: '매우상승',
+}
+
+_REGIME6_TO_3 = {
+    STRONG_BEAR: 'BEAR', BEAR: 'BEAR',
+    WEAK_SIDEWAYS: 'SIDEWAYS', STRONG_SIDEWAYS: 'SIDEWAYS',
+    BULL: 'BULL', STRONG_BULL: 'BULL',
+}
+
+
+def to_regime3(regime6) -> str | None:
+    """6단계 → 3단계(BULL/SIDEWAYS/BEAR). 모르는 값·None은 None이다."""
+    return _REGIME6_TO_3.get(regime6)
+
 # 이 파일 기준 ../../data — base_simulator가 self.data_dir을 만드는 방식과 같다.
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data')
 
@@ -92,3 +122,51 @@ def read_regime(data_dir=None) -> tuple:
     except (KeyError, TypeError, ValueError):
         bull_score = None
     return (regime_hint() or regime), bull_score
+
+
+def read_regime6(data_dir=None) -> str | None:
+    """6단계 국면(VALID_REGIMES6 중 하나) — 10시 이후 오늘 장중 판정이 섞일 수 있다.
+    판단할 수 없으면 None.
+
+    **심의 진입 게이트는 이것을 쓰지 않는다** — 전일 확정값 read_regime6_confirmed를
+    쓴다(10-01 결정). 이 함수는 대시보드 등 '지금 국면'을 보여주는 용도다. None을
+    어떻게 다룰지(대개 진입 금지 = fail-closed)는 호출자가 정한다 — 여기서
+    WEAK_SIDEWAYS 같은 기본값으로 채우지 않는다.
+
+    **REGIME_HINT(인계값)는 적용하지 않는다.** 인계값은 3단계뿐이라 6단계를
+    복원할 수 없다. 그래서 스크래퍼 경로에서는 이 값이 한 격자 낡을 수 있다
+    (read_regime 독스트링의 순서 문제). 3단계와 6단계를 함께 쓰는 호출자는
+    to_regime3(read_regime6())와 read_regime()[0]이 그 격자에서 어긋날 수 있다는
+    것을 알아야 한다.
+    """
+    d = read_regime_state(data_dir) or {}
+    r6 = d.get('regime6')
+    return r6 if r6 in VALID_REGIMES6 else None
+
+
+def read_regime6_confirmed(data_dir=None) -> str | None:
+    """리베로가 **어제까지** 확정한 6단계 국면. 판단할 수 없으면 None.
+
+    **심의 6단계 진입 게이트는 전부 이것을 읽는다**(심5·심10·Sim14, 10-01 사용자
+    결정). 연구 하네스는 t−1일 라벨로 t일 신규 진입을 걸었다(룩어헤드 금지). 상태
+    파일의 `regime6`(read_regime6)는 10시 이후 오늘 장중 판정이 섞일 수 있어
+    (advance_regime6) 백테스트와 다른 게이트가 된다. 그래서 리베로가 남긴 확정
+    상태(`regime6_state.base` — 마지막으로 끝난 날까지 반영)에서 라벨을 다시 만든다.
+
+    라벨 규칙은 리베로의 regime6_label 그대로다(여기서 다시 적지 않는다). sim0_libero가
+    이 모듈을 import하므로 순환을 피하려고 지연 import한다.
+
+    base가 없거나 깨졌거나 라벨이 나오지 않으면 None — 장중 `regime6`로 대신 채우지
+    않는다. None을 진입 금지로 다루는 것(fail-closed)은 호출자 몫이다.
+    """
+    from src.strategy.simulators.sim0_libero import regime6_label
+    d = read_regime_state(data_dir) or {}
+    r6state = d.get('regime6_state')
+    base = r6state.get('base') if isinstance(r6state, dict) else None
+    if not isinstance(base, dict):
+        return None
+    try:
+        label = regime6_label(base.get('level'), base.get('vol10'))
+    except Exception:
+        return None
+    return label if label in VALID_REGIMES6 else None

@@ -4,7 +4,6 @@ import os
 import statistics
 
 from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
-from .sim0_libero import regime6_label
 from .. import regime_state as rs
 
 _cooldown_active = BaseSimulator.cooldown_active
@@ -169,26 +168,6 @@ def entry_gate(regime6):
     return regime6 == rs.STRONG_SIDEWAYS
 
 
-def read_regime6_prev(data_dir=None):
-    """리베로가 **어제까지** 확정한 6단계 국면. 모르면 None.
-
-    설계서 §1·§7: "t−1일 라벨로 t일 신규 진입을 허용(룩어헤드 금지)". 상태 파일의
-    `regime6`는 10시 이후 오늘 장중 판정이 섞인 값이라(advance_regime6) 백테스트와
-    다른 게이트가 된다. 그래서 리베로가 남긴 확정 상태(`regime6_state.base` —
-    마지막으로 끝난 날까지 반영)에서 라벨을 다시 만든다. 라벨 규칙은 리베로의
-    regime6_label 그대로다(여기서 다시 적지 않는다).
-    """
-    d = rs.read_regime_state(data_dir) or {}
-    base = (d.get('regime6_state') or {}).get('base')
-    if not isinstance(base, dict):
-        return None
-    try:
-        label = regime6_label(base.get('level'), base.get('vol10'))
-    except Exception:
-        return None
-    return label if label in rs.VALID_REGIMES6 else None
-
-
 # ── 결정(순수 함수) ──────────────────────────────────────────────
 def _in_exit_window(now):
     hhmm = now.strftime('%H:%M')
@@ -203,7 +182,7 @@ def _held_trading_days(entry_date, bar_dates):
 def decide_sim14(view, candidates, current_prices, entry_allowed, now, funnel=None, notes=None):
     """[Sim14] 수축 돌파형. 순수 함수. Order 리스트 반환.
 
-    entry_allowed: 국면 게이트 결과(run()이 entry_gate(read_regime6_prev())로 정한다).
+    entry_allowed: 국면 게이트 결과(run()이 entry_gate(rs.read_regime6_confirmed())로 정한다).
       False여도 청산은 한다 — 청산은 국면과 무관하다(설계서 §7).
     now: KST datetime. 손절은 언제나, MA10·만기는 마감 직전 창에서만 본다.
     notes: 청산 재료가 없어 MA10·만기를 못 본 보유 종목 메모(깔때기와 별도 —
@@ -323,7 +302,7 @@ class SqueezeBreakoutSimulator(BaseSimulator):
         self._pre_funnel = []
 
     def _regime6_prev(self):
-        return read_regime6_prev(self.data_dir)
+        return rs.read_regime6_confirmed(self.data_dir)
 
     def get_universe(self):
         """지표 통과 종목 + 보유 종목(청산 재료). price는 채우지 않는다.

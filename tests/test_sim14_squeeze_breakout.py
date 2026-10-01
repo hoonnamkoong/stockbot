@@ -279,22 +279,23 @@ def _write_libero(d, base, regime6_now=None):
                    'regime6_state': {'base': base, 'today': None}}, f)
 
 
-def test_read_regime6_prev_uses_confirmed_base_not_intraday():
+def test_gate_reads_shared_confirmed_helper_not_intraday():
+    """Sim14 게이트는 심5·심10과 같은 공용 헬퍼(rs.read_regime6_confirmed)를 쓴다."""
     with tempfile.TemporaryDirectory() as d:
         # 장중 판정이 강한횡보여도 전일 확정(base)이 상승이면 상승이다
         _write_libero(d, {'date': '2026-09-28', 'level': 1, 'vol10': 1.5},
                       regime6_now=rs.STRONG_SIDEWAYS)
-        assert m.read_regime6_prev(d) == rs.BULL
+        assert rs.read_regime6_confirmed(d) == rs.BULL
         _write_libero(d, {'date': '2026-09-28', 'level': 0, 'vol10': 1.5})
-        assert m.read_regime6_prev(d) == rs.STRONG_SIDEWAYS
+        assert rs.read_regime6_confirmed(d) == rs.STRONG_SIDEWAYS
         _write_libero(d, {'date': '2026-09-28', 'level': 0, 'vol10': 0.5})
-        assert m.read_regime6_prev(d) == rs.WEAK_SIDEWAYS
+        assert rs.read_regime6_confirmed(d) == rs.WEAK_SIDEWAYS
         _write_libero(d, {'date': '2026-09-28', 'level': 0, 'vol10': None})
-        assert m.read_regime6_prev(d) is None
+        assert rs.read_regime6_confirmed(d) is None
         _write_libero(d, None)
-        assert m.read_regime6_prev(d) is None
+        assert rs.read_regime6_confirmed(d) is None
     with tempfile.TemporaryDirectory() as d:
-        assert m.read_regime6_prev(d) is None      # 파일 없음
+        assert rs.read_regime6_confirmed(d) is None      # 파일 없음
 
 
 # ── 심 인스턴스(get_universe + run) ─────────────────────────────

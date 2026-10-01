@@ -125,9 +125,11 @@ def read_regime(data_dir=None) -> tuple:
 
 
 def read_regime6(data_dir=None) -> str | None:
-    """6단계 확정 국면(VALID_REGIMES6 중 하나). 판단할 수 없으면 None.
+    """6단계 국면(VALID_REGIMES6 중 하나) — 10시 이후 오늘 장중 판정이 섞일 수 있다.
+    판단할 수 없으면 None.
 
-    심5·횡보 심처럼 약한/강한 횡보를 구분해 진입을 거는 소비자용이다. None을
+    **심의 진입 게이트는 이것을 쓰지 않는다** — 전일 확정값 read_regime6_confirmed를
+    쓴다(10-01 결정). 이 함수는 대시보드 등 '지금 국면'을 보여주는 용도다. None을
     어떻게 다룰지(대개 진입 금지 = fail-closed)는 호출자가 정한다 — 여기서
     WEAK_SIDEWAYS 같은 기본값으로 채우지 않는다.
 
@@ -140,3 +142,31 @@ def read_regime6(data_dir=None) -> str | None:
     d = read_regime_state(data_dir) or {}
     r6 = d.get('regime6')
     return r6 if r6 in VALID_REGIMES6 else None
+
+
+def read_regime6_confirmed(data_dir=None) -> str | None:
+    """리베로가 **어제까지** 확정한 6단계 국면. 판단할 수 없으면 None.
+
+    **심의 6단계 진입 게이트는 전부 이것을 읽는다**(심5·심10·Sim14, 10-01 사용자
+    결정). 연구 하네스는 t−1일 라벨로 t일 신규 진입을 걸었다(룩어헤드 금지). 상태
+    파일의 `regime6`(read_regime6)는 10시 이후 오늘 장중 판정이 섞일 수 있어
+    (advance_regime6) 백테스트와 다른 게이트가 된다. 그래서 리베로가 남긴 확정
+    상태(`regime6_state.base` — 마지막으로 끝난 날까지 반영)에서 라벨을 다시 만든다.
+
+    라벨 규칙은 리베로의 regime6_label 그대로다(여기서 다시 적지 않는다). sim0_libero가
+    이 모듈을 import하므로 순환을 피하려고 지연 import한다.
+
+    base가 없거나 깨졌거나 라벨이 나오지 않으면 None — 장중 `regime6`로 대신 채우지
+    않는다. None을 진입 금지로 다루는 것(fail-closed)은 호출자 몫이다.
+    """
+    from src.strategy.simulators.sim0_libero import regime6_label
+    d = read_regime_state(data_dir) or {}
+    r6state = d.get('regime6_state')
+    base = r6state.get('base') if isinstance(r6state, dict) else None
+    if not isinstance(base, dict):
+        return None
+    try:
+        label = regime6_label(base.get('level'), base.get('vol10'))
+    except Exception:
+        return None
+    return label if label in VALID_REGIMES6 else None

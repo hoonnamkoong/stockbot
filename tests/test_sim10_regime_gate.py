@@ -87,3 +87,67 @@ def test_confirmed_regime_keeps_bull_score():
         sim = _sim(d, regime='BULL')
         _run_watching_strategies(sim)
         assert sim.state['active_bull_score'] == 71.5
+
+
+# ── SIDEWAYS 위임에도 심5의 6단계 게이트(전일 확정값)를 건다 ─────────
+# 10-01 사용자 결정: 심10이 3단계로 SIDEWAYS에 라우팅해도 전일 확정 6단계가
+# 강한횡보면 심5 신규 진입 없음. 청산(−5% 손절)은 항상. 심5·Sim14와 같은
+# regime_state.read_regime6_confirmed를 읽는다(장중 regime6가 아니다).
+_BOX = [1100, 1200, 1150, 1200, 1100, 1180, 1050, 1160, 1100, 1200,
+        1150, 1190, 1100, 1160, 1080, 1060, 1040, 1025, 1010, 1000]
+_BASE6 = {'WEAK_SIDEWAYS': {'level': 0, 'vol10': 0.5},
+          'STRONG_SIDEWAYS': {'level': 0, 'vol10': 1.5}}
+
+
+def _sideways_sim(tmpdir, base6, intraday=None):
+    sim = _sim(tmpdir)
+    payload = {'current_regime': 'SIDEWAYS', 'bull_score': 50.0, 'regime6': intraday}
+    if base6 is not None:
+        payload['regime6_state'] = {'base': _BASE6[base6], 'today': None}
+    with open(os.path.join(tmpdir, 'sim_libero_state.json'), 'w', encoding='utf-8') as f:
+        json.dump(payload, f)
+    return sim
+
+
+def _box_cand():
+    return [{'code': '222', 'name': '레인지', 'price': 1000, 'amount': 2_000_000_000,
+             'range_history': list(_BOX), 'change_rate': '+0.5%'}]
+
+
+@pytest.mark.parametrize('base6,intraday,expect_buy', [
+    ('WEAK_SIDEWAYS', 'STRONG_SIDEWAYS', True),    # 전일 기준 — 장중 값은 안 본다
+    ('STRONG_SIDEWAYS', 'WEAK_SIDEWAYS', False),
+    ('STRONG_SIDEWAYS', None, False),
+    (None, 'WEAK_SIDEWAYS', False),                # base 없음 → 판정 불가 → 진입 금지
+])
+def test_sideways_delegate_obeys_prev_confirmed_regime6(base6, intraday, expect_buy):
+    with tempfile.TemporaryDirectory() as d:
+        sim = _sideways_sim(d, base6, intraday)
+        sim.run(_box_cand(), current_prices={'222': 1000})
+        assert sim.state['active_regime'] == 'SIDEWAYS'
+        assert ('222' in sim.state['portfolio']) is expect_buy
+
+
+@pytest.mark.parametrize('base6', ['WEAK_SIDEWAYS', 'STRONG_SIDEWAYS', None])
+def test_sideways_delegate_stop_loss_always_fires(base6):
+    with tempfile.TemporaryDirectory() as d:
+        sim = _sideways_sim(d, base6)
+        sim.state['portfolio'] = {'005930': {'name': '삼성', 'quantity': 10, 'avg_price': 1000,
+                                             'peak_price': 1000, 'entry_date': '2026-09-28',
+                                             'is_scaled_out': False}}
+        sim.state['cash'] = 3_000_000 - 10_000
+        sim.state['invested'] = 10_000
+        sim.run([], current_prices={'005930': 950})
+        assert '005930' not in sim.state['portfolio']
+
+
+def test_sideways_delegate_passes_gate_value():
+    """allow_entry가 True 하드코딩이 아니라 게이트 값으로 넘어가는지 직접 본다."""
+    with tempfile.TemporaryDirectory() as d:
+        sim = _sideways_sim(d, 'STRONG_SIDEWAYS')
+        _, side, _ = _run_watching_strategies(sim)
+        assert side.call_args.kwargs['allow_entry'] is False
+    with tempfile.TemporaryDirectory() as d:
+        sim = _sideways_sim(d, 'WEAK_SIDEWAYS')
+        _, side, _ = _run_watching_strategies(sim)
+        assert side.call_args.kwargs['allow_entry'] is True

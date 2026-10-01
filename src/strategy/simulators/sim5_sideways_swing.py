@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from ..regime_state import BEAR, STRONG_BEAR, WEAK_SIDEWAYS, REGIME6_LABEL_KO, read_regime6
+from ..regime_state import BEAR, STRONG_BEAR, WEAK_SIDEWAYS, REGIME6_LABEL_KO, read_regime6_confirmed
 from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 
 # base 순수 헬퍼(Task 3 @staticmethod) 재사용
@@ -103,7 +103,8 @@ def decide_sideways(view, candidates, current_prices, funnel=None, *, allow_entr
 
     allow_entry: 신규 진입 허용 여부(국면 게이트). **필수 인자다** — 기본값을 두면
       호출자가 게이트를 잊었을 때 조용히 '진입 허용'이 된다. 심5 run()은
-      entry_allowed(read_regime6())를, 심10은 자체 3단계 라우팅이 게이트라 True를 넘긴다.
+      entry_allowed(read_regime6_confirmed())를 넘긴다 — 심10도 SIDEWAYS 위임 때 같은 값을
+      넘긴다(10-01: 3단계 라우팅만으로는 강한횡보 진입을 못 막는다).
       청산은 이 값과 무관하게 항상 돈다.
     """
     orders = []
@@ -296,12 +297,15 @@ class SidewaysSwingSimulator(BaseSimulator):
             return None
 
     def _read_regime6(self):
-        """리베로 6단계 확정 국면. 판정 불가면 None(→ 신규 진입 금지).
+        """리베로가 전일까지 확정한 6단계 국면. 판정 불가면 None(→ 신규 진입 금지).
+
+        장중 regime6가 아니라 전일 확정값이다 — 연구 하네스의 t−1 라벨 게이트와 같고,
+        심10·Sim14와 같은 헬퍼(read_regime6_confirmed)를 쓴다.
 
         페이퍼(trade_engine._run_simulators)와 실전(program_trader)이 같은 run()을
         부르므로 같은 파일(self.data_dir의 국면 상태)을 같은 방식으로 읽는다.
         """
-        return read_regime6(self.data_dir)
+        return read_regime6_confirmed(self.data_dir)
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}

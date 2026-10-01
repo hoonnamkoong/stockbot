@@ -180,10 +180,15 @@ def test_sim3_value_can_buy(tmp_path):
 # ── 심10 오케스트레이터 (국면별 위임) ────────────────────────────────
 
 @pytest.mark.parametrize('regime, maker', [('SIDEWAYS', _box), ('BULL', _momentum)])
-def test_sim10_can_buy_in_each_regime(tmp_path, regime, maker):
+def test_sim10_can_buy_in_each_regime(tmp_path, monkeypatch, regime, maker):
     """심10은 자체 진입 로직이 없다 — 국면에 따라 하위 전략을 그대로 부른다.
-    그래서 하위 전략이 막히면 심10도 같이 막힌다(8월 0건이 그랬다)."""
+    그래서 하위 전략이 막히면 심10도 같이 막힌다(8월 0건이 그랬다).
+
+    SIDEWAYS 위임은 심5의 6단계 게이트(전일 확정값)도 받는다(10-01) — 진입 허용
+    국면(약한횡보)으로 고정한다. 게이트 자체는 test_sim10_regime_gate.py가 본다."""
+    from src.strategy.simulators import sim10_orchestrator
     from src.strategy.simulators.sim10_orchestrator import Sim10OrchestratorSimulator
+    monkeypatch.setattr(sim10_orchestrator, 'read_regime6_confirmed', lambda *a, **k: 'WEAK_SIDEWAYS')
     s = _sim(Sim10OrchestratorSimulator, tmp_path)
     s._read_regime = lambda: (regime, 70.0)
     cands = [maker(i) for i in range(8)]

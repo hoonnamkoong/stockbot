@@ -16,7 +16,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.pipeline.workers.trade_engine import TradeEngineWorker
-from src.strategy.simulators.sim6_bear_hedge import decide_sim6
+from src.strategy.simulators.sim6_bear_hedge import ASSETS, CASH_ETF, decide_gtaa
 
 
 def _enrich(stocks, quote):
@@ -122,44 +122,33 @@ def test_enrich_does_not_fabricate_amount_when_quote_fails():
     assert 'amount' not in out[0]
 
 
-# ── 결함이 실제로 Sim6 진입을 막았다는 증거 ────────────────────
-def _inverse(**kw):
-    """enrich를 통과한 뒤의 인버스 ETF. 완벽한 상승 추세(=시장 급락)."""
-    s = {'code': '114800', 'name': 'KODEX 인버스', 'price': 6000, 'current_price': 6000,
-         'sparkline_price': [5000, 5200, 5500, 5800, 6000]}
-    s.update(kw)
-    return s
+# ── 심6(GTAA-KR5, 10-01 재목적화)의 ETF 6종도 같은 경로로 실시간가를 받는다 ──
+# 심6 유니버스는 price 없는 리터럴이라 _needs_live_price로 표시되고, KIS
+# inquire-price 값으로 price가 채워진다. 네이버는 여기서 죽여 두었으므로
+# price의 출처는 KIS뿐이다.
+def _gtaa_universe():
+    from src.strategy.simulators.sim6_bear_hedge import BearHedgeSimulator
+    return BearHedgeSimulator.__new__(BearHedgeSimulator).get_universe()
 
 
-def _view():
-    return {'portfolio': {}, 'cash': 3_000_000, 'cooldown_codes': {}}
+def test_enrich_gives_live_price_to_all_six_gtaa_etfs():
+    out = _enrich(_gtaa_universe(), _GOOD_QUOTE)
+    assert [s['code'] for s in out] == [a['code'] for a in ASSETS] + [CASH_ETF['code']]
+    assert all(s['price'] == 6000 for s in out)
 
 
-def test_sim6_cannot_buy_without_change_rate():
-    """회귀 고정 — 등락률이 빠지면 아무리 좋은 추세라도 주문이 0이다."""
-    assert decide_sim6(_view(), [_inverse()], {'114800': 6000}) == []
+def test_enrich_failure_leaves_gtaa_price_absent():
+    out = _enrich(_gtaa_universe(), _FAILED_QUOTE)
+    assert all('price' not in s for s in out)
 
 
-def test_sim6_buys_when_change_rate_present():
-    orders = decide_sim6(_view(), [_inverse(change_rate='+3.21%')], {'114800': 6000})
-    assert [(o['action'], o['code']) for o in orders] == [('BUY', '114800')]
-    assert orders[0]['quantity'] > 0
-
-
-def test_enriched_universe_feeds_sim6_end_to_end():
-    """enrich 산출물을 그대로 Sim6에 넣으면 매수가 나온다 — 배선 전체를 묶는다."""
-    enriched = _enrich([{'code': '114800', 'name': 'KODEX 인버스'}], _GOOD_QUOTE)
-    enriched[0].update(price=6000, sparkline_price=[5000, 5200, 5500, 5800, 6000])
-    orders = decide_sim6(_view(), enriched, {'114800': 6000})
-    assert [(o['action'], o['code']) for o in orders] == [('BUY', '114800')]
-
-
-def test_sim10_bear_universe_gets_change_rate_too():
-    """Sim10도 BEAR 국면에 같은 리터럴 유니버스로 decide_sim6을 재사용한다 —
-    같은 결함을 공유하고 있었으므로 두 번째 소비자도 고정한다."""
-    from src.strategy.simulators.sim10_orchestrator import INVERSE_UNIVERSE
-    out = _enrich([dict(e) for e in INVERSE_UNIVERSE], _GOOD_QUOTE)
-    assert all('change_rate' in s for s in out)
+def test_enriched_gtaa_universe_feeds_rebalance_end_to_end():
+    """enrich 산출물의 가격으로 리밸런스 주문이 나온다 — 배선 전체를 묶는다."""
+    out = _enrich(_gtaa_universe(), _GOOD_QUOTE)
+    prices = {s['code']: s['price'] for s in out}
+    view = {'portfolio': {}, 'cash': 3_000_000, 'nav': 3_000_000, 'cooldown_codes': {}}
+    orders = decide_gtaa(view, prices, {a['code']: 'above' for a in ASSETS}, {})
+    assert {o['code'] for o in orders if o['action'] == 'BUY'} == {a['code'] for a in ASSETS}
 
 
 # ── 중복 가드가 매매 주기를 삼키지 않는다 ──────────────────────

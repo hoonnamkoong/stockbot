@@ -85,19 +85,17 @@ def test_sim5_range_can_buy():
     assert b[0]['quantity'] == int(NAV * POSITION_WEIGHT / 900)
 
 
-# ── 심6 인버스 (1종목 특례) ──────────────────────────────────────────
+# ── 심6 GTAA-KR5 (10-01 재목적화: 상시 방어형 자산배분, 관찰 심) ───────────
 
-def test_sim6_inverse_can_buy():
-    from src.strategy.simulators.sim6_bear_hedge import (
-        INVERSE_UNIVERSE, MAX_HOLDINGS, decide_sim6,
-    )
-    inv = dict(INVERSE_UNIVERSE[0])
-    inv.update(price=1200, sparkline_price=[1000, 1050, 1100, 1150, 1200],
-               change_rate='+2.00%')
+def test_sim6_gtaa_can_buy():
+    """5자산이 전부 10개월선 위면 각 20%씩 산다 — 구조적으로 못 사는 심이 아니다."""
+    from src.strategy.simulators.sim6_bear_hedge import ASSETS, ASSET_WEIGHT, decide_gtaa
+    prices = {a['code']: 1000 for a in ASSETS}
 
-    b = _buys(decide_sim6(_view(), [inv], {inv['code']: 1200}))
+    b = _buys(decide_gtaa(_view(), prices, {c: 'above' for c in prices}, {}))
 
-    assert len(b) == MAX_HOLDINGS == 1, '인버스는 1종목 특례다'
+    assert len(b) == len(ASSETS) == 5
+    assert b[0]['quantity'] == int(NAV * ASSET_WEIGHT / 1000)
 
 
 # ── 심1 심리 (버즈) ──────────────────────────────────────────────────
@@ -196,3 +194,17 @@ def test_sim10_can_buy_in_each_regime(tmp_path, monkeypatch, regime, maker):
     s.run(cands, {c['code']: c['price'] for c in cands})
 
     assert s.state['portfolio'], f'{regime} 국면에서 한 종목도 못 샀다'
+
+
+def test_sim10_bear_does_not_buy(tmp_path):
+    """BEAR는 '살 수 있다'가 아니라 '사지 않는다'다(10-01: 현금 대기, 보유분 청산).
+    구 심6 진입 조건을 완벽히 만족하는 인버스 후보를 줘도 0건이어야 한다."""
+    from src.strategy.simulators.sim10_orchestrator import Sim10OrchestratorSimulator
+    s = _sim(Sim10OrchestratorSimulator, tmp_path)
+    s._read_regime = lambda: ('BEAR', 20.0)
+    inv = {'code': '114800', 'name': 'KODEX 인버스', 'price': 1200,
+           'sparkline_price': [1000, 1050, 1100, 1150, 1200], 'change_rate': '+2.00%'}
+
+    s.run([inv] + [_momentum(i) for i in range(8)], {'114800': 1200})
+
+    assert s.state['portfolio'] == {}

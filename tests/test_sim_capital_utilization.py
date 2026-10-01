@@ -25,7 +25,6 @@ from src.strategy.simulators import (
     sim4_bull_momentum,
     sim1_psych,
     sim5_sideways_swing,
-    sim6_bear_hedge,
 )
 from src.strategy.simulators.sim4_bull_daytrading import decide_bull_daytrade
 from src.strategy.simulators.sim5_sideways_swing import SidewaysSwingSimulator, decide_sideways
@@ -58,7 +57,8 @@ CAPS = [
      sim4_bull_momentum.BullMomentumSimulator.MAX_HOLDINGS),
     ("Sim4-1 단타", sim4_bull_daytrading.POSITION_WEIGHT, sim4_bull_daytrading.MAX_HOLDINGS),
     ("Sim5 레인지", sim5_sideways_swing.POSITION_WEIGHT, sim5_sideways_swing.MAX_HOLDINGS),
-    ("Sim6 인버스", sim6_bear_hedge.ENTRY_RATIO, sim6_bear_hedge.MAX_HOLDINGS),
+    # 심6은 2026-10-01 GTAA-KR5(5자산×20%=100%, 신호 아래면 현금성 ETF)로 바뀌어
+    # 이 상한 모형(종목당 비중×최대 보유)에 맞지 않는다 — test_sim6_gtaa.py가 본다.
 ]
 
 

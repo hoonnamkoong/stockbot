@@ -2,13 +2,27 @@ from ..regime_state import read_regime, read_regime6_confirmed
 from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH
 from .sim4_bull_daytrading import decide_bull_daytrade
 from .sim5_sideways_swing import decide_sideways, entry_allowed
-from .sim6_bear_hedge import decide_sim6, INVERSE_UNIVERSE
+
+
+def decide_bear_cash(view, current_prices):
+    """[Sim10-BEAR] 현금 대기. 신규 BUY 없음, 보유분 전량 SELL. 순수 함수.
+
+    2026-10-01 결정(docs/superpowers/specs/2026-10-01-sim6-bear-redesign.md §4·§5):
+    t−1 BEAR 조건부 다음 날 코스피 기댓값은 사실상 0이고, 지금까지의 인버스 위임
+    (decide_sim6)은 BEAR 슬롯에서 −43~−67%(복리 기여)였다. 가격이 없는 종목은
+    팔지 않는다 — 지어낸 가격으로 팔지 않고 다음 사이클을 기다린다.
+    """
+    return [{'action': 'SELL', 'code': code, 'price': current_prices.get(code, 0),
+             'quantity': None, 'reason': "[Sim10-BEAR] 현금 대기 — 보유 청산",
+             'cooldown': 1, 'mark_partial': False}
+            for code in list(view['portfolio'].keys())
+            if (current_prices.get(code, 0) or 0) > 0]
 
 
 class Sim10OrchestratorSimulator(BaseSimulator):
     """[Sim 10] 메타-얼로케이터 — Sim0 국면에 따라 검증된 하위 전략 로직을 자기 자본으로 실행.
 
-    BULL → Sim4-1(단타), SIDEWAYS → Sim5(눌림목), BEAR → Sim6(인버스 ETF 추세추종).
+    BULL → Sim4-1(단타), SIDEWAYS → Sim5(눌림목), BEAR → 현금 대기(10-01, 인버스 위임 폐지).
     자체 종목 선정을 하지 않는다. 300만원 독립 운용.
     """
 
@@ -19,7 +33,8 @@ class Sim10OrchestratorSimulator(BaseSimulator):
     def needs_buzz(cls, regime: str | None) -> bool:
         """이 심의 버즈(네이버 게시글) 필요 여부는 국면에 따라 바뀐다.
 
-        BULL·BEAR는 get_universe()가 KIS 자체 유니버스를 쓰므로 불필요.
+        BULL은 get_universe()가 KIS 자체 유니버스를 쓰므로 불필요. BEAR는 현금
+        대기라 후보 자체를 보지 않는다(보유 종목 가격은 보유분 보강 경로가 채운다).
         SIDEWAYS는 get_universe()가 None을 반환해 공통 버즈 후보로 폴백하므로
         필요. 국면을 모르면(regime=None) 버즈 필요로 취급한다 — 스크래핑을
         건너뛰었다가 실제로는 SIDEWAYS라 유니버스가 텅 비는 사고를 막는다.
@@ -44,8 +59,8 @@ class Sim10OrchestratorSimulator(BaseSimulator):
         return regime, 50.0 if bull_score is None else bull_score
 
     def get_universe(self):
-        """국면 연동 유니버스. BULL=등락률 상위 30, BEAR=인버스 ETF 고정,
-        SIDEWAYS=시총 상위 100(중립).
+        """국면 연동 유니버스. BULL=등락률 상위 30, BEAR=빈 목록(현금 대기 — 살 게
+        없다), SIDEWAYS=시총 상위 100(중립).
 
         SIDEWAYS는 `decide_sideways`(심5의 판단 함수)를 그대로 쓴다. 그래서
         심5와 **같은 유니버스 문제를 그대로 물려받았다** — 버즈 후보로는
@@ -63,7 +78,7 @@ class Sim10OrchestratorSimulator(BaseSimulator):
             except Exception:
                 return None
         if regime == "BEAR":
-            return [dict(e) for e in INVERSE_UNIVERSE]
+            return []
         try:
             from src.data.market_cap_universe import fetch_top100
             return fetch_top100(limit=100)
@@ -101,16 +116,8 @@ class Sim10OrchestratorSimulator(BaseSimulator):
             # 페이퍼·실전(program_trader)이 같은 run()·같은 self.data_dir을 읽는다.
             orders = decide_sideways(self._view(current_prices), candidates, current_prices,
                                      allow_entry=entry_allowed(read_regime6_confirmed(self.data_dir)))
-        else:  # BEAR: 인버스 ETF 추세추종 + 직전 국면 잔여 보유 청산
-            orders = decide_sim6(self._view(current_prices), candidates, current_prices)
-            inverse_codes = {e['code'] for e in INVERSE_UNIVERSE}
-            for code in list(self.state["portfolio"].keys()):
-                if code in inverse_codes:
-                    continue
-                px = current_prices.get(code, 0)
-                if px > 0 and not any(o['code'] == code for o in orders):
-                    orders.append({'action': 'SELL', 'code': code, 'price': px, 'quantity': None,
-                                   'reason': "[Sim10-BEAR] 국면전환 잔여 청산", 'cooldown': 1, 'mark_partial': False})
+        else:  # BEAR: 현금 대기 — 신규 진입 없음, 보유분(구 인버스 포함) 전량 청산
+            orders = decide_bear_cash(self._view(current_prices), current_prices)
 
         self._apply(orders, current_prices)
         self._log_regime(regime, bull_score)

@@ -1,6 +1,7 @@
 """Sim10의 국면 게이팅 — 지어낸 국면으로 전략을 실행하지 않는다.
 
-Sim10은 국면에 따라 하위 전략을 갈아탄다(BULL=단타, SIDEWAYS=눌림목, BEAR=인버스).
+Sim10은 국면에 따라 하위 전략을 갈아탄다(BULL=단타, SIDEWAYS=눌림목, BEAR=현금 대기 —
+10-01 결정으로 인버스 위임을 뺐다).
 _read_regime이 파일 없음·파싱 실패·알 수 없는 값을 'SIDEWAYS'로 뭉개면 두 가지가
 동시에 깨진다.
   1. 근거 없는 SIDEWAYS로 눌림목 전략이 실제로 돌아 신규 진입까지 낼 수 있다.
@@ -38,10 +39,11 @@ def _sim(tmpdir, regime=None, prior_regime='BEAR'):
 
 
 def _run_watching_strategies(sim):
-    """하위 전략 3개를 감시하며 run(). 어느 것도 불리면 안 되는 경우를 잡는다."""
+    """하위 전략을 감시하며 run(). 어느 것도 불리면 안 되는 경우를 잡는다.
+    BEAR는 하위 전략 위임이 아니라 심10 자신의 현금 대기(decide_bear_cash)다(10-01)."""
     with mock.patch.object(sim10_orchestrator, 'decide_bull_daytrade', return_value=[]) as bull, \
          mock.patch.object(sim10_orchestrator, 'decide_sideways', return_value=[]) as side, \
-         mock.patch.object(sim10_orchestrator, 'decide_sim6', return_value=[]) as bear:
+         mock.patch.object(sim10_orchestrator, 'decide_bear_cash', return_value=[]) as bear:
         sim.run([], current_prices={})
     return bull, side, bear
 
@@ -151,3 +153,92 @@ def test_sideways_delegate_passes_gate_value():
         sim = _sideways_sim(d, 'WEAK_SIDEWAYS')
         _, side, _ = _run_watching_strategies(sim)
         assert side.call_args.kwargs['allow_entry'] is True
+
+
+# ── BEAR = 현금 대기 (10-01 결정) ───────────────────────────────────
+# R6 연구: t−1 BEAR 조건부 다음 날 기댓값 ≈ 0, 인버스 위임(현행)이 BEAR 슬롯에서
+# −43~−67%(복리 기여). 신규 BUY 없음, 보유분 전량 청산(가격 없으면 다음 사이클).
+def _held(code, qty=10, avg=1000):
+    return {code: {'name': code, 'quantity': qty, 'avg_price': avg, 'peak_price': avg,
+                   'entry_date': '2026-09-28', 'is_scaled_out': False}}
+
+
+def _bear_sim(tmpdir, portfolio):
+    sim = _sim(tmpdir, regime='BEAR', prior_regime='SIDEWAYS')
+    sim.state['portfolio'] = portfolio
+    sim.state['invested'] = sum(p['quantity'] * p['avg_price'] for p in portfolio.values())
+    sim.state['cash'] = 3_000_000 - sim.state['invested']
+    return sim
+
+
+def _perfect_inverse_cand():
+    """구 심6 진입 조건을 완벽히 만족하는 인버스 — 그래도 사면 안 된다."""
+    return [{'code': '114800', 'name': 'KODEX 인버스', 'price': 6000,
+             'sparkline_price': [5000, 5200, 5500, 5800, 6000], 'change_rate': '+3.00%'}]
+
+
+def test_bear_buys_nothing_even_with_perfect_inverse_candidate():
+    with tempfile.TemporaryDirectory() as d:
+        sim = _bear_sim(d, {})
+        sim.run(_perfect_inverse_cand(), current_prices={'114800': 6000})
+        assert sim.state['portfolio'] == {}
+        assert sim.state['active_regime'] == 'BEAR'
+
+
+def test_bear_sells_every_holding_including_inverse():
+    with tempfile.TemporaryDirectory() as d:
+        sim = _bear_sim(d, {**_held('005930'), **_held('114800', avg=6000)})
+        sim.run([], current_prices={'005930': 1000, '114800': 6000})
+        assert sim.state['portfolio'] == {}
+
+
+def test_bear_does_not_sell_at_missing_price():
+    with tempfile.TemporaryDirectory() as d:
+        sim = _bear_sim(d, {**_held('005930'), **_held('000660')})
+        sim.run([], current_prices={'005930': 1000})
+        assert set(sim.state['portfolio']) == {'000660'}
+
+
+def test_decide_bear_cash_is_sell_only():
+    view = {'portfolio': {**_held('005930'), **_held('000660')}, 'cash': 0}
+    orders = sim10_orchestrator.decide_bear_cash(view, {'005930': 1000, '000660': 0})
+    assert [(o['action'], o['code'], o['quantity']) for o in orders] == [('SELL', '005930', None)]
+
+
+def test_bear_universe_is_empty():
+    """BEAR에서 인버스 유니버스를 주면 KIS 보강 호출만 는다 — 빈 목록."""
+    with tempfile.TemporaryDirectory() as d:
+        sim = _sim(d, regime='BEAR')
+        assert sim.get_universe() == []
+        assert Sim10OrchestratorSimulator.needs_buzz('BEAR') is False
+
+
+def test_sim10_no_longer_imports_sim6():
+    src = open(sim10_orchestrator.__file__, encoding='utf-8').read()
+    assert 'from .sim6_bear_hedge' not in src and 'decide_sim6(' not in src
+
+
+def test_bear_paper_and_program_paths_produce_same_orders():
+    """페이퍼(trade_engine → sim.run)와 실전(program_trader._make_adapter → sim.run)이
+    같은 run()으로 같은 주문을 내는지 직접 호출로 본다."""
+    from src.pipeline.workers.program_trader import _make_adapter
+    pf = {**_held('005930'), **_held('114800', avg=6000), **_held('000660')}
+    prices = {'005930': 1000, '114800': 6000}          # 000660은 가격 결손
+    with tempfile.TemporaryDirectory() as d:
+        paper = _bear_sim(d, {k: dict(v) for k, v in pf.items()})
+        paper_orders = []
+        paper._apply_orig = paper._apply
+        paper._apply = lambda orders, cp=None: (paper_orders.extend(orders), paper._apply_orig(orders, cp))
+        paper.run(_perfect_inverse_cand(), current_prices=dict(prices))
+    with tempfile.TemporaryDirectory() as d:
+        real = _bear_sim(d, {})
+        snapshot = {'cash': 1_000_000, 'invested': 0, 'cooldown_codes': {},
+                    'portfolio': {k: dict(v) for k, v in pf.items()},
+                    'total_fees': 0, 'history': [3_000_000], 'daily_trades': [],
+                    'peak_nav': 3_000_000, 'exec_path': 'program'}
+        real_orders = _make_adapter(real, snapshot, '2026-10-01',
+                                    real_holdings={k: {} for k in pf})
+        real.run(_perfect_inverse_cand(), current_prices=dict(prices))
+    assert sorted((o['action'].lower(), o['code']) for o in paper_orders) == \
+        sorted((o['side'], o['code']) for o in real_orders) == \
+        [('sell', '005930'), ('sell', '114800')]

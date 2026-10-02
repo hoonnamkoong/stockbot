@@ -286,3 +286,58 @@ def test_watchlist_logs_why_candidates_were_rejected(capsys):
     assert '깔때기' in out, f'깔때기 줄이 없다: {out!r}'
     assert 'no_eps' in out and 'eps_low' in out, (
         f'결손과 미달이 구분돼 찍히지 않는다: {out!r}')
+
+
+# ── 폴백 표시 exit_next_open (2026-10-02) ─────────────────
+# 50일선 이탈은 이제 마감 창(15:15~15:20)에서만 판정한다. 창을 놓쳤거나
+# 15:15 현재가가 종가와 갈려 못 판 보유분은, EOD가 '오늘 종가 < 오늘 루프가 쓴
+# ma50(오늘 종가 제외 50일)'이면 표시하고 다음날 첫 사이클에 판다.
+def _held_cand(price, code='T001'):
+    # daily_closes 마지막 50개 평균 = 100 → 오늘 루프가 쓴 ma50
+    return {'code': code, 'name': '보유주', 'price': price, 'amount': 5_000_000_000,
+            'daily_closes': [100.0] * 229, 'w52_hgpr': 120.0, 'w52_lwpr': 40.0,
+            'eps_growth_yoy': 30.0, 'revenue_growth_yoy': 30.0}
+
+
+def test_held_close_below_ma50_is_flagged_for_next_open():
+    entries = build_sim11_watchlist([_held_cand(99.0)], held_codes={'T001'})
+    assert entries['T001']['exit_next_open'] is True
+    assert entries['T001']['pivot_price'] is None
+
+
+def test_held_close_at_or_above_ma50_is_not_flagged():
+    """종가 == ma50은 이탈이 아니다(창 판정 `cur < ma50`과 같은 부등호)."""
+    e = build_sim11_watchlist([_held_cand(100.0)], held_codes={'T001'})
+    assert not e.get('T001', {}).get('exit_next_open')
+
+
+def test_qualifying_holding_is_flagged_when_close_below_ma50():
+    """자격 유지 항목에도 같은 규칙을 적용한다(실제로는 추세 템플릿이 price>ma50을
+    요구해 겹치지 않지만, 경로를 가리지 않는다)."""
+    def fake_entry(stock, funnel=None):
+        return {'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}
+
+    with mock.patch('src.strategy.simulators.sim11_minervini.build_watchlist_entry',
+                    side_effect=fake_entry):
+        entries = build_sim11_watchlist([_held_cand(99.0)], held_codes={'T001'})
+    assert entries['T001']['exit_next_open'] is True
+    assert entries['T001']['pivot_price'] == 200.0
+
+
+def test_non_held_qualifying_entry_has_no_flag():
+    def fake_entry(stock, funnel=None):
+        return {'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}
+
+    with mock.patch('src.strategy.simulators.sim11_minervini.build_watchlist_entry',
+                    side_effect=fake_entry):
+        entries = build_sim11_watchlist([_held_cand(99.0)], held_codes=set())
+    assert 'exit_next_open' not in entries['T001']
+
+
+def test_flag_not_invented_when_ma50_unmeasurable(capsys):
+    """오늘 종가 제외 50일 표본이 없으면 판정 불가 — 표시하지 않고 로그를 남긴다."""
+    c = _held_cand(10.0)
+    c['daily_closes'] = [100.0] * 49
+    entries = build_sim11_watchlist([c], held_codes={'T001'}, log=print)
+    assert not entries.get('T001', {}).get('exit_next_open')
+    assert '익일 청산 판정 불가' in capsys.readouterr().out

@@ -11,6 +11,12 @@ MIN_AMOUNT = 1_000_000_000   # 거래대금 최소 문턱(매수 시점 실시�
 
 STOP_PCT = -7.5              # 미너비니의 시그니처 손절폭(7~8%)의 중간값
 MA_EXIT_WINDOW = 50          # 50일선 이탈 시 청산(추세 종료 신호)
+# 50일선 이탈은 마감 직전 창에서만 판정한다(손절은 언제나). Sim14 EXIT_WINDOW와
+# 같은 창·같은 비교(15:15 포함, 15:20 미포함) — 15:20부터 동시호가라 그 뒤
+# 현재가는 종가가 아니다. 창을 놓친 보유분은 EOD가 exit_next_open으로 표시해
+# 다음날 첫 사이클에 판다. 배포 재생 하네스로 장기 알파 연 -6.7→+2.0%(8/8 경로)
+# (docs/superpowers/specs/2026-10-02-sim11-ma50-close-exit.md).
+MA_EXIT_TIME_WINDOW = ('15:15', '15:20')
 
 MIN_ABOVE_52W_LOW_PCT = 30.0   # 52주 저가 대비 최소 상승폭
 MAX_BELOW_52W_HIGH_PCT = 25.0  # 52주 고가 대비 최대 하락폭
@@ -213,8 +219,41 @@ def load_watchlist(date_str: str) -> dict[str, dict]:
     return entries if isinstance(entries, dict) else {}
 
 
-def decide_minervini(view, candidates, current_prices, funnel=None):
+def _in_ma_exit_window(now):
+    hhmm = now.strftime('%H:%M')
+    return MA_EXIT_TIME_WINDOW[0] <= hhmm < MA_EXIT_TIME_WINDOW[1]
+
+
+def tally_ma50_window(state, now):
+    """마감 창 사이클 수를 state['ma50_window']에 날짜별로 센다.
+
+    날이 바뀐 첫 사이클에 전일 값을 한 줄로 돌려준다(아니면 None). 0회면
+    창을 놓친 날이다 — "창을 놓쳤다"와 "판정했는데 안 걸렸다"는 거래 기록만
+    보면 같은 모양이라 따로 세야 한다. 루프는 런마다 새 프로세스라 메모리가
+    아니라 심 상태 파일(배포됨)에 둔다. 루프가 하루 통째로 안 돈 날은 줄이 없다.
+    """
+    today = now.strftime('%Y-%m-%d')
+    tally = state.get('ma50_window')
+    line = None
+    if not isinstance(tally, dict) or tally.get('date') != today:
+        if isinstance(tally, dict) and tally.get('date'):
+            n = int(tally.get('cycles', 0) or 0)
+            line = (f"[미너비니] {tally['date']} 마감 창 50일선 판정 사이클 {n}회"
+                    + (" — 창 놓침(그 날 보유분은 EOD 표시로 익일 청산)" if n == 0 else ""))
+        tally = {'date': today, 'cycles': 0}
+    if _in_ma_exit_window(now):
+        tally['cycles'] += 1
+    state['ma50_window'] = tally
+    return line
+
+
+def decide_minervini(view, candidates, current_prices, now, funnel=None, notes=None):
     """[Sim11] 미너비니 SEPA/VCP 결정. 순수 함수. Order 리스트 반환.
+
+    now: KST datetime. 손절은 언제나, 50일선 이탈은 마감 창(MA_EXIT_TIME_WINDOW)
+      에서만 본다(진입일 보유분 포함). 감시목록 항목에 exit_next_open이 있으면
+      (EOD가 전일 종가 < ma50으로 표시) 시간과 무관하게 첫 사이클에 판다.
+    notes: 마감 창에서 ma50이 없어 판정을 못 한 보유 종목 메모.
 
     candidates는 get_universe()가 준 감시 목록(code, name, pivot_price, ma50)에
     _enrich_universe가 실시간 price·amount를 채운 것이다 — 무거운 계산
@@ -226,8 +265,9 @@ def decide_minervini(view, candidates, current_prices, funnel=None):
     portfolio = view['portfolio']
     sold = set()
     cand_by_code = {s['code']: s for s in candidates if s.get('code')}
+    closing = _in_ma_exit_window(now)
 
-    # 1. 청산 — 하드손절(가격만으로 판단) / 50일선 이탈(감시 목록의 ma50, 실시간가와 비교)
+    # 1. 청산 — 하드손절(언제나) / 전일 종가 이탈 표시(첫 사이클) / 50일선 이탈(마감 창)
     for code in list(portfolio.keys()):
         p = portfolio[code]
         cur = current_prices.get(code, 0)
@@ -242,10 +282,26 @@ def decide_minervini(view, candidates, current_prices, funnel=None):
                            'cooldown': 3, 'mark_partial': False})
             sold.add(code); continue
 
-        ma50 = (cand_by_code.get(code) or {}).get('ma50')
-        if ma50 is not None and cur < ma50:
+        c = cand_by_code.get(code) or {}
+        # 폴백: 전일 마감 창을 놓쳤거나 15:15 현재가가 종가와 갈려 못 판 보유분.
+        # 사유 문자열을 창 판정과 구분해 둔다 — 판정 경로별 성과를 나눠 봐야 한다.
+        if c.get('exit_next_open'):
             orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
-                           'reason': f"[미너비니] {MA_EXIT_WINDOW}일선 이탈 ({ma50:,.0f} 하회, {pr:+.1f}%)",
+                           'reason': f"[미너비니] {MA_EXIT_WINDOW}일선 이탈(전일 종가 판정, 익일 청산) ({pr:+.1f}%)",
+                           'cooldown': 3, 'mark_partial': False})
+            sold.add(code); continue
+
+        if not closing:
+            continue
+        ma50 = c.get('ma50')
+        if ma50 is None:
+            # 지어낸 값으로 팔지 않는다 — 손절만 유효하다는 사실을 남긴다.
+            if notes is not None:
+                notes.append(f'{code} ma50 없음 — 50일선 판정 불가(손절만 유효)')
+            continue
+        if cur < ma50:
+            orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
+                           'reason': f"[미너비니] {MA_EXIT_WINDOW}일선 이탈(마감 판정) ({ma50:,.0f} 하회, {pr:+.1f}%)",
                            'cooldown': 3, 'mark_partial': False})
             sold.add(code); continue
 
@@ -321,8 +377,10 @@ class MinerviniTrendSimulator(BaseSimulator):
       실시간가로 한다.
     - 진입: 감시 목록에 있고(전날 밤 이미 추세 템플릿+실적 가속+VCP 압축
       통과), 실시간가가 그때 계산한 pivot_price(20일 고점)를 넘으면 산다.
-    - 청산: 하드손절 -7.5%(실시간가) / 실시간가가 감시 목록의 ma50 밑으로
-      내려가면(추세 종료). 고정 익절 없음 — 승자는 끝까지 탄다.
+    - 청산: 하드손절 -7.5%(실시간가, 언제나) / 50일선 이탈(추세 종료) —
+      2026-10-02부터 장중 즉시가 아니라 마감 창(15:15~15:20) 사이클의 현재가로
+      판정하고, 창을 놓친 보유분은 EOD 표시(exit_next_open)로 다음날 첫
+      사이클에 판다. 고정 익절 없음 — 승자는 끝까지 탄다.
     - get_universe()는 감시 목록만 돌려주고 **price를 채우지 않는다** —
       _enrich_universe(trade_engine.py)가 실시간 KIS 시세로 채운다(Sim6와
       같은 공유 보강 경로를 그대로 탄다). 오늘 날짜 감시 목록이 없으면
@@ -343,17 +401,24 @@ class MinerviniTrendSimulator(BaseSimulator):
         entries = load_watchlist(today)
         return [
             {'code': code, 'name': e.get('name', code),
-             'pivot_price': e.get('pivot_price'), 'ma50': e.get('ma50')}
+             'pivot_price': e.get('pivot_price'), 'ma50': e.get('ma50'),
+             # 필드 추가 전 감시목록 파일에는 없다 — 없으면 표시 없음(False).
+             'exit_next_open': e.get('exit_next_open') is True}
             for code, e in entries.items()
         ]
 
     def run(self, candidates, current_prices=None):
         current_prices = current_prices or {}
         self.update_peak_prices(current_prices)
-        funnel = []
+        now = get_kst_now()
+        tally_line = tally_ma50_window(self.state, now)
+        if tally_line:
+            # 하루 한 줄. log_funnel의 details는 후보가 비면 안 찍혀서 직접 찍는다.
+            print(tally_line)
+        funnel, notes = [], []
         orders = decide_minervini(self._view(current_prices), candidates,
-                                  current_prices, funnel=funnel)
-        log_funnel('미너비니', candidates, funnel, orders)
+                                  current_prices, now, funnel=funnel, notes=notes)
+        log_funnel('미너비니', candidates, funnel, orders, details=notes)
         self._apply(orders, current_prices)
         self.save_state(current_prices)
         return self.calculate_stats(current_prices)

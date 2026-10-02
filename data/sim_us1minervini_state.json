@@ -1,0 +1,104 @@
+{
+  "initial_cash": 20000,
+  "cash": 929.2669999999985,
+  "invested": 18759.690000000002,
+  "portfolio": {
+    "EXPD": {
+      "name": "Expeditors International of Washington, Inc. Common Stock",
+      "quantity": 19,
+      "avg_price": 191.53,
+      "entry_date": "2026-08-27",
+      "peak_price": 194.48,
+      "is_scaled_out": false
+    },
+    "DINO": {
+      "name": "HF Sinclair Corporation Common Stock",
+      "quantity": 38,
+      "avg_price": 97.51,
+      "entry_date": "2026-08-27",
+      "peak_price": 118.01,
+      "is_scaled_out": false
+    },
+    "PSX": {
+      "name": "Phillips 66 Common Stock",
+      "quantity": 15,
+      "avg_price": 243.87,
+      "entry_date": "2026-08-27",
+      "peak_price": 276.015,
+      "is_scaled_out": false
+    },
+    "ANET": {
+      "name": "Arista Networks, Inc. Common Stock",
+      "quantity": 19,
+      "avg_price": 203.91,
+      "entry_date": "2026-09-21",
+      "peak_price": 211.53,
+      "is_scaled_out": false
+    },
+    "P": {
+      "name": "Everpure, Inc. Class A common stock",
+      "quantity": 35,
+      "avg_price": 110.94,
+      "entry_date": "2026-09-21",
+      "peak_price": 139.815,
+      "is_scaled_out": false
+    }
+  },
+  "peak_nav": 21660.453,
+  "total_fees": 7.344450000000001,
+  "history": [
+    20000
+  ],
+  "daily_trades": [
+    {
+      "date": "2026-09-18",
+      "is_win": false
+    },
+    {
+      "date": "2026-09-21",
+      "is_win": false
+    }
+  ],
+  "cooldown_codes": {
+    "RGA": "2026-09-21",
+    "VG": "2026-09-24"
+  },
+  "raw_stats": {
+    "cash": 929.2669999999985,
+    "total_asset": 21529.022,
+    "profit_rate": 7.645110000000003,
+    "holdings_count": 5,
+    "win_rate": 0.0,
+    "profit_factor": 0.0,
+    "mdd": 0.6067786301606919,
+    "turnover": 1.6780529999999998,
+    "frequency": 0.24324324324324326,
+    "total_fees": 7.344450000000001,
+    "current_prices": {
+      "FTNT": 182.05,
+      "EXPD": 193.08,
+      "ANET": 206.025,
+      "XOM": 163.645,
+      "HPE": 68.85,
+      "SNOW": 340.205,
+      "DINO": 111.945,
+      "LITE": 1077.28,
+      "NVDA": 234.75,
+      "PAYC": 224.02,
+      "AAPL": 331.605,
+      "MRVL": 273.095,
+      "PSX": 261.35,
+      "P": 138.36,
+      "RBRK": 116.98,
+      "SMTC": 199.545,
+      "DXCM": 85.85
+    }
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 0.0,
+    "MDD": 98.17966410951793,
+    "거래빈도": 1.2162162162162162,
+    "자본회전율": 3.3561059999999996
+  }
+}

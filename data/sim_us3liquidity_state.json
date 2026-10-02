@@ -1,0 +1,104 @@
+{
+  "initial_cash": 20000,
+  "cash": 1937.3549999999996,
+  "invested": 18133.73,
+  "portfolio": {
+    "MU": {
+      "name": "Micron Technology, Inc. Common Stock",
+      "quantity": 4,
+      "avg_price": 938.84,
+      "entry_date": "2026-08-27",
+      "peak_price": 1107.02,
+      "is_scaled_out": false
+    },
+    "NVDA": {
+      "name": "NVIDIA Corporation Common Stock",
+      "quantity": 18,
+      "avg_price": 210.25,
+      "entry_date": "2026-08-27",
+      "peak_price": 237.66,
+      "is_scaled_out": false
+    },
+    "SNDK": {
+      "name": "Sandisk Corporation Common Stock",
+      "quantity": 2,
+      "avg_price": 1503.99,
+      "entry_date": "2026-08-27",
+      "peak_price": 1906.649,
+      "is_scaled_out": false
+    },
+    "AAPL": {
+      "name": "Apple Inc. Common Stock",
+      "quantity": 12,
+      "avg_price": 313.32,
+      "entry_date": "2026-08-27",
+      "peak_price": 343.687,
+      "is_scaled_out": false
+    },
+    "TSLA": {
+      "name": "Tesla, Inc. Common Stock",
+      "quantity": 10,
+      "avg_price": 382.605,
+      "entry_date": "2026-09-25",
+      "peak_price": 382.605,
+      "is_scaled_out": false
+    }
+  },
+  "peak_nav": 22118.74,
+  "total_fees": 17.7648,
+  "history": [
+    20000
+  ],
+  "daily_trades": [
+    {
+      "date": "2026-09-25",
+      "is_win": true
+    }
+  ],
+  "cooldown_codes": {},
+  "rebalance": {
+    "elapsed": 5,
+    "last_seen": "20261002"
+  },
+  "raw_stats": {
+    "cash": 1937.3549999999996,
+    "total_asset": 21601.835,
+    "profit_rate": 8.009174999999995,
+    "holdings_count": 5,
+    "win_rate": 100.0,
+    "profit_factor": 99.0,
+    "mdd": 2.3369549983407847,
+    "turnover": 1.2559529999999999,
+    "frequency": 0.1891891891891892,
+    "total_fees": 17.7648,
+    "current_prices": {
+      "GOOG": 339.38,
+      "TSM": 470.2,
+      "META": 731.035,
+      "GOOGL": 342.38,
+      "SNDK": 1718.46,
+      "AAPL": 331.74,
+      "MRVL": 273.0,
+      "AMZN": 251.04,
+      "AVGO": 352.28,
+      "INTC": 122.335,
+      "ORCL": 141.385,
+      "MU": 1075.855,
+      "TSLA": 371.56,
+      "DELL": 559.98,
+      "MSFT": 515.37,
+      "LITE": 1079.04,
+      "NVDA": 234.87,
+      "AMD": 635.21,
+      "PLTR": 191.26,
+      "BE": 289.891
+    }
+  },
+  "normalized_stats": {
+    "승률": 100,
+    "수익팩터": 100,
+    "MDD": 92.98913500497764,
+    "거래빈도": 0.945945945945946,
+    "자본회전율": 2.5119059999999998
+  }
+}

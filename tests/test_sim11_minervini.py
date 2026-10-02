@@ -1,4 +1,5 @@
 import os, sys
+from datetime import datetime
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -13,6 +14,10 @@ from src.strategy.simulators.sim11_minervini import (
 def _view(portfolio, nav=3_000_000):
     return {'portfolio': portfolio, 'cash': nav, 'initial_cash': 3_000_000, 'nav': nav,
             'cooldown_codes': {}, 'market_index_healthy': True}
+
+
+MID = datetime(2026, 10, 2, 10, 0)      # 장중(마감 창 밖)
+CLOSE = datetime(2026, 10, 2, 15, 16)   # 마감 창 안
 
 
 def _rising_closes(n=200, start=100.0, step=0.5):
@@ -178,35 +183,35 @@ def _watch_stock(**kw):
 
 
 def test_entry_when_price_crosses_pivot_live():
-    orders = decide_minervini(_view({}), [_watch_stock()], {'T001': 210.0})
+    orders = decide_minervini(_view({}), [_watch_stock()], {'T001': 210.0}, MID)
     b = _buys(orders)
     assert len(b) == 1 and 'pivot' in b[0]['reason']
 
 
 def test_no_entry_when_price_has_not_reached_pivot():
-    orders = decide_minervini(_view({}), [_watch_stock(price=199.0)], {'T001': 199.0})
+    orders = decide_minervini(_view({}), [_watch_stock(price=199.0)], {'T001': 199.0}, MID)
     assert _buys(orders) == []
 
 
 def test_no_entry_exactly_at_pivot():
     """같아도 돌파가 아니다 — 초과해야 한다."""
-    orders = decide_minervini(_view({}), [_watch_stock(price=200.0)], {'T001': 200.0})
+    orders = decide_minervini(_view({}), [_watch_stock(price=200.0)], {'T001': 200.0}, MID)
     assert _buys(orders) == []
 
 
 def test_no_entry_when_illiquid():
-    orders = decide_minervini(_view({}), [_watch_stock(amount=500_000_000)], {'T001': 210.0})
+    orders = decide_minervini(_view({}), [_watch_stock(amount=500_000_000)], {'T001': 210.0}, MID)
     assert _buys(orders) == []
 
 
 def test_no_entry_without_pivot_price():
     """감시목록에 없는(pivot_price 결손) 종목은 자격이 없다."""
-    orders = decide_minervini(_view({}), [_watch_stock(pivot_price=None)], {'T001': 210.0})
+    orders = decide_minervini(_view({}), [_watch_stock(pivot_price=None)], {'T001': 210.0}, MID)
     assert _buys(orders) == []
 
 
 def test_entry_takes_full_position_weight():
-    orders = decide_minervini(_view({}), [_watch_stock()], {'T001': 210.0})
+    orders = decide_minervini(_view({}), [_watch_stock()], {'T001': 210.0}, MID)
     b = _buys(orders)[0]
     assert b['quantity'] == int(3_000_000 * POSITION_WEIGHT / 210.0)
 
@@ -214,7 +219,7 @@ def test_entry_takes_full_position_weight():
 def test_max_holdings_caps_entries():
     stocks = [_watch_stock(code=f'T{i:03d}') for i in range(7)]
     prices = {s['code']: 210.0 for s in stocks}
-    orders = decide_minervini(_view({}), stocks, prices)
+    orders = decide_minervini(_view({}), stocks, prices, MID)
     assert len(_buys(orders)) == 5   # MAX_HOLDINGS
 
 
@@ -227,25 +232,96 @@ def test_hard_stop_fires():
     avg = 1000.0
     stop_price = avg * (1 + STOP_PCT / 100) - 1
     orders = decide_minervini(_view(_held(avg=avg)), [_watch_stock(price=stop_price)],
-                              {'T001': stop_price})
+                              {'T001': stop_price}, MID)
     s = _sells(orders)
     assert len(s) == 1 and '손절' in s[0]['reason']
 
 
-def test_exit_below_50day_ma():
-    """MA50(감시목록 값) 아래로 실시간가가 내려오면 판다 — 하드손절 폭 안쪽이어도."""
+# 2026-10-02: 50일선 이탈은 장중 즉시 → 마감 창(15:15~15:20) 판정 + EOD 표시
+# 익일 첫 사이클 폴백으로 바뀌었다(docs/superpowers/specs/2026-10-02-sim11-ma50-close-exit.md).
+# 손절(-7.5%)은 여전히 언제나 본다.
+def test_ma50_break_outside_window_does_not_sell():
+    """장중(10:00)에 실시간가가 ma50 밑이어도 팔지 않는다 — 마감 창에서만 본다."""
     below_ma = 149.0   # ma50=150
     orders = decide_minervini(_view(_held(avg=155.0)), [_watch_stock(price=below_ma)],
-                              {'T001': below_ma})
+                              {'T001': below_ma}, MID)
+    assert _sells(orders) == []
+
+
+def test_hard_stop_fires_outside_window():
+    avg = 1000.0
+    stop_price = avg * (1 + STOP_PCT / 100) - 1
+    orders = decide_minervini(_view(_held(avg=avg)), [_watch_stock(price=stop_price, ma50=2000.0)],
+                              {'T001': stop_price}, datetime(2026, 10, 2, 9, 1))
     s = _sells(orders)
-    assert len(s) == 1 and '50일선 이탈' in s[0]['reason']
+    assert len(s) == 1 and '손절' in s[0]['reason']
+
+
+def test_exit_below_50day_ma_in_closing_window():
+    """MA50(감시목록 값) 아래면 마감 창 사이클에 판다 — 하드손절 폭 안쪽이어도."""
+    below_ma = 149.0
+    orders = decide_minervini(_view(_held(avg=155.0)), [_watch_stock(price=below_ma)],
+                              {'T001': below_ma}, CLOSE)
+    s = _sells(orders)
+    assert len(s) == 1 and '50일선 이탈(마감 판정)' in s[0]['reason']
+
+
+def test_closing_window_bounds_match_sim14():
+    """15:15 포함, 15:20 미포함(동시호가) — Sim14 EXIT_WINDOW와 같은 비교."""
+    from src.strategy.simulators.sim14_squeeze_breakout import EXIT_WINDOW
+    assert sim11.MA_EXIT_TIME_WINDOW == EXIT_WINDOW == ('15:15', '15:20')
+    below_ma = 149.0
+
+    def sells_at(h, m):
+        return _sells(decide_minervini(_view(_held(avg=155.0)), [_watch_stock(price=below_ma)],
+                                       {'T001': below_ma}, datetime(2026, 10, 2, h, m)))
+    assert sells_at(15, 14) == []
+    assert len(sells_at(15, 15)) == 1
+    assert len(sells_at(15, 19)) == 1
+    assert sells_at(15, 20) == []
+
+
+def test_ma50_missing_in_window_does_not_sell_and_notes_it():
+    """ma50 결손이면 판정 불가 — 지어내서 팔지 않고 사유를 남긴다."""
+    notes = []
+    orders = decide_minervini(_view(_held(avg=155.0)), [_watch_stock(price=149.0, ma50=None)],
+                              {'T001': 149.0}, CLOSE, notes=notes)
+    assert _sells(orders) == []
+    assert any('T001' in n and 'ma50' in n for n in notes)
+
+
+def test_exit_next_open_sells_on_first_morning_cycle():
+    """EOD가 '전일 종가 < ma50'으로 표시한 보유분은 창 밖(09:01)이어도 첫 사이클에 판다."""
+    above_ma = 160.0   # 오늘 실시간가는 ma50 위여도 표시가 우선한다
+    orders = decide_minervini(_view(_held(avg=155.0)),
+                              [_watch_stock(price=above_ma, exit_next_open=True)],
+                              {'T001': above_ma}, datetime(2026, 10, 2, 9, 1))
+    s = _sells(orders)
+    assert len(s) == 1
+    assert '50일선 이탈(전일 종가 판정, 익일 청산)' in s[0]['reason']
+
+
+def test_exit_next_open_and_window_break_sell_once():
+    """표시와 창 판정이 같은 사이클에 겹쳐도 매도는 한 번."""
+    below_ma = 149.0
+    orders = decide_minervini(_view(_held(avg=155.0)),
+                              [_watch_stock(price=below_ma, exit_next_open=True)],
+                              {'T001': below_ma}, CLOSE)
+    assert len(_sells(orders)) == 1
+
+
+def test_exit_next_open_without_live_price_does_not_sell():
+    """현재가 결손(0)이면 표시가 있어도 팔지 않는다 — 다음 사이클에 다시 본다."""
+    orders = decide_minervini(_view(_held(avg=155.0)),
+                              [_watch_stock(exit_next_open=True)], {}, datetime(2026, 10, 2, 9, 1))
+    assert _sells(orders) == []
 
 
 def test_no_fixed_take_profit():
     """미너비니 철학 — 승자는 끝까지 탄다. 고정 익절 없음."""
     far_above = 1000.0
     orders = decide_minervini(_view(_held(avg=180.0)), [_watch_stock(price=far_above)],
-                              {'T001': far_above})
+                              {'T001': far_above}, CLOSE)
     assert _sells(orders) == []
 
 
@@ -253,7 +329,7 @@ def test_holding_absent_from_candidates_is_not_touched():
     """오늘 후보에 없으면 ma50을 알 수 없다 — 손절폭 밖이면 없는 근거로 팔지 않는다."""
     orders = decide_minervini(
         _view({'ZZZ': {'name': 'x', 'quantity': 10, 'avg_price': 100, 'peak_price': 100}}),
-        [], {'ZZZ': 98})
+        [], {'ZZZ': 98}, CLOSE)
     assert _sells(orders) == []
 
 
@@ -266,8 +342,65 @@ def test_get_universe_returns_watchlist_without_price():
     with mock.patch.object(sim11, 'load_watchlist',
                            return_value={'T001': {'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}}):
         universe = sim.get_universe()
-    assert universe == [{'code': 'T001', 'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0}]
+    # exit_next_open 필드가 없는 옛 감시목록 파일도 그대로 읽힌다(False).
+    assert universe == [{'code': 'T001', 'name': '추세주', 'pivot_price': 200.0, 'ma50': 150.0,
+                         'exit_next_open': False}]
     assert 'price' not in universe[0]
+
+
+def test_get_universe_carries_exit_next_open_flag():
+    from src.strategy.simulators.sim11_minervini import MinerviniTrendSimulator
+    sim = object.__new__(MinerviniTrendSimulator)
+    with mock.patch.object(sim11, 'load_watchlist',
+                           return_value={'T001': {'name': '보유주', 'pivot_price': None, 'ma50': 150.0,
+                                                  'exit_next_open': True}}):
+        universe = sim.get_universe()
+    assert universe[0]['exit_next_open'] is True
+    assert universe[0]['pivot_price'] is None   # 보유 전용 항목 — 재매수 불가 그대로
+
+
+def test_old_watchlist_file_without_flag_loads(tmp_path):
+    """필드 추가 전 포맷 파일(exit_next_open 없음)도 load_watchlist가 그대로 돌려준다."""
+    import json as _json
+    path = tmp_path / 'w.json'
+    path.write_text(_json.dumps({'date': '20261002', 'entries': {
+        'T001': {'name': 'x', 'pivot_price': None, 'ma50': 150.0}}}), encoding='utf-8')
+    with mock.patch.object(sim11, 'WATCHLIST_PATH', str(path)):
+        assert load_watchlist('20261002') == {'T001': {'name': 'x', 'pivot_price': None, 'ma50': 150.0}}
+
+
+# ── 마감 창 판정 사이클 수(하루 한 줄) ────────────────────
+# "창을 놓쳤다"와 "판정했는데 안 걸렸다"는 같은 모양이다(skip-and-nonfire-look-alike).
+# 창 안 사이클 수를 state에 날짜별로 세고, 날이 바뀐 첫 사이클에 전일 값을 한 줄 남긴다.
+def test_tally_counts_window_cycles_and_reports_on_next_day():
+    from src.strategy.simulators.sim11_minervini import tally_ma50_window
+    state = {}
+    assert tally_ma50_window(state, datetime(2026, 10, 1, 9, 0)) is None
+    assert tally_ma50_window(state, datetime(2026, 10, 1, 15, 15)) is None
+    assert tally_ma50_window(state, datetime(2026, 10, 1, 15, 17)) is None
+    assert tally_ma50_window(state, datetime(2026, 10, 1, 15, 20)) is None   # 창 밖
+    assert state['ma50_window'] == {'date': '2026-10-01', 'cycles': 2}
+    line = tally_ma50_window(state, datetime(2026, 10, 2, 9, 0))
+    assert '2026-10-01' in line and '2회' in line and '놓침' not in line
+    assert state['ma50_window'] == {'date': '2026-10-02', 'cycles': 0}
+
+
+def test_tally_zero_cycles_reports_missed_window():
+    from src.strategy.simulators.sim11_minervini import tally_ma50_window
+    state = {'ma50_window': {'date': '2026-10-01', 'cycles': 0}}
+    line = tally_ma50_window(state, datetime(2026, 10, 2, 9, 0))
+    assert '0회' in line and '창 놓침' in line
+
+
+def test_run_prints_daily_tally_line(capsys):
+    from src.strategy.simulators.sim11_minervini import MinerviniTrendSimulator
+    sim = object.__new__(MinerviniTrendSimulator)
+    sim.state = {'ma50_window': {'date': '2026-10-01', 'cycles': 3}}
+    with mock.patch.object(sim11, 'get_kst_now', return_value=datetime(2026, 10, 2, 9, 1)),             mock.patch.object(MinerviniTrendSimulator, 'update_peak_prices'),             mock.patch.object(MinerviniTrendSimulator, '_view', return_value=_view({})),             mock.patch.object(MinerviniTrendSimulator, '_apply'),             mock.patch.object(MinerviniTrendSimulator, 'save_state'),             mock.patch.object(MinerviniTrendSimulator, 'calculate_stats', return_value={}):
+        sim.run([], {})
+    out = capsys.readouterr().out
+    assert '2026-10-01' in out and '3회' in out
+    assert sim.state['ma50_window'] == {'date': '2026-10-02', 'cycles': 0}
 
 
 def test_get_universe_empty_without_todays_watchlist():

@@ -257,6 +257,28 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
     return out
 
 
+def _flag_sim11_exit_next_open(entry: dict, cand: dict, log=print) -> None:
+    """보유 종목의 오늘 종가가 오늘 루프가 쓴 ma50 밑이면 exit_next_open=True.
+
+    심11은 50일선 이탈을 마감 창(15:15~15:20)에서만 판정한다. 창을 놓쳤거나
+    15:15 현재가가 종가와 갈려 못 판 보유분을 다음날 첫 사이클에 팔게 하는
+    폴백이다. 비교 기준 ma50은 **오늘 종가 제외** 50일(= 오늘 감시목록이 준
+    값, 창 판정이 쓴 값)이다 — entry['ma50'](오늘 포함, 내일 쓸 값)이 아니다.
+
+    EOD는 하루 두 번(16시 런, 21~23시 cron) 같은 날을 확정할 수 있고 종가가
+    달라질 수 있다. 감시목록 파일은 마지막 런이 덮어쓰므로 표시도 마지막 런
+    기준이다. 판정 규칙(종가 < ma50)은 어느 런이든 같다.
+    """
+    price = float(cand.get('price', 0) or 0)
+    ma50_today = _sim11_sma(cand.get('daily_closes') or [], SIM11_MA_EXIT_WINDOW)
+    if price <= 0 or ma50_today is None:
+        # 지어내지 않는다 — 표시 없이 넘어가되 흔적을 남긴다.
+        log(f"[EOD] 심11 보유 {cand.get('code')} — 종가/ma50 측정 불가로 익일 청산 판정 불가")
+        return
+    if price < ma50_today:
+        entry['exit_next_open'] = True
+
+
 def build_sim11_watchlist(candidates: list[dict], log=print,
                           held_codes=()) -> dict[str, dict]:
     """Sim11 후보들에서 감시 목록(오늘 밤 기준, 내일부터 쓸 pivot_price·ma50)을 만든다.
@@ -278,6 +300,8 @@ def build_sim11_watchlist(candidates: list[dict], log=print,
         entry = build_watchlist_entry(c, funnel=funnel)
         if entry:
             entries[c['code']] = entry
+            if c['code'] in held_codes:
+                _flag_sim11_exit_next_open(entry, c, log)
             continue
         # 자격을 잃은 **보유** 종목은 ma50만 실어 남긴다 — 청산 전용 항목.
         # decide_minervini의 50일선 이탈 청산은 오늘 감시 목록에서 ma50을 읽는데,
@@ -294,6 +318,7 @@ def build_sim11_watchlist(candidates: list[dict], log=print,
             continue
         entries[c['code']] = {'name': c.get('name', c['code']),
                               'pivot_price': None, 'ma50': ma50}
+        _flag_sim11_exit_next_open(entries[c['code']], c, log)
 
     # Actions 로그는 며칠 뒤 사라지므로 diag_id로 db-data에도 남긴다.
     from src.strategy.simulators.base_simulator import log_funnel

@@ -66,7 +66,7 @@ def test_constants_match_spec():
     assert s5.ENTRY_RSI2_MAX == 15.0 and s5.EXIT_RSI2_MIN == 70.0
     assert s5.STOP_PCT == -5.0 and s5.TIMEOUT_DAYS == 10
     assert not hasattr(s5, 'TRAIL_ARM_RATIO') and not hasattr(s5, 'TRAIL_CALLBACK_PCT')
-    assert s5.ALLOWED_REGIMES6 == frozenset({'WEAK_SIDEWAYS', 'BEAR', 'STRONG_BEAR'})
+    assert s5.ALLOWED_REGIMES6 == frozenset({'BEAR', 'STRONG_BEAR'})  # 10-02 G2
 
 
 # ── RSI2 정의(§7 · §8) ───────────────────────────────────────────────

@@ -154,13 +154,13 @@ simulators:
   - id: "sim5_sideways"
     module: "src.strategy.simulators.sim5_sideways_swing"
     class: "SidewaysSwingSimulator"
-    description: "레인지 저점형 - 20일 채널 저점 +3% 이내 + RSI2<15 과매도 진입, RSI2>70·-5% 손절·10일 청산 (리베로 약한횡보·하락·매우하락에서만 진입)"
+    description: "레인지 저점형 - 20일 채널 저점 +3% 이내 + RSI2<15 과매도 진입, RSI2>70·-5% 손절·10일 청산 (리베로 하락·매우하락에서만 진입)"
     state_file: "sim_sideways_state.json"
     csv_file: "trade_history_sim_sideways.csv"
     label: "추세 눌림목형 (Sim 5)"
     display_order: 50
     ui_key: "sim5"
-    short_desc: "채널 저점+RSI2 과매도 진입 · RSI2>70/-5%/10일 청산 · 약한횡보+하락계만"
+    short_desc: "채널 저점+RSI2 과매도 진입 · RSI2>70/-5%/10일 청산 · 하락계만"
     chart_group: 2
     color: "yellow"
     active: true

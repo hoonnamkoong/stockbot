@@ -186,7 +186,7 @@ def test_sim10_can_buy_in_each_regime(tmp_path, monkeypatch, regime, maker):
     국면(약한횡보)으로 고정한다. 게이트 자체는 test_sim10_regime_gate.py가 본다."""
     from src.strategy.simulators import sim10_orchestrator
     from src.strategy.simulators.sim10_orchestrator import Sim10OrchestratorSimulator
-    monkeypatch.setattr(sim10_orchestrator, 'read_regime6_confirmed', lambda *a, **k: 'WEAK_SIDEWAYS')
+    monkeypatch.setattr(sim10_orchestrator, 'read_regime6_confirmed', lambda *a, **k: 'BEAR')  # 10-02 G2: 허용 국면=하락계
     s = _sim(Sim10OrchestratorSimulator, tmp_path)
     s._read_regime = lambda: (regime, 70.0)
     cands = [maker(i) for i in range(8)]

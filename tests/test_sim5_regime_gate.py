@@ -72,7 +72,7 @@ def _held():
                        'is_scaled_out': False}}
 
 
-@pytest.mark.parametrize('r6', ['WEAK_SIDEWAYS', 'BEAR', 'STRONG_BEAR'])
+@pytest.mark.parametrize('r6', ['BEAR', 'STRONG_BEAR'])
 def test_entry_in_allowed_regimes(r6):
     with tempfile.TemporaryDirectory() as d:
         sim = _sim(d, regime6=r6)
@@ -80,7 +80,8 @@ def test_entry_in_allowed_regimes(r6):
         assert '222' in sim.state['portfolio']
 
 
-@pytest.mark.parametrize('r6', ['STRONG_SIDEWAYS', 'BULL', 'STRONG_BULL'])
+# 2026-10-02 약한횡보도 차단(G2) — 장기 검증에서 약한횡보 진입은 모든 패널에서 손해였다.
+@pytest.mark.parametrize('r6', ['WEAK_SIDEWAYS', 'STRONG_SIDEWAYS', 'BULL', 'STRONG_BULL'])
 def test_no_entry_in_blocked_regimes(r6):
     with tempfile.TemporaryDirectory() as d:
         sim = _sim(d, regime6=r6)
@@ -102,13 +103,13 @@ def test_no_entry_when_regime6_undeterminable(setup):
 
 
 def test_gate_reads_prev_confirmed_not_intraday():
-    """장중 강한횡보·전일 약한횡보 → 진입(전일 기준). 반대면 차단."""
+    """장중 강한횡보·전일 하락 → 진입(전일 기준). 장중 하락·전일 약한횡보면 차단."""
     with tempfile.TemporaryDirectory() as d:
-        sim = _sim(d, regime6='WEAK_SIDEWAYS', intraday='STRONG_SIDEWAYS')
+        sim = _sim(d, regime6='BEAR', intraday='STRONG_SIDEWAYS')
         sim.run(_cand(), current_prices={'222': 1000})
         assert '222' in sim.state['portfolio']
     with tempfile.TemporaryDirectory() as d:
-        sim = _sim(d, regime6='STRONG_SIDEWAYS', intraday='WEAK_SIDEWAYS')
+        sim = _sim(d, regime6='WEAK_SIDEWAYS', intraday='BEAR')
         sim.run(_cand(), current_prices={'222': 1000})
         assert sim.state['portfolio'] == {}
 
@@ -131,6 +132,6 @@ def test_stop_loss_still_fires_when_entry_blocked(r6):
 
 
 def test_entry_allowed_helper():
-    assert entry_allowed('WEAK_SIDEWAYS') and entry_allowed('BEAR') and entry_allowed('STRONG_BEAR')
-    for r in ('STRONG_SIDEWAYS', 'BULL', 'STRONG_BULL', None, 'SIDEWAYS', ''):
+    assert entry_allowed('BEAR') and entry_allowed('STRONG_BEAR')
+    for r in ('WEAK_SIDEWAYS', 'STRONG_SIDEWAYS', 'BULL', 'STRONG_BULL', None, 'SIDEWAYS', ''):
         assert not entry_allowed(r)

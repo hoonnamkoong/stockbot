@@ -5,6 +5,7 @@ import statistics
 
 from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 from .. import regime_state as rs
+from src import market_calendar
 
 _cooldown_active = BaseSimulator.cooldown_active
 
@@ -12,6 +13,11 @@ _cooldown_active = BaseSimulator.cooldown_active
 # §5.1(격자)·§7.1(의사코드)의 값을 그대로 옮겼다. 바꾸면 설계서의 백테스트
 # (top100 강한횡보 n=168, 건당 +2.51%, 일별 클러스터 t=+2.67)가 이 코드를
 # 더는 설명하지 않는다.
+# [2026-10-02 정정] 위 n=168·t=2.67은 **슬롯 제약 없는 신호 목록** 기준이다. 실제 5슬롯
+# Sim14는 같은 창에서 t 1.80·NAV +40%·MDD −11%다. 장기(2005~, 폐지 보정)로는 β조정
+# 알파 +0.2%/년(t 0.10)이고, 신호 품질은 강한횡보(t 1.85)가 기타 국면(t 4.20)보다
+# 낮다 — 게이트는 알파가 아니라 β·MDD를 줄이는 역할이다
+# (docs/superpowers/specs/2026-10-02-sim14-replay-validation.md).
 MAX_HOLDINGS = 5
 POSITION_WEIGHT = 0.19          # 종목당 NAV 대비 비중 (전 심 통일)
 MIN_AMT5 = 1_000_000_000        # 전일까지 5일 평균 거래대금 하한(설계서 §2 유니버스 필터)
@@ -34,9 +40,17 @@ EXIT_WINDOW = ('15:15', '15:20')
 # 운영 리베로·심9-1과 같은 모집단). trading.yml이 db-data의 data/를 통째로 받으므로
 # 60초 루프에서 KIS 추가 호출 없이 읽힌다.
 OHLCV_FILENAME = 'ohlcv_top100.csv'
-# 마지막 확정 봉이 이보다 오래되면 EOD가 멈춘 것이다 — 옛 20일 고가·분위로
-# 사지 않는다. 추석(5일 연휴 + 주말)을 넘기는 값으로 잡았다.
-STALE_CSV_DAYS = 7
+# 마지막 확정 봉 다음 날부터 어제까지 **거래일**이 이만큼 비면 EOD가 멈춘 것이다 —
+# 옛 20일 고가·분위로 사지 않는다. 하루 결손(1)은 봐준다.
+# [2026-10-02 정정] 예전엔 달력일 7(STALE_CSV_DAYS)이었다. 2025 추석(마지막 봉 10/02 →
+# 10/10, 8일)에 걸려 정상 신호(241560 +10.3%)를 놓쳤고 보유분 MA10·만기 판정도
+# 건너뛰었다(docs/superpowers/specs/2026-10-02-sim14-replay-validation.md §4.2).
+# 휴장 판정은 KIS chk-holiday 달력(opnd_yn)만 믿는다.
+STALE_TRADING_DAYS = 2
+# 달력이 모르는 날이 끼면(판정 불가 ≠ 개장) 평일을 거래일로 근사하고 연휴 여유를 둔다.
+# 평일 8개 ≈ 달력일 12. 역대 최장 공백(2017 추석, 평일 6개)을 넘는다.
+STALE_FALLBACK_WEEKDAYS = 8
+CALENDAR_FILENAME = 'market_calendar.json'
 
 
 def _fn(funnel, code, reason, **vals):
@@ -52,6 +66,28 @@ def _fn(funnel, code, reason, **vals):
 
 
 # ── 확정 일봉 ────────────────────────────────────────────────────
+def csv_staleness(last_iso, today, calendar):
+    """(낡음 여부, 판정 경로, 결손 거래일 수).
+
+    마지막 확정 봉 다음 날부터 **어제까지** 개장일을 센다(오늘 봉은 원래 없다).
+    달력이 전부 아는 구간이면 'calendar' — STALE_TRADING_DAYS 이상이면 낡음.
+    하루라도 모르면 'weekday_approx' — 모르는 날은 평일=개장으로 세고(더 엄격),
+    문턱은 STALE_FALLBACK_WEEKDAYS로 넓힌다. 근사가 연휴를 결손으로 세기 때문이다.
+    """
+    day = dt.date.fromisoformat(last_iso) + dt.timedelta(days=1)
+    missed, approx = 0, False
+    while day < today:
+        verdict = market_calendar.lookup(calendar, day.strftime('%Y%m%d'))
+        if verdict is None:
+            approx = True
+            verdict = day.weekday() < 5
+        missed += 1 if verdict else 0
+        day += dt.timedelta(days=1)
+    if approx:
+        return missed >= STALE_FALLBACK_WEEKDAYS, 'weekday_approx', missed
+    return missed >= STALE_TRADING_DAYS, 'calendar', missed
+
+
 def _num(v):
     try:
         x = float(v)
@@ -210,6 +246,10 @@ def decide_sim14(view, candidates, current_prices, entry_allowed, now, funnel=No
             continue
         if not closing:
             continue
+        # 진입 당일은 MA10·만기를 안 본다 — R4 백테스트는 다음 날부터 청산을 봤다.
+        # 당일 판정 때문에 5건이 당일 청산돼 건당 −0.24%p였다(재생 검증 §4.1).
+        if p.get('entry_date') == now.strftime('%Y-%m-%d'):
+            continue
         c = cand_by_code.get(code) or {}
         closes9, bar_dates = c.get('closes9'), c.get('bar_dates')
         if not closes9 or bar_dates is None:
@@ -293,6 +333,7 @@ class SqueezeBreakoutSimulator(BaseSimulator):
     - 진입: 전일 확정 6단계가 강한횡보일 때만, 실시간 현재가 > hi20.
       현재가는 _enrich_universe(trade_engine)가 KIS 실시간 시세로 채운다(심11과 같은 경로).
     - 청산(국면 무관): -5% 손절 즉시 / 15:15~15:20 루프에서 현재가 < MA10 또는 10거래일 만기.
+      MA10·만기는 진입 다음 날부터 본다(R4 백테스트와 같다). 손절은 진입 당일에도 본다.
       청산한 종목은 그날 재진입 금지(쿨다운 1일 = 백테스트의 '다음 날부터 재진입').
     - 페이퍼 관찰 단계(tradeable: false).
     """
@@ -300,6 +341,7 @@ class SqueezeBreakoutSimulator(BaseSimulator):
     def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Squeeze", initial_cash)
         self._pre_funnel = []
+        self._csv_note = None
 
     def _regime6_prev(self):
         return rs.read_regime6_confirmed(self.data_dir)
@@ -311,13 +353,19 @@ class SqueezeBreakoutSimulator(BaseSimulator):
         보강(네이버·KIS 호출)할 이유가 없다.
         """
         self._pre_funnel = []
+        self._csv_note = None
         today = get_kst_now().date()
         portfolio = self.state.get('portfolio', {})
         daily = load_daily_bars(os.path.join(self.data_dir, OHLCV_FILENAME), today)
         if daily:
             last = max(b['dates'][-1] for b in daily.values() if b['dates'])
-            if (today - dt.date.fromisoformat(last)).days > STALE_CSV_DAYS:
-                _fn(self._pre_funnel, '_csv', 'stale_daily_csv', last=last)
+            calendar = market_calendar.load_calendar(
+                os.path.join(self.data_dir, CALENDAR_FILENAME))
+            stale, mode, missed = csv_staleness(last, today, calendar)
+            self._csv_note = f'일봉 마지막 {last}, 결손 거래일 {missed} (판정 {mode})'
+            if stale:
+                _fn(self._pre_funnel, '_csv', 'stale_daily_csv', last=last,
+                    mode=mode, missed=missed)
                 daily = None
         else:
             _fn(self._pre_funnel, '_csv', 'no_daily_csv')
@@ -353,6 +401,8 @@ class SqueezeBreakoutSimulator(BaseSimulator):
         orders = decide_sim14(self._view(current_prices), candidates, current_prices,
                               entry_gate(regime6), get_kst_now(), funnel=funnel, notes=notes)
         pre = list(self._pre_funnel)
+        if self._csv_note:
+            notes.insert(0, self._csv_note)
         # diag_id(심별 진단 CSV)는 쓰지 않는다 — 그러면 trade_loop.DIAG_LOG_SIM_IDS와
         # scraper.yml 배포 제외 목록 두 곳에 하드코딩이 늘어난다. 깔때기는
         # log_funnel이 전 심 공용 결정 스냅샷(decision_log)에 이미 남긴다.

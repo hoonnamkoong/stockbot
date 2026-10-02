@@ -98,7 +98,8 @@ def test_confirmed_regime_keeps_bull_score():
 _BOX = [1100, 1200, 1150, 1200, 1100, 1180, 1050, 1160, 1100, 1200,
         1150, 1190, 1100, 1160, 1080, 1060, 1040, 1025, 1010, 1000]
 _BASE6 = {'WEAK_SIDEWAYS': {'level': 0, 'vol10': 0.5},
-          'STRONG_SIDEWAYS': {'level': 0, 'vol10': 1.5}}
+          'STRONG_SIDEWAYS': {'level': 0, 'vol10': 1.5},
+          'BEAR': {'level': -1, 'vol10': 1.0}}   # 전일 확정 하락 — 3단계는 오늘 SIDEWAYS로 바뀐 전환일
 
 
 def _sideways_sim(tmpdir, base6, intraday=None):
@@ -117,7 +118,8 @@ def _box_cand():
 
 
 @pytest.mark.parametrize('base6,intraday,expect_buy', [
-    ('WEAK_SIDEWAYS', 'STRONG_SIDEWAYS', True),    # 전일 기준 — 장중 값은 안 본다
+    ('BEAR', 'STRONG_SIDEWAYS', True),             # 전일 기준 — 장중 값은 안 본다
+    ('WEAK_SIDEWAYS', 'BEAR', False),              # 10-02 G2: 약한횡보도 차단
     ('STRONG_SIDEWAYS', 'WEAK_SIDEWAYS', False),
     ('STRONG_SIDEWAYS', None, False),
     (None, 'WEAK_SIDEWAYS', False),                # base 없음 → 판정 불가 → 진입 금지
@@ -150,7 +152,7 @@ def test_sideways_delegate_passes_gate_value():
         _, side, _ = _run_watching_strategies(sim)
         assert side.call_args.kwargs['allow_entry'] is False
     with tempfile.TemporaryDirectory() as d:
-        sim = _sideways_sim(d, 'WEAK_SIDEWAYS')
+        sim = _sideways_sim(d, 'BEAR')
         _, side, _ = _run_watching_strategies(sim)
         assert side.call_args.kwargs['allow_entry'] is True
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from ..regime_state import BEAR, STRONG_BEAR, WEAK_SIDEWAYS, REGIME6_LABEL_KO, read_regime6_confirmed
+from ..regime_state import BEAR, STRONG_BEAR, REGIME6_LABEL_KO, read_regime6_confirmed
 from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
 
 # base 순수 헬퍼(Task 3 @staticmethod) 재사용
@@ -24,9 +24,12 @@ EXIT_RSI2_MIN = 70.0      # RSI2 > 70 과열 청산
 STOP_PCT = -5.0           # 하드 손절. −3%는 모든 격자 칸에서 가장 나빴다(§4.3·§9.4)
 TIMEOUT_DAYS = 10         # 타임 스탑(달력일)
 
-# 신규 진입을 허용하는 리베로 6단계 국면(§9, 09-29 사용자 확정). 청산은 국면과 무관.
+# 신규 진입을 허용하는 리베로 6단계 국면. 청산은 국면과 무관.
 # ⚠ 6단계 'BEAR'는 '하락' 하나다(3단계 BEAR와 철자만 같다) — 매우하락은 따로 적는다.
-ALLOWED_REGIMES6 = frozenset({WEAK_SIDEWAYS, BEAR, STRONG_BEAR})
+# 2026-10-02 {약한횡보, 하락, 매우하락} → {하락, 매우하락}(사용자 확정). 배포 코드 재생 +
+# 상장폐지 267종목 보정 장기 검증에서 약한횡보만 허용 시 β조정 알파 −6.7%p(t≈−3)로 모든
+# 패널에서 손해였다. 장기 MDD −72% → −44% (docs/superpowers/specs/2026-10-02-sim5-gate-review.md).
+ALLOWED_REGIMES6 = frozenset({BEAR, STRONG_BEAR})
 
 
 def entry_allowed(regime6) -> bool:
@@ -256,7 +259,7 @@ class SidewaysSwingSimulator(BaseSimulator):
     - 진입: range_history(직전 20일 종가) 채널 폭>=8% + 채널 저점 +3% 이내 + 당일 등락 > −2%
             + RSI2(이력+현재가) < 15 + 거래대금 >= 10억. 후보는 price/low 오름차순으로 채운다.
     - 청산: 하드손절 −5% / RSI2 > 70 / 10달력일 타임스탑. 고정 익절·트레일링 없음.
-    - 국면 게이트는 run()에 있다: 리베로 6단계가 약한횡보·하락·매우하락일 때만 신규 진입.
+    - 국면 게이트는 run()에 있다: 리베로 6단계(전일 확정)가 하락·매우하락일 때만 신규 진입(10-02 G2).
       강한횡보·상승·매우상승·판정 불가(None)면 진입만 막고 **청산은 계속한다**
       (심6와 다르다 — 심6의 비 BEAR 경로는 국면 청산이라 None에서 멈춰야 하지만,
       심5의 청산은 국면을 보지 않는 손절·타임스탑이라 멈추면 손실이 방치된다).

@@ -262,6 +262,24 @@ def test_ten_trading_day_expiry():
     assert m.decide_sim14(_view(portfolio=held10), [cand], price, True, _kst('14:00')) == []
 
 
+def test_no_ma10_exit_on_entry_day_but_stop_still_applies():
+    """진입 당일은 MA10을 안 본다(R4 백테스트는 다음 날부터 봤다 — 재생 검증 §4.1).
+    -5% 손절은 당일에도 유효하다."""
+    dates = [d.isoformat() for d in _weekdays_before(TODAY, 20)]
+    cand = _exit_cand([10500.0] * 9, dates)          # ma10 > 현재가 → 이탈 조건
+    today_held = _held(avg=10000.0, entry_date=TODAY.isoformat())
+    assert m.decide_sim14(_view(portfolio=today_held), [cand], {'000001': 10000.0}, True,
+                          _kst('15:16')) == []
+    orders = m.decide_sim14(_view(portfolio=today_held), [cand], {'000001': 9500.0}, True,
+                            _kst('15:16'))
+    assert orders and '손절' in orders[0]['reason']
+    # 다음 날(어제 진입분)부터는 MA10 청산
+    yday_held = _held(avg=10000.0, entry_date=dates[-1])
+    orders = m.decide_sim14(_view(portfolio=yday_held), [cand], {'000001': 10000.0}, True,
+                            _kst('15:16'))
+    assert orders and 'MA10' in orders[0]['reason']
+
+
 def test_exit_inputs_missing_does_not_invent_ma10():
     """확정 봉이 없으면 MA10·보유일을 지어내지 않는다 — 손절만 남는다."""
     held = _held(avg=10000.0, entry_date='2026-09-01')
@@ -373,6 +391,58 @@ def test_stale_csv_is_not_used(monkeypatch):
         monkeypatch.setattr(m, 'get_kst_now', lambda: _kst('10:30', TODAY + dt.timedelta(days=10)))
         assert sim.get_universe() == []
         assert sim._pre_funnel[0]['reason'] == 'stale_daily_csv'
+        assert sim._pre_funnel[0]['mode'] == 'weekday_approx'     # 달력 없음 → 근사 경로
+
+
+def _cal(start, end, closed=()):
+    """start~end 달력: 주말과 closed는 'N', 나머지 'Y'."""
+    out, d = {}, start
+    while d <= end:
+        out[d.strftime('%Y%m%d')] = 'N' if d.weekday() >= 5 or d in closed else 'Y'
+        d += dt.timedelta(days=1)
+    return out
+
+
+def test_staleness_counts_trading_days_not_calendar_days():
+    """2025 추석: 마지막 봉 10/02 → 10/10(달력일 8). 사이 거래일 0 → 낡지 않음."""
+    D = dt.date
+    chuseok = {D(2025, 10, 3), D(2025, 10, 6), D(2025, 10, 7), D(2025, 10, 8), D(2025, 10, 9)}
+    cal = _cal(D(2025, 9, 20), D(2025, 10, 20), chuseok)
+    assert m.csv_staleness('2025-10-02', D(2025, 10, 10), cal) == (False, 'calendar', 0)
+    # EOD가 하루 멈춤(거래일 1개 결손) → 아직 쓴다
+    assert m.csv_staleness('2025-09-26', D(2025, 9, 30), cal) == (False, 'calendar', 1)
+    # 거래일 2개 결손 → 낡음
+    assert m.csv_staleness('2025-09-26', D(2025, 10, 1), cal) == (True, 'calendar', 2)
+
+
+def test_staleness_without_calendar_falls_back_to_weekdays_with_slack():
+    """달력이 모르는 날이 있으면 판정 불가 — 평일 근사 + 연휴 여유로 본다."""
+    D = dt.date
+    # 추석형 공백(평일 5개)은 통과
+    assert m.csv_staleness('2025-10-02', D(2025, 10, 10), {}) == (False, 'weekday_approx', 5)
+    # 2017 추석(9/29 → 10/10, 평일 6개)도 통과
+    assert m.csv_staleness('2017-09-29', D(2017, 10, 10), {}) == (False, 'weekday_approx', 6)
+    # 평일 8개 결손(≈달력일 12) → 낡음
+    assert m.csv_staleness('2025-09-19', D(2025, 10, 2), {}) == (True, 'weekday_approx', 8)
+
+
+def test_holiday_gap_does_not_block_entry_or_exit_inputs(monkeypatch):
+    """긴 연휴 다음 날 확정 봉이 달력일 7을 넘어도 진입·청산 재료를 낸다(2025-10-10 사례)."""
+    with tempfile.TemporaryDirectory() as d:
+        _write_csv(os.path.join(d, m.OHLCV_FILENAME), {'000001': ('수축', {})})  # 마지막 봉 09-28
+        _write_libero(d, {'date': '2026-09-28', 'level': 0, 'vol10': 1.5})
+        now_day = dt.date(2026, 10, 7)
+        holidays = {dt.date(2026, 9, 29) + dt.timedelta(days=i) for i in range(8)}  # 9/29~10/6
+        with open(os.path.join(d, 'market_calendar.json'), 'w', encoding='utf-8') as f:
+            json.dump({'days': _cal(dt.date(2026, 9, 20), dt.date(2026, 10, 20), holidays)}, f)
+        sim = _sim(d, monkeypatch)
+        monkeypatch.setattr(m, 'get_kst_now', lambda: _kst('10:30', now_day))
+        univ = sim.get_universe()
+        assert [s['code'] for s in univ] == ['000001']
+        assert 'closes9' in univ[0] and 'hi20' in univ[0]
+        assert not [f for f in sim._pre_funnel if f['code'] == '_csv']
+        # 어느 판정 경로였는지는 깔때기 상세(details)에 남긴다 — 깔때기 행으로 넣으면 seen이 는다
+        assert 'calendar' in sim._csv_note and '2026-09-28' in sim._csv_note
 
 
 # ── 등록·배선 ───────────────────────────────────────────────────

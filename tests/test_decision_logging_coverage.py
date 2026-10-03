@@ -217,6 +217,7 @@ def _is_candidate_loop(node) -> bool:
 NO_BUY_LOOP = {
     'sim0_libero.py': '분석기 — 국면만 판정하고 매매하지 않는다',
     'sim10_orchestrator.py': '오케스트레이터 — 하위 전략에 위임한다(자기 매수 루프가 없다)',
+    'sim16_adm_leveraged.py': '심15(sim15_adm.py)의 판정·주문 로직을 상속한다 — 보유 ETF 매핑만 있다',
 }
 
 

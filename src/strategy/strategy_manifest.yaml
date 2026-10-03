@@ -342,3 +342,40 @@ simulators:
                       # 두꺼운 꼬리(중앙값 음) — 페이퍼 관찰 단계
     needs_buzz: false  # top100 일봉(data/ohlcv_top100.csv)으로 지표를 만들고 실시간가는
                        # _enrich_universe가 채운다 — 60초 매매 루프에서 돈다
+
+  - id: "sim15_adm"
+    module: "src.strategy.simulators.sim15_adm"
+    class: "DualMomentumSimulator"
+    description: "Sim15 듀얼모멘텀 1배(ADM) — 069500 대 133690의 월말 (1+3+6개월 수익률 합), 큰 쪽이 0보다 크면 그 ETF 100%, 아니면 국고채10년(148070) 100%. 월 1회 전량 교체"
+    state_file: "sim_adm_state.json"
+    csv_file: "trade_history_sim_adm.csv"
+    label: "듀얼모멘텀 1배 (Sim 15)"
+    display_order: 150
+    ui_key: "sim15"
+    short_desc: "코스피200 vs 나스닥100 · 1+3+6개월 점수 승자 100% · 0 이하면 국고채 · 월 1회 (관찰)"
+    chart_group: 3  # 심6 GTAA와 같은 ETF 자산배분 계열
+    color: "#7d8500"  # 리터럴 hex(Sim13과 같은 방식) — gen_sim_registry.py SIM_CHART_HEX에 등록
+    active: true
+    tradeable: false  # 신규(2026-10-03), 설계서 docs/superpowers/specs/2026-10-02-max-return-etf.md §9
+                      # — 백테스트뿐이고 유의성이 경계선(DSR 0.83~0.97), 2025~26 코스피
+                      # 급등 의존, MDD −41% — 페이퍼 관찰 단계
+    needs_buzz: false  # ETF 3종 고정 유니버스. 판정은 KIS 일봉(월 1회), 실시간가는
+                       # _enrich_universe가 채운다 — 60초 매매 루프에서 돈다
+
+  - id: "sim16_adm_lev"
+    module: "src.strategy.simulators.sim16_adm_leveraged"
+    class: "LeveragedDualMomentumSimulator"
+    description: "Sim16 듀얼모멘텀 2배(ADM) — 판정은 Sim15와 같고(1배 ETF 점수) 보유만 122630·418660으로. 레버리지 ETF(실전은 사전교육·예탁금 필요). 0 이하면 국고채10년(148070) 100%"
+    state_file: "sim_admlev_state.json"
+    csv_file: "trade_history_sim_admlev.csv"
+    label: "듀얼모멘텀 2배 (Sim 16)"
+    display_order: 160
+    ui_key: "sim16"
+    short_desc: "Sim15와 같은 판정 · 보유는 2배 레버리지 ETF(122630·418660) · 월 1회 (관찰)"
+    chart_group: 3
+    color: "#1b3a6b"  # 리터럴 hex — gen_sim_registry.py SIM_CHART_HEX에 등록
+    active: true
+    tradeable: false  # 신규(2026-10-03), 같은 설계서 §9 추천 2 — 백테스트 MDD −68%(2026 여름
+                      # 5주), 2005~20은 합성 대리 — 페이퍼 관찰 단계. 실전은 레버리지 ETF
+                      # 사전교육·기본예탁금 요건이 있다
+    needs_buzz: false  # ETF 3종 고정 유니버스 — Sim15와 같다

@@ -57,6 +57,16 @@ def test_sim6_universe_is_registered_as_etf():
     assert set(SIM6_CODES) <= fees.TAX_EXEMPT_ETF_CODES
 
 
+def test_adm_universes_are_registered_as_etf():
+    """심15·심16(듀얼모멘텀)이 사고파는 ETF도 같은 이유로 집합에 있어야 한다."""
+    from src.strategy.simulators.sim15_adm import DualMomentumSimulator
+    from src.strategy.simulators.sim16_adm_leveraged import LeveragedDualMomentumSimulator
+    for cls in (DualMomentumSimulator, LeveragedDualMomentumSimulator):
+        codes = {e['code'] for e in cls.__new__(cls).get_universe()}
+        assert len(codes) == 3 and codes <= fees.TAX_EXEMPT_ETF_CODES
+        assert all(BaseSimulator.sell_tax_rate(c) == 0.0 for c in codes)
+
+
 # ── 페이퍼 매도 ───────────────────────────────────────────────────
 
 def test_etf_sell_charges_commission_only(tmp_path):

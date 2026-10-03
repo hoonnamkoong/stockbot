@@ -43,17 +43,17 @@ def _prev_month(month):
     return f'{y - 1}12' if mo == 1 else f'{y}{mo - 1:02d}'
 
 
-def trend_signal(history, month):
-    """직전 완결 월말 종가 vs 10개월 이동평균 → ('above'|'below'|None, info).
+def month_end_closes(history, month, n):
+    """직전 완결 월말 종가 n개(오래된→최신) → (closes|None, 사유 dict|None).
 
     month(YYYYMM)의 봉은 쓰지 않는다 — 진행 중인 달이라 룩어헤드다. 판정 불가는
     None과 사유다(지어낸 값으로 판정하지 않는다):
       no_history    이력이 비었다(조회 실패)
       stale_history 직전 달 봉이 없다(낡은 캐시·결손) — 더 옛 월말로 판정하지 않는다
-      short_history 완결 월이 10개 미만
-      gap_history   최근 10개 월 사이가 비었다
+      short_history 완결 월이 n개 미만
+      gap_history   최근 n개 월 사이가 비었다
       bad_close     월말 종가가 0 이하
-    '아래면 현금'이므로 종가 == 평균은 'above'다.
+    심15·심16(sim15_adm.py)도 같은 월말 종가 규칙을 쓴다.
     """
     month_end = {}
     for row in sorted(history or [], key=lambda r: r.get('date', '')):
@@ -65,15 +65,27 @@ def trend_signal(history, month):
     months = sorted(month_end)
     if months[-1] != _prev_month(month):
         return None, {'reason': 'stale_history', 'last_month': months[-1]}
-    if len(months) < SMA_MONTHS:
+    if len(months) < n:
         return None, {'reason': 'short_history', 'months': len(months)}
-    window = months[-SMA_MONTHS:]
+    window = months[-n:]
     for older, newer in zip(window, window[1:]):
         if _prev_month(newer) != older:
             return None, {'reason': 'gap_history', 'missing_before': newer}
     closes = [float(month_end[ym]) for ym in window]
     if min(closes) <= 0:
         return None, {'reason': 'bad_close'}
+    return closes, None
+
+
+def trend_signal(history, month):
+    """직전 완결 월말 종가 vs 10개월 이동평균 → ('above'|'below'|None, info).
+
+    판정 불가 사유는 month_end_closes와 같다. '아래면 현금'이므로 종가 == 평균은
+    'above'다.
+    """
+    closes, why = month_end_closes(history, month, SMA_MONTHS)
+    if closes is None:
+        return None, why
     close, sma = closes[-1], sum(closes) / len(closes)
     return ('below' if close < sma else 'above'), {'close': close, 'sma': round(sma, 2)}
 

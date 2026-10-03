@@ -37,6 +37,8 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
   { id: 'sim12_regime_dual', uiKey: 'sim12', label: '국면이원 반등/추세형 (Sim 12)', shortDesc: 'BULL=모멘텀 지속 / SIDEWAYS·BEAR=급락반등(거래대금+기관수급 확인)', color: 'dark', chartGroup: 5, stateFile: 'sim_regimedual_state.json', csvFile: 'trade_history_sim_regimedual.csv', tradeable: false },
   { id: 'sim13_theme_cascade', uiKey: 'sim13', label: '테마 캐스케이드 (Sim 13)', shortDesc: '테마모멘텀+ADX/거래대금서프라이즈+외국인수급 이벤트탐지, PER게이트+그룹집중상한', color: '#a1662f', chartGroup: 5, stateFile: 'sim_themecascade_state.json', csvFile: 'trade_history_sim_themecascade.csv', tradeable: false },
   { id: 'sim14_squeeze_breakout', uiKey: 'sim14', label: '수축 돌파형 (Sim 14)', shortDesc: '강한횡보 전용 · 밴드폭 수축 후 20일 고가 돌파 · MA10 이탈/-5%/10일 청산', color: 'pink', chartGroup: 5, stateFile: 'sim_squeeze_state.json', csvFile: 'trade_history_sim_squeeze.csv', tradeable: false },
+  { id: 'sim15_adm', uiKey: 'sim15', label: '듀얼모멘텀 1배 (Sim 15)', shortDesc: '코스피200 vs 나스닥100 · 1+3+6개월 점수 승자 100% · 0 이하면 국고채 · 월 1회 (관찰)', color: '#7d8500', chartGroup: 3, stateFile: 'sim_adm_state.json', csvFile: 'trade_history_sim_adm.csv', tradeable: false },
+  { id: 'sim16_adm_lev', uiKey: 'sim16', label: '듀얼모멘텀 2배 (Sim 16)', shortDesc: 'Sim15와 같은 판정 · 보유는 2배 레버리지 ETF(122630·418660) · 월 1회 (관찰)', color: '#1b3a6b', chartGroup: 3, stateFile: 'sim_admlev_state.json', csvFile: 'trade_history_sim_admlev.csv', tradeable: false },
 ];
 
 /** 국면 분석기(매매 없음). 성과 목록에 오르지 않고 국면 표시로만 쓰인다. */
@@ -120,6 +122,8 @@ export const SIM_CHART_HEX: Record<string, string> = {
   // 색상값을 그대로 받아들인다(공식 지원 동작). shade 자동계산(filled/light
   // variant의 밝기 단계)은 못 받지만 Badge/Text 등에서 문제없이 렌더된다.
   '#a1662f': '#a1662f',
+  '#7d8500': '#7d8500',
+  '#1b3a6b': '#1b3a6b',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

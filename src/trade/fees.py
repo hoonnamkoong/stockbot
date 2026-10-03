@@ -44,7 +44,8 @@ SELL_TAX_RATE = 0.0018    # 증권거래세율 (매도에만 부과)
 #   비용 계산이 네트워크에 기대면 조회 실패 때 세율을 지어내야 한다.
 # 집합에 없는 코드는 모르는 것이므로 **과세한다**(오판 시 성과가 과소 — 안전한 쪽).
 # ETF를 새로 매매하는 심을 만들면 여기에 더한다. 심6 유니버스는 테스트가 지킨다
-# (tests/test_etf_sell_tax.py).
+# (tests/test_etf_sell_tax.py). 면세는 증권거래세 얘기다 — 해외지수·채권형 ETF 매매차익의
+# 배당소득세(15.4%)는 이 모듈도 심도 계산하지 않는다.
 TAX_EXEMPT_ETF_CODES = frozenset({
     # 심6 GTAA-KR5 (src/strategy/simulators/sim6_bear_hedge.py ASSETS·CASH_ETF)
     '069500',  # KODEX 200
@@ -53,6 +54,10 @@ TAX_EXEMPT_ETF_CODES = frozenset({
     '411060',  # ACE KRX금현물
     '305080',  # TIGER 미국채10년선물
     '357870',  # TIGER CD금리투자KIS
+    # 심15·심16 듀얼모멘텀 (sim15_adm.py·sim16_adm_leveraged.py — 069500·148070은 위에 있다)
+    '133690',  # TIGER 미국나스닥100
+    '122630',  # KODEX 레버리지
+    '418660',  # TIGER 미국나스닥100레버리지(합성)
     # 구 인버스 심6(~2026-10-01) 보유분 — 레거시 청산이 이 코드를 판다
     '114800',  # KODEX 인버스
     '252670',  # KODEX 200선물인버스2X

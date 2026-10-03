@@ -98,6 +98,8 @@ export const SIM_CHART_HEX: Record<string, string> = {
   // 색상값을 그대로 받아들인다(공식 지원 동작). shade 자동계산(filled/light
   // variant의 밝기 단계)은 못 받지만 Badge/Text 등에서 문제없이 렌더된다.
   '#a1662f': '#a1662f',
+  '#7d8500': '#7d8500',
+  '#1b3a6b': '#1b3a6b',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

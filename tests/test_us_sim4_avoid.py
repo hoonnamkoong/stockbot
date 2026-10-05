@@ -177,11 +177,15 @@ def test_unaffordable_stock_is_replaced_by_next_rank():
 
 def test_small_drift_is_left_alone_and_large_drift_is_trimmed():
     entries = _entries()
-    target = int(100_000 * (1 - m.CASH_RESERVE) / 40 / 50.0)     # 49주
-    held = {c: {'name': c, 'quantity': target, 'avg_price': 50.0} for c in list(entries)[:40]}
+    # 47달러: 목표 수량이 52.13주라 정수 경계에서 멀다. 50달러면 49.0주 경계에 걸려
+    # 부동소수 합산 순서(파이썬 버전)에 따라 48/49로 갈린다 — CI에서 실제로 갈렸다.
+    price = 47.0
+    target = int(100_000 * (1 - m.CASH_RESERVE) / 40 / price)
+    assert target == 52
+    held = {c: {'name': c, 'quantity': target, 'avg_price': price} for c in list(entries)[:40]}
     held['R001']['quantity'] = int(target * 1.1)      # 밴드 안
     held['R002']['quantity'] = target * 2             # 밴드 밖
-    orders, done = m.decide_us_avoid(_view(held), entries, _cands(entries), {})
+    orders, done = m.decide_us_avoid(_view(held), entries, _cands(entries, price=price), {})
     assert done and not _buys(orders)
     assert [(o['code'], o['quantity']) for o in _sells(orders)] == [('R002', target)]
 

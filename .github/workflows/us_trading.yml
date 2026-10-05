@@ -80,6 +80,8 @@ jobs:
           cp data/trade_history_sim_us2donchian.csv db_data_repo/data/ 2>/dev/null || true
           cp data/sim_us3liquidity_state.json db_data_repo/data/ 2>/dev/null || true
           cp data/trade_history_sim_us3liquidity.csv db_data_repo/data/ 2>/dev/null || true
+          cp data/sim_us4avoid_state.json db_data_repo/data/ 2>/dev/null || true
+          cp data/trade_history_sim_us4avoid.csv db_data_repo/data/ 2>/dev/null || true
           # 알림 쿨다운 상태. 이게 왕복하지 않으면 2분마다 새 컨테이너가 빈 상태로
           # 시작해 send_alert_once의 60분 쿨다운이 한 번도 적용되지 않는다 —
           # 2026-09-01에 워치리스트 결손 알림이 세션 내내 2분 간격으로 나갔다.

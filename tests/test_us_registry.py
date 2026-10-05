@@ -3,7 +3,7 @@ from src.strategy.us_registry import get_us_sim_registry, get_active_us_simulato
 
 def test_get_us_sim_registry_has_sim1():
     reg = get_us_sim_registry()
-    assert len(reg) == 3
+    assert len(reg) == 4
     entry = reg[0]
     assert entry['id'] == 'us_sim1_minervini'
     assert entry['currency'] == 'USD'
@@ -19,9 +19,9 @@ def test_get_us_sim_registry_has_sim2():
 
 def test_get_active_us_simulators_instantiates():
     sims = get_active_us_simulators()
-    assert len(sims) == 3
+    assert len(sims) == 4
     names = {s.name for s in sims}
-    assert names == {'Us1Minervini', 'Us2Donchian', 'Us3Liquidity'}
+    assert names == {'Us1Minervini', 'Us2Donchian', 'Us3Liquidity', 'Us4Avoid'}
 
 
 def test_get_us_sim_registry_has_sim3_baseline():
@@ -30,6 +30,15 @@ def test_get_us_sim_registry_has_sim3_baseline():
     assert entry['currency'] == 'USD'
     assert entry['state_file'] == 'sim_us3liquidity_state.json'
     # 기준선 심은 잣대라 매매 대상이 아니다
+    assert entry['tradeable'] is False
+
+
+def test_get_us_sim_registry_has_sim4_avoid():
+    reg = get_us_sim_registry()
+    entry = next(e for e in reg if e['id'] == 'us_sim4_avoid')
+    assert entry['state_file'] == 'sim_us4avoid_state.json'
+    assert entry['csv_file'] == 'trade_history_sim_us4avoid.csv'
+    # 관찰 심이다 — 2012~2022 재생에서는 지수와 같았다
     assert entry['tradeable'] is False
 
 

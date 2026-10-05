@@ -14,6 +14,7 @@ SEC EDGAR는 US Sim1의 추세 템플릿을 통과한 종목에만 조회한다(
 
     PYTHONPATH=. python scripts/run_eod_sim_us.py
 """
+import datetime as dt
 import json
 import os
 import sys
@@ -26,6 +27,8 @@ from src.data.us_universe import (  # noqa: E402
     fetch_us_universe, filter_universe, load_universe, save_universe)
 from src.data.us_ohlcv import fetch_daily_ohlcv  # noqa: E402
 from src.data.us_fundamentals import fetch_cik_map, fetch_eps_revenue_growth  # noqa: E402
+from src.data.us_factors import compute_signals, fetch_company_facts  # noqa: E402
+from src.data.us_short_interest import fetch_latest_short_interest  # noqa: E402
 from src.strategy.simulators.us_calendar import watchlist_target_date  # noqa: E402
 from src.strategy.simulators.us_sim1_minervini import (  # noqa: E402
     build_watchlist_entry as build_sim1_entry,
@@ -44,6 +47,7 @@ from src.strategy.simulators.us_sim3_liquidity import (  # noqa: E402
     build_watchlist as build_sim3_watchlist,
     save_watchlist as save_sim3_watchlist,
 )
+from src.strategy.simulators import us_sim4_avoid as sim4  # noqa: E402
 
 MIN_HISTORY_DAYS = 220
 
@@ -58,7 +62,7 @@ YAHOO_RATE_LIMIT_SLEEP_SEC = 0.15
 
 
 def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamentals,
-                                  sim1_held=()):
+                                  sim1_held=(), avg_volumes=None):
     """오케스트레이션. 네트워크 함수는 주입 — 테스트에서 모킹한다.
 
     반환: (sim1_watchlist, sim2_watchlist, sim3_watchlist). 세 판정은 서로 독립이라
@@ -71,7 +75,11 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
     **청산 판정용** 항목으로 워치리스트에 남긴다(pivot_price=None이라 다시 살
     수는 없다). 안 그러면 50일선 이탈 청산이 구조적으로 발화하지 않는다 —
     _trend_template_ok가 `price > ma50`을 요구하므로 50일선을 깬 종목은
-    정의상 워치리스트에 못 오르기 때문이다."""
+    정의상 워치리스트에 못 오르기 때문이다.
+
+    avg_volumes: dict를 주면 {심볼: 최근 20일 평균 거래량(주)}을 채운다. US Sim4가
+    공매도 잔고를 '며칠치 거래량인가'로 바꾸는 데 쓴다 — 이미 받은 일봉에서 나오므로
+    추가 호출이 없다."""
     out1 = {}
     out2 = {}
     liquidity_rows = []
@@ -105,6 +113,10 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
         recent_dollar = [c * v for c, v in zip(daily_closes[-SIM2_CHANNEL_DAYS:],
                                                 volumes[-SIM2_CHANNEL_DAYS:])]
         avg_dollar_volume = sum(recent_dollar) / len(recent_dollar) if recent_dollar else 0.0
+        if avg_volumes is not None:
+            recent_volume = [v for v in volumes[-SIM2_CHANNEL_DAYS:] if v]
+            if recent_volume:
+                avg_volumes[symbol] = sum(recent_volume) / len(recent_volume)
 
         # US Sim3(기준선) — 판정 없이 전 종목을 모아 두고, 아래에서 상위 N만 남긴다.
         liquidity_rows.append((symbol, name, avg_dollar_volume))
@@ -144,6 +156,89 @@ def build_watchlists_for_universe(universe, cik_map, fetch_ohlcv, fetch_fundamen
     if len(capped2) < len(out2):
         print(f'[EOD-US] US Sim2 워치리스트 {len(out2)}→{len(capped2)}종목 (거래대금 상위 상한)')
     return out1, capped2, build_sim3_watchlist(liquidity_rows)
+
+
+# US Sim4 점수 산출이 믿을 만한지 가르는 하한. 풀이 이보다 얇거나 공매도 잔고가
+# 이보다 비면 그 달 점수는 내지 않는다 — 절반만 채워진 순위로 40종목을 갈아치우는
+# 것보다 지난달 목록을 한 달 더 드는 편이 낫다.
+SIM4_MIN_POOL_RATIO = 0.8
+SIM4_MIN_SHORT_COVERAGE = 0.8
+# SEC 정책(10 req/s 이하). companyfacts는 종목당 한 번이다.
+SIM4_FACTS_SLEEP_SEC = 0.15
+
+
+def refresh_sim4_watchlist(universe, cik_map, avg_volumes, today, asof,
+                           fetch_facts, fetch_short_interest, sleep=time.sleep):
+    """US Sim4 감시목록. **달이 바뀔 때만** 점수를 새로 낸다. 반환: 상태 문자열.
+
+    달이 같으면 직전 목록을 날짜만 바꿔 다시 쓴다(읽는 쪽이 날짜에 fail-closed다).
+    새로 낼 수 없으면 직전 목록을 **옛 score_month 그대로** 이어 쓴다 — 그러면 심은
+    교체하지 않고 보유를 유지한다. 지어낸 점수로 교체하지 않는다."""
+    month = today[:6]
+    prev = sim4.read_watchlist_file()
+    prev_entries = prev.get('entries') if isinstance(prev.get('entries'), dict) else {}
+    if prev_entries and prev.get('score_month') == month:
+        sim4.save_watchlist(prev_entries, today, month, prev.get('meta'))
+        return 'carried'
+
+    def give_up(why):
+        alerts.send_alert(
+            '<b>US Sim4 점수 산출 실패 — 이번 달 교체 보류</b>\n\n'
+            f'{why}\n\n'
+            + ('지난달 목록을 그대로 둡니다(보유 유지).' if prev_entries
+               else '직전 목록도 없어 이 심은 매매하지 않습니다.'))
+        if prev_entries:
+            sim4.save_watchlist(prev_entries, today, prev.get('score_month'), prev.get('meta'))
+        return 'failed'
+
+    try:
+        si_date, short_interest = fetch_short_interest()
+    except Exception as e:
+        return give_up(f'공매도 잔고 조회 실패: {type(e).__name__}: {e}')
+
+    # 한 회사(CIK)에 티커가 여럿 달린다 — 보통주 말고도 상장 채권·우선주(T의 TBB,
+    # CMCSA의 CCZ)가 모회사 시총을 단 채 스크리너에 나온다. 2026-10-06 실제 실행에서
+    # 그 둘이 상위 40에 들었다. SEC 목록에서 그 회사의 **첫 티커**만 보통주로 본다.
+    primary = {}
+    for ticker, cik in cik_map.items():
+        primary.setdefault(cik, ticker)
+
+    rows = []
+    scanned = 0
+    for row in sorted(universe, key=lambda r: -float(r.get('market_cap') or 0)):
+        if len(rows) >= sim4.POOL_SIZE or scanned >= sim4.POOL_SIZE * 2:
+            break
+        symbol = row['symbol']
+        cik = cik_map.get(symbol)
+        if not cik:
+            continue            # SEC에 보고하지 않는 종목(외국 상장사 ADR 일부)
+        if primary[cik] != symbol:
+            continue            # 같은 회사의 다른 증권(채권·우선주·다른 주식 클래스)
+        scanned += 1
+        facts = fetch_facts(cik)
+        sleep(SIM4_FACTS_SLEEP_SEC)
+        if facts is None:
+            continue
+        signals = compute_signals(facts, asof)
+        signals['si_dtc'] = sim4.days_to_cover(short_interest.get(symbol), avg_volumes.get(symbol))
+        if sum(1 for k in sim4.SCORE_SIGNALS if signals.get(k) is not None) < sim4.MIN_SIGNALS:
+            continue
+        rows.append({'code': symbol, 'name': row.get('name', symbol),
+                     'market_cap': float(row['market_cap']), **signals})
+
+    if len(rows) < SIM4_MIN_POOL_RATIO * sim4.POOL_SIZE:
+        return give_up(f'재무 신호를 얻은 종목이 {len(rows)}개뿐입니다(필요 {sim4.POOL_SIZE}).')
+    covered = sum(1 for r in rows if r['si_dtc'] is not None)
+    if covered < SIM4_MIN_SHORT_COVERAGE * len(rows):
+        return give_up(f'공매도 잔고가 붙은 종목이 {covered}/{len(rows)}개뿐입니다(결제일 {si_date}).')
+
+    entries = sim4.build_watchlist(sim4.score_pool(rows))
+    sim4.save_watchlist(entries, today, month,
+                        {'short_interest_date': si_date, 'pool': len(rows),
+                         'scored_on': asof.isoformat()})
+    print(f'[EOD-US] US Sim4 점수 갱신 — 풀 {len(rows)}종목(SEC 조회 {scanned}), '
+          f'공매도 잔고 {covered}종목(결제일 {si_date}), 감시목록 {len(entries)}종목')
+    return 'scored'
 
 
 def main():
@@ -221,9 +316,10 @@ def _run():
           + (' (직전 것 재사용)' if stale else ''))
 
     cik_map = fetch_cik_map()
+    avg_volumes = {}
     watchlist1, watchlist2, watchlist3 = build_watchlists_for_universe(
         universe, cik_map, fetch_daily_ohlcv, fetch_eps_revenue_growth,
-        sim1_held=load_sim1_holdings(data_dir))
+        sim1_held=load_sim1_holdings(data_dir), avg_volumes=avg_volumes)
     # 아직 안 끝난 가장 가까운 세션 — 장중에 돌리면 오늘치로 찍혀 그 자리에서
     # 쓰인다. 마감 뒤 정규 배치(22:00 UTC)는 지금까지처럼 다음 거래일이다.
     today = watchlist_target_date()
@@ -233,6 +329,19 @@ def _run():
     print(f'[EOD-US] US Sim1 워치리스트 {len(watchlist1)}종목, '
           f'US Sim2 워치리스트 {len(watchlist2)}종목, '
           f'US Sim3 워치리스트 {len(watchlist3)}종목 저장 (날짜 {today})')
+
+    # US Sim4는 맨 뒤에 따로 돈다. 여기서 예외가 나도 위 세 심의 워치리스트는 이미
+    # 저장됐다 — 한 달에 한 번 도는 점수 산출이 매일 도는 세 심을 죽이면 안 된다.
+    try:
+        status = refresh_sim4_watchlist(
+            universe, cik_map, avg_volumes, today, dt.datetime.now(dt.timezone.utc).date(),
+            fetch_company_facts, fetch_latest_short_interest)
+        print(f'[EOD-US] US Sim4 워치리스트: {status} (날짜 {today})')
+    except Exception as e:
+        alerts.send_alert(
+            '<b>US Sim4 워치리스트 실패</b>\n\n'
+            f'{type(e).__name__}: {e}\n\n다음 거래일 이 심은 교체하지 않습니다.')
+        print(f'[EOD-US] US Sim4 워치리스트 실패: {type(e).__name__}: {e}')
 
     # 예외 없이 끝나도 셋이 전부 비면 결과는 배치가 죽은 것과 같다. 심마다 판정이
     # 다른데 동시에 0이 되는 건 정상 결과가 아니라 입력 쪽 고장에 가깝다

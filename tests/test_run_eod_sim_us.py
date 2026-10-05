@@ -127,6 +127,8 @@ def _patch_main(**kw):
         'build_watchlists_for_universe': mock.DEFAULT,
         'save_sim1_watchlist': mock.DEFAULT, 'save_sim2_watchlist': mock.DEFAULT,
         'save_sim3_watchlist': mock.DEFAULT,
+        # US Sim4 점수 산출은 SEC·FINRA를 친다 — 여기서는 막고, 아래 전용 테스트가 본다.
+        'refresh_sim4_watchlist': mock.DEFAULT,
     }
     defaults.update(kw)
     return mock.patch.multiple('scripts.run_eod_sim_us', **defaults)
@@ -237,3 +239,130 @@ def test_non_held_symbol_still_excluded_when_it_fails_filters(mock_sleep):
         fetch_ohlcv=mock.Mock(return_value=bars),
         fetch_fundamentals=mock.Mock())
     assert out1 == {}
+
+
+# ── US Sim4: 점수는 달이 바뀔 때만 새로 낸다 (2026-10-06) ─────────────────────
+# SEC 150콜 + FINRA 한 번이라 매일 돌릴 이유가 없고, 못 냈을 때 지어낸 순위로
+# 40종목을 갈아치우면 안 된다. 세 갈래(이어 쓰기 / 새로 내기 / 실패 시 보유 유지)를 고정한다.
+import datetime as dt  # noqa: E402
+
+from scripts import run_eod_sim_us as eod  # noqa: E402
+from src.strategy.simulators import us_sim4_avoid as sim4  # noqa: E402
+
+
+def _sim4_env(tmp_path, monkeypatch, n=160):
+    monkeypatch.setattr(sim4, 'WATCHLIST_PATH', str(tmp_path / 'sim_us4_avoid_watchlist.json'))
+    universe = [{'symbol': f'S{i:03d}', 'name': f'Co{i}', 'market_cap': 1e12 - i * 1e9} for i in range(n)]
+    cik_map = {r['symbol']: str(i).zfill(10) for i, r in enumerate(universe)}
+    volumes = {r['symbol']: 1_000_000.0 for r in universe}
+    short = {r['symbol']: float(i) * 10_000 for i, r in enumerate(universe)}
+    return universe, cik_map, volumes, short
+
+
+def _signals(i):
+    return {'accr': i * 0.001, 'issue': -i * 0.001, 'ag': 0.0, 'd_opm': 0.01, 'ni_chg': 0.02}
+
+
+def test_sim4_same_month_carries_previous_list_without_network(tmp_path, monkeypatch):
+    universe, cik_map, volumes, short = _sim4_env(tmp_path, monkeypatch)
+    sim4.save_watchlist({'AAA': {'name': 'A', 'rank': 1, 'score': 0.9, 'market_cap': 1e12}},
+                        '20261005', '202610', {'pool': 150})
+    fetch_facts, fetch_short = mock.Mock(), mock.Mock()
+    status = eod.refresh_sim4_watchlist(universe, cik_map, volumes, '20261006', dt.date(2026, 10, 5),
+                                        fetch_facts, fetch_short, sleep=lambda s: None)
+    assert status == 'carried'
+    assert not fetch_facts.called and not fetch_short.called, '달이 같은데 SEC·FINRA를 쳤다'
+    entries, month = sim4.load_watchlist('20261006')
+    assert set(entries) == {'AAA'} and month == '202610', '날짜만 바뀌어야 한다'
+
+
+def test_sim4_new_month_scores_top_pool_by_market_cap(tmp_path, monkeypatch):
+    universe, cik_map, volumes, short = _sim4_env(tmp_path, monkeypatch)
+    sim4.save_watchlist({'OLD': {'name': 'O', 'rank': 1, 'score': 0.9, 'market_cap': 1e12}},
+                        '20261030', '202610')
+    calls = []
+
+    def fetch_facts(cik):
+        calls.append(cik)
+        return {'_i': int(cik)}
+
+    with mock.patch.object(eod, 'compute_signals', side_effect=lambda facts, asof: _signals(facts['_i'])):
+        status = eod.refresh_sim4_watchlist(
+            universe, cik_map, volumes, '20261102', dt.date(2026, 10, 30),
+            fetch_facts, lambda: ('2026-10-15', short), sleep=lambda s: None)
+    assert status == 'scored'
+    assert len(calls) == sim4.POOL_SIZE, '시총 상위 POOL_SIZE개만 조회해야 한다'
+    entries, month = sim4.load_watchlist('20261102')
+    assert month == '202611' and len(entries) == sim4.BUFFER_RANK
+    assert 'OLD' not in entries
+    # 시총 151위 이하는 풀에 못 든다
+    assert not any(c >= 'S150' for c in entries)
+
+
+def test_sim4_scoring_failure_keeps_old_month_so_the_sim_holds(tmp_path, monkeypatch):
+    """공매도 잔고를 못 받으면 지난달 목록을 **옛 score_month 그대로** 이어 쓴다.
+    새 달로 찍으면 심이 낡은 순위로 교체해 버린다."""
+    universe, cik_map, volumes, short = _sim4_env(tmp_path, monkeypatch)
+    sim4.save_watchlist({'OLD': {'name': 'O', 'rank': 1, 'score': 0.9, 'market_cap': 1e12}},
+                        '20261030', '202610')
+    with mock.patch.object(eod.alerts, 'send_alert') as alert:
+        status = eod.refresh_sim4_watchlist(
+            universe, cik_map, volumes, '20261102', dt.date(2026, 10, 30),
+            mock.Mock(), mock.Mock(side_effect=RuntimeError('FINRA 503')), sleep=lambda s: None)
+    assert status == 'failed' and alert.called
+    entries, month = sim4.load_watchlist('20261102')
+    assert set(entries) == {'OLD'} and month == '202610'
+
+
+def test_sim4_thin_pool_is_a_failure_not_a_small_ranking(tmp_path, monkeypatch):
+    """SEC가 대부분 실패한 날 '받은 30종목 중 상위'로 순위를 내지 않는다."""
+    universe, cik_map, volumes, short = _sim4_env(tmp_path, monkeypatch)
+    n = {'i': 0}
+
+    def flaky(cik):
+        n['i'] += 1
+        return {'_i': int(cik)} if n['i'] % 10 == 0 else None
+
+    with mock.patch.object(eod, 'compute_signals', side_effect=lambda facts, asof: _signals(facts['_i'])),          mock.patch.object(eod.alerts, 'send_alert') as alert:
+        status = eod.refresh_sim4_watchlist(
+            universe, cik_map, volumes, '20261102', dt.date(2026, 10, 30),
+            flaky, lambda: ('2026-10-15', short), sleep=lambda s: None)
+    assert status == 'failed' and alert.called
+    assert sim4.load_watchlist('20261102') == ({}, None), '직전 목록도 없는데 뭔가 저장됐다'
+
+
+def test_sim4_missing_short_interest_is_a_failure(tmp_path, monkeypatch):
+    """공매도 잔고가 대부분 비면 가장 강한 신호 없이 순위를 내는 셈이다."""
+    universe, cik_map, volumes, short = _sim4_env(tmp_path, monkeypatch)
+    with mock.patch.object(eod, 'compute_signals', side_effect=lambda facts, asof: _signals(facts['_i'])),          mock.patch.object(eod.alerts, 'send_alert') as alert:
+        status = eod.refresh_sim4_watchlist(
+            universe, cik_map, volumes, '20261102', dt.date(2026, 10, 30),
+            lambda cik: {'_i': int(cik)}, lambda: ('2026-10-15', {'S000': 1.0}), sleep=lambda s: None)
+    assert status == 'failed' and alert.called
+
+
+@mock.patch('scripts.run_eod_sim_us.time.sleep')
+def test_avg_volumes_are_collected_from_bars_already_fetched(mock_sleep):
+    closes = _uptrend_closes()
+    bars = _bars(closes, volume=1234)
+    out = {}
+    build_watchlists_for_universe(
+        [{'symbol': 'AAPL', 'name': 'Apple', 'market_cap': 1e9}], cik_map={},
+        fetch_ohlcv=mock.Mock(return_value=bars), fetch_fundamentals=mock.Mock(), avg_volumes=out)
+    assert out == {'AAPL': 1234.0}
+
+
+def test_sim4_skips_other_securities_of_the_same_company(tmp_path, monkeypatch):
+    """T의 상장 채권 TBB는 스크리너에 AT&T 시총을 달고 나온다. 2026-10-06 실제 실행에서
+    TBB·CCZ가 상위 40에 들었다 — 회사(CIK)당 SEC 목록의 첫 티커만 보통주로 본다."""
+    universe, cik_map, volumes, short = _sim4_env(tmp_path, monkeypatch)
+    universe.insert(1, {'symbol': 'S000B', 'name': 'Co0 5.35% Notes', 'market_cap': 1e12})
+    cik_map['S000B'] = cik_map['S000']          # 같은 회사, SEC 목록에서는 뒤에 온다
+    volumes['S000B'] = 1_000.0
+    short['S000B'] = 0.0
+    with mock.patch.object(eod, 'compute_signals', side_effect=lambda facts, asof: _signals(facts['_i'])):
+        eod.refresh_sim4_watchlist(
+            universe, cik_map, volumes, '20261102', dt.date(2026, 10, 30),
+            lambda cik: {'_i': int(cik)}, lambda: ('2026-10-15', short), sleep=lambda s: None)
+    entries, _ = sim4.load_watchlist('20261102')
+    assert 'S000B' not in entries and 'S000' in entries

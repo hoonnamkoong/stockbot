@@ -60,3 +60,19 @@ simulators:
     currency: "USD"
     active: true
     tradeable: false  # 잣대용 페이퍼. 다른 US 심의 성과를 재는 기준선이다.
+
+  - id: "us_sim4_avoid"
+    module: "src.strategy.simulators.us_sim4_avoid"
+    class: "USAvoidSimulator"
+    description: "US Sim4 회피형 대형주 — 시총 상위 150에서 공매도 쏠림·발생액·주식 발행·자산 급증·마진 악화 종목을 빼고 40종목을 √시총 비중으로 보유, 월 1회 교체"
+    state_file: "sim_us4avoid_state.json"
+    csv_file: "trade_history_sim_us4avoid.csv"
+    label: "US 회피형 대형주 (US Sim 4)"
+    display_order: 40
+    ui_key: "us_sim4"
+    short_desc: "시총 상위 150 중 회피 점수 상위 40 · √시총 비중 · 월 1회 교체"
+    chart_group: 1
+    color: "green"
+    currency: "USD"
+    active: true
+    tradeable: false  # 페이퍼 관찰 단계. 자본 10만 달러(40종목을 1주 단위로 싣기 위해)

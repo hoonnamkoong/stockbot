@@ -47,8 +47,8 @@ MIN_WRITES = {
     'eod_data.yml': 7,
     'premarket_data.yml': 7,
     'token_refresh.yml': 1,
-    'us_eod_watchlist.yml': 4,
-    'us_trading.yml': 7,
+    'us_eod_watchlist.yml': 5,
+    'us_trading.yml': 9,
 }
 
 
@@ -173,6 +173,7 @@ def test_the_us_watchlists_are_the_case_this_file_was_written_for():
     for name in ('sim_us1_minervini_watchlist.json',
                  'sim_us2_donchian_watchlist.json',
                  'sim_us3_liquidity_watchlist.json',
+                 'sim_us4_avoid_watchlist.json',
                  'us_universe.json'):
         assert _covered(name, patterns), f'{name}이 제외 목록에서 빠졌다'
 

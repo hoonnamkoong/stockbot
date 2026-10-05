@@ -25,7 +25,9 @@ SEC_PER_SYMBOL = 0.26
 SETUP_SEC = 23            # checkout + setup-python + pip + db-data fetch
 DEPLOY_WORST_SEC = 142    # push 충돌 시 fetch --unshallow + rebase
 # run_cycle은 심마다 따로 조회한다(심 간 중복 제거 없음).
-OTHER_SIM_SYMBOLS = 55    # US Sim1 ~18 + US Sim3 20 + 보유 ~15
+# US Sim1 ~18 + US Sim3 20 + 보유 ~15 = 55, 여기에 US Sim4의 최악(월 1회 교체
+# 사이클): 감시목록 80 + 보유 40 = 120. 평소에는 보유 40만 조회한다.
+OTHER_SIM_SYMBOLS = 175
 
 
 def test_job_timeout_covers_watchlist_worst_case():

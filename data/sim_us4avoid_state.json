@@ -1,0 +1,436 @@
+{
+  "initial_cash": 100000,
+  "cash": 7264.427800000014,
+  "invested": 92735.57220000001,
+  "portfolio": {
+    "COP": {
+      "name": "ConocoPhillips Common Stock",
+      "quantity": 16,
+      "avg_price": 128.52,
+      "entry_date": "2026-10-06",
+      "peak_price": 128.52,
+      "is_scaled_out": false
+    },
+    "BKNG": {
+      "name": "Booking Holdings Inc. Common Stock",
+      "quantity": 11,
+      "avg_price": 158.9832,
+      "entry_date": "2026-10-06",
+      "peak_price": 158.9832,
+      "is_scaled_out": false
+    },
+    "VLO": {
+      "name": "Valero Energy Corporation Common Stock",
+      "quantity": 4,
+      "avg_price": 419.629,
+      "entry_date": "2026-10-06",
+      "peak_price": 419.629,
+      "is_scaled_out": false
+    },
+    "ADI": {
+      "name": "Analog Devices, Inc. Common Stock",
+      "quantity": 5,
+      "avg_price": 419.24,
+      "entry_date": "2026-10-06",
+      "peak_price": 419.24,
+      "is_scaled_out": false
+    },
+    "LMT": {
+      "name": "Lockheed Martin Corporation Common Stock",
+      "quantity": 3,
+      "avg_price": 506.04,
+      "entry_date": "2026-10-06",
+      "peak_price": 506.04,
+      "is_scaled_out": false
+    },
+    "FTNT": {
+      "name": "Fortinet, Inc. Common Stock",
+      "quantity": 10,
+      "avg_price": 191.14,
+      "entry_date": "2026-10-06",
+      "peak_price": 191.14,
+      "is_scaled_out": false
+    },
+    "SHOP": {
+      "name": "Shopify Inc. Class A Subordinate Voting Shares",
+      "quantity": 14,
+      "avg_price": 164.405,
+      "entry_date": "2026-10-06",
+      "peak_price": 164.405,
+      "is_scaled_out": false
+    },
+    "MPC": {
+      "name": "Marathon Petroleum Corporation Common Stock",
+      "quantity": 4,
+      "avg_price": 433.065,
+      "entry_date": "2026-10-06",
+      "peak_price": 433.065,
+      "is_scaled_out": false
+    },
+    "BAC": {
+      "name": "Bank of America Corporation Common Stock",
+      "quantity": 59,
+      "avg_price": 54.225,
+      "entry_date": "2026-10-06",
+      "peak_price": 54.225,
+      "is_scaled_out": false
+    },
+    "MDT": {
+      "name": "Medtronic plc. Ordinary Shares",
+      "quantity": 20,
+      "avg_price": 87.95,
+      "entry_date": "2026-10-06",
+      "peak_price": 87.95,
+      "is_scaled_out": false
+    },
+    "NEM": {
+      "name": "Newmont Corporation",
+      "quantity": 15,
+      "avg_price": 116.215,
+      "entry_date": "2026-10-06",
+      "peak_price": 116.215,
+      "is_scaled_out": false
+    },
+    "ABBV": {
+      "name": "AbbVie Inc. Common Stock",
+      "quantity": 13,
+      "avg_price": 268.5,
+      "entry_date": "2026-10-06",
+      "peak_price": 268.5,
+      "is_scaled_out": false
+    },
+    "AMD": {
+      "name": "Advanced Micro Devices, Inc. Common Stock",
+      "quantity": 8,
+      "avg_price": 643.265,
+      "entry_date": "2026-10-06",
+      "peak_price": 643.265,
+      "is_scaled_out": false
+    },
+    "JCI": {
+      "name": "Johnson Controls International plc Ordinary Share",
+      "quantity": 10,
+      "avg_price": 157.875,
+      "entry_date": "2026-10-06",
+      "peak_price": 157.875,
+      "is_scaled_out": false
+    },
+    "SYK": {
+      "name": "Stryker Corporation Common Stock",
+      "quantity": 6,
+      "avg_price": 280.86,
+      "entry_date": "2026-10-06",
+      "peak_price": 280.86,
+      "is_scaled_out": false
+    },
+    "ABNB": {
+      "name": "Airbnb, Inc. Class A Common Stock",
+      "quantity": 10,
+      "avg_price": 164.34,
+      "entry_date": "2026-10-06",
+      "peak_price": 164.34,
+      "is_scaled_out": false
+    },
+    "HPE": {
+      "name": "Hewlett Packard Enterprise Company Common Stock",
+      "quantity": 22,
+      "avg_price": 70.19,
+      "entry_date": "2026-10-06",
+      "peak_price": 70.19,
+      "is_scaled_out": false
+    },
+    "TXN": {
+      "name": "Texas Instruments Incorporated Common Stock",
+      "quantity": 9,
+      "avg_price": 294.9,
+      "entry_date": "2026-10-06",
+      "peak_price": 294.9,
+      "is_scaled_out": false
+    },
+    "SNPS": {
+      "name": "Synopsys, Inc. Common Stock",
+      "quantity": 3,
+      "avg_price": 493.675,
+      "entry_date": "2026-10-06",
+      "peak_price": 493.675,
+      "is_scaled_out": false
+    },
+    "CRM": {
+      "name": "Salesforce, Inc. Common Stock",
+      "quantity": 10,
+      "avg_price": 230.98,
+      "entry_date": "2026-10-06",
+      "peak_price": 230.98,
+      "is_scaled_out": false
+    },
+    "SPGI": {
+      "name": "S&P Global Inc. Common Stock",
+      "quantity": 4,
+      "avg_price": 393.72,
+      "entry_date": "2026-10-06",
+      "peak_price": 393.72,
+      "is_scaled_out": false
+    },
+    "DHR": {
+      "name": "Danaher Corporation Common Stock",
+      "quantity": 9,
+      "avg_price": 225.745,
+      "entry_date": "2026-10-06",
+      "peak_price": 225.745,
+      "is_scaled_out": false
+    },
+    "SCHW": {
+      "name": "Charles Schwab Corporation (The) Common Stock",
+      "quantity": 22,
+      "avg_price": 98.335,
+      "entry_date": "2026-10-06",
+      "peak_price": 98.335,
+      "is_scaled_out": false
+    },
+    "DELL": {
+      "name": "Dell Technologies Inc. Class C Common Stock ",
+      "quantity": 5,
+      "avg_price": 568.88,
+      "entry_date": "2026-10-06",
+      "peak_price": 568.88,
+      "is_scaled_out": false
+    },
+    "SNOW": {
+      "name": "Snowflake Inc. Common Stock",
+      "quantity": 5,
+      "avg_price": 343.63,
+      "entry_date": "2026-10-06",
+      "peak_price": 343.63,
+      "is_scaled_out": false
+    },
+    "PSX": {
+      "name": "Phillips 66 Common Stock",
+      "quantity": 6,
+      "avg_price": 268.985,
+      "entry_date": "2026-10-06",
+      "peak_price": 268.985,
+      "is_scaled_out": false
+    },
+    "INTC": {
+      "name": "Intel Corporation Common Stock",
+      "quantity": 36,
+      "avg_price": 116.83,
+      "entry_date": "2026-10-06",
+      "peak_price": 116.83,
+      "is_scaled_out": false
+    },
+    "UNH": {
+      "name": "UnitedHealth Group Incorporated Common Stock (DE)",
+      "quantity": 8,
+      "avg_price": 379.145,
+      "entry_date": "2026-10-06",
+      "peak_price": 379.145,
+      "is_scaled_out": false
+    },
+    "V": {
+      "name": "Visa Inc.",
+      "quantity": 11,
+      "avg_price": 368.82,
+      "entry_date": "2026-10-06",
+      "peak_price": 368.82,
+      "is_scaled_out": false
+    },
+    "MCD": {
+      "name": "McDonald's Corporation Common Stock",
+      "quantity": 9,
+      "avg_price": 232.704,
+      "entry_date": "2026-10-06",
+      "peak_price": 232.704,
+      "is_scaled_out": false
+    },
+    "PEP": {
+      "name": "PepsiCo, Inc. Common Stock",
+      "quantity": 17,
+      "avg_price": 126.015,
+      "entry_date": "2026-10-06",
+      "peak_price": 126.015,
+      "is_scaled_out": false
+    },
+    "WDC": {
+      "name": "Western Digital Corporation Common Stock",
+      "quantity": 4,
+      "avg_price": 420.855,
+      "entry_date": "2026-10-06",
+      "peak_price": 420.855,
+      "is_scaled_out": false
+    },
+    "STX": {
+      "name": "Seagate Technology Holdings PLC Ordinary Shares (Ireland)",
+      "quantity": 2,
+      "avg_price": 840.0,
+      "entry_date": "2026-10-06",
+      "peak_price": 840.0,
+      "is_scaled_out": false
+    },
+    "DIS": {
+      "name": "Walt Disney Company (The) Common Stock",
+      "quantity": 21,
+      "avg_price": 103.44,
+      "entry_date": "2026-10-06",
+      "peak_price": 103.44,
+      "is_scaled_out": false
+    },
+    "AVGO": {
+      "name": "Broadcom Inc. Common Stock",
+      "quantity": 18,
+      "avg_price": 365.725,
+      "entry_date": "2026-10-06",
+      "peak_price": 365.725,
+      "is_scaled_out": false
+    },
+    "HCA": {
+      "name": "HCA Healthcare, Inc. Common Stock",
+      "quantity": 3,
+      "avg_price": 436.62,
+      "entry_date": "2026-10-06",
+      "peak_price": 436.62,
+      "is_scaled_out": false
+    },
+    "WMB": {
+      "name": "Williams Companies, Inc. (The) Common Stock",
+      "quantity": 22,
+      "avg_price": 70.595,
+      "entry_date": "2026-10-06",
+      "peak_price": 70.595,
+      "is_scaled_out": false
+    },
+    "PLTR": {
+      "name": "Palantir Technologies Inc. Class A Common Stock",
+      "quantity": 18,
+      "avg_price": 191.3,
+      "entry_date": "2026-10-06",
+      "peak_price": 191.3,
+      "is_scaled_out": false
+    },
+    "TJX": {
+      "name": "TJX Companies, Inc. (The) Common Stock",
+      "quantity": 14,
+      "avg_price": 135.865,
+      "entry_date": "2026-10-06",
+      "peak_price": 135.865,
+      "is_scaled_out": false
+    },
+    "CB": {
+      "name": "Chubb Limited  Common Stock",
+      "quantity": 5,
+      "avg_price": 330.3,
+      "entry_date": "2026-10-06",
+      "peak_price": 330.3,
+      "is_scaled_out": false
+    }
+  },
+  "peak_nav": 100000.00000000003,
+  "total_fees": 92.73559999999999,
+  "history": [
+    100000
+  ],
+  "daily_trades": [],
+  "cooldown_codes": {},
+  "rebalance_month": "202610",
+  "raw_stats": {
+    "cash": 7264.427800000014,
+    "total_asset": 100000.00000000003,
+    "profit_rate": 2.9103830456733704e-14,
+    "holdings_count": 40,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0.0,
+    "turnover": 0.927356,
+    "frequency": 40.0,
+    "total_fees": 92.73559999999999,
+    "current_prices": {
+      "GILD": 145.44,
+      "PLTR": 191.3,
+      "UBER": 69.73,
+      "WFC": 81.605,
+      "MCD": 232.704,
+      "MDT": 87.95,
+      "PGR": 213.02,
+      "T": 24.23,
+      "ADI": 419.24,
+      "LRCX": 343.345,
+      "ABBV": 268.5,
+      "SCHW": 98.335,
+      "ISRG": 406.31,
+      "SHOP": 164.405,
+      "CRWD": 282.06,
+      "AVGO": 365.725,
+      "PH": 978.725,
+      "V": 368.82,
+      "ORCL": 144.56,
+      "EQIX": 1035.865,
+      "APP": 281.955,
+      "SNDK": 1693.79,
+      "BNY": 144.115,
+      "UNH": 379.145,
+      "CAT": 853.68,
+      "SYK": 280.86,
+      "MSFT": 529.845,
+      "ANET": 209.01,
+      "AMD": 643.265,
+      "WMB": 70.595,
+      "NEM": 116.215,
+      "JPM": 331.8,
+      "TJX": 135.865,
+      "LMT": 506.04,
+      "SPCX": 174.23,
+      "LIN": 489.13,
+      "SNOW": 343.63,
+      "BAC": 54.225,
+      "VRT": 251.67,
+      "BKNG": 158.9832,
+      "PLD": 128.25,
+      "BMY": 58.895,
+      "GD": 328.5,
+      "MPC": 433.065,
+      "INTC": 116.83,
+      "DHR": 225.745,
+      "AAPL": 333.055,
+      "STX": 840.0,
+      "COP": 128.52,
+      "GS": 897.3,
+      "MA": 563.297,
+      "DIS": 103.44,
+      "WDC": 420.855,
+      "SPGI": 393.72,
+      "VLO": 419.629,
+      "PEP": 126.015,
+      "FTNT": 191.14,
+      "TMUS": 164.87,
+      "EMR": 162.54,
+      "CRM": 230.98,
+      "CB": 330.3,
+      "COF": 196.18,
+      "CSX": 47.604,
+      "CVX": 206.47,
+      "MU": 1060.36,
+      "HCA": 436.62,
+      "ADBE": 238.61,
+      "SBUX": 93.996,
+      "AXP": 305.485,
+      "HPE": 70.19,
+      "JCI": 157.875,
+      "KO": 86.68,
+      "TXN": 294.9,
+      "PM": 190.12,
+      "SNPS": 493.675,
+      "LITE": 1090.91,
+      "PSX": 268.985,
+      "CVS": 86.93,
+      "DELL": 568.88,
+      "ABNB": 164.34
+    }
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 20.0,
+    "MDD": 100.0,
+    "거래빈도": 100,
+    "자본회전율": 1.854712
+  }
+}

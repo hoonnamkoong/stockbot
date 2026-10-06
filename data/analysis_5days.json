@@ -5,9 +5,9 @@
     "market": "KOSPI",
     "price": 271000,
     "recent_posts_count": 800,
-    "unique_posters": 448,
+    "unique_posters": 450,
     "fact_score": 0.1,
-    "total_likes": 1523,
+    "total_likes": 1529,
     "foreign_rate": 46.41,
     "foreign_change": 0.0,
     "inst_net_buy": 614278,
@@ -16,7 +16,7 @@
     "day_high": 279000,
     "day_low": 270000,
     "prev_foreign_rate": 46.41,
-    "posts_summary": "영업이익 100조에도 불구하고 주가 부진, 정치적 요인 및 자사주 매입에 대한 불만 제기. 하이닉스와의 비교 및 향후 하락 전망 언급.",
+    "posts_summary": "분기 영업이익 100조 예상에도 주가 부진, 정치적 요인 및 자사주 매입 관련 불만 제기.",
     "sentiment": "-5",
     "top_keywords": [],
     "consecutive_days": 6,
@@ -24,23 +24,23 @@
     "change_rate": "-1.81%",
     "signal": null,
     "current_price": 271000,
-    "volume": 9055582,
-    "amount": 2485831736500,
+    "volume": 9263944,
+    "amount": 2542298386500,
     "posts": [
-      {
-        "nid": "430161404",
-        "title": "형수만 잘 찢는줄 알았는데",
-        "likes": 11
-      },
       {
         "nid": "430166702",
         "title": "주식판이 이리된건",
-        "likes": 10
+        "likes": 11
       },
       {
         "nid": "430164677",
         "title": "분기 영업이익 100조 앞두고도 주가가 이모양이다니",
-        "likes": 10
+        "likes": 11
+      },
+      {
+        "nid": "430161404",
+        "title": "형수만 잘 찢는줄 알았는데",
+        "likes": 11
       },
       {
         "nid": "430163398",
@@ -73,6 +73,11 @@
         "likes": 9
       },
       {
+        "nid": "430155708",
+        "title": "삼성전자 vs. 하이닉스 ver.03",
+        "likes": 9
+      },
+      {
         "nid": "430153681",
         "title": "전세계반도체회사가 전고점을 향해가는데",
         "likes": 9
@@ -95,11 +100,6 @@
       {
         "nid": "430158881",
         "title": "3분기 실발하면 또 큰 폭 하락하겠죠?",
-        "likes": 8
-      },
-      {
-        "nid": "430155708",
-        "title": "삼성전자 vs. 하이닉스 ver.03",
         "likes": 8
       },
       {
@@ -128,6 +128,11 @@
         "likes": 7
       },
       {
+        "nid": "430162183",
+        "title": "그래서 결론은??",
+        "likes": 7
+      },
+      {
         "nid": "430161838",
         "title": "[속보] 조희대 \"국회와 대통령, 대법원장의 제청에 관여할 수 없어\"",
         "likes": 7
@@ -148,6 +153,16 @@
         "likes": 7
       },
       {
+        "nid": "430168014",
+        "title": "은행권다해킹될정도면",
+        "likes": 6
+      },
+      {
+        "nid": "430166733",
+        "title": "미국",
+        "likes": 6
+      },
+      {
         "nid": "430163760",
         "title": "대국민 사기주식이네",
         "likes": 6
@@ -161,28 +176,13 @@
         "nid": "430163441",
         "title": "어째",
         "likes": 6
-      },
-      {
-        "nid": "430163158",
-        "title": "매출 잘 나온다고 주가 올라가지 않겠다",
-        "likes": 6
-      },
-      {
-        "nid": "430162253",
-        "title": "[충격]이재명은 원상복구하라",
-        "likes": 6
-      },
-      {
-        "nid": "430162183",
-        "title": "그래서 결론은??",
-        "likes": 6
       }
     ],
     "sparkline_price": [
-      271000,
       270250,
       270750,
       270500,
+      271000,
       271000
     ],
     "range_history": [
@@ -229,11 +229,11 @@
       3771924538500,
       3174345000000
     ],
-    "tick_power": 92.89,
-    "bid_ask_ratio": 0.5192540402205337,
-    "frgn_fake_ntby_qty": -1259000,
-    "orgn_fake_ntby_qty": 374000,
-    "sum_fake_ntby_qty": -885000,
+    "tick_power": 92.63,
+    "bid_ask_ratio": 0.5472793669919033,
+    "frgn_fake_ntby_qty": -1436000,
+    "orgn_fake_ntby_qty": 139000,
+    "sum_fake_ntby_qty": -1297000,
     "roe": 31.39,
     "net_profit_rate": 38.92,
     "debt_ratio": 31.1,
@@ -254,7 +254,7 @@
     "keywords": [
       "영업이익",
       "자사주 매입",
-      "정치"
+      "반도체"
     ],
     "sparkline_posts": [
       800,
@@ -270,11 +270,11 @@
     "code": "000660",
     "name": "SK하이닉스",
     "market": "KOSPI",
-    "price": 1782000,
+    "price": 1780000,
     "recent_posts_count": 800,
-    "unique_posters": 458,
-    "fact_score": 0.1,
-    "total_likes": 1950,
+    "unique_posters": 463,
+    "fact_score": 0.05,
+    "total_likes": 1928,
     "foreign_rate": 49.76,
     "foreign_change": -0.01,
     "inst_net_buy": 76049,
@@ -283,16 +283,16 @@
     "day_high": 1837000,
     "day_low": 1771000,
     "prev_foreign_rate": 49.77,
-    "posts_summary": "이재명 리스크와 대통령실 관련 언급이 지배적이며, 주가 조작 의혹 및 오너 리스크 제기. 과거와 다른 하이닉스에 대한 부정적 평가.",
+    "posts_summary": "이재명 리스크와 오너십 문제로 인한 주가 하락에 대한 강한 불만과 정치적 책임론 제기.",
     "sentiment": "-8",
     "top_keywords": [],
     "consecutive_days": 6,
     "status": "활성",
-    "change_rate": "-3.20%",
+    "change_rate": "-3.31%",
     "signal": null,
-    "current_price": 1782000,
-    "volume": 1895613,
-    "amount": 3411506584500,
+    "current_price": 1780000,
+    "volume": 1959970,
+    "amount": 3526055429000,
     "posts": [
       {
         "nid": "430162856",
@@ -430,27 +430,27 @@
         "likes": 8
       },
       {
-        "nid": "430153721",
-        "title": "얘들아! 형이다.",
-        "likes": 8
+        "nid": "430168395",
+        "title": "회사 대표하나가 반윤리적행동 하나로",
+        "likes": 7
+      },
+      {
+        "nid": "430166890",
+        "title": "3.5% 넘게 빠지는건 진짜 너무 한거 아니냐?",
+        "likes": 7
       },
       {
         "nid": "430166396",
         "title": "내일부터 자사주 다시 60만주로 늘려라",
         "likes": 7
-      },
-      {
-        "nid": "430166304",
-        "title": "레버리지로 외인 먹여살려",
-        "likes": 7
       }
     ],
     "sparkline_price": [
-      1784000,
       1777000,
       1774000,
       1784500,
-      1782000
+      1782000,
+      1780000
     ],
     "range_history": [
       1596000,
@@ -496,11 +496,11 @@
       4031281088000,
       3743555544000
     ],
-    "tick_power": 90.0,
-    "bid_ask_ratio": 0.4693777002956113,
-    "frgn_fake_ntby_qty": -549000,
-    "orgn_fake_ntby_qty": 13000,
-    "sum_fake_ntby_qty": -536000,
+    "tick_power": 89.14,
+    "bid_ask_ratio": 0.932303024556746,
+    "frgn_fake_ntby_qty": -648000,
+    "orgn_fake_ntby_qty": -31000,
+    "sum_fake_ntby_qty": -679000,
     "roe": 92.68,
     "net_profit_rate": 101.8,
     "debt_ratio": 32.8,
@@ -511,16 +511,16 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 30.23,
-    "pbr": 10.38,
+    "per": 30.19,
+    "pbr": 10.36,
     "eps": 58955,
     "bps": 171751,
     "w52_hgpr": 2987000,
     "w52_lwpr": 403000,
-    "mkt_cap": 13017374,
+    "mkt_cap": 13002764,
     "keywords": [
       "이재명 리스크",
-      "오너 리스크",
+      "오너십",
       "주가 조작"
     ],
     "sparkline_posts": [
@@ -537,11 +537,11 @@
     "code": "356680",
     "name": "엑스게이트",
     "market": "KOSDAQ",
-    "price": 20500,
-    "recent_posts_count": 124,
-    "unique_posters": 78,
+    "price": 20450,
+    "recent_posts_count": 126,
+    "unique_posters": 79,
     "fact_score": 0.4,
-    "total_likes": 212,
+    "total_likes": 214,
     "foreign_rate": 1.04,
     "foreign_change": 0.21,
     "inst_net_buy": 9128,
@@ -550,16 +550,16 @@
     "day_high": 22300,
     "day_low": 20050,
     "prev_foreign_rate": 0.83,
-    "posts_summary": "은행권 보안 이슈와 연관된 보안주로서 연말 상승 기대감 표출. 긍정적 상승 징조 및 양자 보안 관련 언급.",
-    "sentiment": "6",
+    "posts_summary": "은행권 해킹 이슈로 인한 보안주 부각, 엑스게이트의 상승 기대감과 실질적 주가 상승 확인.",
+    "sentiment": "7",
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "+9.10%",
+    "change_rate": "+8.83%",
     "signal": null,
-    "current_price": 20500,
-    "volume": 6735957,
-    "amount": 142594911290,
+    "current_price": 20450,
+    "volume": 6777981,
+    "amount": 143457398665,
     "posts": [
       {
         "nid": "430140603",
@@ -610,6 +610,11 @@
         "nid": "430140571",
         "title": "보안주...연말에 지금의 2~3배 가있을거다..",
         "likes": 4
+      },
+      {
+        "nid": "430167436",
+        "title": "이 놈은",
+        "likes": 3
       },
       {
         "nid": "430162439",
@@ -672,8 +677,8 @@
         "likes": 2
       },
       {
-        "nid": "430167436",
-        "title": "이 놈은",
+        "nid": "430167246",
+        "title": "골드만이 21900원에 쳐물려있네 ㅋㅋㅋㅋㅋ",
         "likes": 2
       },
       {
@@ -705,19 +710,14 @@
         "nid": "430161551",
         "title": "엑스게이트",
         "likes": 2
-      },
-      {
-        "nid": "430160577",
-        "title": "여기가 저점이니?",
-        "likes": 2
       }
     ],
     "sparkline_price": [
-      20350,
       20400,
       20400,
       20850,
-      20500
+      20500,
+      20450
     ],
     "range_history": [
       10760,
@@ -763,11 +763,11 @@
       25569711600,
       63752294880
     ],
-    "tick_power": 93.07,
-    "bid_ask_ratio": 0.9756285800422068,
-    "frgn_fake_ntby_qty": -73000,
+    "tick_power": 92.54,
+    "bid_ask_ratio": 3.584943504713512,
+    "frgn_fake_ntby_qty": -58000,
     "orgn_fake_ntby_qty": 2000,
-    "sum_fake_ntby_qty": -71000,
+    "sum_fake_ntby_qty": -56000,
     "roe": 9.43,
     "net_profit_rate": 9.25,
     "debt_ratio": 51.08,
@@ -778,37 +778,37 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 146.43,
-    "pbr": 13.17,
+    "per": 146.07,
+    "pbr": 13.13,
     "eps": 140,
     "bps": 1557,
     "w52_hgpr": 30550,
     "w52_lwpr": 6100,
-    "mkt_cap": 5851,
+    "mkt_cap": 5837,
     "keywords": [
       "보안주",
       "양자 보안",
-      "상승 기대"
+      "금융 고객사"
     ],
     "sparkline_posts": [
-      117,
       116,
       120,
       124,
-      124
+      124,
+      126
     ],
-    "avg_posts": 120.2,
-    "total_posts": 601
+    "avg_posts": 122.0,
+    "total_posts": 610
   },
   {
     "code": "028300",
     "name": "HLB",
     "market": "KOSDAQ",
-    "price": 46900,
-    "recent_posts_count": 784,
-    "unique_posters": 424,
+    "price": 46750,
+    "recent_posts_count": 799,
+    "unique_posters": 428,
     "fact_score": 0.8,
-    "total_likes": 4682,
+    "total_likes": 4778,
     "foreign_rate": 14.1,
     "foreign_change": -0.01,
     "inst_net_buy": 196465,
@@ -822,16 +822,16 @@
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "+15.95%",
+    "change_rate": "+15.57%",
     "signal": null,
-    "current_price": 46900,
-    "volume": 5196272,
-    "amount": 248611245750,
+    "current_price": 46750,
+    "volume": 5233154,
+    "amount": 250343719275,
     "posts": [
       {
         "nid": "430143799",
         "title": "HLB 동진사이트 VAI 축하드립니다.",
-        "likes": 66
+        "likes": 67
       },
       {
         "nid": "430139972",
@@ -889,6 +889,11 @@
         "likes": 26
       },
       {
+        "nid": "430161114",
+        "title": "재접수시",
+        "likes": 25
+      },
+      {
         "nid": "430158890",
         "title": "평단 8만원..",
         "likes": 25
@@ -912,11 +917,6 @@
         "nid": "430158528",
         "title": "HLB \"꿈의 간암 신약\", 美 FDA 허가…로슈 뛰어넘는다\"",
         "likes": 24
-      },
-      {
-        "nid": "430161114",
-        "title": "재접수시",
-        "likes": 23
       },
       {
         "nid": "430159894",
@@ -980,11 +980,11 @@
       }
     ],
     "sparkline_price": [
-      46850,
       46650,
       46500,
       46450,
-      46900
+      46900,
+      46750
     ],
     "range_history": [
       32800,
@@ -1031,10 +1031,10 @@
       28516503450
     ],
     "tick_power": 126.29,
-    "bid_ask_ratio": 1.2895153626860945,
-    "frgn_fake_ntby_qty": 425000,
-    "orgn_fake_ntby_qty": 8000,
-    "sum_fake_ntby_qty": 433000,
+    "bid_ask_ratio": 0.6375843454790823,
+    "frgn_fake_ntby_qty": 474000,
+    "orgn_fake_ntby_qty": 9000,
+    "sum_fake_ntby_qty": 483000,
     "roe": -54.43,
     "net_profit_rate": -259.77,
     "debt_ratio": 114.94,
@@ -1045,37 +1045,37 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -27.97,
-    "pbr": 14.85,
+    "per": -27.88,
+    "pbr": 14.8,
     "eps": -1677,
     "bps": 3159,
     "w52_hgpr": 69200,
     "w52_lwpr": 24150,
-    "mkt_cap": 62470,
+    "mkt_cap": 62270,
     "keywords": [
       "리보세라닙",
       "FDA 승인",
       "간암 신약"
     ],
     "sparkline_posts": [
-      727,
       736,
       754,
       770,
-      784
+      784,
+      799
     ],
-    "avg_posts": 754.2,
-    "total_posts": 3771
+    "avg_posts": 768.6,
+    "total_posts": 3843
   },
   {
     "code": "486510",
     "name": "글로벌테크놀로지",
     "market": "KOSDAQ",
-    "price": 15360,
-    "recent_posts_count": 131,
+    "price": 15220,
+    "recent_posts_count": 134,
     "unique_posters": 62,
     "fact_score": 0.2,
-    "total_likes": 391,
+    "total_likes": 393,
     "foreign_rate": 0.32,
     "foreign_change": 0.14,
     "inst_net_buy": 257,
@@ -1089,11 +1089,11 @@
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "+0.07%",
+    "change_rate": "-0.85%",
     "signal": null,
-    "current_price": 15360,
-    "volume": 4449852,
-    "amount": 69713846510,
+    "current_price": 15220,
+    "volume": 4482032,
+    "amount": 70205514895,
     "posts": [
       {
         "nid": "430138414",
@@ -1247,11 +1247,11 @@
       }
     ],
     "sparkline_price": [
-      15230,
       15400,
       15230,
       15210,
-      15360
+      15360,
+      15220
     ],
     "range_history": [
       14500,
@@ -1265,11 +1265,11 @@
       101164423750,
       57161159560
     ],
-    "tick_power": 84.15,
-    "bid_ask_ratio": 0.13770431924025203,
-    "frgn_fake_ntby_qty": 13000,
+    "tick_power": 83.53,
+    "bid_ask_ratio": 0.11307538358905937,
+    "frgn_fake_ntby_qty": 12000,
     "orgn_fake_ntby_qty": 0,
-    "sum_fake_ntby_qty": 13000,
+    "sum_fake_ntby_qty": 12000,
     "roe": 0.0,
     "net_profit_rate": 0.0,
     "debt_ratio": 999.0,
@@ -1286,20 +1286,20 @@
     "bps": 0,
     "w52_hgpr": 29750,
     "w52_lwpr": 12760,
-    "mkt_cap": 3018,
+    "mkt_cap": 2990,
     "keywords": [
       "자사주 매집",
       "초저평가",
       "수급"
     ],
     "sparkline_posts": [
-      118,
       122,
       122,
       125,
-      131
+      131,
+      134
     ],
-    "avg_posts": 123.6,
-    "total_posts": 618
+    "avg_posts": 126.8,
+    "total_posts": 634
   }
 ]

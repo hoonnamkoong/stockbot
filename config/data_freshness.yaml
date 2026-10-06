@@ -94,6 +94,14 @@ outputs:
       미국 심2 감시목록을 장중 루프가 읽는다. 이 파일이 낡으면 us_trading이
       돌았어도 판단 근거가 없다 — 2026-08-27~28 미발화가 이 자리에 걸린다.
 
+  - path: data/sim_us4_avoid_watchlist.json
+    producer: us_eod_watchlist.yml
+    calendar: us
+    max_age_sessions: 2
+    why: >
+      미국 심4 감시목록. 점수는 달에 한 번만 새로 내지만 파일은 매일 날짜를 바꿔
+      다시 쓴다(읽는 쪽이 날짜에 fail-closed). 낡으면 월초 교체가 통째로 안 일어난다.
+
   - path: data/us_universe.json
     producer: us_eod_watchlist.yml
     calendar: us

@@ -52,6 +52,11 @@ jobs:
           # 없고 db-data에만 있다. 한 줄 git checkout에 여러 경로를 묶지 않는다 —
           # 하나만 없어도 전체가 실패한다.
           git checkout FETCH_HEAD -- data/sim_us1minervini_state.json 2>/dev/null || echo "[Info] US Sim1 상태 없음 — 보유 종목 청산 지표 생략"
+          # US Sim4 직전 감시목록. 점수는 달이 바뀔 때만 새로 내고, 그 사이에는
+          # 직전 목록을 날짜만 바꿔 다시 쓴다(run_eod_sim_us.refresh_sim4_watchlist).
+          # 이게 없으면 매일 SEC 150콜을 다시 치고, 점수 산출이 실패한 달에는
+          # 이어 쓸 목록이 없어 심이 멈춘다.
+          git checkout FETCH_HEAD -- data/sim_us4_avoid_watchlist.json 2>/dev/null || echo "[Info] US Sim4 직전 감시목록 없음 — 이번 런에서 점수를 새로 냄"
           mkdir -p data
 
       # 워치리스트 수집(최대 40분)보다 **먼저** 돈다 — 뒤에 두면 알림이 그만큼 늦다.
@@ -87,6 +92,7 @@ jobs:
           cp data/sim_us1_minervini_watchlist.json db_data_repo/data/ 2>/dev/null || true
           cp data/sim_us2_donchian_watchlist.json db_data_repo/data/ 2>/dev/null || true
           cp data/sim_us3_liquidity_watchlist.json db_data_repo/data/ 2>/dev/null || true
+          cp data/sim_us4_avoid_watchlist.json db_data_repo/data/ 2>/dev/null || true
           cp data/us_universe.json db_data_repo/data/ 2>/dev/null || true
           cd db_data_repo
           git add -A data/

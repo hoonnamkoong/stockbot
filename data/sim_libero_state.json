@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-10-06 10:50:56",
+  "last_run": "2026-10-06 11:01:12",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": null,
-  "bull_score": 43.5,
+  "bull_score": 44.8,
   "metrics": {
-    "breadth_score": 46.0,
-    "momentum_score": -0.26,
+    "breadth_score": 48.0,
+    "momentum_score": 0.0,
     "trend_strength": 32.3,
     "foreign_score": null,
     "volatility_score": null
@@ -836,6 +836,10 @@
       {
         "t": "10:00",
         "breadth": 52.0
+      },
+      {
+        "t": "11:00",
+        "breadth": 48.0
       }
     ],
     "predictions": [
@@ -861,7 +865,7 @@
         "type": "h1",
         "model": "naive",
         "value": 52.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "10:00",
@@ -870,19 +874,26 @@
         "model": "naive",
         "value": 52.0,
         "scored": false
+      },
+      {
+        "made_at": "11:00",
+        "target": "12:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 48.0,
+        "scored": false
+      },
+      {
+        "made_at": "11:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 48.0,
+        "scored": false
       }
     ]
   },
   "intraday_score_log": [
-    {
-      "date": "2026-07-21",
-      "type": "h1",
-      "made_at": "09:00",
-      "target": "10:00",
-      "pred": 12.0,
-      "actual": 38.0,
-      "gap": -26.0
-    },
     {
       "date": "2026-07-21",
       "type": "h1",
@@ -12665,6 +12676,16 @@
       "pred": 60.0,
       "actual": 52.0,
       "gap": 8.0
+    },
+    {
+      "date": "2026-10-06",
+      "type": "h1",
+      "made_at": "10:00",
+      "model": "naive",
+      "target": "11:00",
+      "pred": 52.0,
+      "actual": 48.0,
+      "gap": 4.0
     }
   ],
   "regime6_state": {
@@ -12686,10 +12707,10 @@
       "date": "2026-10-06",
       "source": "live",
       "metrics": {
-        "D": -0.1136223650449912,
-        "ab20": 38.38383838383838,
-        "ret10": 0.014244104073388941,
-        "vol10": 0.7640940083419465
+        "D": -0.06779697550664238,
+        "ab20": 40.4040404040404,
+        "ret10": 0.014894665969505949,
+        "vol10": 0.7654454044865981
       }
     }
   },
@@ -12700,13 +12721,13 @@
   "regime6_confirmed_since": "2026-10-02",
   "regime6_status": "ok",
   "regime6_metrics": {
-    "D": -0.1136,
-    "ab20": 38.4,
-    "ret10": 1.42,
-    "vol10": 0.764,
+    "D": -0.0678,
+    "ab20": 40.4,
+    "ret10": 1.49,
+    "vol10": 0.765,
     "raw_level": 0,
     "source": "live",
-    "judged_at": "2026-10-06 10:50:56",
+    "judged_at": "2026-10-06 11:01:12",
     "reason": null
   }
 }

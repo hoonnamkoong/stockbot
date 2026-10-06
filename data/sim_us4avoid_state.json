@@ -40,7 +40,7 @@
       "quantity": 3,
       "avg_price": 506.04,
       "entry_date": "2026-10-06",
-      "peak_price": 506.87,
+      "peak_price": 507.34,
       "is_scaled_out": false
     },
     "FTNT": {
@@ -112,7 +112,7 @@
       "quantity": 10,
       "avg_price": 157.875,
       "entry_date": "2026-10-06",
-      "peak_price": 158.425,
+      "peak_price": 158.51,
       "is_scaled_out": false
     },
     "SYK": {
@@ -168,7 +168,7 @@
       "quantity": 4,
       "avg_price": 393.72,
       "entry_date": "2026-10-06",
-      "peak_price": 394.925,
+      "peak_price": 395.27,
       "is_scaled_out": false
     },
     "DHR": {
@@ -184,7 +184,7 @@
       "quantity": 22,
       "avg_price": 98.335,
       "entry_date": "2026-10-06",
-      "peak_price": 98.68,
+      "peak_price": 98.705,
       "is_scaled_out": false
     },
     "DELL": {
@@ -192,7 +192,7 @@
       "quantity": 5,
       "avg_price": 568.88,
       "entry_date": "2026-10-06",
-      "peak_price": 584.833,
+      "peak_price": 586.04,
       "is_scaled_out": false
     },
     "SNOW": {
@@ -232,7 +232,7 @@
       "quantity": 11,
       "avg_price": 368.82,
       "entry_date": "2026-10-06",
-      "peak_price": 370.27,
+      "peak_price": 370.32,
       "is_scaled_out": false
     },
     "MCD": {
@@ -280,7 +280,7 @@
       "quantity": 18,
       "avg_price": 365.725,
       "entry_date": "2026-10-06",
-      "peak_price": 370.39,
+      "peak_price": 371.49,
       "is_scaled_out": false
     },
     "HCA": {
@@ -296,7 +296,7 @@
       "quantity": 22,
       "avg_price": 70.595,
       "entry_date": "2026-10-06",
-      "peak_price": 70.595,
+      "peak_price": 70.66,
       "is_scaled_out": false
     },
     "PLTR": {
@@ -320,11 +320,11 @@
       "quantity": 5,
       "avg_price": 330.3,
       "entry_date": "2026-10-06",
-      "peak_price": 332.175,
+      "peak_price": 333.005,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 100084.15280000003,
+  "peak_nav": 100132.11980000003,
   "total_fees": 92.73559999999999,
   "history": [
     100000
@@ -334,62 +334,62 @@
   "rebalance_month": "202610",
   "raw_stats": {
     "cash": 7264.427800000014,
-    "total_asset": 100083.33080000003,
-    "profit_rate": 0.08333080000002518,
+    "total_asset": 100132.11980000003,
+    "profit_rate": 0.13211980000002949,
     "holdings_count": 40,
     "win_rate": 0,
     "profit_factor": 1.0,
-    "mdd": 0.0008213088456098879,
+    "mdd": 0.0,
     "turnover": 0.927356,
     "frequency": 40.0,
     "total_fees": 92.73559999999999,
     "current_prices": {
-      "SPGI": 394.35,
-      "JCI": 158.425,
-      "V": 369.76,
-      "ABNB": 163.0,
-      "TJX": 135.535,
-      "AMD": 639.91,
-      "HCA": 431.34,
-      "SNPS": 493.33,
-      "COP": 128.08,
-      "BAC": 54.16,
-      "SCHW": 98.56,
-      "INTC": 116.07,
-      "DIS": 103.53,
-      "SHOP": 165.205,
-      "SNOW": 347.14,
-      "MDT": 88.25,
-      "BKNG": 158.52,
-      "PEP": 125.965,
-      "PSX": 267.095,
-      "SYK": 283.45,
-      "WMB": 70.562,
-      "PLTR": 193.545,
-      "AVGO": 370.39,
-      "HPE": 70.52,
-      "TXN": 295.655,
-      "STX": 840.862,
-      "DELL": 584.833,
-      "FTNT": 191.165,
-      "CRM": 230.135,
-      "DHR": 224.64,
-      "WDC": 418.086,
-      "NEM": 114.76,
-      "ABBV": 266.45,
-      "MCD": 232.71,
-      "VLO": 414.19,
-      "MPC": 428.77,
-      "CB": 332.175,
-      "UNH": 379.555,
-      "ADI": 420.93,
-      "LMT": 506.497
+      "DIS": 103.835,
+      "TXN": 294.72,
+      "SHOP": 165.305,
+      "CB": 333.005,
+      "BAC": 54.199,
+      "HPE": 70.46,
+      "JCI": 158.51,
+      "PLTR": 193.61,
+      "SPGI": 395.27,
+      "INTC": 115.91,
+      "HCA": 431.17,
+      "NEM": 114.94,
+      "TJX": 135.675,
+      "SNOW": 346.761,
+      "SYK": 283.18,
+      "V": 370.32,
+      "SNPS": 491.48,
+      "FTNT": 191.06,
+      "DELL": 586.04,
+      "PEP": 126.0,
+      "CRM": 230.2,
+      "WDC": 416.77,
+      "ABBV": 266.14,
+      "VLO": 414.885,
+      "STX": 837.14,
+      "AMD": 642.865,
+      "BKNG": 159.23,
+      "LMT": 507.34,
+      "ADI": 419.82,
+      "COP": 128.355,
+      "WMB": 70.66,
+      "DHR": 222.63,
+      "MDT": 87.975,
+      "PSX": 267.28,
+      "UNH": 379.925,
+      "ABNB": 164.02,
+      "SCHW": 98.705,
+      "MPC": 428.859,
+      "MCD": 232.91,
+      "AVGO": 371.49
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 20.0,
-    "MDD": 99.99753607346317,
+    "MDD": 100.0,
     "거래빈도": 100,
     "자본회전율": 1.854712
   }

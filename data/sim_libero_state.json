@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-10-06 15:30:45",
+  "last_run": "2026-10-06 15:40:59",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": null,
-  "bull_score": 46.6,
+  "bull_score": 47.6,
   "metrics": {
-    "breadth_score": 52.0,
-    "momentum_score": 0.12,
+    "breadth_score": 54.0,
+    "momentum_score": 0.24,
     "trend_strength": 32.3,
     "foreign_score": null,
     "volatility_score": null
@@ -12803,10 +12803,10 @@
       "date": "2026-10-06",
       "source": "live",
       "metrics": {
-        "D": -0.04523979726753288,
+        "D": -0.03220111879937121,
         "ab20": 40.4040404040404,
-        "ret10": 0.017601527358199087,
-        "vol10": 0.7767803354487772
+        "ret10": 0.01916616877437849,
+        "vol10": 0.787415382142747
       }
     }
   },
@@ -12817,13 +12817,13 @@
   "regime6_confirmed_since": "2026-10-02",
   "regime6_status": "ok",
   "regime6_metrics": {
-    "D": -0.0452,
+    "D": -0.0322,
     "ab20": 40.4,
-    "ret10": 1.76,
-    "vol10": 0.777,
+    "ret10": 1.92,
+    "vol10": 0.787,
     "raw_level": 0,
     "source": "live",
-    "judged_at": "2026-10-06 15:30:45",
+    "judged_at": "2026-10-06 15:40:59",
     "reason": null
   }
 }

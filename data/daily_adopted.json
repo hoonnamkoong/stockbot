@@ -18,12 +18,38 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "FDA 승인 가능성에 대한 AI 분석 결과 및 커뮤니티 내 긍정적 분위기 형성. 관련 공지 및 결과 확인에 대한 언급.",
+        "posts_summary": "FDA 승인 기대감과 AI 분석 기반의 긍정적 전망. 공시나 공식 발표는 아직 확인되지 않음.",
         "sentiment": "8",
         "keywords": [
           "FDA",
           "AI",
           "승인"
+        ]
+      }
+    },
+    "005930": {
+      "name": "삼성전자",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "반도체 시장 랠리에 따른 30만 돌파 기대감. 일부 뉴스와 개인적 전망에 기반함.",
+        "sentiment": "1",
+        "keywords": [
+          "반도체",
+          "영업이익",
+          "외국인"
+        ]
+      }
+    },
+    "356680": {
+      "name": "엑스게이트",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "미국 보안주 강세 및 AI 해킹 사태 관련 보안주 투자 심리 고조. 실제 실적 근거는 부족.",
+        "sentiment": "7",
+        "keywords": [
+          "보안주",
+          "AI",
+          "해킹"
         ]
       }
     }

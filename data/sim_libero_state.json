@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-10-06 14:51:02",
+  "last_run": "2026-10-06 15:00:53",
   "current_regime": "SIDEWAYS",
   "instant_regime": "SIDEWAYS",
   "regime_confidence": null,
-  "bull_score": 41.4,
+  "bull_score": 42.4,
   "metrics": {
-    "breadth_score": 41.0,
-    "momentum_score": -0.31,
+    "breadth_score": 43.0,
+    "momentum_score": -0.22,
     "trend_strength": 32.3,
     "foreign_score": null,
     "volatility_score": null
@@ -852,6 +852,10 @@
       {
         "t": "14:00",
         "breadth": 39.0
+      },
+      {
+        "t": "15:00",
+        "breadth": 43.0
       }
     ],
     "predictions": [
@@ -941,7 +945,7 @@
         "type": "h1",
         "model": "naive",
         "value": 39.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "14:00",
@@ -950,19 +954,18 @@
         "model": "naive",
         "value": 39.0,
         "scored": false
+      },
+      {
+        "made_at": "15:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 43.0,
+        "scored": false
       }
     ]
   },
   "intraday_score_log": [
-    {
-      "date": "2026-07-21",
-      "type": "h1",
-      "made_at": "13:00",
-      "target": "14:00",
-      "pred": 89.0,
-      "actual": 74.0,
-      "gap": 15.0
-    },
     {
       "date": "2026-07-21",
       "type": "h1",
@@ -12749,6 +12752,16 @@
       "pred": 34.0,
       "actual": 39.0,
       "gap": -5.0
+    },
+    {
+      "date": "2026-10-06",
+      "type": "h1",
+      "made_at": "14:00",
+      "model": "naive",
+      "target": "15:00",
+      "pred": 39.0,
+      "actual": 43.0,
+      "gap": -4.0
     }
   ],
   "regime6_state": {
@@ -12770,10 +12783,10 @@
       "date": "2026-10-06",
       "source": "live",
       "metrics": {
-        "D": -0.11631889956434052,
+        "D": -0.10351996469543881,
         "ab20": 38.38383838383838,
-        "ret10": 0.013920519931067021,
-        "vol10": 0.763622654936409
+        "ret10": 0.015456392115335227,
+        "vol10": 0.7670442303319717
       }
     }
   },
@@ -12784,13 +12797,13 @@
   "regime6_confirmed_since": "2026-10-02",
   "regime6_status": "ok",
   "regime6_metrics": {
-    "D": -0.1163,
+    "D": -0.1035,
     "ab20": 38.4,
-    "ret10": 1.39,
-    "vol10": 0.764,
+    "ret10": 1.55,
+    "vol10": 0.767,
     "raw_level": 0,
     "source": "live",
-    "judged_at": "2026-10-06 14:51:02",
+    "judged_at": "2026-10-06 15:00:53",
     "reason": null
   }
 }

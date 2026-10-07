@@ -1,0 +1,60 @@
+{
+  "initial_cash": 0,
+  "cash": 0,
+  "invested": 0,
+  "portfolio": {},
+  "peak_nav": 0,
+  "total_fees": 0,
+  "history": [
+    0,
+    {
+      "date": "2026-10-07",
+      "stage": "관찰",
+      "reason": "EPU 12개월 변화 상위 15% (분위 85)"
+    }
+  ],
+  "daily_trades": [],
+  "cooldown_codes": {},
+  "stage": "관찰",
+  "stage_since": "2026-10-07",
+  "metrics": {
+    "asof": "2026-10-07",
+    "ready": true,
+    "epu_month": "2026-10",
+    "epu_level": 406.17,
+    "epu_obs": 6,
+    "epu_month_partial": true,
+    "epu_12m_pct": 85.3,
+    "epu_z": 1.26,
+    "stress_month": "2026-09",
+    "stress_level": -0.79,
+    "stress_obs": 4,
+    "stress_z": 0.07,
+    "aux_유가WTI_yoy": 52.2,
+    "aux_원달러_yoy": -4.8,
+    "aux_곡선10_2": 0.46,
+    "errors": []
+  },
+  "reason": "EPU 12개월 변화 상위 15% (분위 85)",
+  "checked_at": "2026-10-07 23:21:16",
+  "raw_stats": {
+    "cash": 0,
+    "total_asset": 0,
+    "profit_rate": 0,
+    "holdings_count": 0,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0,
+    "turnover": 0,
+    "frequency": 0,
+    "total_fees": 0,
+    "current_prices": {}
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 20.0,
+    "MDD": 100,
+    "거래빈도": 0,
+    "자본회전율": 0
+  }
+}

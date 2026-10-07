@@ -218,6 +218,7 @@ NO_BUY_LOOP = {
     'sim0_libero.py': '분석기 — 국면만 판정하고 매매하지 않는다',
     'sim10_orchestrator.py': '오케스트레이터 — 하위 전략에 위임한다(자기 매수 루프가 없다)',
     'sim16_adm_leveraged.py': '심15(sim15_adm.py)의 판정·주문 로직을 상속한다 — 보유 ETF 매핑만 있다',
+    'sim17_panic_floor.py': '분석기 — 거시 저점 국면만 판정하고 알린다(유니버스가 빈 리스트다)',
 }
 
 

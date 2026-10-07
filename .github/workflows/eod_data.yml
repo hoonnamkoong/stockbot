@@ -164,6 +164,11 @@ jobs:
               && echo "[EOD] 심11 상태 복원" || echo "[EOD] 심11 상태 없음"
             cp state_repo/data/sim11_watchlist.json data/ 2>/dev/null \
               && echo "[EOD] 직전 심11 감시 목록 복원" || echo "[EOD] 직전 심11 감시 목록 없음"
+            # 심17(패닉바닥) 상태. 지표가 여기 실려 왕복한다 — 별도 캐시 파일을
+            # 두면 동기화 목록(매니페스트 파생)에 없어 복원되지 않고, 그러면
+            # FRED가 죽은 날 '어제 값' 폴백이 영영 동작하지 않는다.
+            cp state_repo/data/sim_panicfloor_state.json data/ 2>/dev/null \
+              && echo "[EOD] 심17 상태 복원" || echo "[EOD] 심17 상태 없음(최초 실행)"
             # 런 시작 시점의 리셋 표지. 배포 때 최신본과 비교해 그 사이 리셋이
             # 들어왔으면 심9-1 상태를 올리지 않는다(scripts/reset_epoch_guard.py).
             cp state_repo/data/sim_reset_epoch.json data/ 2>/dev/null || true
@@ -233,7 +238,7 @@ jobs:
           # 심9-1이 매일 실행·매수까지 하고도 db-data에 한 번도 반영되지
           # 못한 원인). 파일별로 나눠서 서로 실패가 전염되지 않게 한다.
           for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv \
-                   sim11_watchlist.json; do
+                   sim11_watchlist.json sim_panicfloor_state.json; do
             [ -f "../data/$f" ] && cp "../data/$f" "data/$f" && git add "data/$f"
           done
           # 심11 감시목록 깔때기. 날짜가 파일명에 들어가 위 리터럴 목록에 못 넣는다.

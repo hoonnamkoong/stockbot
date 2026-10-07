@@ -6,7 +6,8 @@
 복제돼 있던 것과 같은 병이다: 생산자 쪽 키가 바뀌면 한 곳만 고치고 나머지는
 조용히 옛 값(또는 실패 폴백)으로 돈다.
 
-파일명은 매니페스트가 안다 — 분석기 심의 state_file이다. 여기서 다시 적지 않는다.
+파일명은 매니페스트가 안다 — `produces_regime: true`인 심의 state_file이다.
+여기서 다시 적지 않는다.
 
 **실패는 값이 아니다.** 읽지 못하면 None을 돌려주고, 무엇을 할지는 호출자가
 정한다. 국면을 모르는 것과 'SIDEWAYS'는 다르고, bull_score를 모르는 것과
@@ -54,18 +55,23 @@ DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 
 
 def regime_state_filename() -> str:
-    """국면 상태 파일명. 매니페스트의 분석기 심에서 파생한다.
+    """국면 상태 파일명. 매니페스트에서 `produces_regime: true`인 심이다.
 
-    분석기가 정확히 하나라는 전제가 깨지면 여기서 죽는다 — 어느 심의 국면을
+    전에는 '분석기 심'으로 찾았는데, 분석기가 하나뿐이라는 전제가 2026-10-07에
+    깨졌다(Sim17 패닉바닥도 매매하지 않는 분석기다). 매매 여부와 국면 생산 여부는
+    다른 축이므로 플래그를 나눴다.
+
+    생산자가 정확히 하나라는 전제가 깨지면 여기서 죽는다 — 어느 심의 국면을
     읽을지 코드가 조용히 고르게 두는 것보다 낫다. 매니페스트를 고치는 순간
     CI가 잡는다(tests/test_regime_state.py).
     """
-    analyzers = [s for s in get_sim_registry(include_analyzers=True) if s['analyzer']]
-    if len(analyzers) != 1:
+    producers = [s for s in get_sim_registry(include_analyzers=True)
+                 if s.get('produces_regime')]
+    if len(producers) != 1:
         raise ValueError(
-            f'[RegimeState] 매니페스트의 분석기 심이 {len(analyzers)}개다(1개여야 한다): '
-            f"{[s['id'] for s in analyzers]}")
-    return analyzers[0]['state_file']
+            f'[RegimeState] 매니페스트의 국면 생산자가 {len(producers)}개다(1개여야 한다): '
+            f"{[s['id'] for s in producers]}")
+    return producers[0]['state_file']
 
 
 def read_regime_state(data_dir=None) -> dict | None:

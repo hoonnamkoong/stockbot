@@ -160,6 +160,9 @@ def get_sim_registry(include_analyzers: bool = False) -> list[dict]:
             'csv_file': s['csv_file'],
             'tradeable': bool(s.get('tradeable', False)),
             'analyzer': is_analyzer,
+            # 국면 생산자 표시. 분석기가 여럿이어도 국면을 쓰는 심은 하나만 봐야 한다
+            # (regime_state.regime_state_filename).
+            'produces_regime': bool(s.get('produces_regime', False)),
             'display_order': s.get('display_order', 9999),
         }
         if not is_analyzer:

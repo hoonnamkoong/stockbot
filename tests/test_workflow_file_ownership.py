@@ -13,6 +13,8 @@ import os
 import re
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 WF = os.path.join(os.path.dirname(__file__), '..', '.github', 'workflows')
@@ -384,3 +386,29 @@ def test_trading은_자기_결정_스냅샷을_배포_목록에_넣는다():
         src = f.read()
     assert 'decision_log' in src and 'names.append' in src, (
         'trade_loop의 배포 매니페스트에 결정 스냅샷이 없다')
+
+
+# ── EOD 심 상태: 복원 목록과 배포 목록이 같아야 한다 ──────────────────────
+# 2026-09-16 심9-1 매매기록이 **배포는 되는데 복원이 없어서** 매 런 잘렸다
+# (상태의 daily_trades 8건 vs CSV 2행). 반대 방향도 같은 무게다 — 복원만 하고
+# 배포하지 않으면 심이 매일 같은 자리에서 다시 시작한다(2026-08-05 심9-1).
+# 두 목록이 eod_data.yml 안에서 각자 리터럴 파일명을 적으므로 서로 갈릴 수 있다.
+
+EOD_ROUNDTRIP = [
+    'sim_donchian_state.json',          # 심9-1 보유·현금
+    'trade_history_sim_donchian.csv',   # append 파일 — 복원이 빠지면 잘린다
+    'sim11_watchlist.json',             # 내일 장중 루프가 읽을 pivot
+    'sim_panicfloor_state.json',        # 심17 단계 + 거시 지표 캐시
+]
+
+
+@pytest.mark.parametrize('name', EOD_ROUNDTRIP)
+def test_eod_restores_and_deploys_the_same_state_files(name):
+    eod = _text('eod_data.yml')
+    assert f'cp state_repo/data/{name} data/' in eod, (
+        f'{name}이 eod_data.yml 복원 블록에 없다. 백지에서 시작하면 '
+        f'누적 파일은 잘리고 상태 파일은 어제를 잊는다.')
+    deploy = eod.split('Deploy CSV to db-data', 1)[1]
+    assert name in deploy, (
+        f'{name}이 eod_data.yml 배포 목록에 없다. 갱신한 값이 db-data에 '
+        f'도달하지 못하면 다음 런이 복원해도 어제 값이다.')

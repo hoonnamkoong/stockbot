@@ -558,13 +558,40 @@ def _run_sim11(path: str) -> int:
     return 0
 
 
+def _run_sim17() -> int:
+    """심17(패닉바닥) — 거시 저점 국면 판정. 매매하지 않는다.
+
+    장중 루프에 넣지 않은 이유: 판정 입력이 **월 단위**(미 EPU·금융스트레스)인데
+    루프는 60초 격자다. 거기 넣으면 월에 한 번 바뀌는 값을 위해 돈 경로의 85초
+    예산에 FRED 5계열 네트워크 I/O를 매일 얹는다. 게다가 상태 왕복이 한 번이라도
+    끊기면 `asof` 캐시가 안 맞아 **매 사이클** 재조회로 떨어진다.
+
+    후보 CSV를 쓰지 않는다 — 입력을 자기가 받는다. 그래서 심9-1이 후보 0건으로
+    못 돌아도 이 판정은 돈다.
+    """
+    from src.strategy.simulators.sim17_panic_floor import PanicFloorSimulator
+    sim = PanicFloorSimulator()
+    before = sim.state.get('stage')
+    sim.run([], current_prices={})
+    print(f'[EOD] 심17 패닉바닥: {before} → {sim.state.get("stage")} '
+          f'| {sim.state.get("reason")}')
+    return 0
+
+
 def main() -> int:
-    """심9-1·심11을 각각 독립적으로 돈다 — 한쪽이 실패해도 다른 쪽은 그대로 돈다.
-    둘 다 실패해야 워크플로 스텝이 실패로 표시된다(호출부가 `|| echo`로
+    """심9-1·심11·심17을 각각 독립적으로 돈다 — 한쪽이 실패해도 나머지는 돈다.
+    매매심 둘이 **다 실패해야** 워크플로 스텝이 실패로 표시된다(호출부가 `|| echo`로
     감싸므로 EOD 배포 자체는 이 실패와 무관하게 계속된다)."""
     path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CSV
     r1 = _run_sim9_1(path)
     r2 = _run_sim11(path)
+    # 심17은 관찰 전용이라 종료코드에 넣지 않는다. 여기 넣으면 FRED가 죽은 날
+    # 매매심 둘이 정상인데도 EOD 런이 빨개져 알림이 사람을 헛되게 부른다 —
+    # 판정 보류는 지표 수집 쪽이 자기 로그에 사유를 남긴다(macro_panic.collect).
+    try:
+        _run_sim17()
+    except Exception as e:
+        print(f'[EOD] 심17 실행 실패: {type(e).__name__}: {e}')
     return 0 if (r1 == 0 or r2 == 0) else 1
 
 

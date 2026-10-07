@@ -72,18 +72,49 @@ def test_reads_valid_state(tmp_path):
 
 def test_filename_comes_from_the_manifest():
     from src.strategy.registry import get_sim_registry
-    analyzers = [s for s in get_sim_registry(include_analyzers=True) if s['analyzer']]
-    assert regime_state_filename() == analyzers[0]['state_file']
+    producers = [s for s in get_sim_registry(include_analyzers=True)
+                 if s.get('produces_regime')]
+    assert len(producers) == 1, '국면 생산자는 매니페스트에 정확히 하나여야 한다'
+    assert regime_state_filename() == producers[0]['state_file']
 
 
-def test_two_analyzers_is_an_error(monkeypatch):
-    """분석기가 둘이면 '어느 국면이냐'는 질문에 답이 없다 — 조용히 첫 번째를 고르지 않는다."""
+def test_analyzer_alone_does_not_make_a_producer():
+    """매매하지 않는 심이 늘어도 국면 생산자는 리베로 하나다.
+
+    2026-10-07 Sim17(패닉바닥)이 두 번째 분석기로 들어오면서 '분석기 = 국면
+    생산자'라는 전제가 깨졌다. 그때 국면 소비자(심5·6·10·14) 64개 테스트가
+    한꺼번에 죽었다 — 매매 여부와 국면 생산 여부는 다른 축이다.
+    """
+    from src.strategy.registry import get_sim_registry
+    sims = get_sim_registry(include_analyzers=True)
+    analyzers = [s for s in sims if s['analyzer']]
+    producers = [s for s in sims if s.get('produces_regime')]
+    assert len(analyzers) >= 1
+    assert len(producers) == 1
+    assert producers[0]['analyzer'], '국면 생산자는 매매하지 않는 심이어야 한다'
+
+
+def test_two_producers_is_an_error(monkeypatch):
+    """생산자가 둘이면 '어느 국면이냐'에 답이 없다 — 조용히 첫 번째를 고르지 않는다."""
     import src.strategy.regime_state as rs
     monkeypatch.setattr(rs, 'get_sim_registry', lambda **kw: [
-        {'analyzer': True, 'id': 'sim0_libero', 'state_file': 'a.json'},
-        {'analyzer': True, 'id': 'sim0_shadow', 'state_file': 'b.json'},
+        {'analyzer': True, 'produces_regime': True, 'id': 'sim0_libero',
+         'state_file': 'a.json'},
+        {'analyzer': True, 'produces_regime': True, 'id': 'sim0_shadow',
+         'state_file': 'b.json'},
     ])
-    with pytest.raises(ValueError, match='분석기 심이 2개'):
+    with pytest.raises(ValueError, match='국면 생산자가 2개'):
+        rs.regime_state_filename()
+
+
+def test_no_producer_is_an_error(monkeypatch):
+    """생산자를 표시하지 않으면 죽는다 — 분석기 중 아무거나 고르지 않는다."""
+    import src.strategy.regime_state as rs
+    monkeypatch.setattr(rs, 'get_sim_registry', lambda **kw: [
+        {'analyzer': True, 'produces_regime': False, 'id': 'sim17_panic_floor',
+         'state_file': 'b.json'},
+    ])
+    with pytest.raises(ValueError, match='국면 생산자가 0개'):
         rs.regime_state_filename()
 
 

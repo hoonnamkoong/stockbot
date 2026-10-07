@@ -83,6 +83,9 @@ simulators:
     label: "리베로 국면판단 (Sim 0)"
     display_order: 0
     analyzer: true   # 매매하지 않는다 — 리셋·브리프 대상에서 제외
+    produces_regime: true  # 6단계 국면의 **유일한** 생산자. src/strategy/regime_state.py가
+                           # 이 플래그로 파일을 찾는다. 분석기가 둘 이상이어도
+                           # (Sim17 패닉바닥) 국면 생산자는 하나여야 한다
     active: true
     tradeable: false  # 분석기(IS_ANALYZER) — 매매 없음, 프로그램 선택 불가
     needs_buzz: false  # top100 라이브 실측만으로 국면 판정 가능 (candidates는 표시 전용 지표만)
@@ -379,3 +382,22 @@ simulators:
                       # 5주), 2005~20은 합성 대리 — 페이퍼 관찰 단계. 실전은 레버리지 ETF
                       # 사전교육·기본예탁금 요건이 있다
     needs_buzz: false  # ETF 3종 고정 유니버스 — Sim15와 같다
+
+  - id: "sim17_panic_floor"
+    module: "src.strategy.simulators.sim17_panic_floor"
+    class: "PanicFloorSimulator"
+    description: "Sim17 패닉 바닥 — 미국 EPU·금융스트레스 극단으로 저점 국면을 판정하고 단계 전이를 알린다. 매매 없음"
+    state_file: "sim_panicfloor_state.json"
+    csv_file: "trade_history_sim_panicfloor.csv"
+    label: "패닉 바닥 판정 (Sim 17)"
+    display_order: 1
+    ui_key: "sim17"
+    short_desc: "미EPU 12개월 변화 상위 20% = 관찰 · 금융스트레스 z와 EPU z 동시 ≥2 = 패닉바닥 · 매매 없음"
+    chart_group: 0  # 리베로와 같은 분석기 계열
+    color: "#b24d00"  # 리터럴 hex — gen_sim_registry.py SIM_CHART_HEX에 등록
+    analyzer: true   # 매매하지 않는다 — 리셋·브리프 대상에서 제외
+    active: true
+    tradeable: false  # 분석기. 신호가 설계 구간(2000~2014)에 없어 아웃오브샘플 검증이
+                      # 원리적으로 불가능하다(EPU→코스피 3개월, 설계 t=+1.70 / 확인
+                      # t=+4.88). 관찰 전용이고 매매에 쓰지 않는다
+    needs_buzz: false  # FRED 2계열만 쓴다. 스크래핑과 무관

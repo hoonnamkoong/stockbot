@@ -44,6 +44,7 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
 /** 국면 분석기(매매 없음). 성과 목록에 오르지 않고 국면 표시로만 쓰인다. */
 export const ANALYZERS: { id: string; stateFile: string }[] = [
   { id: 'sim0_libero', stateFile: 'sim_libero_state.json' },
+  { id: 'sim17_panic_floor', stateFile: 'sim_panicfloor_state.json' },
 ];
 
 /** 심 초기자본. 원천은 파이썬 base_simulator.DEFAULT_INITIAL_CASH다. */
@@ -124,6 +125,7 @@ export const SIM_CHART_HEX: Record<string, string> = {
   '#a1662f': '#a1662f',
   '#7d8500': '#7d8500',
   '#1b3a6b': '#1b3a6b',
+  '#b24d00': '#b24d00',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

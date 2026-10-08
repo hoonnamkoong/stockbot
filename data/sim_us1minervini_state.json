@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 118.01,
+      "peak_price": 118.345,
       "is_scaled_out": false
     },
     "PSX": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 22615.749,
+  "peak_nav": 22627.833999999995,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -65,8 +65,8 @@
   },
   "raw_stats": {
     "cash": 929.2669999999985,
-    "total_asset": 22615.749,
-    "profit_rate": 13.078745,
+    "total_asset": 22627.833999999995,
+    "profit_rate": 13.139169999999979,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
@@ -75,28 +75,28 @@
     "frequency": 0.20930232558139536,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "ANET": 214.958,
-      "SMCI": 43.49,
-      "MU": 1084.01,
-      "EBAY": 108.22,
-      "COP": 132.76,
-      "AMG": 376.35,
-      "PSX": 274.05,
-      "XOM": 167.93,
-      "EXPD": 191.475,
-      "P": 153.675,
-      "RBRK": 124.0,
-      "ALAB": 380.01,
-      "DDOG": 273.415,
-      "ZBRA": 382.51,
-      "SMTC": 190.775,
-      "DINO": 117.76,
-      "TWLO": 279.205,
-      "DVN": 48.94,
-      "DELL": 568.535,
-      "AMD": 636.87,
-      "CVX": 210.569,
-      "SANM": 215.605
+      "EXPD": 191.523,
+      "P": 153.04,
+      "ZBRA": 383.72,
+      "AMD": 634.35,
+      "RBRK": 122.623,
+      "MU": 1076.18,
+      "SMTC": 190.8,
+      "PSX": 274.45,
+      "ALAB": 375.83,
+      "ANET": 215.23,
+      "EBAY": 107.23,
+      "CVX": 210.23,
+      "DVN": 48.77,
+      "TWLO": 277.935,
+      "DINO": 118.345,
+      "XOM": 168.005,
+      "SMCI": 43.63,
+      "DELL": 572.51,
+      "COP": 132.42,
+      "DDOG": 272.02,
+      "SANM": 214.96,
+      "AMG": 376.0
     }
   },
   "normalized_stats": {

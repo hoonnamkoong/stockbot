@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 118.83,
+      "peak_price": 118.88,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 276.146,
+      "peak_price": 276.5,
       "is_scaled_out": false
     },
     "ANET": {
@@ -40,11 +40,11 @@
       "quantity": 35,
       "avg_price": 110.94,
       "entry_date": "2026-09-21",
-      "peak_price": 154.415,
+      "peak_price": 154.555,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 22728.131999999998,
+  "peak_nav": 22748.221999999998,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -65,8 +65,8 @@
   },
   "raw_stats": {
     "cash": 929.2669999999985,
-    "total_asset": 22728.131999999998,
-    "profit_rate": 13.640659999999988,
+    "total_asset": 22748.221999999998,
+    "profit_rate": 13.74110999999999,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
@@ -75,28 +75,28 @@
     "frequency": 0.20930232558139536,
     "total_fees": 7.344450000000001,
     "current_prices": {
+      "ANET": 216.54,
+      "PSX": 276.5,
+      "COP": 132.9,
+      "RBRK": 123.66,
+      "DELL": 575.1,
+      "DDOG": 277.155,
+      "TWLO": 278.45,
+      "SANM": 214.905,
+      "EXPD": 191.07,
+      "AMD": 633.477,
+      "SMCI": 43.54,
+      "AMG": 378.26,
       "ZBRA": 383.055,
-      "EXPD": 190.965,
-      "DDOG": 275.515,
-      "AMG": 377.355,
-      "COP": 133.07,
-      "CVX": 210.81,
-      "DVN": 48.895,
-      "SMCI": 43.952,
-      "DELL": 578.62,
-      "AMD": 636.0,
-      "PSX": 276.146,
-      "ALAB": 373.275,
-      "RBRK": 122.78,
-      "SANM": 215.515,
-      "MU": 1072.175,
-      "P": 154.415,
-      "SMTC": 193.99,
-      "XOM": 168.45,
-      "ANET": 216.245,
-      "EBAY": 107.87,
-      "DINO": 118.82,
-      "TWLO": 277.18
+      "DVN": 48.79,
+      "XOM": 168.13,
+      "MU": 1065.58,
+      "P": 154.555,
+      "EBAY": 108.313,
+      "CVX": 210.601,
+      "ALAB": 369.94,
+      "SMTC": 192.3,
+      "DINO": 118.88
     }
   },
   "normalized_stats": {

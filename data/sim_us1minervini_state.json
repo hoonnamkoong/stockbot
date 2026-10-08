@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 119.585,
+      "peak_price": 119.9,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 278.0,
+      "peak_price": 278.48,
       "is_scaled_out": false
     },
     "ANET": {
@@ -40,11 +40,11 @@
       "quantity": 35,
       "avg_price": 110.94,
       "entry_date": "2026-09-21",
-      "peak_price": 155.59,
+      "peak_price": 155.655,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 22835.637000000002,
+  "peak_nav": 22869.147,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -65,8 +65,8 @@
   },
   "raw_stats": {
     "cash": 929.2669999999985,
-    "total_asset": 22835.637000000002,
-    "profit_rate": 14.178185000000013,
+    "total_asset": 22869.147,
+    "profit_rate": 14.345735000000005,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
@@ -75,28 +75,28 @@
     "frequency": 0.20930232558139536,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "ANET": 216.19,
-      "ALAB": 370.676,
-      "AMD": 636.01,
-      "EXPD": 191.52,
-      "DDOG": 277.39,
-      "ZBRA": 382.698,
-      "SMCI": 43.245,
-      "AMG": 380.57,
-      "DINO": 119.585,
-      "TWLO": 279.925,
-      "EBAY": 108.755,
-      "MU": 1066.87,
-      "SANM": 216.51,
-      "RBRK": 121.745,
-      "P": 155.59,
-      "DELL": 582.7,
-      "SMTC": 195.79,
-      "PSX": 278.0,
-      "XOM": 168.41,
-      "DVN": 48.7,
-      "CVX": 211.47,
-      "COP": 133.715
+      "SANM": 216.96,
+      "CVX": 211.5,
+      "AMD": 637.4,
+      "TWLO": 279.495,
+      "EXPD": 191.885,
+      "DINO": 119.9,
+      "MU": 1068.93,
+      "P": 155.655,
+      "DVN": 48.785,
+      "COP": 133.895,
+      "XOM": 168.64,
+      "DDOG": 277.565,
+      "PSX": 278.48,
+      "SMCI": 43.395,
+      "ANET": 216.46,
+      "ZBRA": 382.64,
+      "AMG": 380.0,
+      "EBAY": 108.71,
+      "RBRK": 121.07,
+      "SMTC": 196.135,
+      "DELL": 584.005,
+      "ALAB": 372.034
     }
   },
   "normalized_stats": {

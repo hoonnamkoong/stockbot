@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 119.56,
+      "peak_price": 119.585,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 277.95,
+      "peak_price": 278.0,
       "is_scaled_out": false
     },
     "ANET": {
@@ -40,11 +40,11 @@
       "quantity": 35,
       "avg_price": 110.94,
       "entry_date": "2026-09-21",
-      "peak_price": 155.29,
+      "peak_price": 155.59,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 22826.047,
+  "peak_nav": 22835.637000000002,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -65,8 +65,8 @@
   },
   "raw_stats": {
     "cash": 929.2669999999985,
-    "total_asset": 22826.047,
-    "profit_rate": 14.130234999999994,
+    "total_asset": 22835.637000000002,
+    "profit_rate": 14.178185000000013,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
@@ -75,28 +75,28 @@
     "frequency": 0.20930232558139536,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "XOM": 168.34,
-      "EBAY": 108.75,
-      "AMD": 636.935,
-      "CVX": 211.351,
-      "DDOG": 277.64,
-      "DELL": 582.59,
-      "PSX": 277.82,
-      "DVN": 48.68,
-      "RBRK": 121.36,
-      "SMCI": 43.405,
-      "EXPD": 191.32,
-      "ZBRA": 383.22,
-      "TWLO": 279.46,
-      "ANET": 216.63,
-      "MU": 1068.19,
-      "ALAB": 372.99,
-      "SANM": 217.21,
-      "COP": 133.605,
-      "DINO": 119.56,
-      "P": 155.29,
-      "AMG": 380.983,
-      "SMTC": 196.035
+      "ANET": 216.19,
+      "ALAB": 370.676,
+      "AMD": 636.01,
+      "EXPD": 191.52,
+      "DDOG": 277.39,
+      "ZBRA": 382.698,
+      "SMCI": 43.245,
+      "AMG": 380.57,
+      "DINO": 119.585,
+      "TWLO": 279.925,
+      "EBAY": 108.755,
+      "MU": 1066.87,
+      "SANM": 216.51,
+      "RBRK": 121.745,
+      "P": 155.59,
+      "DELL": 582.7,
+      "SMTC": 195.79,
+      "PSX": 278.0,
+      "XOM": 168.41,
+      "DVN": 48.7,
+      "CVX": 211.47,
+      "COP": 133.715
     }
   },
   "normalized_stats": {

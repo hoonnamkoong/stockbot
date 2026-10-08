@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 119.9,
+      "peak_price": 120.315,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 278.48,
+      "peak_price": 279.08,
       "is_scaled_out": false
     },
     "ANET": {
@@ -40,11 +40,11 @@
       "quantity": 35,
       "avg_price": 110.94,
       "entry_date": "2026-09-21",
-      "peak_price": 156.002,
+      "peak_price": 156.43,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 22878.697,
+  "peak_nav": 22905.367,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -65,8 +65,8 @@
   },
   "raw_stats": {
     "cash": 929.2669999999985,
-    "total_asset": 22878.697,
-    "profit_rate": 14.393485,
+    "total_asset": 22905.367,
+    "profit_rate": 14.526834999999991,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
@@ -75,28 +75,28 @@
     "frequency": 0.20930232558139536,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "EXPD": 191.62,
-      "MU": 1066.238,
-      "DELL": 584.617,
-      "DVN": 48.775,
-      "SMTC": 196.21,
-      "AMG": 379.79,
-      "CVX": 211.558,
-      "RBRK": 121.24,
-      "AMD": 635.95,
-      "XOM": 168.7,
-      "TWLO": 279.61,
-      "P": 156.002,
-      "SMCI": 43.455,
-      "EBAY": 108.68,
-      "DINO": 119.9,
-      "ANET": 216.62,
-      "DDOG": 278.898,
-      "COP": 133.935,
+      "AMG": 381.09,
+      "DDOG": 278.53,
+      "XOM": 168.66,
+      "AMD": 636.675,
+      "SANM": 216.98,
+      "EXPD": 191.63,
+      "SMCI": 43.42,
+      "RBRK": 121.365,
       "ZBRA": 382.485,
-      "SANM": 216.9,
-      "PSX": 278.44,
-      "ALAB": 371.82
+      "PSX": 279.08,
+      "ALAB": 371.505,
+      "MU": 1068.39,
+      "SMTC": 196.46,
+      "DELL": 584.536,
+      "EBAY": 108.835,
+      "ANET": 215.89,
+      "CVX": 211.42,
+      "COP": 133.99,
+      "TWLO": 279.45,
+      "DVN": 48.87,
+      "P": 156.43,
+      "DINO": 120.315
     }
   },
   "normalized_stats": {

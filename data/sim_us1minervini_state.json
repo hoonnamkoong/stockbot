@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 123.58,
+      "peak_price": 123.655,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 285.81,
+      "peak_price": 285.84,
       "is_scaled_out": false
     },
     "ANET": {
@@ -44,7 +44,7 @@
       "is_scaled_out": false
     }
   },
-  "peak_nav": 22982.996999999996,
+  "peak_nav": 22992.777,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -65,8 +65,8 @@
   },
   "raw_stats": {
     "cash": 929.2669999999985,
-    "total_asset": 22982.996999999996,
-    "profit_rate": 14.914984999999978,
+    "total_asset": 22992.777,
+    "profit_rate": 14.96388499999999,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
@@ -75,28 +75,28 @@
     "frequency": 0.20454545454545456,
     "total_fees": 7.344450000000001,
     "current_prices": {
+      "DVN": 49.005,
+      "DINO": 123.655,
+      "PSX": 285.84,
+      "RBRK": 121.795,
+      "EXPD": 192.955,
+      "CVX": 213.395,
+      "XOM": 170.06,
+      "APH": 86.7,
+      "MU": 1024.45,
+      "ANET": 216.7,
+      "AMD": 613.15,
+      "KEYS": 379.945,
+      "OSCR": 33.045,
+      "OVV": 64.61,
+      "PR": 23.32,
+      "ROKU": 153.675,
       "ZBRA": 385.35,
-      "P": 151.315,
-      "RBRK": 121.78,
-      "OSCR": 33.02,
-      "DVN": 49.04,
-      "PSX": 285.81,
-      "ANET": 216.55,
-      "DDOG": 283.4,
-      "DINO": 123.58,
-      "EXPD": 192.635,
-      "TWLO": 281.082,
-      "APH": 86.705,
-      "PR": 23.33,
-      "ROKU": 153.57,
-      "CVX": 213.385,
-      "MU": 1023.58,
-      "XOM": 170.02,
-      "COP": 135.34,
-      "OVV": 64.63,
-      "KEYS": 379.95,
-      "AMD": 613.2,
-      "SMTC": 185.92
+      "DDOG": 283.015,
+      "P": 151.245,
+      "COP": 135.23,
+      "TWLO": 281.23,
+      "SMTC": 185.855
     }
   },
   "normalized_stats": {

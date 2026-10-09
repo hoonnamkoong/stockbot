@@ -215,7 +215,7 @@ jobs:
               # 이 목록의 누락을 자동으로 잡는다. CSV는 아래 csv 루프에 있다.
               #   eod_data.yml — EOD 배치(심9-1·심11)
               sim11_watchlist.json|sim_donchian_state.json|sim_donchian_log.json) continue ;;
-              sim_panicfloor_state.json) continue ;;
+              sim_panicfloor_state.json|sim_meltup_state.json|sim_semiboom_state.json) continue ;;
               #   us_trading.yml — US 심 상태
               sim_us*_state.json) continue ;;
             esac

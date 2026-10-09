@@ -401,3 +401,42 @@ simulators:
                       # 원리적으로 불가능하다(EPU→코스피 3개월, 설계 t=+1.70 / 확인
                       # t=+4.88). 관찰 전용이고 매매에 쓰지 않는다
     needs_buzz: false  # FRED 2계열만 쓴다. 스크래핑과 무관
+
+  - id: "sim18_meltup_phase"
+    module: "src.strategy.simulators.sim18_meltup_phase"
+    class: "MeltupPhaseSimulator"
+    description: "Sim18 급등 고점 단계 — 코스피가 전12M +100% 신고가를 찍은 앵커로부터 경과 개월을 단계로 알린다. 매매 없음"
+    state_file: "sim_meltup_state.json"
+    csv_file: "trade_history_sim_meltup.csv"
+    label: "급등 고점 단계 (Sim 18)"
+    display_order: 2
+    ui_key: "sim18"
+    short_desc: "앵커 후 0~6개월 = 조기(과거 9사건 중 최저점 0건) · 7~12 = 관찰(2건) · 13~24 = 최저권(7건, 중앙 13개월) · 매매 없음"
+    chart_group: 0  # 분석기 계열
+    color: "#2e6f5e"  # 리터럴 hex — gen_sim_registry.py SIM_CHART_HEX에 등록
+    analyzer: true   # 매매하지 않는다 — 리셋·브리프 대상에서 제외
+    active: true
+    tradeable: false  # 분석기. n=9(반도체 4·상하이 2 쏠림)의 **참조 분포**이고
+                      # 통계 검정이 아니다. 코스피는 앵커 5개월째에 고점을 찍어
+                      # 과거 어느 유형에도 맞지 않는다. 관찰 전용
+    needs_buzz: false  # 네이버 지수 일봉 1회. 종목 스크래핑과 무관
+
+  - id: "sim19_semi_boom"
+    module: "src.strategy.simulators.sim19_semi_boom"
+    class: "SemiBoomSimulator"
+    description: "Sim19 반도체 붐의 질 — 관세청 HS8542 수출을 단가와 중량으로 분해해 가격 주도인지 물량 주도인지 알린다. 매매 없음"
+    state_file: "sim_semiboom_state.json"
+    csv_file: "trade_history_sim_semiboom.csv"
+    label: "반도체 붐의 질 (Sim 19)"
+    display_order: 3
+    ui_key: "sim19"
+    short_desc: "수출금액 YoY를 단가·중량으로 분해 · 단가 비중 70%↑ & 중량 5%↓ = 가격주도 · 예측 아니라 상태 기술 · 매매 없음"
+    chart_group: 0  # 분석기 계열
+    color: "#6b4c9a"  # 리터럴 hex — gen_sim_registry.py SIM_CHART_HEX에 등록
+    analyzer: true
+    active: true
+    tradeable: false  # 분석기. 반도체 사이클 변곡을 **선행하는 실물 데이터는 없다**
+                      # (생산 3M·가동률 4M·수주 5M·고용 10M 전부 후행, 재고/출하 p=0.43).
+                      # 단가 고점의 주가 예측력도 12검정 전부 미통과(최소 p=0.092).
+                      # 예측이 아니라 상태 기술이므로 매매에 쓰지 않는다
+    needs_buzz: false  # 관세청 API만 쓴다. DATA_GO_KR_KEY 필요

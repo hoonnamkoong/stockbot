@@ -45,6 +45,8 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
 export const ANALYZERS: { id: string; stateFile: string }[] = [
   { id: 'sim0_libero', stateFile: 'sim_libero_state.json' },
   { id: 'sim17_panic_floor', stateFile: 'sim_panicfloor_state.json' },
+  { id: 'sim18_meltup_phase', stateFile: 'sim_meltup_state.json' },
+  { id: 'sim19_semi_boom', stateFile: 'sim_semiboom_state.json' },
 ];
 
 /** 심 초기자본. 원천은 파이썬 base_simulator.DEFAULT_INITIAL_CASH다. */
@@ -126,6 +128,8 @@ export const SIM_CHART_HEX: Record<string, string> = {
   '#7d8500': '#7d8500',
   '#1b3a6b': '#1b3a6b',
   '#b24d00': '#b24d00',
+  '#2e6f5e': '#2e6f5e',
+  '#6b4c9a': '#6b4c9a',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

@@ -399,6 +399,8 @@ EOD_ROUNDTRIP = [
     'trade_history_sim_donchian.csv',   # append 파일 — 복원이 빠지면 잘린다
     'sim11_watchlist.json',             # 내일 장중 루프가 읽을 pivot
     'sim_panicfloor_state.json',        # 심17 단계 + 거시 지표 캐시
+    'sim_meltup_state.json',            # 심18 앵커 — 24개월 유지돼야 한다
+    'sim_semiboom_state.json',          # 심19 질 + 수출 지표
 ]
 
 

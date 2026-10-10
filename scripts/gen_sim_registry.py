@@ -101,6 +101,8 @@ export const SIM_CHART_HEX: Record<string, string> = {
   '#7d8500': '#7d8500',
   '#1b3a6b': '#1b3a6b',
   '#b24d00': '#b24d00',
+  '#2e6f5e': '#2e6f5e',
+  '#6b4c9a': '#6b4c9a',
 };
 
 export function chartHex(s: SimRegistryEntry): string {

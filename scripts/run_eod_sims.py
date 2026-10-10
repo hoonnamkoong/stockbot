@@ -578,6 +578,28 @@ def _run_sim17() -> int:
     return 0
 
 
+def _run_sim18() -> int:
+    """심18(급등 고점 단계) — 코스피 지수 일봉만 쓴다. 매매하지 않는다."""
+    from src.strategy.simulators.sim18_meltup_phase import MeltupPhaseSimulator
+    sim = MeltupPhaseSimulator()
+    before = sim.state.get('stage')
+    sim.run([], current_prices={})
+    print(f'[EOD] 심18 급등고점: {before} -> {sim.state.get("stage")} '
+          f'| 앵커 {sim.state.get("anchor")} {sim.state.get("elapsed")}개월째')
+    return 0
+
+
+def _run_sim19() -> int:
+    """심19(반도체 붐의 질) — 관세청 API만 쓴다(DATA_GO_KR_KEY 필요)."""
+    from src.strategy.simulators.sim19_semi_boom import SemiBoomSimulator
+    sim = SemiBoomSimulator()
+    before = sim.state.get('quality')
+    sim.run([], current_prices={})
+    print(f'[EOD] 심19 반도체붐: {before} -> {sim.state.get("quality")} '
+          f'| {sim.state.get("reason")}')
+    return 0
+
+
 def main() -> int:
     """심9-1·심11·심17을 각각 독립적으로 돈다 — 한쪽이 실패해도 나머지는 돈다.
     매매심 둘이 **다 실패해야** 워크플로 스텝이 실패로 표시된다(호출부가 `|| echo`로
@@ -588,10 +610,12 @@ def main() -> int:
     # 심17은 관찰 전용이라 종료코드에 넣지 않는다. 여기 넣으면 FRED가 죽은 날
     # 매매심 둘이 정상인데도 EOD 런이 빨개져 알림이 사람을 헛되게 부른다 —
     # 판정 보류는 지표 수집 쪽이 자기 로그에 사유를 남긴다(macro_panic.collect).
-    try:
-        _run_sim17()
-    except Exception as e:
-        print(f'[EOD] 심17 실행 실패: {type(e).__name__}: {e}')
+    for fn, tag in ((_run_sim17, '심17'), (_run_sim18, '심18'),
+                    (_run_sim19, '심19')):
+        try:
+            fn()
+        except Exception as e:
+            print(f'[EOD] {tag} 실행 실패: {type(e).__name__}: {e}')
     return 0 if (r1 == 0 or r2 == 0) else 1
 
 

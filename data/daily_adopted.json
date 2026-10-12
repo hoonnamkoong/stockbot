@@ -18,12 +18,12 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "HLB의 간암 1차 치료제 FDA 재승인 서류 제출 공시 및 이에 따른 주가 상승 기대감.",
+        "posts_summary": "HLB의 리보세라닙 FDA 재승인 서류 제출에 따른 주가 상승 기대. 공매도 관련 언급.",
         "sentiment": "8",
         "keywords": [
+          "리보세라닙",
           "FDA",
-          "재승인",
-          "공시"
+          "공매도"
         ]
       }
     },
@@ -44,23 +44,20 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "대우건설 주주연대의 범죄짓 중단 요구와 대차 관련 논쟁.",
-        "sentiment": "-8",
-        "keywords": [
-          "대차",
-          "주주연대"
-        ]
+        "posts_summary": "대우건설 주주연대의 활동 촉구 및 가격 상승 기대. 다만, 감정적 표현이 다수.",
+        "sentiment": "-2",
+        "keywords": []
       }
     },
     "010140": {
       "name": "삼성중공업",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "삼성중공업의 수주 소식에도 불구하고 주가 하락 및 신저점 갱신에 대한 불만.",
-        "sentiment": "-7",
+        "posts_summary": "삼성중공업의 LNG·FLNG 수주 랠리에도 불구하고 주가 하락 및 조선업 투자 부정적 전망. 뉴스 신뢰도 의문 제기.",
+        "sentiment": "-4",
         "keywords": [
-          "수주",
-          "신저점",
+          "LNG",
+          "FLNG",
           "조선주"
         ]
       }
@@ -69,12 +66,11 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "광통신 테마 부각 속에서 대한광통신의 주가 상승 기대와 관련 뉴스 언급.",
-        "sentiment": "5",
+        "posts_summary": "대한광통신의 3만원 예상 및 광통신 시장 성장 전망. AI 관련 호재 및 기술적 지지선 언급.",
+        "sentiment": "3",
         "keywords": [
           "광통신",
-          "AI",
-          "테마"
+          "AI"
         ]
       }
     },
@@ -82,12 +78,11 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "LG디스플레이의 FLIP 기술 관련 논의와 미래 전망에 대한 부정적 인식 및 주가 하락 우려.",
-        "sentiment": "-8",
+        "posts_summary": "LG디스플레이의 사업 전망에 대한 부정적 평가와 주가 하락 우려. 일부 기술 관련 언급.",
+        "sentiment": "-5",
         "keywords": [
-          "FLIP",
-          "기술",
-          "전망"
+          "FLiPP",
+          "FMM"
         ]
       }
     },
@@ -95,12 +90,11 @@
       "name": "덕산넵코어스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "방산 테마 속 덕산넵코어스의 주가 움직임에 대한 투자자 불만 및 보호예수 관련 우려.",
-        "sentiment": "-5",
+        "posts_summary": "덕산넵코어스의 주가 상승 기대와 기관 매수세 언급. 보호예수 및 투매 우려도 존재.",
+        "sentiment": "1",
         "keywords": [
-          "방산",
-          "보호예수",
-          "테마"
+          "방산주",
+          "보호예수"
         ]
       }
     }

@@ -5,8 +5,8 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "로봇용 D램 수요 20배 폭증 호재 속에서 주가 방향성에 대한 상반된 의견 존재. 긍정적 전망과 폭락 우려 공존.",
-        "sentiment": "0",
+        "posts_summary": "로봇용 D램 수요 증가 뉴스에도 불구하고 주가 하락 및 투자자 불만.",
+        "sentiment": "-4",
         "keywords": [
           "D램",
           "로봇",
@@ -18,12 +18,12 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "HLB 간암 1차 치료제 FDA 재승인 서류 제출 공시 확인. 연말 30만 기대감과 함께 공매도 세력에 대한 강한 비판.",
+        "posts_summary": "HLB의 간암 1차 치료제 FDA 재승인 서류 제출 공시 및 이에 따른 주가 상승 기대감.",
         "sentiment": "8",
         "keywords": [
           "FDA",
-          "공시",
-          "재승인"
+          "재승인",
+          "공시"
         ]
       }
     },
@@ -44,12 +44,11 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주주들의 불만과 '천인공노할 범죄짓'에 대한 강한 비판이 반복적으로 제기됨. 대차 관련 언급 다수.",
-        "sentiment": "-5",
+        "posts_summary": "대우건설 주주연대의 범죄짓 중단 요구와 대차 관련 논쟁.",
+        "sentiment": "-8",
         "keywords": [
-          "주주",
-          "불만",
-          "대차"
+          "대차",
+          "주주연대"
         ]
       }
     },
@@ -57,12 +56,12 @@
       "name": "삼성중공업",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "LNG·FLNG 수주 랠리에도 불구하고 주가 하락 및 52주 신저가 갱신. 3분기 어닝쇼크 가능성 언급.",
-        "sentiment": "-6",
+        "posts_summary": "삼성중공업의 수주 소식에도 불구하고 주가 하락 및 신저점 갱신에 대한 불만.",
+        "sentiment": "-7",
         "keywords": [
           "수주",
-          "LNG",
-          "어닝쇼크"
+          "신저점",
+          "조선주"
         ]
       }
     },
@@ -70,8 +69,8 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "AI 및 광통신 테마 상승 기대감 속 3만원 예상. 미국 광통신 대장주 신고가 및 20일선 지지선 중요성 언급.",
-        "sentiment": "3",
+        "posts_summary": "광통신 테마 부각 속에서 대한광통신의 주가 상승 기대와 관련 뉴스 언급.",
+        "sentiment": "5",
         "keywords": [
           "광통신",
           "AI",
@@ -83,12 +82,25 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "미래 전망이 불투명하고 답답하다는 의견이 지배적. 플립 기술 관련 뉴스와 목표가에 대한 회의적 시각.",
-        "sentiment": "-4",
+        "posts_summary": "LG디스플레이의 FLIP 기술 관련 논의와 미래 전망에 대한 부정적 인식 및 주가 하락 우려.",
+        "sentiment": "-8",
         "keywords": [
-          "미래전망",
-          "플립",
-          "목표가"
+          "FLIP",
+          "기술",
+          "전망"
+        ]
+      }
+    },
+    "266690": {
+      "name": "덕산넵코어스",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "방산 테마 속 덕산넵코어스의 주가 움직임에 대한 투자자 불만 및 보호예수 관련 우려.",
+        "sentiment": "-5",
+        "keywords": [
+          "방산",
+          "보호예수",
+          "테마"
         ]
       }
     }

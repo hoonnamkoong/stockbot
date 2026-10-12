@@ -6,8 +6,56 @@
   "peak_nav": 0,
   "total_fees": 0,
   "history": [
-    0
+    0,
+    {
+      "date": "2026-10-12",
+      "month": "2026-09",
+      "quality": "가격주도",
+      "reason": "금액 +216.5% 중 단가가 +212.5%p — 물량은 +1.3%로 제자리"
+    }
   ],
   "daily_trades": [],
-  "cooldown_codes": {}
+  "cooldown_codes": {},
+  "quality": "가격주도",
+  "metrics": {
+    "month": "2026-09",
+    "금액": 43116428429.0,
+    "단가": 24113.591824077,
+    "중량": 1788055.0,
+    "금액YoY": 216.48064256579983,
+    "단가YoY": 212.4698871021586,
+    "중량YoY": 1.283565434364542,
+    "중량추이": [
+      9.9,
+      3.7,
+      8.5,
+      -1.2,
+      1.3,
+      1.3
+    ]
+  },
+  "reason": "금액 +216.5% 중 단가가 +212.5%p — 물량은 +1.3%로 제자리",
+  "last_error": null,
+  "checked_at": "2026-10-12 16:08:10",
+  "quality_since": "2026-10-12",
+  "raw_stats": {
+    "cash": 0,
+    "total_asset": 0,
+    "profit_rate": 0,
+    "holdings_count": 0,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0,
+    "turnover": 0,
+    "frequency": 0,
+    "total_fees": 0,
+    "current_prices": {}
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 20.0,
+    "MDD": 100,
+    "거래빈도": 0,
+    "자본회전율": 0
+  }
 }

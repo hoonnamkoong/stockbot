@@ -6,8 +6,42 @@
   "peak_nav": 0,
   "total_fees": 0,
   "history": [
-    0
+    0,
+    {
+      "date": "2026-10-12",
+      "stage": "관찰",
+      "anchor": "2026-01-27",
+      "elapsed": 8
+    }
   ],
   "daily_trades": [],
-  "cooldown_codes": {}
+  "cooldown_codes": {},
+  "stage": "관찰",
+  "anchor": "2026-01-27",
+  "anchor_level": 5084.85,
+  "elapsed": 8,
+  "kospi": 6384.24,
+  "last_error": null,
+  "checked_at": "2026-10-12 16:08:07",
+  "stage_since": "2026-10-12",
+  "raw_stats": {
+    "cash": 0,
+    "total_asset": 0,
+    "profit_rate": 0,
+    "holdings_count": 0,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0,
+    "turnover": 0,
+    "frequency": 0,
+    "total_fees": 0,
+    "current_prices": {}
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 20.0,
+    "MDD": 100,
+    "거래빈도": 0,
+    "자본회전율": 0
+  }
 }

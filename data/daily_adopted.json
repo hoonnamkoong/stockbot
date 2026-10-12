@@ -5,12 +5,12 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "로봇용 D램 수요 증가 및 소부장 테마. 주가 하락 및 최태원 회장 발언 논란.",
-        "sentiment": "-2",
+        "posts_summary": "솔리다임 쪼개기 상장 관련 논란 및 오너 리스크 우려 제기.",
+        "sentiment": "-8",
         "keywords": [
-          "D램",
-          "로봇",
-          "소부장"
+          "오너 리스크",
+          "IPO",
+          "솔리다임"
         ]
       }
     },
@@ -18,12 +18,12 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "HLB 간암 1차 치료제 리보세라닙 FDA 재승인 서류 제출. 연말 30만 기대.",
+        "posts_summary": "HLB 간암 1차 치료제 FDA 재승인 서류 제출, 리보세라닙/캄렐리주맙 병용요법 기대감.",
         "sentiment": "8",
         "keywords": [
-          "리보세라닙",
           "FDA",
-          "재승인"
+          "리보세라닙",
+          "간암"
         ]
       }
     },
@@ -31,12 +31,12 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "반도체 주 상승 시작 전망. 마이크론 파업 및 로봇 D램 수요 증가 기대.",
-        "sentiment": "1",
+        "posts_summary": "반도체 업황 부진 우려 속, 로봇용 D램 수요 증가 뉴스 언급.",
+        "sentiment": "-3",
         "keywords": [
           "반도체",
           "D램",
-          "로봇"
+          "수요"
         ]
       }
     },
@@ -44,25 +44,21 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "대차 관련 논란과 소액주주연대 활동. 주가 상승에 대한 회의적인 시각.",
+        "posts_summary": "주가 부양 및 범죄 척결 요구 주장 반복, 구체적 근거 제시 부족.",
         "sentiment": "-5",
-        "keywords": [
-          "대차",
-          "소액주주",
-          "주가"
-        ]
+        "keywords": []
       }
     },
     "010140": {
       "name": "삼성중공업",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "LNG·FLNG 수주 랠리에도 주가 하락. 조선업 투자 비관론.",
-        "sentiment": "-3",
+        "posts_summary": "조선주 순환매 기대감에도 주가 하락, LNG/FLNG 수주 소식 언급.",
+        "sentiment": "-7",
         "keywords": [
-          "LNG",
-          "FLNG",
-          "조선업"
+          "조선",
+          "수주",
+          "LNG"
         ]
       }
     },
@@ -70,8 +66,8 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "AI 및 광통신 시장 성장률에 따른 주가 상승 기대. 미국 광통신 대장주 신고가.",
-        "sentiment": "3",
+        "posts_summary": "AI 광통신 시장 성장 기대감, 미국 광통신 대장주 신고가 언급.",
+        "sentiment": "7",
         "keywords": [
           "광통신",
           "AI",
@@ -96,12 +92,12 @@
       "name": "덕산넵코어스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "방산주 테마 및 보호예수 해제 영향. 장기적 관점에서 접근 필요.",
-        "sentiment": "2",
+        "posts_summary": "누리호 발사 성공 연관성 부각, 방산/우주 테마 기대감 반영.",
+        "sentiment": "5",
         "keywords": [
-          "방산주",
-          "보호예수",
-          "장기투자"
+          "방산",
+          "우주",
+          "누리호"
         ]
       }
     },
@@ -109,11 +105,11 @@
       "name": "금호건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "건설 사업 확정 및 2차 상승 기대감. 외국인+프로그램 매수세 동반.",
+        "posts_summary": "건설주 상승 기대감 속 거래량 미미, 외국인/프매 장난질 의혹 제기.",
         "sentiment": "4",
         "keywords": [
           "건설",
-          "상승",
+          "거래량",
           "외국인"
         ]
       }
@@ -122,11 +118,11 @@
       "name": "삼기에너지솔루션즈",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "인공지능 데이터센터 확대에 따른 ESS용 유연회로기판 매출 급증 기대.",
-        "sentiment": "1",
+        "posts_summary": "인공지능 데이터센터 확대에 따른 ESS 매출 증대 전망.",
+        "sentiment": "2",
         "keywords": [
           "ESS",
-          "유연회로기판",
+          "데이터센터",
           "매출"
         ]
       }

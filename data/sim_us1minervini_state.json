@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 126.4,
+      "peak_price": 128.385,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 288.295,
+      "peak_price": 291.73,
       "is_scaled_out": false
     },
     "ANET": {
@@ -40,11 +40,11 @@
       "quantity": 35,
       "avg_price": 110.94,
       "entry_date": "2026-09-21",
-      "peak_price": 156.65,
+      "peak_price": 156.725,
       "is_scaled_out": false
     }
   },
-  "peak_nav": 23086.592,
+  "peak_nav": 23273.877,
   "total_fees": 7.344450000000001,
   "history": [
     20000
@@ -65,41 +65,41 @@
   },
   "raw_stats": {
     "cash": 929.2669999999985,
-    "total_asset": 22832.271999999997,
-    "profit_rate": 14.161359999999986,
+    "total_asset": 23273.877,
+    "profit_rate": 16.369385,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 1.101591781064972,
+    "mdd": 0.0,
     "turnover": 1.6780529999999998,
-    "frequency": 0.1875,
+    "frequency": 0.1836734693877551,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "P": 153.19,
-      "ZBRA": 383.67,
-      "KEYS": 367.225,
-      "CVX": 217.81,
-      "DVN": 49.56,
-      "AMG": 378.13,
-      "PSX": 286.08,
-      "MU": 946.245,
-      "TWLO": 284.81,
-      "DDOG": 285.14,
-      "ANET": 200.745,
-      "DINO": 125.29,
-      "EXPD": 193.42,
-      "PR": 23.79,
-      "APH": 84.635,
-      "MRVL": 261.27,
-      "HALO": 110.54,
-      "AMD": 588.46
+      "PR": 24.325,
+      "DINO": 128.385,
+      "TWLO": 282.31,
+      "HALO": 109.79,
+      "CVX": 218.41,
+      "DDOG": 284.38,
+      "KEYS": 370.545,
+      "MRVL": 267.375,
+      "APH": 85.8,
+      "ANET": 205.08,
+      "PSX": 291.73,
+      "P": 156.725,
+      "DVN": 50.245,
+      "AMD": 601.92,
+      "ZBRA": 385.897,
+      "MU": 941.5,
+      "AMG": 378.54,
+      "EXPD": 195.165
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 96.69522465680508,
-    "거래빈도": 0.9375,
+    "MDD": 100.0,
+    "거래빈도": 0.9183673469387755,
     "자본회전율": 3.3561059999999996
   }
 }

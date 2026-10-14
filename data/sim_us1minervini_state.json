@@ -1,14 +1,14 @@
 {
   "initial_cash": 20000,
-  "cash": 929.2669999999985,
-  "invested": 18759.690000000002,
+  "cash": 426.9069999999974,
+  "invested": 19100.170000000002,
   "portfolio": {
     "EXPD": {
       "name": "Expeditors International of Washington, Inc. Common Stock",
       "quantity": 19,
       "avg_price": 191.53,
       "entry_date": "2026-08-27",
-      "peak_price": 195.725,
+      "peak_price": 196.25,
       "is_scaled_out": false
     },
     "DINO": {
@@ -24,15 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 291.73,
-      "is_scaled_out": false
-    },
-    "ANET": {
-      "name": "Arista Networks, Inc. Common Stock",
-      "quantity": 19,
-      "avg_price": 203.91,
-      "entry_date": "2026-09-21",
-      "peak_price": 217.25,
+      "peak_price": 294.18,
       "is_scaled_out": false
     },
     "P": {
@@ -41,6 +33,14 @@
       "avg_price": 110.94,
       "entry_date": "2026-09-21",
       "peak_price": 156.725,
+      "is_scaled_out": false
+    },
+    "CVX": {
+      "name": "Chevron Corporation Common Stock",
+      "quantity": 19,
+      "avg_price": 221.83,
+      "entry_date": "2026-10-15",
+      "peak_price": 221.83,
       "is_scaled_out": false
     }
   },
@@ -57,49 +57,54 @@
     {
       "date": "2026-09-21",
       "is_win": false
+    },
+    {
+      "date": "2026-10-15",
+      "is_win": false
     }
   ],
   "cooldown_codes": {
     "RGA": "2026-09-21",
-    "VG": "2026-09-24"
+    "VG": "2026-09-24",
+    "ANET": "2026-10-18"
   },
   "raw_stats": {
-    "cash": 929.2669999999985,
-    "total_asset": 23273.877,
-    "profit_rate": 16.369385,
+    "cash": 426.9069999999974,
+    "total_asset": 22655.151999999995,
+    "profit_rate": 13.275759999999973,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 0.0,
-    "turnover": 1.6780529999999998,
-    "frequency": 0.1836734693877551,
+    "mdd": 2.6584526505833375,
+    "turnover": 2.074412,
+    "frequency": 0.22,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "PR": 24.325,
-      "DINO": 128.385,
-      "TWLO": 282.31,
-      "HALO": 109.79,
-      "CVX": 218.41,
-      "DDOG": 284.38,
-      "KEYS": 370.545,
-      "MRVL": 267.375,
-      "APH": 85.8,
-      "ANET": 205.08,
-      "PSX": 291.73,
-      "P": 156.725,
-      "DVN": 50.245,
-      "AMD": 601.92,
-      "ZBRA": 385.897,
-      "MU": 941.5,
-      "AMG": 378.54,
-      "EXPD": 195.165
+      "PSX": 294.18,
+      "DVN": 50.155,
+      "ANET": 195.39,
+      "TWLO": 273.775,
+      "MRVL": 251.03,
+      "DDOG": 272.47,
+      "ZBRA": 376.82,
+      "APH": 82.86,
+      "EXPD": 196.25,
+      "CVX": 221.83,
+      "HALO": 118.355,
+      "P": 142.815,
+      "KEYS": 359.945,
+      "AMG": 373.185,
+      "PR": 24.085,
+      "DINO": 128.25,
+      "MU": 922.3,
+      "AMD": 572.634
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 100.0,
-    "거래빈도": 0.9183673469387755,
-    "자본회전율": 3.3561059999999996
+    "MDD": 92.02464204824999,
+    "거래빈도": 1.1,
+    "자본회전율": 4.148824
   }
 }

@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 294.18,
+      "peak_price": 295.74,
       "is_scaled_out": false
     },
     "P": {
@@ -40,7 +40,7 @@
       "quantity": 19,
       "avg_price": 221.83,
       "entry_date": "2026-10-15",
-      "peak_price": 221.83,
+      "peak_price": 223.3,
       "is_scaled_out": false
     }
   },
@@ -70,40 +70,35 @@
   },
   "raw_stats": {
     "cash": 426.9069999999974,
-    "total_asset": 22655.151999999995,
-    "profit_rate": 13.275759999999973,
+    "total_asset": 22289.951999999997,
+    "profit_rate": 11.449759999999989,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 2.6584526505833375,
+    "mdd": 4.227593881328852,
     "turnover": 2.074412,
     "frequency": 0.22,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "PSX": 294.18,
-      "DVN": 50.155,
-      "ANET": 195.39,
-      "TWLO": 273.775,
-      "MRVL": 251.03,
-      "DDOG": 272.47,
-      "ZBRA": 376.82,
-      "APH": 82.86,
-      "EXPD": 196.25,
-      "CVX": 221.83,
-      "HALO": 118.355,
-      "P": 142.815,
-      "KEYS": 359.945,
-      "AMG": 373.185,
-      "PR": 24.085,
-      "DINO": 128.25,
-      "MU": 922.3,
-      "AMD": 572.634
+      "KEYS": 340.4,
+      "APH": 80.211,
+      "TWLO": 264.235,
+      "HALO": 117.75,
+      "EXPD": 196.165,
+      "MRVL": 231.99,
+      "PSX": 295.74,
+      "DINO": 126.27,
+      "P": 133.11,
+      "AMD": 539.69,
+      "CVX": 223.3,
+      "DDOG": 262.41,
+      "ZBRA": 370.72
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 92.02464204824999,
+    "MDD": 87.31721835601344,
     "거래빈도": 1.1,
     "자본회전율": 4.148824
   }

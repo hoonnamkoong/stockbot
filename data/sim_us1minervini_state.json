@@ -16,7 +16,7 @@
       "quantity": 38,
       "avg_price": 97.51,
       "entry_date": "2026-08-27",
-      "peak_price": 129.045,
+      "peak_price": 129.2,
       "is_scaled_out": false
     },
     "PSX": {
@@ -24,7 +24,7 @@
       "quantity": 15,
       "avg_price": 243.87,
       "entry_date": "2026-08-27",
-      "peak_price": 298.97,
+      "peak_price": 299.105,
       "is_scaled_out": false
     },
     "P": {
@@ -40,7 +40,7 @@
       "quantity": 19,
       "avg_price": 221.83,
       "entry_date": "2026-10-15",
-      "peak_price": 225.25,
+      "peak_price": 225.495,
       "is_scaled_out": false
     }
   },
@@ -70,31 +70,31 @@
   },
   "raw_stats": {
     "cash": 426.9069999999974,
-    "total_asset": 22326.352,
-    "profit_rate": 11.631759999999995,
+    "total_asset": 22342.875999999997,
+    "profit_rate": 11.714379999999982,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 4.071195357782468,
+    "mdd": 4.000197302752798,
     "turnover": 2.074412,
     "frequency": 0.2037037037037037,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "DINO": 129.045,
-      "PSX": 298.92,
-      "CRBG": 34.66,
-      "DDOG": 257.0,
-      "CVX": 225.25,
-      "P": 128.105,
-      "EXPD": 197.29,
-      "TWLO": 251.64,
+      "PSX": 299.105,
+      "CRBG": 34.68,
+      "DDOG": 257.545,
+      "CVX": 225.495,
+      "TWLO": 252.205,
+      "DINO": 129.2,
+      "P": 128.31,
+      "EXPD": 197.081,
       "ZBRA": 372.45
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 87.7864139266526,
+    "MDD": 87.9994080917416,
     "거래빈도": 1.0185185185185184,
     "자본회전율": 4.148824
   }

@@ -31,8 +31,8 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 발언이 주를 이루며 주가 관련 객관적 근거는 부재함.",
-        "sentiment": "-5",
+        "posts_summary": "정치적 이슈와 관련된 부정적 언급이 다수.",
+        "sentiment": "-7",
         "keywords": []
       }
     },
@@ -40,8 +40,8 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 이슈 및 특정 인물에 대한 부정적 언급이 많으며, 솔리다임 상장 관련 언급이 있으나 구체적 분석은 부족함.",
-        "sentiment": "-7",
+        "posts_summary": "솔리다임 상장 관련 불확실성 및 정치적 이슈 언급.",
+        "sentiment": "-6",
         "keywords": [
           "솔리다임"
         ]
@@ -51,12 +51,11 @@
       "name": "한화시스템",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 이슈와 연관된 부정적 언급 다수. 공매도 비율 및 급락에 대한 불만 표출.",
-        "sentiment": "-8",
+        "posts_summary": "공매도 관련 불만 및 정치적 이슈에 대한 부정적 언급.",
+        "sentiment": "-7",
         "keywords": [
-          "정치",
           "공매도",
-          "하락"
+          "방산"
         ]
       }
     },
@@ -64,12 +63,11 @@
       "name": "HT로보틱스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "ESS, 로봇, 이차전지 사업 관련 언급과 함께 수주 잔고 7천억, 1조 클럽 가능성 등 구체적인 팩트 기반 긍정적 전망 제시.",
+        "posts_summary": "로봇 및 ESS 사업의 강점과 수주잔고에 대한 긍정적 전망.",
         "sentiment": "8",
         "keywords": [
           "ESS",
-          "로봇",
-          "수주잔고"
+          "로봇"
         ]
       }
     },
@@ -90,8 +88,8 @@
       "name": "명신산업",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "개별 종목의 주가 흐름에 대한 언급과 함께 테슬라 관련 언급이 있으나, 구체적인 팩트 기반 분석은 부족함.",
-        "sentiment": "1",
+        "posts_summary": "주가 하락 및 개인 투자자들의 어려움에 대한 언급.",
+        "sentiment": "-4",
         "keywords": [
           "테슬라"
         ]

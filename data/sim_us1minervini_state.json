@@ -40,7 +40,7 @@
       "quantity": 19,
       "avg_price": 221.83,
       "entry_date": "2026-10-15",
-      "peak_price": 226.55,
+      "peak_price": 226.665,
       "is_scaled_out": false
     }
   },
@@ -70,30 +70,30 @@
   },
   "raw_stats": {
     "cash": 426.9069999999974,
-    "total_asset": 21980.271999999997,
-    "profit_rate": 9.901359999999986,
+    "total_asset": 22008.592000000004,
+    "profit_rate": 10.042960000000022,
     "holdings_count": 5,
     "win_rate": 0.0,
     "profit_factor": 0.0,
-    "mdd": 5.558184397038805,
+    "mdd": 5.436502908389505,
     "turnover": 2.074412,
     "frequency": 0.2,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "PSX": 292.515,
-      "PBF": 81.705,
-      "BTSG": 61.5,
-      "CVX": 226.55,
-      "P": 124.895,
-      "CRBG": 34.575,
-      "DINO": 124.84,
-      "EXPD": 197.155
+      "BTSG": 61.565,
+      "PSX": 292.32,
+      "EXPD": 197.155,
+      "PBF": 82.245,
+      "CVX": 226.665,
+      "DINO": 125.45,
+      "CRBG": 34.63,
+      "P": 125.063
     }
   },
   "normalized_stats": {
     "승률": 0,
     "수익팩터": 0.0,
-    "MDD": 83.32544680888358,
+    "MDD": 83.69049127483149,
     "거래빈도": 1.0,
     "자본회전율": 4.148824
   }

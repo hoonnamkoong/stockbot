@@ -27,6 +27,31 @@
       "code": "005930",
       "name": "삼성전자",
       "rank": 5
+    },
+    {
+      "code": "065450",
+      "name": "빅텍",
+      "rank": 1
+    },
+    {
+      "code": "042510",
+      "name": "라온시큐어",
+      "rank": 2
+    },
+    {
+      "code": "468670",
+      "name": "브릴스",
+      "rank": 3
+    },
+    {
+      "code": "009900",
+      "name": "명신산업",
+      "rank": 4
+    },
+    {
+      "code": "272210",
+      "name": "한화시스템",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "396300",
     "000660",
     "008970",
-    "005930"
+    "005930",
+    "065450",
+    "042510",
+    "468670",
+    "009900",
+    "272210"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "065450",
+      "name": "빅텍",
+      "rank": 1
+    },
+    {
+      "code": "042510",
+      "name": "라온시큐어",
+      "rank": 2
+    },
+    {
+      "code": "468670",
+      "name": "브릴스",
+      "rank": 3
+    },
+    {
+      "code": "009900",
+      "name": "명신산업",
+      "rank": 4
+    },
+    {
+      "code": "272210",
+      "name": "한화시스템",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

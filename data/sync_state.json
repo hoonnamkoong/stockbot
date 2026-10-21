@@ -27,6 +27,16 @@
       "code": "009900",
       "name": "명신산업",
       "rank": 5
+    },
+    {
+      "code": "290720",
+      "name": "푸드나무",
+      "rank": 1
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 2
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +44,9 @@
     "396300",
     "047040",
     "000660",
-    "009900"
+    "009900",
+    "290720",
+    "034020"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +75,18 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "290720",
+      "name": "푸드나무",
+      "rank": 1
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 2
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

@@ -5,25 +5,21 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 이슈와 반도체 산업 부진에 따른 SK하이닉스 주가 하락 및 투자 심리 위축.",
-        "sentiment": "-8",
-        "keywords": [
-          "반도체 산업",
-          "정치적 이슈",
-          "주가 하락"
-        ]
+        "posts_summary": "정치적 이슈와 특정 인물에 대한 부정적 언급 및 반도체 산업 전반에 대한 비관론 제기.",
+        "sentiment": "-7",
+        "keywords": []
       }
     },
     "028300": {
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "HLB, 간암 신약 승인 기대감 속 기관 순매수. FDA 승인 관련 불확실성 상존.",
-        "sentiment": "3",
+        "posts_summary": "간암 치료제 CRL 수령 이후 클래스 1 또는 즉시 승인 기대감 표출. FDA 승인 요건 미충족 가능성에 대한 신중론과 긍정론 혼재.",
+        "sentiment": "4",
         "keywords": [
-          "간암 신약",
+          "간암 치료제",
           "FDA 승인",
-          "기관 순매수"
+          "CRL"
         ]
       }
     },
@@ -44,13 +40,9 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 요인에 따른 한국 증시 하락 전망 및 외국인 투자자 우려 제기.",
-        "sentiment": "-7",
-        "keywords": [
-          "한국 증시",
-          "외국인 투자자",
-          "정치적 요인"
-        ]
+        "posts_summary": "정치적 이슈와 특정 인물 관련 부정적 전망 및 증시 하락 예측.",
+        "sentiment": "-8",
+        "keywords": []
       }
     },
     "009900": {
@@ -70,12 +62,12 @@
       "name": "HT로보틱스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "HT로보틱스, 로봇주 테마 조정 및 ESS 마진율 불확실성으로 주가 급락. 투매 우려.",
-        "sentiment": "-6",
+        "posts_summary": "로봇주 전반의 급등 후 조정 및 투기적 거래 경고. ESS 마진율 불확실성 및 하락 파동 복구 어려움 언급.",
+        "sentiment": "-7",
         "keywords": [
           "로봇주",
-          "ESS",
-          "주가 급락"
+          "투기",
+          "ESS"
         ]
       }
     },
@@ -109,11 +101,11 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "엔비디아 AI 광통신 관련 기술 확보 및 EUV용 유리기판 제조 기술 발표. 기관 매집 시작 및 주가 상승 기대.",
-        "sentiment": "2",
+        "posts_summary": "AI 광통신 및 EUV용 유리기판 제조 기술 확보 관련 뉴스 언급. 기관 매집 시작 가능성 및 기술력에 대한 긍정적 평가.",
+        "sentiment": "3",
         "keywords": [
           "AI 광통신",
-          "EUV 유리기판",
+          "유리기판",
           "기관 매집"
         ]
       }
@@ -135,12 +127,12 @@
       "name": "LG디스플레이",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "LG디스플레이, 대규모 영업손실 발표 후 주가 급락 및 저점 논란. OLED 사업 경쟁 심화.",
+        "posts_summary": "지속된 적자와 낮은 주가에도 불구하고 과거 대규모 투자 언급. 신저가 수준의 낮은 PBR 기반 바닥론 제기.",
         "sentiment": "-8",
         "keywords": [
           "영업손실",
-          "주가 급락",
-          "OLED"
+          "신저가",
+          "PBR"
         ]
       }
     },
@@ -148,12 +140,12 @@
       "name": "유니켐",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "미국 기업 루미아 인수 및 촉각 센서 기술 개발 관련 다수의 긍정적 뉴스 확인. 향후 큰 폭의 상승 기대.",
+        "posts_summary": "로봇 관련 촉각 센서 기술 개발 및 현대차 파트너십을 기반으로 한 높은 기대감 표출. 미국 기업 루미아 인수 관련 구체적인 인수 의향서 및 본계약 언급.",
         "sentiment": "8",
         "keywords": [
           "촉각 센서",
           "루미아 인수",
-          "로봇 공학"
+          "현대차"
         ]
       }
     },

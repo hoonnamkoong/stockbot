@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 1937.3549999999996,
-  "invested": 18133.73,
+  "cash": 2865.4449999999997,
+  "invested": 17599.239999999998,
   "portfolio": {
     "MU": {
       "name": "Micron Technology, Inc. Common Stock",
@@ -27,20 +27,20 @@
       "peak_price": 1906.649,
       "is_scaled_out": false
     },
-    "AAPL": {
-      "name": "Apple Inc. Common Stock",
-      "quantity": 12,
-      "avg_price": 313.32,
-      "entry_date": "2026-08-27",
-      "peak_price": 347.37,
-      "is_scaled_out": false
-    },
     "TSLA": {
       "name": "Tesla, Inc. Common Stock",
       "quantity": 10,
       "avg_price": 382.605,
       "entry_date": "2026-09-25",
       "peak_price": 388.26,
+      "is_scaled_out": false
+    },
+    "META": {
+      "name": "Meta Platforms, Inc. Class A Common Stock",
+      "quantity": 5,
+      "avg_price": 645.07,
+      "entry_date": "2026-10-24",
+      "peak_price": 645.07,
       "is_scaled_out": false
     }
   },
@@ -53,52 +53,56 @@
     {
       "date": "2026-09-25",
       "is_win": true
+    },
+    {
+      "date": "2026-10-24",
+      "is_win": true
     }
   ],
   "cooldown_codes": {},
   "rebalance": {
-    "elapsed": 19,
-    "last_seen": "20261022"
+    "elapsed": 0,
+    "last_seen": "20261023"
   },
   "raw_stats": {
-    "cash": 1937.3549999999996,
-    "total_asset": 19672.707,
-    "profit_rate": -1.6364650000000074,
+    "cash": 2865.4449999999997,
+    "total_asset": 19680.645,
+    "profit_rate": -1.5967749999999978,
     "holdings_count": 5,
     "win_rate": 100.0,
     "profit_factor": 99.0,
-    "mdd": 11.058645293538435,
-    "turnover": 1.2559529999999999,
-    "frequency": 0.1206896551724138,
+    "mdd": 11.022757173329046,
+    "turnover": 1.6248924999999999,
+    "frequency": 0.15254237288135594,
     "total_fees": 17.7648,
     "current_prices": {
-      "TSLA": 378.41,
-      "TSM": 411.75,
-      "NBIS": 156.85,
-      "MSFT": 523.44,
-      "INTC": 86.32,
-      "AVGO": 324.65,
-      "META": 647.179,
-      "AAPL": 345.39,
-      "LITE": 760.465,
-      "GOOGL": 325.435,
-      "STX": 638.65,
-      "SNDK": 1257.26,
-      "MRVL": 222.91,
-      "ORCL": 123.63,
-      "AMZN": 250.5,
-      "AMD": 511.606,
-      "PLTR": 197.38,
-      "GOOG": 321.76,
-      "MU": 865.683,
-      "NVDA": 212.74
+      "GOOG": 319.35,
+      "SNDK": 1266.747,
+      "MSFT": 524.31,
+      "AMZN": 249.015,
+      "AVGO": 324.25,
+      "GOOGL": 322.48,
+      "ORCL": 127.18,
+      "TSLA": 370.9,
+      "INTC": 86.663,
+      "NBIS": 160.04,
+      "LITE": 764.036,
+      "STX": 644.17,
+      "AMD": 516.258,
+      "PLTR": 195.695,
+      "MRVL": 227.857,
+      "MU": 884.0,
+      "TSM": 416.35,
+      "META": 645.07,
+      "AAPL": 346.12,
+      "NVDA": 211.742
     }
   },
   "normalized_stats": {
     "승률": 100,
     "수익팩터": 100,
-    "MDD": 66.8240641193847,
-    "거래빈도": 0.603448275862069,
-    "자본회전율": 2.5119059999999998
+    "MDD": 66.93172848001286,
+    "거래빈도": 0.7627118644067797,
+    "자본회전율": 3.2497849999999997
   }
 }

@@ -27,6 +27,31 @@
       "code": "042510",
       "name": "라온시큐어",
       "rank": 5
+    },
+    {
+      "code": "047040",
+      "name": "대우건설",
+      "rank": 1
+    },
+    {
+      "code": "003780",
+      "name": "진양산업",
+      "rank": 2
+    },
+    {
+      "code": "138360",
+      "name": "앤로보틱스",
+      "rank": 3
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 4
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "065450",
     "000660",
     "010170",
-    "042510"
+    "042510",
+    "047040",
+    "003780",
+    "138360",
+    "005930",
+    "034020"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "047040",
+      "name": "대우건설",
+      "rank": 1
+    },
+    {
+      "code": "003780",
+      "name": "진양산업",
+      "rank": 2
+    },
+    {
+      "code": "138360",
+      "name": "앤로보틱스",
+      "rank": 3
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 4
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

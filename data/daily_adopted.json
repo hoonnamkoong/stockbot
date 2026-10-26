@@ -5,12 +5,11 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 조작 의혹과 시장 상황에 대한 부정적 전망.",
-        "sentiment": "-5",
+        "posts_summary": "주가 부양 의지 부족 및 시장 조작 의혹 제기, 데이터센터 전망.",
+        "sentiment": "-1",
         "keywords": [
-          "주가조작",
-          "레버리지",
-          "외인"
+          "데이터센터",
+          "주가조작"
         ]
       }
     },
@@ -18,13 +17,9 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 정책에 대한 비판과 외국인 매도세 우려.",
-        "sentiment": "-6",
-        "keywords": [
-          "외인",
-          "정부",
-          "경제"
-        ]
+        "posts_summary": "현 정부 정책 및 경제 운영에 대한 비판과 불만.",
+        "sentiment": "-2",
+        "keywords": []
       }
     },
     "034020": {
@@ -44,12 +39,11 @@
       "name": "빅텍",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "지정학적 리스크 부각 속 급락 및 신용 위험 경고.",
-        "sentiment": "-8",
+        "posts_summary": "북한 관련 이슈에 따른 급락 및 투자 심리 위축.",
+        "sentiment": "-5",
         "keywords": [
-          "북한",
-          "전쟁",
-          "신용"
+          "자주포",
+          "핵실험"
         ]
       }
     },
@@ -70,12 +64,12 @@
       "name": "루닛",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "공매도 쇼트 스퀴즈 기대감과 글로벌 AI 신약 밸류체인 합류. 연기금 순매수.",
+        "posts_summary": "AI 신약 밸류체인 합류 및 임상 진입, 연기금 순매수 기반 상승 기대.",
         "sentiment": "8",
         "keywords": [
-          "AI",
-          "신약",
-          "공매도"
+          "AI 신약",
+          "연기금",
+          "임상"
         ]
       }
     },
@@ -83,13 +77,9 @@
       "name": "진양산업",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치 테마주에 대한 회의론과 급락 전망.",
-        "sentiment": "-7",
-        "keywords": [
-          "정치테마",
-          "개미",
-          "급락"
-        ]
+        "posts_summary": "정치 테마주에 대한 부정적 전망 및 투자 경고.",
+        "sentiment": "0",
+        "keywords": []
       }
     },
     "047040": {

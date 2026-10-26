@@ -5,19 +5,16 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치 관련 부정적 언급 다수. 일부 긍정적 전망 및 외인 복귀 기대 있으나 근거 부족.",
-        "sentiment": "-3",
-        "keywords": [
-          "외인",
-          "정치"
-        ]
+        "posts_summary": "이재명 정부 및 정치 관련 부정적 발언 다수. 투자 관련 실질적 내용 부족.",
+        "sentiment": "-4",
+        "keywords": []
       }
     },
     "005930": {
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치 관련 언급만 다수. 주가 관련 객관적 근거 없음.",
+        "posts_summary": "이재명 정부에 대한 정치적 불만 표출. 주가 관련 내용은 거의 없음.",
         "sentiment": "-5",
         "keywords": []
       }
@@ -62,12 +59,12 @@
       "name": "루닛",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "AI 신약 개발 관련 빅파마 협력 및 임상 진입 긍정적 전망. 공매도 쇼트커버링 기대.",
-        "sentiment": "9",
+        "posts_summary": "신규 투자 및 기술 개발에 대한 긍정적 전망. 공매도 청산 기대감 형성.",
+        "sentiment": "8",
         "keywords": [
           "AI 신약",
-          "임상",
-          "공매도"
+          "공매도",
+          "임상"
         ]
       }
     },

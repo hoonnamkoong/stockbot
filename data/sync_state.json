@@ -27,6 +27,16 @@
       "code": "028050",
       "name": "삼성E&A",
       "rank": 5
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 1
+    },
+    {
+      "code": "065450",
+      "name": "빅텍",
+      "rank": 2
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +44,9 @@
     "328130",
     "003780",
     "005930",
-    "028050"
+    "028050",
+    "034020",
+    "065450"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +75,18 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 1
+    },
+    {
+      "code": "065450",
+      "name": "빅텍",
+      "rank": 2
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

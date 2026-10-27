@@ -3,11 +3,11 @@
     "code": "005930",
     "name": "삼성전자",
     "market": "KOSPI",
-    "price": 221250,
+    "price": 222000,
     "recent_posts_count": 800,
-    "unique_posters": 445,
-    "fact_score": 0.3,
-    "total_likes": 1315,
+    "unique_posters": 443,
+    "fact_score": 0.2,
+    "total_likes": 1318,
     "foreign_rate": 46.1,
     "foreign_change": -0.01,
     "inst_net_buy": 627948,
@@ -16,16 +16,16 @@
     "day_high": 225500,
     "day_low": 221000,
     "prev_foreign_rate": 46.11,
-    "posts_summary": "실적 및 주주환원 발표 기대감 속 공매도 세력 청산 가능성 언급. 다만, 외인 매도세 및 부정적 전망 혼재.",
-    "sentiment": "1",
+    "posts_summary": "실적 및 주주환원 발표 기대감과 함께 상승 전망. 공매도 세력의 대차 상환 움직임도 언급.",
+    "sentiment": "0",
     "top_keywords": [],
     "consecutive_days": 18,
     "status": "활성",
-    "change_rate": "+3.87%",
+    "change_rate": "+4.23%",
     "signal": null,
-    "current_price": 221250,
-    "volume": 8906721,
-    "amount": 1987308848000,
+    "current_price": 222000,
+    "volume": 9064066,
+    "amount": 2022149218000,
     "posts": [
       {
         "nid": "431128811",
@@ -83,6 +83,11 @@
         "likes": 8
       },
       {
+        "nid": "431138214",
+        "title": "이 개잡주는",
+        "likes": 7
+      },
+      {
         "nid": "431136537",
         "title": "삼성전자 7만원 간다는건 ",
         "likes": 7
@@ -118,13 +123,18 @@
         "likes": 6
       },
       {
+        "nid": "431139012",
+        "title": "남은 올해중 오늘이 제일 싸다",
+        "likes": 6
+      },
+      {
         "nid": "431138728",
         "title": "골때리는 2찍들",
         "likes": 6
       },
       {
-        "nid": "431138214",
-        "title": "이 개잡주는",
+        "nid": "431138071",
+        "title": "잘 되어 가나",
         "likes": 6
       },
       {
@@ -166,24 +176,14 @@
         "nid": "431124761",
         "title": "종가 -3%본다.",
         "likes": 6
-      },
-      {
-        "nid": "431116701",
-        "title": "+10%  급등 가보자 오늘",
-        "likes": 6
-      },
-      {
-        "nid": "431113983",
-        "title": "주식은 여유 자금으로",
-        "likes": 6
       }
     ],
     "sparkline_price": [
-      223000,
       222750,
       222750,
       222500,
-      221250
+      221250,
+      222000
     ],
     "range_history": [
       286500,
@@ -229,8 +229,8 @@
       3447165022000,
       2428777281000
     ],
-    "tick_power": 100.27,
-    "bid_ask_ratio": 1.446444495821911,
+    "tick_power": 101.13,
+    "bid_ask_ratio": 1.5679834836593651,
     "frgn_fake_ntby_qty": 1190000,
     "orgn_fake_ntby_qty": 624000,
     "sum_fake_ntby_qty": 1814000,
@@ -244,17 +244,17 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 33.71,
-    "pbr": 3.46,
+    "per": 33.82,
+    "pbr": 3.47,
     "eps": 6564,
     "bps": 63997,
     "w52_hgpr": 374500,
     "w52_lwpr": 94500,
-    "mkt_cap": 12934891,
+    "mkt_cap": 12978739,
     "keywords": [
+      "실적",
       "주주환원",
-      "공매도",
-      "실적"
+      "공매도"
     ],
     "sparkline_posts": [
       800,
@@ -271,10 +271,10 @@
     "name": "삼성E&A",
     "market": "KOSPI",
     "price": 62100,
-    "recent_posts_count": 148,
-    "unique_posters": 95,
-    "fact_score": 0.3,
-    "total_likes": 875,
+    "recent_posts_count": 145,
+    "unique_posters": 92,
+    "fact_score": 0.4,
+    "total_likes": 868,
     "foreign_rate": 40.44,
     "foreign_change": 0.05,
     "inst_net_buy": -5466,
@@ -283,7 +283,7 @@
     "day_high": 63900,
     "day_low": 60100,
     "prev_foreign_rate": 40.39,
-    "posts_summary": "삼성그룹주 중 저평가 분석 및 MSCI 편입 기대감. 중동 전쟁 관련 불확실성 속 공매도 공세. 수주 공시 시 급등 전망.",
+    "posts_summary": "중동 관련 호재 및 그룹 내 저평가 인식. MSCI 편입 기대감과 대형 수주 공시 가능성 언급.",
     "sentiment": "5",
     "top_keywords": [],
     "consecutive_days": 4,
@@ -291,8 +291,8 @@
     "change_rate": "+3.85%",
     "signal": null,
     "current_price": 62100,
-    "volume": 3578285,
-    "amount": 222966647350,
+    "volume": 3631087,
+    "amount": 226242851050,
     "posts": [
       {
         "nid": "431109789",
@@ -302,7 +302,7 @@
       {
         "nid": "431110659",
         "title": "삼전닉스가 2,000조 투자해서 반도체 클러스트와 AI데이터 센터를 짓는다는데...",
-        "likes": 35
+        "likes": 36
       },
       {
         "nid": "431110578",
@@ -312,12 +312,12 @@
       {
         "nid": "431129157",
         "title": "62,400원의 의미",
-        "likes": 23
+        "likes": 24
       },
       {
         "nid": "431134530",
         "title": "어처구니없는 사건",
-        "likes": 19
+        "likes": 20
       },
       {
         "nid": "431109788",
@@ -345,14 +345,14 @@
         "likes": 14
       },
       {
-        "nid": "431106751",
-        "title": "내일 9시 곱버스 손절치고 바로 이거 몰빵하려고 합니다",
+        "nid": "431135207",
+        "title": "50% 잘먹고 갑니다 ",
         "likes": 13
       },
       {
-        "nid": "431135207",
-        "title": "50% 잘먹고 갑니다 ",
-        "likes": 12
+        "nid": "431106751",
+        "title": "내일 9시 곱버스 손절치고 바로 이거 몰빵하려고 합니다",
+        "likes": 13
       },
       {
         "nid": "431127743",
@@ -363,11 +363,6 @@
         "nid": "431123031",
         "title": "지수5일선안착했다..",
         "likes": 12
-      },
-      {
-        "nid": "431130320",
-        "title": "오늘 입성 했습니다",
-        "likes": 11
       },
       {
         "nid": "431123423",
@@ -443,13 +438,18 @@
         "nid": "431122387",
         "title": "대형수주 공시뜨는순간",
         "likes": 9
+      },
+      {
+        "nid": "431108844",
+        "title": "뭐라도 줏어 먹을라고 야간에도 애들 쓴다",
+        "likes": 9
       }
     ],
     "sparkline_price": [
-      62300,
       62200,
       62400,
       62400,
+      62100,
       62100
     ],
     "range_history": [
@@ -496,8 +496,8 @@
       774155982600,
       340581531400
     ],
-    "tick_power": 89.79,
-    "bid_ask_ratio": 3.478574727812603,
+    "tick_power": 88.54,
+    "bid_ask_ratio": 3.497996341752887,
     "frgn_fake_ntby_qty": 219000,
     "orgn_fake_ntby_qty": 3000,
     "sum_fake_ntby_qty": 222000,
@@ -519,29 +519,29 @@
     "w52_lwpr": 23150,
     "mkt_cap": 121716,
     "keywords": [
-      "저평가",
-      "MSCI",
-      "수주공시"
+      "중동",
+      " MSCI",
+      "수주"
     ],
     "sparkline_posts": [
       137,
-      137,
       140,
       141,
-      148
+      148,
+      145
     ],
-    "avg_posts": 140.6,
-    "total_posts": 703
+    "avg_posts": 142.2,
+    "total_posts": 711
   },
   {
     "code": "047040",
     "name": "대우건설",
     "market": "KOSPI",
-    "price": 14480,
-    "recent_posts_count": 141,
+    "price": 14570,
+    "recent_posts_count": 145,
     "unique_posters": 61,
-    "fact_score": 0.4,
-    "total_likes": 409,
+    "fact_score": 0.3,
+    "total_likes": 433,
     "foreign_rate": 10.02,
     "foreign_change": -0.01,
     "inst_net_buy": 39429,
@@ -550,16 +550,16 @@
     "day_high": 15150,
     "day_low": 14390,
     "prev_foreign_rate": 10.03,
-    "posts_summary": "영업이익 223% 증가라는 긍정적 실적 발표에도 불구하고 반등 없는 주가에 대한 실망감. 도배글 및 일부 부정적 의견 존재.",
-    "sentiment": "0",
+    "posts_summary": "영업이익 223% 증가 실적 발표에도 불구하고 주가 부진에 대한 우려. 도배성 글에 대한 비판.",
+    "sentiment": "-2",
     "top_keywords": [],
     "consecutive_days": 18,
     "status": "활성",
-    "change_rate": "+1.83%",
+    "change_rate": "+2.46%",
     "signal": null,
-    "current_price": 14480,
-    "volume": 2539891,
-    "amount": 37694840965,
+    "current_price": 14570,
+    "volume": 2560624,
+    "amount": 37995914275,
     "posts": [
       {
         "nid": "431118732",
@@ -567,13 +567,13 @@
         "likes": 14
       },
       {
-        "nid": "431116912",
-        "title": "아니 반도체소부장",
-        "likes": 13
-      },
-      {
         "nid": "431115990",
         "title": "딱 10연상만 찍어보자",
+        "likes": 14
+      },
+      {
+        "nid": "431116912",
+        "title": "아니 반도체소부장",
         "likes": 13
       },
       {
@@ -647,8 +647,28 @@
         "likes": 7
       },
       {
+        "nid": "431138804",
+        "title": "끝까지 들고간다",
+        "likes": 6
+      },
+      {
+        "nid": "431138461",
+        "title": "정말....",
+        "likes": 6
+      },
+      {
+        "nid": "431137678",
+        "title": "실적발표후 반등없고 하락은 머다?",
+        "likes": 6
+      },
+      {
         "nid": "431132761",
         "title": "대우건설 주주님들 끝까지 해봅시다!",
+        "likes": 6
+      },
+      {
+        "nid": "431128385",
+        "title": "여기 도배꾼들이 있는한",
         "likes": 6
       },
       {
@@ -672,23 +692,8 @@
         "likes": 6
       },
       {
-        "nid": "431138461",
-        "title": "정말....",
-        "likes": 5
-      },
-      {
-        "nid": "431137678",
-        "title": "실적발표후 반등없고 하락은 머다?",
-        "likes": 5
-      },
-      {
         "nid": "431132851",
         "title": "진짜 끝났거 같네 이 회사능 ㅜㅜ",
-        "likes": 5
-      },
-      {
-        "nid": "431128385",
-        "title": "여기 도배꾼들이 있는한",
         "likes": 5
       },
       {
@@ -702,22 +707,17 @@
         "likes": 5
       },
       {
-        "nid": "431138804",
-        "title": "끝까지 들고간다",
-        "likes": 4
-      },
-      {
-        "nid": "431136969",
-        "title": "주주님들~ 대차해지 꼭 부탁드려요!!",
+        "nid": "431139989",
+        "title": "이것이 작전잡츄닷!",
         "likes": 4
       }
     ],
     "sparkline_price": [
-      14630,
       14650,
       14570,
       14535,
-      14480
+      14480,
+      14570
     ],
     "range_history": [
       17700,
@@ -763,8 +763,8 @@
       39257961660,
       27161057140
     ],
-    "tick_power": 111.26,
-    "bid_ask_ratio": 0.21004192404058444,
+    "tick_power": 111.62,
+    "bid_ask_ratio": 0.14411742901623545,
     "frgn_fake_ntby_qty": 197000,
     "orgn_fake_ntby_qty": 38000,
     "sum_fake_ntby_qty": 235000,
@@ -778,37 +778,37 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -6.6,
-    "pbr": 1.78,
+    "per": -6.64,
+    "pbr": 1.79,
     "eps": -2195,
     "bps": 8148,
     "w52_hgpr": 40350,
     "w52_lwpr": 3320,
-    "mkt_cap": 59496,
+    "mkt_cap": 59866,
     "keywords": [
       "영업이익",
-      "실적 발표",
-      "반등"
+      "실적",
+      "주가 부진"
     ],
     "sparkline_posts": [
-      124,
       128,
       133,
       136,
-      141
+      141,
+      145
     ],
-    "avg_posts": 132.4,
-    "total_posts": 662
+    "avg_posts": 136.6,
+    "total_posts": 683
   },
   {
     "code": "010140",
     "name": "삼성중공업",
     "market": "KOSPI",
-    "price": 16450,
+    "price": 16540,
     "recent_posts_count": 84,
-    "unique_posters": 51,
+    "unique_posters": 50,
     "fact_score": 0.2,
-    "total_likes": 246,
+    "total_likes": 247,
     "foreign_rate": 27.96,
     "foreign_change": 0.02,
     "inst_net_buy": -170462,
@@ -822,11 +822,11 @@
     "top_keywords": [],
     "consecutive_days": 14,
     "status": "활성",
-    "change_rate": "+0.92%",
+    "change_rate": "+1.47%",
     "signal": null,
-    "current_price": 16450,
-    "volume": 2386268,
-    "amount": 39543454870,
+    "current_price": 16540,
+    "volume": 2447613,
+    "amount": 40554544945,
     "posts": [
       {
         "nid": "431109874",
@@ -841,7 +841,7 @@
       {
         "nid": "431137146",
         "title": "조선업 두 자리수 영업이익 낸적이 있을까요?",
-        "likes": 8
+        "likes": 9
       },
       {
         "nid": "431126847",
@@ -980,7 +980,8 @@
       }
     ],
     "sparkline_price": [
-      16450
+      16450,
+      16540
     ],
     "range_history": [
       20450,
@@ -1026,8 +1027,8 @@
       48804662520,
       41376554980
     ],
-    "tick_power": 101.16,
-    "bid_ask_ratio": 0.3071041290143195,
+    "tick_power": 102.78,
+    "bid_ask_ratio": 0.5445166760881854,
     "frgn_fake_ntby_qty": 125000,
     "orgn_fake_ntby_qty": -32000,
     "sum_fake_ntby_qty": 93000,
@@ -1041,33 +1042,34 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 26.53,
-    "pbr": 3.39,
+    "per": 26.68,
+    "pbr": 3.41,
     "eps": 620,
     "bps": 4857,
     "w52_hgpr": 35350,
     "w52_lwpr": 16270,
-    "mkt_cap": 144760,
+    "mkt_cap": 145552,
     "keywords": [
       "외국인 매수",
       "주가 부진",
       "부정적 전망"
     ],
     "sparkline_posts": [
+      84,
       84
     ],
     "avg_posts": 84.0,
-    "total_posts": 84
+    "total_posts": 168
   },
   {
     "code": "000660",
     "name": "SK하이닉스",
     "market": "KOSPI",
-    "price": 1345000,
+    "price": 1352000,
     "recent_posts_count": 800,
-    "unique_posters": 446,
-    "fact_score": 0.5,
-    "total_likes": 1659,
+    "unique_posters": 447,
+    "fact_score": 0.3,
+    "total_likes": 1669,
     "foreign_rate": 48.66,
     "foreign_change": -0.03,
     "inst_net_buy": 236302,
@@ -1076,16 +1078,16 @@
     "day_high": 1381000,
     "day_low": 1341000,
     "prev_foreign_rate": 48.69,
-    "posts_summary": "실적 발표 및 주주환원 기대감 속 외국인, 기관 동시 매수세 유입. 단기 급등 후 조정 구간에 대한 의견 분분.",
-    "sentiment": "3",
+    "posts_summary": "실적 발표 후 반등 기대와 함께 외국인, 기관의 쌍끌이 매수세 관찰. 단기 조정 구간 탈피 전망.",
+    "sentiment": "1",
     "top_keywords": [],
     "consecutive_days": 18,
     "status": "활성",
-    "change_rate": "+5.49%",
+    "change_rate": "+6.04%",
     "signal": null,
-    "current_price": 1345000,
-    "volume": 1966187,
-    "amount": 2674739030500,
+    "current_price": 1352000,
+    "volume": 1992961,
+    "amount": 2710793796500,
     "posts": [
       {
         "nid": "431136921",
@@ -1121,6 +1123,11 @@
         "nid": "431130694",
         "title": "내일 실적발표후는?",
         "likes": 9
+      },
+      {
+        "nid": "431138252",
+        "title": "하이닉스 실적발표때 바라는 한가지.",
+        "likes": 8
       },
       {
         "nid": "431137211",
@@ -1183,8 +1190,13 @@
         "likes": 8
       },
       {
-        "nid": "431138252",
-        "title": "하이닉스 실적발표때 바라는 한가지.",
+        "nid": "431139506",
+        "title": "약속의 2시 오늘 145-150 안착합니다~300 가즈아",
+        "likes": 7
+      },
+      {
+        "nid": "431139177",
+        "title": "하이닉스 현실적인 목표가",
         "likes": 7
       },
       {
@@ -1226,24 +1238,14 @@
         "nid": "431124015",
         "title": "10월 2일 krx 정규 종가가 1841000원이었네",
         "likes": 7
-      },
-      {
-        "nid": "431121159",
-        "title": "이제 겨우 최태원 회장 평단 수준이네",
-        "likes": 7
-      },
-      {
-        "nid": "431139163",
-        "title": "오늘 개인1조 팔앗네 ㅋㅋㅋㅋㅋ 하긴",
-        "likes": 6
       }
     ],
     "sparkline_price": [
-      1360000,
       1358000,
       1356000,
       1357000,
-      1345000
+      1345000,
+      1352000
     ],
     "range_history": [
       1863000,
@@ -1289,8 +1291,8 @@
       4978046298000,
       3458499030000
     ],
-    "tick_power": 109.11,
-    "bid_ask_ratio": 4.213401454116722,
+    "tick_power": 108.84,
+    "bid_ask_ratio": 2.8094405594405596,
     "frgn_fake_ntby_qty": 53000,
     "orgn_fake_ntby_qty": 166000,
     "sum_fake_ntby_qty": 219000,
@@ -1304,17 +1306,17 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 22.81,
-    "pbr": 7.83,
+    "per": 22.93,
+    "pbr": 7.87,
     "eps": 58955,
     "bps": 171751,
     "w52_hgpr": 2987000,
     "w52_lwpr": 501000,
-    "mkt_cap": 9825122,
+    "mkt_cap": 9876257,
     "keywords": [
       "실적 발표",
-      "주주환원",
-      "외국인 기관"
+      "기관",
+      "외국인"
     ],
     "sparkline_posts": [
       800,
@@ -1330,11 +1332,11 @@
     "code": "009830",
     "name": "한화솔루션",
     "market": "KOSPI",
-    "price": 26400,
-    "recent_posts_count": 85,
+    "price": 26450,
+    "recent_posts_count": 84,
     "unique_posters": 56,
     "fact_score": 0.1,
-    "total_likes": 275,
+    "total_likes": 286,
     "foreign_rate": 12.32,
     "foreign_change": -0.07,
     "inst_net_buy": -572555,
@@ -1343,16 +1345,16 @@
     "day_high": 27200,
     "day_low": 25350,
     "prev_foreign_rate": 12.39,
-    "posts_summary": "3분기 실적 악화 우려 및 유증 관련 부정적 전망. 태양광 업황 부진 및 환율 영향 언급. JP모건 목표주가 하향 조정 루머 존재. 반도체 관련 기대감 일부 존재.",
-    "sentiment": "-2",
+    "posts_summary": "3분기 실적 발표에 대한 우려와 함께 주가 하락세 지속. 유증 관련 불만 및 태양광 업황 부진 언급.",
+    "sentiment": "-6",
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "-0.38%",
+    "change_rate": "-0.19%",
     "signal": null,
-    "current_price": 26400,
-    "volume": 1665055,
-    "amount": 44317614150,
+    "current_price": 26450,
+    "volume": 1687457,
+    "amount": 44908982150,
     "posts": [
       {
         "nid": "431121537",
@@ -1405,6 +1407,11 @@
         "likes": 6
       },
       {
+        "nid": "431137632",
+        "title": "와 얘는 단기간 40프로를 떨궜네",
+        "likes": 5
+      },
+      {
         "nid": "431137296",
         "title": "노골적으로 ",
         "likes": 5
@@ -1445,8 +1452,13 @@
         "likes": 5
       },
       {
-        "nid": "431137632",
-        "title": "와 얘는 단기간 40프로를 떨궜네",
+        "nid": "431139544",
+        "title": "외인 기관 미리 알고있나보네",
+        "likes": 4
+      },
+      {
+        "nid": "431139272",
+        "title": "인간지표 고르는 법 특별 공유",
         "likes": 4
       },
       {
@@ -1493,22 +1505,13 @@
         "nid": "431117033",
         "title": "3분기 AMPC제외 -7천억  찌라시 실화냐?",
         "likes": 4
-      },
-      {
-        "nid": "431115652",
-        "title": "3분기 실적 개작살 맞지요? ",
-        "likes": 4
-      },
-      {
-        "nid": "431114525",
-        "title": "실적 기관 외인 대충 아나보네 ㅋㅋㅋㅋㅋ",
-        "likes": 4
       }
     ],
     "sparkline_price": [
       26450,
       26450,
-      26400
+      26400,
+      26450
     ],
     "range_history": [
       29400,
@@ -1554,8 +1557,8 @@
       49959576000,
       67337891200
     ],
-    "tick_power": 66.14,
-    "bid_ask_ratio": 0.6269581668375827,
+    "tick_power": 66.27,
+    "bid_ask_ratio": 0.5947327793670254,
     "frgn_fake_ntby_qty": -236000,
     "orgn_fake_ntby_qty": -68000,
     "sum_fake_ntby_qty": -304000,
@@ -1569,35 +1572,36 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -7.82,
+    "per": -7.83,
     "pbr": 0.55,
     "eps": -3377,
     "bps": 47898,
     "w52_hgpr": 59300,
     "w52_lwpr": 22000,
-    "mkt_cap": 59372,
+    "mkt_cap": 59484,
     "keywords": [
-      "3분기 실적",
-      "유증",
+      "실적",
+      "주가 하락",
       "태양광"
     ],
     "sparkline_posts": [
       80,
       82,
-      85
+      85,
+      84
     ],
-    "avg_posts": 82.3,
-    "total_posts": 247
+    "avg_posts": 82.8,
+    "total_posts": 331
   },
   {
     "code": "138360",
     "name": "앤로보틱스",
     "market": "KOSDAQ",
     "price": 2170,
-    "recent_posts_count": 105,
+    "recent_posts_count": 106,
     "unique_posters": 52,
-    "fact_score": 0.3,
-    "total_likes": 200,
+    "fact_score": 0.2,
+    "total_likes": 206,
     "foreign_rate": 4.89,
     "foreign_change": -0.11,
     "inst_net_buy": 2881,
@@ -1606,7 +1610,7 @@
     "day_high": 2300,
     "day_low": 1953,
     "prev_foreign_rate": 5.0,
-    "posts_summary": "로봇 관련주로서의 상승 기대감 및 긍정적 흐름 언급. 투자 주의 예고 및 일부 변동성 수반에 대한 우려 존재.",
+    "posts_summary": "로봇 관련주로서 스마트 팩토리 및 자동화 테마 언급. 흑자 전환 기대감 속 변동성 장세.",
     "sentiment": "2",
     "top_keywords": [],
     "consecutive_days": 4,
@@ -1614,8 +1618,8 @@
     "change_rate": "+6.63%",
     "signal": null,
     "current_price": 2170,
-    "volume": 22537913,
-    "amount": 48502469830,
+    "volume": 22775561,
+    "amount": 49019682669,
     "posts": [
       {
         "nid": "431114716",
@@ -1651,6 +1655,11 @@
         "nid": "431127166",
         "title": "이가격대 물린봉이  앞에보면 삼단봉",
         "likes": 5
+      },
+      {
+        "nid": "431139121",
+        "title": "갈거처럼 굴더니 ",
+        "likes": 4
       },
       {
         "nid": "431138108",
@@ -1708,6 +1717,11 @@
         "likes": 4
       },
       {
+        "nid": "431139500",
+        "title": "텃다",
+        "likes": 3
+      },
+      {
         "nid": "431138838",
         "title": "원래가 상승종목은들~~ ",
         "likes": 3
@@ -1748,11 +1762,6 @@
         "likes": 3
       },
       {
-        "nid": "431139121",
-        "title": "갈거처럼 굴더니 ",
-        "likes": 2
-      },
-      {
         "nid": "431138843",
         "title": "ㅈ꼭아박았을때 사라고 글쓰던가",
         "likes": 2
@@ -1761,18 +1770,13 @@
         "nid": "431138759",
         "title": "□■ 로봇주 영익 흑자는 레어템임.",
         "likes": 2
-      },
-      {
-        "nid": "431138102",
-        "title": "재무재표 튼튼해서 무상증자 갈꺼라는 유튜버들의 얘기들이 있네요.",
-        "likes": 2
       }
     ],
     "sparkline_price": [
-      2210,
       2160,
       2160,
       2180,
+      2170,
       2170
     ],
     "range_history": [
@@ -1819,8 +1823,8 @@
       95694063500,
       67404066360
     ],
-    "tick_power": 90.24,
-    "bid_ask_ratio": 0.6103949213273095,
+    "tick_power": 90.13,
+    "bid_ask_ratio": 1.4980770427531271,
     "frgn_fake_ntby_qty": -41000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": -41000,
@@ -1843,28 +1847,28 @@
     "mkt_cap": 1909,
     "keywords": [
       "로봇",
-      "상승 기대감",
+      "스마트 팩토리",
       "변동성"
     ],
     "sparkline_posts": [
-      93,
       94,
       100,
       104,
-      105
+      105,
+      106
     ],
-    "avg_posts": 99.2,
-    "total_posts": 496
+    "avg_posts": 101.8,
+    "total_posts": 509
   },
   {
     "code": "328130",
     "name": "루닛",
     "market": "KOSDAQ",
-    "price": 14520,
+    "price": 14560,
     "recent_posts_count": 156,
     "unique_posters": 96,
-    "fact_score": 0.6,
-    "total_likes": 558,
+    "fact_score": 0.5,
+    "total_likes": 555,
     "foreign_rate": 7.82,
     "foreign_change": 0.46,
     "inst_net_buy": 289657,
@@ -1873,16 +1877,16 @@
     "day_high": 15800,
     "day_low": 14260,
     "prev_foreign_rate": 7.36,
-    "posts_summary": "의료 AI 분야에서의 확장성 및 성장성에 대한 긍정적 전망. 해외 수출 및 신약 개발 활용 등 구체적 언급 다수. 공매도 숏커버링 가능성.",
+    "posts_summary": "해외 수출 및 신약 개발 관련 긍정적 전망. AI 신약 개발 활용 및 성장성 확장성 확고. 공매도 숏커버링 기대.",
     "sentiment": "4",
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "-1.16%",
+    "change_rate": "-0.88%",
     "signal": null,
-    "current_price": 14520,
-    "volume": 5228851,
-    "amount": 78344959165,
+    "current_price": 14560,
+    "volume": 5291458,
+    "amount": 79255986840,
     "posts": [
       {
         "nid": "431123524",
@@ -1995,11 +1999,6 @@
         "likes": 7
       },
       {
-        "nid": "431132652",
-        "title": "외인 세력~  대량 매도물량 쏟는중...",
-        "likes": 7
-      },
-      {
         "nid": "431123210",
         "title": "본전 심리",
         "likes": 7
@@ -2033,14 +2032,19 @@
         "nid": "431135749",
         "title": "엄청산다. 장기상승 초입",
         "likes": 6
+      },
+      {
+        "nid": "431134765",
+        "title": "독한 넘들..몇번을 터는거냐?",
+        "likes": 6
       }
     ],
     "sparkline_price": [
-      14750,
       14870,
       14720,
       14700,
-      14520
+      14520,
+      14560
     ],
     "range_history": [
       9870,
@@ -2086,8 +2090,8 @@
       5907980040,
       61455335890
     ],
-    "tick_power": 99.76,
-    "bid_ask_ratio": 0.28470715835141,
+    "tick_power": 100.12,
+    "bid_ask_ratio": 0.7368715083798882,
     "frgn_fake_ntby_qty": 50000,
     "orgn_fake_ntby_qty": 109000,
     "sum_fake_ntby_qty": 159000,
@@ -2101,296 +2105,292 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -19.11,
-    "pbr": 6.61,
+    "per": -19.16,
+    "pbr": 6.63,
     "eps": -760,
     "bps": 2196,
     "w52_hgpr": 49800,
     "w52_lwpr": 8180,
-    "mkt_cap": 10811,
+    "mkt_cap": 10841,
     "keywords": [
-      "의료 AI",
-      "성장성",
-      "해외 수출"
+      "AI 신약 개발",
+      "수출",
+      "성장성"
     ],
     "sparkline_posts": [
-      150,
       152,
       155,
       155,
+      156,
       156
     ],
-    "avg_posts": 153.6,
-    "total_posts": 768
+    "avg_posts": 154.8,
+    "total_posts": 774
   },
   {
-    "code": "010170",
-    "name": "대한광통신",
+    "code": "486510",
+    "name": "글로벌테크놀로지",
     "market": "KOSDAQ",
-    "price": 13660,
-    "recent_posts_count": 81,
-    "unique_posters": 53,
-    "fact_score": 0.7,
-    "total_likes": 322,
-    "foreign_rate": 2.82,
-    "foreign_change": 0.0,
-    "inst_net_buy": -12769,
-    "prev_close": 13380,
-    "open_price": 14000,
-    "day_high": 14410,
-    "day_low": 13640,
-    "prev_foreign_rate": 2.82,
-    "posts_summary": "미국 빅테크 AI 데이터센터향 핵심 규격 통과 및 GR-20 인증 획득. 긍정적 호재 연달아 발생하며 상승 전망 우세. 공매도 세력 애먹는다는 언급.",
-    "sentiment": "3",
+    "price": 8930,
+    "recent_posts_count": 80,
+    "unique_posters": 47,
+    "fact_score": 0.5,
+    "total_likes": 139,
+    "foreign_rate": 2.12,
+    "foreign_change": 0.07,
+    "inst_net_buy": 67,
+    "prev_close": 7100,
+    "open_price": 7170,
+    "day_high": 9190,
+    "day_low": 7160,
+    "prev_foreign_rate": 2.05,
+    "posts_summary": "엔트로픽 상장 최대 수혜주로 언급되며 어닝 서프라이즈 및 급등 기대감. 차트상 추가 상승 여력 언급.",
+    "sentiment": "8",
     "top_keywords": [],
-    "consecutive_days": 4,
+    "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "+2.09%",
+    "change_rate": "+25.77%",
     "signal": null,
-    "current_price": 13660,
-    "volume": 4146941,
-    "amount": 57893276415,
+    "current_price": 8930,
+    "volume": 5095271,
+    "amount": 43299566515,
     "posts": [
       {
-        "nid": "431109526",
-        "title": "속보>루멘텀+9.5%어플라이드옵토+7.67%코닝+6.4%코히어런트+7.17%시에나+5.85%비아셋+8%",
-        "likes": 26
-      },
-      {
-        "nid": "431127177",
-        "title": "대한광통신, 美 빅테크 AI 데이터센터향 '864심 광케이블 핵심 규격' 통과…'GR-20' 인증 획득",
-        "likes": 25
-      },
-      {
-        "nid": "431130119",
-        "title": "GR 20 인증의 의미^^",
-        "likes": 23
-      },
-      {
-        "nid": "431110967",
-        "title": "오늘  급등이다    축하한다  ",
-        "likes": 16
-      },
-      {
-        "nid": "431123662",
-        "title": "이재용회장!!!!",
-        "likes": 11
-      },
-      {
-        "nid": "431115908",
-        "title": "대광인~",
-        "likes": 10
-      },
-      {
-        "nid": "431135963",
-        "title": "삼성인수합병",
-        "likes": 9
-      },
-      {
-        "nid": "431127595",
-        "title": "힘이없는거냐???",
-        "likes": 9
-      },
-      {
-        "nid": "431120569",
-        "title": "제발 팔지 마셈",
-        "likes": 9
-      },
-      {
-        "nid": "431117762",
-        "title": "매도",
-        "likes": 9
-      },
-      {
-        "nid": "431127968",
-        "title": "좋은소식들이 연달아 터지네",
+        "nid": "431121555",
+        "title": "8500원가면 상한가 간다",
         "likes": 8
       },
       {
-        "nid": "431124482",
-        "title": "공매(신한,한투)~",
-        "likes": 8
-      },
-      {
-        "nid": "431116269",
-        "title": "공매들 애먹고 있네 ㅋㅋㅋ",
-        "likes": 8
-      },
-      {
-        "nid": "431113282",
-        "title": "대광이는 통신,전선,반도체,우주,방산 업황 ",
+        "nid": "431117912",
+        "title": "차트연구30년째",
         "likes": 7
       },
       {
-        "nid": "431109915",
-        "title": "어제 종가에 조금 담았는데 ",
-        "likes": 7
-      },
-      {
-        "nid": "431130301",
-        "title": "대광이는 정말 알수가 없는 주식이다",
+        "nid": "431133660",
+        "title": "다음 봉은 불기둥으로 긴 장대양봉 만들어야~",
         "likes": 6
       },
       {
-        "nid": "431122963",
-        "title": "앞으로 주~우욱 상승입니다!!!!",
+        "nid": "431133087",
+        "title": "차트는 2만원대 바로 날라갈 모양을 하고 있는데~",
         "likes": 6
       },
       {
-        "nid": "431134507",
-        "title": "줄때 못 먹으면 아마도 물렸을 껄",
+        "nid": "431121229",
+        "title": "오늘은 무조건 상한가다",
+        "likes": 6
+      },
+      {
+        "nid": "431120876",
+        "title": "■□ 엔트로픽 상장 국장 최대 수혜주 □■",
+        "likes": 6
+      },
+      {
+        "nid": "431133247",
+        "title": "8500원 통과하면 바로 상한가다",
         "likes": 5
       },
       {
-        "nid": "431127839",
-        "title": "우리들이 뭐아무리떠들어봤자",
+        "nid": "431122232",
+        "title": "몇시?",
         "likes": 5
       },
       {
-        "nid": "431119051",
-        "title": "또!!!",
-        "likes": 5
-      },
-      {
-        "nid": "431115649",
-        "title": "빛샘전자 8%오르고있네.우리도 더 위로가자",
-        "likes": 5
-      },
-      {
-        "nid": "431129877",
-        "title": "이런불장에",
+        "nid": "431136854",
+        "title": "22층 사람 있어요 ㅠㅠ",
         "likes": 4
       },
       {
-        "nid": "431126023",
-        "title": "호재 16천원 또 넘어가보자",
+        "nid": "431136581",
+        "title": "오전에",
         "likes": 4
       },
       {
-        "nid": "431124078",
-        "title": "잡주님 진짜 여기 공매도신가?",
+        "nid": "431135969",
+        "title": "그래도 쪼막손 주포 힘 대단하네요",
         "likes": 4
       },
       {
-        "nid": "431122121",
-        "title": "오늘 같은날  힘차게  가야하는데",
+        "nid": "431133779",
+        "title": "Nice!!",
         "likes": 4
       },
       {
-        "nid": "431118265",
-        "title": "미국전력",
+        "nid": "431122817",
+        "title": "💪💪 어닝서프라이즈+엔트로픽 수혜 대장 ",
         "likes": 4
       },
       {
-        "nid": "431139064",
-        "title": "낼은",
+        "nid": "431109734",
+        "title": "오늘이다.",
+        "likes": 4
+      },
+      {
+        "nid": "431137050",
+        "title": "감사합니다 내일은 12000원 가는거 맞죠??",
         "likes": 3
       },
       {
-        "nid": "431138872",
-        "title": "개꿀",
+        "nid": "431136366",
+        "title": "형님들이 그러시네요",
         "likes": 3
       },
       {
-        "nid": "431137655",
-        "title": "대광아",
+        "nid": "431135574",
+        "title": "멜콘 과 글로벌테크",
         "likes": 3
       },
       {
-        "nid": "431137159",
-        "title": "호재",
+        "nid": "431132316",
+        "title": "뉴스라도내라 기사내용 이렇게 써주라",
         "likes": 3
+      },
+      {
+        "nid": "431131219",
+        "title": "● 출발합니다..",
+        "likes": 3
+      },
+      {
+        "nid": "431127026",
+        "title": "차트는 3연상 이상 차트이네요~",
+        "likes": 3
+      },
+      {
+        "nid": "431121393",
+        "title": "동지들이여 ",
+        "likes": 3
+      },
+      {
+        "nid": "431116902",
+        "title": "상한가 가자.",
+        "likes": 3
+      },
+      {
+        "nid": "431136678",
+        "title": "아고, 상한가 시간 끌 필요가 뭐 있나요?",
+        "likes": 2
+      },
+      {
+        "nid": "431136359",
+        "title": "에고 힘들다….",
+        "likes": 2
+      },
+      {
+        "nid": "431135910",
+        "title": "선배님들 털어야 됩니까?",
+        "likes": 2
+      },
+      {
+        "nid": "431135777",
+        "title": "이거 14000원까지 열려있네",
+        "likes": 2
+      },
+      {
+        "nid": "431135655",
+        "title": "가자",
+        "likes": 2
+      },
+      {
+        "nid": "431134802",
+        "title": "상승 VI, one more time 원합니다",
+        "likes": 2
+      },
+      {
+        "nid": "431134285",
+        "title": "목요일 하한가",
+        "likes": 2
+      },
+      {
+        "nid": "431132424",
+        "title": "싹쓸어 담고 올린다",
+        "likes": 2
       }
     ],
     "sparkline_price": [
-      13660
+      8930
     ],
     "range_history": [
-      17720,
-      17260,
-      16960,
-      16740,
-      17100,
-      17860,
-      18780,
-      17720,
-      16970,
-      15570,
-      15020,
-      14670,
-      12450,
-      13540,
-      13490,
-      12450,
-      14550,
-      13450,
-      13690,
-      13330
+      14500,
+      18230,
+      16250,
+      14860,
+      14540,
+      12420,
+      11120,
+      10500,
+      9310,
+      10170,
+      7480,
+      7290,
+      7250,
+      6800,
+      7530,
+      7270,
+      6900,
+      7050
     ],
     "amount_history": [
-      157547952960,
-      171178690780,
-      113937398720,
-      97893142920,
-      90305048700,
-      269408277000,
-      266827404360,
-      290689547440,
-      110317625680,
-      92736072180,
-      104977934200,
-      64289969370,
-      81038680950,
-      55287001900,
-      61026318310,
-      37055794050,
-      182632880400,
-      122858930850,
-      86373262870,
-      34465994680
+      693975336000,
+      727179897240,
+      101164423750,
+      57161159560,
+      73700133900,
+      24638808420,
+      32343231680,
+      30448246500,
+      12789444920,
+      116189585460,
+      26681616280,
+      14319491850,
+      7165747750,
+      15659638400,
+      24575284500,
+      14193940730,
+      4655781900,
+      6318907950
     ],
-    "tick_power": 85.32,
-    "bid_ask_ratio": 0.7226953230602866,
-    "frgn_fake_ntby_qty": -212000,
-    "orgn_fake_ntby_qty": 6000,
-    "sum_fake_ntby_qty": -206000,
-    "roe": -27.86,
-    "net_profit_rate": -3.87,
-    "debt_ratio": 155.22,
-    "current_ratio": 106.29,
-    "invest_opinion": "중립",
+    "tick_power": 95.72,
+    "bid_ask_ratio": 0.34489532633554215,
+    "frgn_fake_ntby_qty": 59000,
+    "orgn_fake_ntby_qty": 0,
+    "sum_fake_ntby_qty": 59000,
+    "roe": 0.0,
+    "net_profit_rate": 0.0,
+    "debt_ratio": 999.0,
+    "current_ratio": 0.0,
+    "invest_opinion": "NotRated",
     "target_price": 0,
     "opinion_divergence": 0.0,
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -56.45,
-    "pbr": 27.82,
-    "eps": -242,
-    "bps": 491,
-    "w52_hgpr": 31500,
-    "w52_lwpr": 1760,
-    "mkt_cap": 21239,
+    "per": 0.0,
+    "pbr": 0.0,
+    "eps": 0,
+    "bps": 0,
+    "w52_hgpr": 29750,
+    "w52_lwpr": 6570,
+    "mkt_cap": 1754,
     "keywords": [
-      "AI 데이터센터",
-      "광케이블",
-      "GR-20 인증"
+      "엔트로픽",
+      "어닝 서프라이즈",
+      "급등"
     ],
     "sparkline_posts": [
-      81
+      80
     ],
-    "avg_posts": 81.0,
-    "total_posts": 81
+    "avg_posts": 80.0,
+    "total_posts": 80
   },
   {
     "code": "468670",
     "name": "브릴스",
     "market": "KOSDAQ",
-    "price": 20150,
-    "recent_posts_count": 89,
+    "price": 20300,
+    "recent_posts_count": 90,
     "unique_posters": 54,
     "fact_score": 0.1,
-    "total_likes": 149,
+    "total_likes": 157,
     "foreign_rate": 0.3,
     "foreign_change": 0.12,
     "inst_net_buy": 11268,
@@ -2399,21 +2399,26 @@
     "day_high": 22450,
     "day_low": 18430,
     "prev_foreign_rate": 0.18,
-    "posts_summary": "로봇 기업으로서의 잠재력 언급에도 불구하고 뚜렷한 상승 모멘텀 부족. 단기 급등락 및 기술적 분석에 대한 의견 존재.",
+    "posts_summary": "로봇 기업으로 빅웨이브 및 흑자 기업임을 언급. 단기 변동성 및 기술적 분석 기반 상승 여력 논의.",
     "sentiment": "0",
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "+5.77%",
+    "change_rate": "+6.56%",
     "signal": null,
-    "current_price": 20150,
-    "volume": 3354988,
-    "amount": 68818069690,
+    "current_price": 20300,
+    "volume": 3373931,
+    "amount": 69200282240,
     "posts": [
       {
         "nid": "431106757",
         "title": "테슬라 폭등중",
         "likes": 14
+      },
+      {
+        "nid": "431136210",
+        "title": "난",
+        "likes": 6
       },
       {
         "nid": "431118060",
@@ -2428,11 +2433,6 @@
       {
         "nid": "431138807",
         "title": "이거는 상한가",
-        "likes": 4
-      },
-      {
-        "nid": "431136210",
-        "title": "난",
         "likes": 4
       },
       {
@@ -2464,6 +2464,16 @@
         "nid": "431107031",
         "title": "낼부터 대장이라고",
         "likes": 4
+      },
+      {
+        "nid": "431137481",
+        "title": "주포형님아 !",
+        "likes": 3
+      },
+      {
+        "nid": "431136547",
+        "title": "35오나?",
+        "likes": 3
       },
       {
         "nid": "431130623",
@@ -2521,18 +2531,18 @@
         "likes": 2
       },
       {
-        "nid": "431137481",
-        "title": "주포형님아 !",
-        "likes": 2
-      },
-      {
         "nid": "431137277",
         "title": "왠지",
         "likes": 2
       },
       {
-        "nid": "431136547",
-        "title": "35오나?",
+        "nid": "431136993",
+        "title": "지수반등한다",
+        "likes": 2
+      },
+      {
+        "nid": "431133789",
+        "title": "브랄스",
         "likes": 2
       },
       {
@@ -2549,24 +2559,14 @@
         "nid": "431131384",
         "title": "피뢰침 전문",
         "likes": 2
-      },
-      {
-        "nid": "431129845",
-        "title": "보호예수 팔려고",
-        "likes": 2
-      },
-      {
-        "nid": "431128955",
-        "title": "오늘종가",
-        "likes": 2
       }
     ],
     "sparkline_price": [
       20500,
-      20500,
       20650,
       20550,
-      20150
+      20150,
+      20300
     ],
     "range_history": [
       31100,
@@ -2604,8 +2604,8 @@
       19013177640,
       81484685600
     ],
-    "tick_power": 88.57,
-    "bid_ask_ratio": 0.4774564183835182,
+    "tick_power": 88.32,
+    "bid_ask_ratio": 0.1358035280327072,
     "frgn_fake_ntby_qty": 24000,
     "orgn_fake_ntby_qty": -1000,
     "sum_fake_ntby_qty": 23000,
@@ -2625,31 +2625,31 @@
     "bps": 0,
     "w52_hgpr": 62100,
     "w52_lwpr": 14600,
-    "mkt_cap": 2290,
+    "mkt_cap": 2307,
     "keywords": [
       "로봇",
-      "상승 여력",
-      "단타"
+      "흑자기업",
+      "기술적 분석"
     ],
     "sparkline_posts": [
-      84,
       87,
       87,
       88,
-      89
+      89,
+      90
     ],
-    "avg_posts": 87.0,
-    "total_posts": 435
+    "avg_posts": 88.2,
+    "total_posts": 441
   },
   {
     "code": "327260",
     "name": "RF머트리얼즈",
     "market": "KOSDAQ",
-    "price": 34550,
-    "recent_posts_count": 145,
-    "unique_posters": 93,
-    "fact_score": 0.2,
-    "total_likes": 238,
+    "price": 34450,
+    "recent_posts_count": 146,
+    "unique_posters": 94,
+    "fact_score": 0.1,
+    "total_likes": 242,
     "foreign_rate": 8.65,
     "foreign_change": 0.62,
     "inst_net_buy": -121293,
@@ -2658,16 +2658,16 @@
     "day_high": 42150,
     "day_low": 33550,
     "prev_foreign_rate": 8.03,
-    "posts_summary": "실적 호조에도 불구하고 주가 하락 및 부정적 전망이 지배적. 외인 매도세 및 급락 가능성에 대한 우려 제기.",
-    "sentiment": "-5",
+    "posts_summary": "실적 부진 및 하한가 기록. 광통신 업종 전반의 약세와 수급 불안정성 언급. 금감원 규제 촉구.",
+    "sentiment": "-7",
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "-5.34%",
+    "change_rate": "-5.62%",
     "signal": null,
-    "current_price": 34550,
-    "volume": 2951309,
-    "amount": 107948546275,
+    "current_price": 34450,
+    "volume": 2984322,
+    "amount": 109084705200,
     "posts": [
       {
         "nid": "431134086",
@@ -2692,7 +2692,7 @@
       {
         "nid": "431137512",
         "title": "실적 작년비해 엄청좋은데",
-        "likes": 5
+        "likes": 6
       },
       {
         "nid": "431134515",
@@ -2728,6 +2728,11 @@
         "nid": "431108289",
         "title": "루멘텀 급등이네",
         "likes": 5
+      },
+      {
+        "nid": "431137955",
+        "title": "이 개잡주가 광통신 전부 끌고 내려가네 ",
+        "likes": 4
       },
       {
         "nid": "431133229",
@@ -2795,13 +2800,13 @@
         "likes": 4
       },
       {
-        "nid": "431138766",
-        "title": "신규입성합니다 ",
+        "nid": "431139106",
+        "title": "이제 쳐,올려라",
         "likes": 3
       },
       {
-        "nid": "431137955",
-        "title": "이 개잡주가 광통신 전부 끌고 내려가네 ",
+        "nid": "431138766",
+        "title": "신규입성합니다 ",
         "likes": 3
       },
       {
@@ -2813,19 +2818,14 @@
         "nid": "431131434",
         "title": "애 뭐냐",
         "likes": 3
-      },
-      {
-        "nid": "431130912",
-        "title": "반드시 확인 후_ 즉시 대응 ",
-        "likes": 3
       }
     ],
     "sparkline_price": [
-      34550,
       34900,
       34650,
       34700,
-      34550
+      34550,
+      34450
     ],
     "range_history": [
       46700,
@@ -2871,8 +2871,8 @@
       53917527400,
       30796245000
     ],
-    "tick_power": 75.73,
-    "bid_ask_ratio": 1.3768313881301217,
+    "tick_power": 75.36,
+    "bid_ask_ratio": 1.3415637860082306,
     "frgn_fake_ntby_qty": -393000,
     "orgn_fake_ntby_qty": 1000,
     "sum_fake_ntby_qty": -392000,
@@ -2886,37 +2886,37 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 85.1,
-    "pbr": 11.39,
+    "per": 84.85,
+    "pbr": 11.35,
     "eps": 406,
     "bps": 3034,
     "w52_hgpr": 126600,
     "w52_lwpr": 15260,
-    "mkt_cap": 6215,
+    "mkt_cap": 6197,
     "keywords": [
-      "실적",
-      "주가 하락",
-      "외인 매도"
+      "실적 부진",
+      "하한가",
+      "광통신"
     ],
     "sparkline_posts": [
-      141,
       143,
       144,
       146,
-      145
+      145,
+      146
     ],
-    "avg_posts": 143.8,
-    "total_posts": 719
+    "avg_posts": 144.8,
+    "total_posts": 724
   },
   {
     "code": "190510",
     "name": "나무가",
     "market": "KOSDAQ",
     "price": 17090,
-    "recent_posts_count": 101,
-    "unique_posters": 65,
-    "fact_score": 0.7,
-    "total_likes": 218,
+    "recent_posts_count": 102,
+    "unique_posters": 66,
+    "fact_score": 0.6,
+    "total_likes": 228,
     "foreign_rate": 4.13,
     "foreign_change": -0.15,
     "inst_net_buy": 21,
@@ -2925,7 +2925,7 @@
     "day_high": 17090,
     "day_low": 15720,
     "prev_foreign_rate": 4.28,
-    "posts_summary": "휴머노이드 로봇 '아틀라스' 공급망 확정 소식과 함께 나무가가 LG이노텍을 제치고 주요 부품을 공급한다는 점이 부각됨. 3D 센싱 카메라 독점 공급 및 텐버거 기대감이 제시되며, 3분기 실적 어닝 서프라이즈 가능성도 언급됨.",
+    "posts_summary": "휴머노이드 로봇 '아틀라스' 공급망 확정 및 3D 센싱 카메라 독점 공급 기대감. 삼성 비스포크 AI 로봇청소기 납품 가능성 언급. 텐버거 가능성 제시.",
     "sentiment": "8",
     "top_keywords": [],
     "consecutive_days": 1,
@@ -2933,8 +2933,8 @@
     "change_rate": "+29.96%",
     "signal": null,
     "current_price": 17090,
-    "volume": 1120791,
-    "amount": 18736057045,
+    "volume": 1120807,
+    "amount": 18736330485,
     "posts": [
       {
         "nid": "431120607",
@@ -2962,6 +2962,11 @@
         "likes": 7
       },
       {
+        "nid": "431139877",
+        "title": "갤럭시 카메라 만들던 나무가, 글로벌 휴머노이드 뚫었다...10월 19일 뉴스...나무가 홈피에도 실림",
+        "likes": 6
+      },
+      {
         "nid": "431132701",
         "title": "대표가 밝힌 로봇 머리에 들어가는 센서수",
         "likes": 6
@@ -2980,6 +2985,11 @@
         "nid": "431113281",
         "title": "4% 물림 ",
         "likes": 6
+      },
+      {
+        "nid": "431132959",
+        "title": "1월 5일 종가가 22250원입니다",
+        "likes": 5
       },
       {
         "nid": "431130103",
@@ -3019,11 +3029,6 @@
       {
         "nid": "431134675",
         "title": "방송에 나오네 LG이노텍이 유력했는데 나무가 된거라고",
-        "likes": 4
-      },
-      {
-        "nid": "431132959",
-        "title": "1월 5일 종가가 22250원입니다",
         "likes": 4
       },
       {
@@ -3079,11 +3084,6 @@
       {
         "nid": "431113221",
         "title": "정규장",
-        "likes": 3
-      },
-      {
-        "nid": "431113096",
-        "title": "역시",
         "likes": 3
       }
     ],
@@ -3163,16 +3163,16 @@
     "keywords": [
       "휴머노이드 로봇",
       "3D 센싱 카메라",
-      "실적 어닝 서프라이즈"
+      "아틀라스"
     ],
     "sparkline_posts": [
-      96,
       97,
       98,
       102,
-      101
+      101,
+      102
     ],
-    "avg_posts": 98.8,
-    "total_posts": 494
+    "avg_posts": 100.0,
+    "total_posts": 500
   }
 ]

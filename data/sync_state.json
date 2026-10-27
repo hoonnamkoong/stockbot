@@ -27,6 +27,21 @@
       "code": "328130",
       "name": "루닛",
       "rank": 5
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 1
+    },
+    {
+      "code": "138360",
+      "name": "앤로보틱스",
+      "rank": 2
+    },
+    {
+      "code": "327260",
+      "name": "RF머트리얼즈",
+      "rank": 3
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +49,10 @@
     "000660",
     "047040",
     "028050",
-    "328130"
+    "328130",
+    "005930",
+    "138360",
+    "327260"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +81,23 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 1
+    },
+    {
+      "code": "138360",
+      "name": "앤로보틱스",
+      "rank": 2
+    },
+    {
+      "code": "327260",
+      "name": "RF머트리얼즈",
+      "rank": 3
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

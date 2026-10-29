@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 426.9069999999974,
-  "invested": 19100.170000000002,
+  "cash": 780.4869999999974,
+  "invested": 19247.43,
   "portfolio": {
     "EXPD": {
       "name": "Expeditors International of Washington, Inc. Common Stock",
@@ -9,14 +9,6 @@
       "avg_price": 191.53,
       "entry_date": "2026-08-27",
       "peak_price": 200.31,
-      "is_scaled_out": false
-    },
-    "DINO": {
-      "name": "HF Sinclair Corporation Common Stock",
-      "quantity": 38,
-      "avg_price": 97.51,
-      "entry_date": "2026-08-27",
-      "peak_price": 129.2,
       "is_scaled_out": false
     },
     "PSX": {
@@ -42,6 +34,14 @@
       "entry_date": "2026-10-15",
       "peak_price": 232.59,
       "is_scaled_out": false
+    },
+    "AAPL": {
+      "name": "Apple Inc. Common Stock",
+      "quantity": 11,
+      "avg_price": 350.24,
+      "entry_date": "2026-10-30",
+      "peak_price": 350.24,
+      "is_scaled_out": false
     }
   },
   "peak_nav": 23273.877,
@@ -61,40 +61,52 @@
     {
       "date": "2026-10-15",
       "is_win": false
+    },
+    {
+      "date": "2026-10-30",
+      "is_win": true
     }
   ],
   "cooldown_codes": {
     "RGA": "2026-09-21",
     "VG": "2026-09-24",
-    "ANET": "2026-10-18"
+    "ANET": "2026-10-18",
+    "DINO": "2026-11-02"
   },
   "raw_stats": {
-    "cash": 426.9069999999974,
-    "total_asset": 21831.837,
-    "profit_rate": 9.159184999999997,
+    "cash": 780.4869999999974,
+    "total_asset": 21622.601999999995,
+    "profit_rate": 8.113009999999976,
     "holdings_count": 5,
-    "win_rate": 0.0,
-    "profit_factor": 0.0,
-    "mdd": 6.195959530077437,
-    "turnover": 2.074412,
-    "frequency": 0.171875,
+    "win_rate": 25.0,
+    "profit_factor": 1.0601134535602383,
+    "mdd": 7.094971757391367,
+    "turnover": 2.477355,
+    "frequency": 0.2,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "EXPD": 196.51,
-      "PSX": 273.82,
-      "CVX": 230.18,
-      "SM": 39.565,
-      "DINO": 113.065,
-      "OXY": 63.34,
-      "P": 139.83,
-      "EBAY": 116.91
+      "COP": 149.72,
+      "P": 137.38,
+      "PSX": 270.42,
+      "RGA": 263.71,
+      "SHOP": 166.29,
+      "VEEV": 310.95,
+      "MU": 929.19,
+      "AAPL": 350.24,
+      "CVX": 230.89,
+      "DINO": 110.69,
+      "EXPD": 196.735,
+      "EBAY": 122.6,
+      "FIVE": 244.72,
+      "HPE": 58.81,
+      "MRVL": 217.275
     }
   },
   "normalized_stats": {
-    "승률": 0,
-    "수익팩터": 0.0,
-    "MDD": 81.41212140976769,
-    "거래빈도": 0.859375,
-    "자본회전율": 4.148824
+    "승률": 25.0,
+    "수익팩터": 21.202269071204768,
+    "MDD": 78.7150847278259,
+    "거래빈도": 1.0,
+    "자본회전율": 4.95471
   }
 }

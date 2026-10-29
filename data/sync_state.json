@@ -27,6 +27,31 @@
       "code": "005935",
       "name": "삼성전자우",
       "rank": 5
+    },
+    {
+      "code": "489790",
+      "name": "한화비전",
+      "rank": 1
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 2
+    },
+    {
+      "code": "328130",
+      "name": "루닛",
+      "rank": 3
+    },
+    {
+      "code": "069540",
+      "name": "빛과전자",
+      "rank": 4
+    },
+    {
+      "code": "079650",
+      "name": "서산",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "000660",
     "028050",
     "010170",
-    "005935"
+    "005935",
+    "489790",
+    "005930",
+    "328130",
+    "069540",
+    "079650"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "489790",
+      "name": "한화비전",
+      "rank": 1
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 2
+    },
+    {
+      "code": "328130",
+      "name": "루닛",
+      "rank": 3
+    },
+    {
+      "code": "069540",
+      "name": "빛과전자",
+      "rank": 4
+    },
+    {
+      "code": "079650",
+      "name": "서산",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

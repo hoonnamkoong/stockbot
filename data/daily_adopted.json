@@ -5,12 +5,155 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "시장 하락 및 주요 기업 실적 부진 속 SK하이닉스 주가 하락 전망. 3분기 실적 우려 및 외인 매도 가능성 언급.",
+        "posts_summary": "반도체 업황 둔화 우려 및 외인 매도세 속 주가 하락세 지속.",
         "sentiment": "-5",
         "keywords": [
-          "3분기 실적",
-          "외인 매도",
-          "반도체"
+          "반도체",
+          "외인",
+          "실적"
+        ]
+      }
+    },
+    "005930": {
+      "name": "삼성전자",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "정치적 논란과 주주 가치 훼손 논란 속에서 배당 관련 긍정적 기대감도 혼재.",
+        "sentiment": "-2",
+        "keywords": [
+          "정치",
+          "배당",
+          "상속세"
+        ]
+      }
+    },
+    "047040": {
+      "name": "대우건설",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "원전 사업 불확실성과 공매도 금지 조치 속에서 재건 사업 기대감 존재.",
+        "sentiment": "0",
+        "keywords": [
+          "원전",
+          "공매도",
+          "재건"
+        ]
+      }
+    },
+    "009830": {
+      "name": "한화솔루션",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "태양광 사업 호조에도 불구하고 주가 급락 및 의혹 제기로 투자 심리 위축.",
+        "sentiment": "-3",
+        "keywords": [
+          "태양광",
+          "주가조작",
+          "RE100"
+        ]
+      }
+    },
+    "010140": {
+      "name": "삼성중공업",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "미국 조선주 강세 속에서 신용 물량 출회 및 주가 하락 우려.",
+        "sentiment": "-1",
+        "keywords": [
+          "조선",
+          "신용",
+          "외국인"
+        ]
+      }
+    },
+    "034020": {
+      "name": "두산에너빌리티",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "미국 SMR 원자로 수주 및 실적 개선 소식에 따른 긍정적 전망.",
+        "sentiment": "2",
+        "keywords": [
+          "SMR",
+          "원전",
+          "수주"
+        ]
+      }
+    },
+    "489790": {
+      "name": "한화비전",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "사상 최대 실적 발표와 HBM, 보안 관련 모멘텀으로 인한 주가 상승 기대.",
+        "sentiment": "4",
+        "keywords": [
+          "실적",
+          "HBM",
+          "보안"
+        ]
+      }
+    },
+    "420610": {
+      "name": "인텔리빅스",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "단기 급등 및 변동성 높은 신규주 특성으로 인한 투자 주의 요구.",
+        "sentiment": "0",
+        "keywords": [
+          "신규주",
+          "단타",
+          "변동성"
+        ]
+      }
+    },
+    "439270": {
+      "name": "크리에이츠",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "상장 첫날 급락하며 공모주 시장 부진 및 높은 변동성 시현.",
+        "sentiment": "-6",
+        "keywords": [
+          "공모주",
+          "하한가",
+          "변동성"
+        ]
+      }
+    },
+    "179880": {
+      "name": "멜콘",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "반도체 업황 부진 및 보호예수 해제 물량 부담으로 인한 주가 급락.",
+        "sentiment": "-7",
+        "keywords": [
+          "반도체",
+          "보호예수",
+          "급락"
+        ]
+      }
+    },
+    "046890": {
+      "name": "서울반도체",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "희토류 없는 백색 LED 세계 최초 개발 발표. 100억 달러 시장 석권 기대.",
+        "sentiment": "7",
+        "keywords": [
+          "백색LED",
+          "희토류",
+          "시장 석권"
+        ]
+      }
+    },
+    "010170": {
+      "name": "대한광통신",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "전반적인 시장 하락 속 광통신 섹터 조정 예상.",
+        "sentiment": "-3",
+        "keywords": [
+          "광통신",
+          "조정",
+          "시장 하락"
         ]
       }
     }

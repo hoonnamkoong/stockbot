@@ -27,6 +27,31 @@
       "code": "420610",
       "name": "인텔리빅스",
       "rank": 5
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 1
+    },
+    {
+      "code": "042940",
+      "name": "상지건설",
+      "rank": 2
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 3
+    },
+    {
+      "code": "009830",
+      "name": "한화솔루션",
+      "rank": 4
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "042510",
     "010140",
     "046890",
-    "420610"
+    "420610",
+    "034020",
+    "042940",
+    "005930",
+    "009830",
+    "000660"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 1
+    },
+    {
+      "code": "042940",
+      "name": "상지건설",
+      "rank": 2
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 3
+    },
+    {
+      "code": "009830",
+      "name": "한화솔루션",
+      "rank": 4
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

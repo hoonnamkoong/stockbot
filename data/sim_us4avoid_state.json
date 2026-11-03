@@ -1,7 +1,7 @@
 {
   "initial_cash": 100000,
-  "cash": 7264.427800000014,
-  "invested": 92735.57220000001,
+  "cash": 6562.432800000014,
+  "invested": 93506.74720000001,
   "portfolio": {
     "COP": {
       "name": "ConocoPhillips Common Stock",
@@ -80,7 +80,7 @@
       "quantity": 20,
       "avg_price": 87.95,
       "entry_date": "2026-10-06",
-      "peak_price": 96.95,
+      "peak_price": 98.78,
       "is_scaled_out": false
     },
     "NEM": {
@@ -115,14 +115,6 @@
       "peak_price": 160.34,
       "is_scaled_out": false
     },
-    "SYK": {
-      "name": "Stryker Corporation Common Stock",
-      "quantity": 6,
-      "avg_price": 280.86,
-      "entry_date": "2026-10-06",
-      "peak_price": 311.98,
-      "is_scaled_out": false
-    },
     "ABNB": {
       "name": "Airbnb, Inc. Class A Common Stock",
       "quantity": 10,
@@ -131,20 +123,12 @@
       "peak_price": 178.56,
       "is_scaled_out": false
     },
-    "HPE": {
-      "name": "Hewlett Packard Enterprise Company Common Stock",
-      "quantity": 22,
-      "avg_price": 70.19,
-      "entry_date": "2026-10-06",
-      "peak_price": 73.495,
-      "is_scaled_out": false
-    },
     "TXN": {
       "name": "Texas Instruments Incorporated Common Stock",
       "quantity": 9,
       "avg_price": 294.9,
       "entry_date": "2026-10-06",
-      "peak_price": 308.28,
+      "peak_price": 310.13,
       "is_scaled_out": false
     },
     "SNPS": {
@@ -165,11 +149,11 @@
     },
     "SPGI": {
       "name": "S&P Global Inc. Common Stock",
-      "quantity": 4,
+      "quantity": 3,
       "avg_price": 393.72,
       "entry_date": "2026-10-06",
-      "peak_price": 466.43,
-      "is_scaled_out": false
+      "peak_price": 466.595,
+      "is_scaled_out": true
     },
     "DHR": {
       "name": "Danaher Corporation Common Stock",
@@ -213,8 +197,8 @@
     },
     "INTC": {
       "name": "Intel Corporation Common Stock",
-      "quantity": 36,
-      "avg_price": 116.83,
+      "quantity": 58,
+      "avg_price": 95.29655172413794,
       "entry_date": "2026-10-06",
       "peak_price": 116.94,
       "is_scaled_out": false
@@ -232,7 +216,7 @@
       "quantity": 11,
       "avg_price": 368.82,
       "entry_date": "2026-10-06",
-      "peak_price": 415.67,
+      "peak_price": 421.9,
       "is_scaled_out": false
     },
     "MCD": {
@@ -240,15 +224,7 @@
       "quantity": 9,
       "avg_price": 232.704,
       "entry_date": "2026-10-06",
-      "peak_price": 259.18,
-      "is_scaled_out": false
-    },
-    "PEP": {
-      "name": "PepsiCo, Inc. Common Stock",
-      "quantity": 17,
-      "avg_price": 126.015,
-      "entry_date": "2026-10-06",
-      "peak_price": 138.59,
+      "peak_price": 262.985,
       "is_scaled_out": false
     },
     "WDC": {
@@ -261,8 +237,8 @@
     },
     "STX": {
       "name": "Seagate Technology Holdings PLC Ordinary Shares (Ireland)",
-      "quantity": 2,
-      "avg_price": 840.0,
+      "quantity": 3,
+      "avg_price": 761.35,
       "entry_date": "2026-10-06",
       "peak_price": 840.862,
       "is_scaled_out": false
@@ -272,7 +248,7 @@
       "quantity": 21,
       "avg_price": 103.44,
       "entry_date": "2026-10-06",
-      "peak_price": 113.259,
+      "peak_price": 113.79,
       "is_scaled_out": false
     },
     "AVGO": {
@@ -320,7 +296,31 @@
       "quantity": 5,
       "avg_price": 330.3,
       "entry_date": "2026-10-06",
-      "peak_price": 365.11,
+      "peak_price": 367.67,
+      "is_scaled_out": false
+    },
+    "MRNA": {
+      "name": "Moderna, Inc. Common Stock",
+      "quantity": 6,
+      "avg_price": 226.9,
+      "entry_date": "2026-11-04",
+      "peak_price": 226.9,
+      "is_scaled_out": false
+    },
+    "TMUS": {
+      "name": "T-Mobile US, Inc. Common Stock",
+      "quantity": 12,
+      "avg_price": 154.82,
+      "entry_date": "2026-11-04",
+      "peak_price": 154.82,
+      "is_scaled_out": false
+    },
+    "INTU": {
+      "name": "Intuit Inc. Common Stock",
+      "quantity": 4,
+      "avg_price": 347.97,
+      "entry_date": "2026-11-04",
+      "peak_price": 347.97,
       "is_scaled_out": false
     }
   },
@@ -329,68 +329,128 @@
   "history": [
     100000
   ],
-  "daily_trades": [],
+  "daily_trades": [
+    {
+      "date": "2026-11-04",
+      "is_win": true
+    },
+    {
+      "date": "2026-11-04",
+      "is_win": false
+    },
+    {
+      "date": "2026-11-04",
+      "is_win": true
+    },
+    {
+      "date": "2026-11-04",
+      "is_win": true
+    }
+  ],
   "cooldown_codes": {},
-  "rebalance_month": "202610",
+  "rebalance_month": "202611",
   "raw_stats": {
-    "cash": 7264.427800000014,
-    "total_asset": 95801.17580000001,
-    "profit_rate": -4.198824199999988,
+    "cash": 6562.432800000014,
+    "total_asset": 95199.43280000001,
+    "profit_rate": -4.80056719999999,
     "holdings_count": 40,
-    "win_rate": 0,
-    "profit_factor": 1.0,
-    "mdd": 4.907012865689008,
-    "turnover": 0.927356,
-    "frequency": 1.6,
+    "win_rate": 75.0,
+    "profit_factor": 1.1841402871937226,
+    "mdd": 5.50430761577246,
+    "turnover": 1.0510659000000002,
+    "frequency": 1.6896551724137931,
     "total_fees": 92.73559999999999,
     "current_prices": {
-      "MDT": 96.63,
-      "SNPS": 462.48,
-      "AMD": 496.125,
-      "MCD": 259.18,
-      "TJX": 142.05,
-      "BAC": 49.865,
-      "PLTR": 184.45,
-      "UNH": 408.59,
-      "STX": 631.79,
-      "AVGO": 320.72,
-      "HCA": 477.18,
-      "BKNG": 148.56,
-      "DHR": 230.69,
-      "PSX": 281.31,
-      "WMB": 73.59,
-      "MPC": 442.36,
-      "SCHW": 87.79,
-      "COP": 152.923,
-      "TXN": 295.85,
-      "DELL": 415.22,
-      "SYK": 295.275,
-      "SNOW": 298.22,
-      "INTC": 63.875,
-      "WDC": 365.975,
-      "SHOP": 154.55,
-      "ABBV": 294.84,
-      "HPE": 53.75,
-      "JCI": 147.745,
-      "PEP": 138.29,
-      "VLO": 396.015,
-      "CB": 365.11,
-      "ADI": 407.23,
-      "ABNB": 164.425,
-      "V": 415.67,
-      "NEM": 104.67,
-      "CRM": 229.71,
-      "DIS": 110.84,
-      "LMT": 638.055,
-      "FTNT": 135.32,
-      "SPGI": 466.43
+      "CME": 305.49,
+      "CVS": 90.96,
+      "GEV": 917.49,
+      "MMM": 177.05,
+      "SBUX": 104.18,
+      "TT": 417.295,
+      "ADI": 418.575,
+      "CSX": 50.885,
+      "ABBV": 286.645,
+      "SNPS": 462.15,
+      "HPE": 53.165,
+      "MCD": 262.985,
+      "CRWD": 242.7,
+      "COP": 144.2,
+      "TXN": 310.13,
+      "BAC": 49.775,
+      "GE": 321.345,
+      "CRM": 222.75,
+      "VRT": 233.26,
+      "GILD": 169.31,
+      "VLO": 389.55,
+      "EMR": 166.605,
+      "GLW": 125.94,
+      "MPC": 427.88,
+      "PH": 946.49,
+      "KLAC": 154.915,
+      "MRNA": 226.9,
+      "WMB": 73.005,
+      "HCA": 464.945,
+      "DHR": 230.45,
+      "BNY": 150.175,
+      "MRK": 144.13,
+      "JCI": 149.61,
+      "TMUS": 154.82,
+      "BA": 174.2,
+      "PSX": 274.2,
+      "DIS": 113.79,
+      "SHOP": 144.245,
+      "SPGI": 466.595,
+      "ORCL": 124.54,
+      "ADBE": 246.671,
+      "CAT": 622.275,
+      "WFC": 85.555,
+      "CB": 367.67,
+      "NEM": 107.195,
+      "COF": 208.165,
+      "STX": 604.05,
+      "MDT": 98.78,
+      "UNH": 402.715,
+      "PLTR": 175.22,
+      "MA": 648.13,
+      "SYK": 309.42,
+      "TMO": 698.04,
+      "DELL": 405.98,
+      "AVGO": 331.38,
+      "WM": 235.29,
+      "AMD": 486.535,
+      "FTNT": 127.255,
+      "LRCX": 229.05,
+      "VZ": 45.015,
+      "ACN": 253.28,
+      "NFLX": 62.935,
+      "SNOW": 292.675,
+      "SNDK": 1109.95,
+      "META": 619.48,
+      "AXP": 325.17,
+      "MU": 847.645,
+      "INTU": 347.97,
+      "ABNB": 167.75,
+      "GD": 372.93,
+      "WDC": 343.3,
+      "TJX": 137.62,
+      "PEP": 137.75,
+      "SPCX": 140.641,
+      "INTC": 60.06,
+      "PLD": 128.65,
+      "LMT": 642.14,
+      "AAPL": 329.96,
+      "SCHW": 89.025,
+      "ANET": 170.07,
+      "PM": 208.48,
+      "BKNG": 152.41,
+      "V": 421.9
     }
   },
   "normalized_stats": {
-    "승률": 0,
-    "수익팩터": 20.0,
-    "MDD": 85.27896140293298,
-    "거래빈도": 8.0,
-    "자본회전율": 1.854712
+    "승률": 75.0,
+    "수익팩터": 23.68280574387445,
+    "MDD": 83.48707715268262,
+    "거래빈도": 8.448275862068966,
+    "자본회전율": 2.1021318000000004
   }
 }

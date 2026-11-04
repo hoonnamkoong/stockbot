@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 8518.616999999997,
-  "invested": 11511.89,
+  "cash": 4757.876999999995,
+  "invested": 15489.529999999999,
   "portfolio": {
     "EXPD": {
       "name": "Expeditors International of Washington, Inc. Common Stock",
@@ -11,20 +11,28 @@
       "peak_price": 204.495,
       "is_scaled_out": false
     },
-    "PSX": {
-      "name": "Phillips 66 Common Stock",
-      "quantity": 15,
-      "avg_price": 243.87,
-      "entry_date": "2026-08-27",
-      "peak_price": 299.105,
-      "is_scaled_out": false
-    },
     "CVX": {
       "name": "Chevron Corporation Common Stock",
       "quantity": 19,
       "avg_price": 221.83,
       "entry_date": "2026-10-15",
       "peak_price": 234.99,
+      "is_scaled_out": false
+    },
+    "MNST": {
+      "name": "Monster Beverage Corporation",
+      "quantity": 78,
+      "avg_price": 48.795,
+      "entry_date": "2026-11-05",
+      "peak_price": 48.795,
+      "is_scaled_out": false
+    },
+    "FAST": {
+      "name": "Fastenal Company Common Stock",
+      "quantity": 72,
+      "avg_price": 53.19,
+      "entry_date": "2026-11-05",
+      "peak_price": 53.19,
       "is_scaled_out": false
     }
   },
@@ -57,6 +65,10 @@
     {
       "date": "2026-11-04",
       "is_win": false
+    },
+    {
+      "date": "2026-11-05",
+      "is_win": true
     }
   ],
   "cooldown_codes": {
@@ -65,43 +77,41 @@
     "ANET": "2026-10-18",
     "DINO": "2026-11-02",
     "P": "2026-11-07",
-    "AAPL": "2026-11-07"
+    "AAPL": "2026-11-07",
+    "PSX": "2026-11-08"
   },
   "raw_stats": {
-    "cash": 8518.616999999997,
-    "total_asset": 20801.391999999996,
-    "profit_rate": 4.006959999999981,
-    "holdings_count": 3,
-    "win_rate": 33.33333333333333,
-    "profit_factor": 1.0443951006374887,
-    "mdd": 10.62343416182875,
-    "turnover": 2.8642615,
-    "frequency": 0.21428571428571427,
+    "cash": 4757.876999999995,
+    "total_asset": 20253.106999999996,
+    "profit_rate": 1.2655349999999816,
+    "holdings_count": 4,
+    "win_rate": 42.857142857142854,
+    "profit_factor": 1.3551178282357974,
+    "mdd": 12.97922988937341,
+    "turnover": 3.4397935,
+    "frequency": 0.2535211267605634,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "P": 117.46,
-      "AAPL": 329.73,
-      "VEEV": 304.75,
-      "OVV": 66.77,
-      "MNST": 47.67,
-      "PAYC": 265.93,
-      "CVX": 225.655,
-      "SM": 37.09,
-      "EOG": 155.03,
-      "XOM": 177.98,
-      "COP": 144.17,
-      "PSX": 273.995,
-      "HALO": 129.85,
-      "PR": 24.1,
-      "FAST": 52.34,
-      "EXPD": 204.495
+      "PSX": 258.33,
+      "XOM": 169.3,
+      "CVX": 216.745,
+      "EOG": 147.249,
+      "OVV": 63.04,
+      "FAST": 53.19,
+      "PR": 22.505,
+      "COP": 135.88,
+      "PAYC": 272.15,
+      "HALO": 130.825,
+      "VEEV": 311.685,
+      "EXPD": 196.915,
+      "MNST": 48.795
     }
   },
   "normalized_stats": {
-    "승률": 33.33333333333333,
-    "수익팩터": 20.887902012749777,
-    "MDD": 68.12969751451375,
-    "거래빈도": 1.0714285714285714,
-    "자본회전율": 5.728523
+    "승률": 42.857142857142854,
+    "수익팩터": 27.102356564715947,
+    "MDD": 61.06231033187977,
+    "거래빈도": 1.267605633802817,
+    "자본회전율": 6.879587
   }
 }

@@ -1,16 +1,8 @@
 {
   "initial_cash": 20000,
-  "cash": 4757.876999999995,
-  "invested": 15489.529999999999,
+  "cash": 8357.426999999994,
+  "invested": 11850.46,
   "portfolio": {
-    "EXPD": {
-      "name": "Expeditors International of Washington, Inc. Common Stock",
-      "quantity": 19,
-      "avg_price": 191.53,
-      "entry_date": "2026-08-27",
-      "peak_price": 204.495,
-      "is_scaled_out": false
-    },
     "CVX": {
       "name": "Chevron Corporation Common Stock",
       "quantity": 19,
@@ -69,6 +61,10 @@
     {
       "date": "2026-11-05",
       "is_win": true
+    },
+    {
+      "date": "2026-11-06",
+      "is_win": false
     }
   ],
   "cooldown_codes": {
@@ -78,40 +74,38 @@
     "DINO": "2026-11-02",
     "P": "2026-11-07",
     "AAPL": "2026-11-07",
-    "PSX": "2026-11-08"
+    "PSX": "2026-11-08",
+    "EXPD": "2026-11-09"
   },
   "raw_stats": {
-    "cash": 4757.876999999995,
-    "total_asset": 20253.106999999996,
-    "profit_rate": 1.2655349999999816,
-    "holdings_count": 4,
-    "win_rate": 42.857142857142854,
-    "profit_factor": 1.3551178282357974,
-    "mdd": 12.97922988937341,
-    "turnover": 3.4397935,
-    "frequency": 0.2535211267605634,
+    "cash": 8357.426999999994,
+    "total_asset": 19985.196999999993,
+    "profit_rate": -0.0740150000000358,
+    "holdings_count": 3,
+    "win_rate": 37.5,
+    "profit_factor": 1.2825087788277698,
+    "mdd": 14.130348802651177,
+    "turnover": 3.619771,
+    "frequency": 0.2638888888888889,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "PSX": 258.33,
-      "XOM": 169.3,
-      "CVX": 216.745,
-      "EOG": 147.249,
-      "OVV": 63.04,
-      "FAST": 53.19,
-      "PR": 22.505,
-      "COP": 135.88,
-      "PAYC": 272.15,
-      "HALO": 130.825,
-      "VEEV": 311.685,
-      "EXPD": 196.915,
-      "MNST": 48.795
+      "HNGE": 116.0,
+      "CVX": 215.47,
+      "EXPD": 189.45,
+      "COP": 137.245,
+      "FAST": 52.745,
+      "MNST": 47.9,
+      "XOM": 167.59,
+      "HALO": 124.545,
+      "VEEV": 308.665,
+      "PAYC": 245.46
     }
   },
   "normalized_stats": {
-    "승률": 42.857142857142854,
-    "수익팩터": 27.102356564715947,
-    "MDD": 61.06231033187977,
-    "거래빈도": 1.267605633802817,
-    "자본회전율": 6.879587
+    "승률": 37.5,
+    "수익팩터": 25.650175576555398,
+    "MDD": 57.60895359204647,
+    "거래빈도": 1.3194444444444444,
+    "자본회전율": 7.239542
   }
 }

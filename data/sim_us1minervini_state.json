@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 12410.886999999995,
-  "invested": 7635.689999999999,
+  "cash": 5166.771999999994,
+  "invested": 14879.805,
   "portfolio": {
     "MNST": {
       "name": "Monster Beverage Corporation",
@@ -16,7 +16,23 @@
       "quantity": 72,
       "avg_price": 53.19,
       "entry_date": "2026-11-05",
-      "peak_price": 53.19,
+      "peak_price": 54.685,
+      "is_scaled_out": false
+    },
+    "RGA": {
+      "name": "Reinsurance Group of America, Incorporated Common Stock",
+      "quantity": 13,
+      "avg_price": 274.455,
+      "entry_date": "2026-11-11",
+      "peak_price": 274.455,
+      "is_scaled_out": false
+    },
+    "HNGE": {
+      "name": "Hinge Health, Inc. Class A Common Stock",
+      "quantity": 30,
+      "avg_price": 122.54,
+      "entry_date": "2026-11-11",
+      "peak_price": 122.54,
       "is_scaled_out": false
     }
   },
@@ -75,30 +91,31 @@
     "CVX": "2026-11-10"
   },
   "raw_stats": {
-    "cash": 12410.886999999995,
-    "total_asset": 19823.196999999993,
-    "profit_rate": -0.8840150000000359,
-    "holdings_count": 2,
+    "cash": 5166.771999999994,
+    "total_asset": 19891.356999999993,
+    "profit_rate": -0.5432150000000365,
+    "holdings_count": 4,
     "win_rate": 33.33333333333333,
     "profit_factor": 1.0523540405838356,
-    "mdd": 14.826408165687251,
-    "turnover": 3.8224440000000004,
-    "frequency": 0.273972602739726,
+    "mdd": 14.533547633683927,
+    "turnover": 4.1846495,
+    "frequency": 0.2857142857142857,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "MNST": 46.125,
-      "HALO": 102.92,
-      "VEEV": 300.85,
-      "FAST": 52.98,
-      "PAYC": 241.08,
-      "CVX": 213.34
+      "MNST": 45.425,
+      "IOT": 41.33,
+      "RGA": 274.455,
+      "HNGE": 122.54,
+      "NDAQ": 109.345,
+      "FAST": 54.685,
+      "VEEV": 305.78
     }
   },
   "normalized_stats": {
     "승률": 33.33333333333333,
     "수익팩터": 21.047080811676715,
-    "MDD": 55.52077550293825,
-    "거래빈도": 1.36986301369863,
-    "자본회전율": 7.644888000000001
+    "MDD": 56.399357098948215,
+    "거래빈도": 1.4285714285714284,
+    "자본회전율": 8.369299
   }
 }

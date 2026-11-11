@@ -3,11 +3,11 @@
     "code": "005930",
     "name": "삼성전자",
     "market": "KOSPI",
-    "price": 204500,
+    "price": 204000,
     "recent_posts_count": 800,
-    "unique_posters": 463,
-    "fact_score": 0.2,
-    "total_likes": 1317,
+    "unique_posters": 457,
+    "fact_score": 0.1,
+    "total_likes": 1381,
     "foreign_rate": 45.93,
     "foreign_change": 0.0,
     "inst_net_buy": 822596,
@@ -16,16 +16,16 @@
     "day_high": 205000,
     "day_low": 196300,
     "prev_foreign_rate": 45.93,
-    "posts_summary": "주가 반등 기대감 속 외국인 매도세 감소 확인. 다만, 주가 전망에 대한 투자자 간 의견 분분.",
-    "sentiment": "1",
+    "posts_summary": "외인 매도세 감소와 연말 랠리 기대감 속 추세 전환 가능성 제기. 다만, 일부 부정적 전망 존재.",
+    "sentiment": "2",
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "+2.82%",
+    "change_rate": "+2.56%",
     "signal": null,
-    "current_price": 204500,
-    "volume": 8201297,
-    "amount": 1641228312100,
+    "current_price": 204000,
+    "volume": 8338243,
+    "amount": 1669231196850,
     "posts": [
       {
         "nid": "432005285",
@@ -43,6 +43,11 @@
         "likes": 11
       },
       {
+        "nid": "432013155",
+        "title": "긴급진단) 삼성전자 상승각 나왔네요.",
+        "likes": 10
+      },
+      {
         "nid": "432009401",
         "title": "삼성전자 주가 7만원을 믿는 사람들은 지능 문제",
         "likes": 10
@@ -51,6 +56,11 @@
         "nid": "432002254",
         "title": "24층 오겠죠?",
         "likes": 10
+      },
+      {
+        "nid": "432012692",
+        "title": "흠... 이제 본전까지",
+        "likes": 9
       },
       {
         "nid": "432011505",
@@ -63,8 +73,8 @@
         "likes": 9
       },
       {
-        "nid": "432012692",
-        "title": "흠... 이제 본전까지",
+        "nid": "432012665",
+        "title": "17찍던날 물 쎄게 탔더만 원금 벌써 복구했네 ㅋㅋㅋ",
         "likes": 8
       },
       {
@@ -103,8 +113,13 @@
         "likes": 8
       },
       {
-        "nid": "432012665",
-        "title": "17찍던날 물 쎄게 탔더만 원금 벌써 복구했네 ㅋㅋㅋ",
+        "nid": "432012131",
+        "title": "외인들 매도세가 팍 줄어들었슴.",
+        "likes": 7
+      },
+      {
+        "nid": "432010807",
+        "title": "바닥 찍었다. 연말 랠리 시작되는거다.",
         "likes": 7
       },
       {
@@ -148,40 +163,25 @@
         "likes": 7
       },
       {
-        "nid": "432012131",
-        "title": "외인들 매도세가 팍 줄어들었슴.",
+        "nid": "432012819",
+        "title": "삼전 50만원 가즈아~~!!",
         "likes": 6
       },
       {
-        "nid": "432011238",
-        "title": "지금이 최 저가입니다",
+        "nid": "432012748",
+        "title": "못 잡으신분들",
         "likes": 6
       },
       {
-        "nid": "432010784",
-        "title": "투자참고~코어위브 +16%폭등중~삼전최소 +5%이상 간다",
-        "likes": 6
-      },
-      {
-        "nid": "432009466",
-        "title": "이번달 종가 23만원 아니면 27만원이다",
-        "likes": 6
-      },
-      {
-        "nid": "432002917",
-        "title": "2028년까지 완판인데",
-        "likes": 6
-      },
-      {
-        "nid": "431998445",
-        "title": "23만 도달",
+        "nid": "432012573",
+        "title": "3일만 먹고 떠났는데",
         "likes": 6
       }
     ],
     "sparkline_price": [
-      203000,
       204000,
-      204500
+      204500,
+      204000
     ],
     "range_history": [
       234500,
@@ -227,8 +227,8 @@
       3713051804000,
       3016556003200
     ],
-    "tick_power": 108.9,
-    "bid_ask_ratio": 1.6095743964144769,
+    "tick_power": 108.86,
+    "bid_ask_ratio": 1.5935294759755227,
     "frgn_fake_ntby_qty": 27000,
     "orgn_fake_ntby_qty": -15000,
     "sum_fake_ntby_qty": 12000,
@@ -242,17 +242,17 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 31.15,
-    "pbr": 3.2,
+    "per": 31.08,
+    "pbr": 3.19,
     "eps": 6564,
     "bps": 63997,
     "w52_hgpr": 374500,
     "w52_lwpr": 94500,
-    "mkt_cap": 11955640,
+    "mkt_cap": 11926408,
     "keywords": [
-      "증여세",
-      "주가 전망",
-      "외인 매도세"
+      "외인 매도세",
+      "연말 랠리",
+      "추세 전환"
     ],
     "sparkline_posts": [
       800,
@@ -266,11 +266,11 @@
     "code": "047040",
     "name": "대우건설",
     "market": "KOSPI",
-    "price": 11650,
-    "recent_posts_count": 128,
+    "price": 11615,
+    "recent_posts_count": 132,
     "unique_posters": 57,
     "fact_score": 0.4,
-    "total_likes": 356,
+    "total_likes": 363,
     "foreign_rate": 10.2,
     "foreign_change": 0.19,
     "inst_net_buy": 300029,
@@ -284,11 +284,11 @@
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "+3.37%",
+    "change_rate": "+3.06%",
     "signal": null,
-    "current_price": 11650,
-    "volume": 3226125,
-    "amount": 37349846205,
+    "current_price": 11615,
+    "volume": 3263408,
+    "amount": 37782927260,
     "posts": [
       {
         "nid": "431985497",
@@ -298,7 +298,7 @@
       {
         "nid": "431999724",
         "title": "우상향으로 일단 3만 넘고 보자",
-        "likes": 12
+        "likes": 13
       },
       {
         "nid": "431979748",
@@ -331,6 +331,11 @@
         "likes": 9
       },
       {
+        "nid": "432002344",
+        "title": "이제는 전쟁도 마무리 단계",
+        "likes": 9
+      },
+      {
         "nid": "431999113",
         "title": "엔비디아 다음 성장은 건설주",
         "likes": 9
@@ -341,11 +346,6 @@
         "likes": 9
       },
       {
-        "nid": "432002344",
-        "title": "이제는 전쟁도 마무리 단계",
-        "likes": 8
-      },
-      {
         "nid": "431998627",
         "title": "스페이스X, 텍사스에 32조원 쏟아부어 가스발전·AI센터 짓는다",
         "likes": 8
@@ -353,6 +353,11 @@
       {
         "nid": "432002321",
         "title": "한사람도 나가지마 ",
+        "likes": 7
+      },
+      {
+        "nid": "431998887",
+        "title": "주가오르니깐",
         "likes": 7
       },
       {
@@ -371,8 +376,8 @@
         "likes": 6
       },
       {
-        "nid": "431998887",
-        "title": "주가오르니깐",
+        "nid": "431998552",
+        "title": "나라에서  밀어주는 가덕도 신공항 건설하는  대우를   한수원이   꼴갑을 떨었다",
         "likes": 6
       },
       {
@@ -384,11 +389,6 @@
         "nid": "431981798",
         "title": "안티들 주가오르니...",
         "likes": 6
-      },
-      {
-        "nid": "431998552",
-        "title": "나라에서  밀어주는 가덕도 신공항 건설하는  대우를   한수원이   꼴갑을 떨었다",
-        "likes": 5
       },
       {
         "nid": "431996593",
@@ -442,9 +442,9 @@
       }
     ],
     "sparkline_price": [
-      11620,
       11660,
-      11650
+      11650,
+      11615
     ],
     "range_history": [
       15730,
@@ -490,8 +490,8 @@
       40224404340,
       58095012780
     ],
-    "tick_power": 98.06,
-    "bid_ask_ratio": 0.2540488633635575,
+    "tick_power": 96.92,
+    "bid_ask_ratio": 0.4626531916129407,
     "frgn_fake_ntby_qty": -15000,
     "orgn_fake_ntby_qty": 9000,
     "sum_fake_ntby_qty": -6000,
@@ -505,35 +505,35 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -5.31,
+    "per": -5.29,
     "pbr": 1.43,
     "eps": -2195,
     "bps": 8148,
     "w52_hgpr": 40350,
     "w52_lwpr": 3375,
-    "mkt_cap": 47868,
+    "mkt_cap": 47724,
     "keywords": [
       "가덕도 신공항",
       "재건 건설",
       "공시"
     ],
     "sparkline_posts": [
-      119,
       120,
-      128
+      128,
+      132
     ],
-    "avg_posts": 122.3,
-    "total_posts": 367
+    "avg_posts": 126.7,
+    "total_posts": 380
   },
   {
     "code": "267850",
     "name": "아시아나IDT",
     "market": "KOSPI",
-    "price": 13920,
-    "recent_posts_count": 107,
-    "unique_posters": 67,
+    "price": 14030,
+    "recent_posts_count": 109,
+    "unique_posters": 68,
     "fact_score": 0.0,
-    "total_likes": 155,
+    "total_likes": 157,
     "foreign_rate": 0.43,
     "foreign_change": 0.01,
     "inst_net_buy": -3282,
@@ -547,11 +547,11 @@
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "-22.10%",
+    "change_rate": "-21.49%",
     "signal": null,
-    "current_price": 13920,
-    "volume": 2892122,
-    "amount": 46274891740,
+    "current_price": 14030,
+    "volume": 2930701,
+    "amount": 46812975315,
     "posts": [
       {
         "nid": "431985243",
@@ -705,9 +705,9 @@
       }
     ],
     "sparkline_price": [
-      13800,
       13840,
-      13920
+      13920,
+      14030
     ],
     "range_history": [
       9370,
@@ -753,8 +753,8 @@
       73270790010,
       94720233600
     ],
-    "tick_power": 73.01,
-    "bid_ask_ratio": 0.14921039586431556,
+    "tick_power": 73.71,
+    "bid_ask_ratio": 1.3116987179487178,
     "frgn_fake_ntby_qty": 91000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": 91000,
@@ -768,35 +768,35 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 13.13,
+    "per": 13.24,
     "pbr": 0.92,
     "eps": 1060,
     "bps": 15201,
     "w52_hgpr": 18360,
     "w52_lwpr": 8610,
-    "mkt_cap": 1545,
+    "mkt_cap": 1557,
     "keywords": [
       "하한가",
       "신용 물량",
       "반대매매"
     ],
     "sparkline_posts": [
-      99,
       105,
-      107
+      107,
+      109
     ],
-    "avg_posts": 103.7,
-    "total_posts": 311
+    "avg_posts": 107.0,
+    "total_posts": 321
   },
   {
     "code": "009830",
     "name": "한화솔루션",
     "market": "KOSPI",
-    "price": 24000,
-    "recent_posts_count": 160,
-    "unique_posters": 96,
-    "fact_score": 0.3,
-    "total_likes": 431,
+    "price": 23900,
+    "recent_posts_count": 168,
+    "unique_posters": 102,
+    "fact_score": 0.2,
+    "total_likes": 462,
     "foreign_rate": 9.79,
     "foreign_change": 0.01,
     "inst_net_buy": -244779,
@@ -805,16 +805,16 @@
     "day_high": 24600,
     "day_low": 23300,
     "prev_foreign_rate": 9.78,
-    "posts_summary": "미국 태양광 시장 불안정 속 유가 하락 영향. 공매도 및 높은 순차입금에 대한 우려 제기.",
+    "posts_summary": "유가 폭락 및 미장 태양광 하락 영향으로 인한 주가 하락 우려. 공매도 부담 및 높은 순차입금 존재.",
     "sentiment": "-3",
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "-1.64%",
+    "change_rate": "-2.05%",
     "signal": null,
-    "current_price": 24000,
-    "volume": 2808332,
-    "amount": 67707114525,
+    "current_price": 23900,
+    "volume": 2853487,
+    "amount": 68788706950,
     "posts": [
       {
         "nid": "432006523",
@@ -837,6 +837,11 @@
         "likes": 9
       },
       {
+        "nid": "432011287",
+        "title": "어이없다, 유일한 파란불",
+        "likes": 8
+      },
+      {
         "nid": "432005609",
         "title": "이번상승장",
         "likes": 8
@@ -847,8 +852,8 @@
         "likes": 8
       },
       {
-        "nid": "432011287",
-        "title": "어이없다, 유일한 파란불",
+        "nid": "432012111",
+        "title": "매도물량 쌓아놓은거 봐 ㅋㅋ",
         "likes": 7
       },
       {
@@ -862,8 +867,8 @@
         "likes": 7
       },
       {
-        "nid": "432012111",
-        "title": "매도물량 쌓아놓은거 봐 ㅋㅋ",
+        "nid": "432010906",
+        "title": "외인 기관 공매넘들 똥줄타겠네",
         "likes": 6
       },
       {
@@ -879,6 +884,11 @@
       {
         "nid": "431997137",
         "title": "여기가 그 유명한 한화에너지 금고 아님?ㅋㅋㅋㅋㅋㅋ",
+        "likes": 6
+      },
+      {
+        "nid": "431993832",
+        "title": "공장풀가동이랑 완판 기사",
         "likes": 6
       },
       {
@@ -902,8 +912,13 @@
         "likes": 6
       },
       {
-        "nid": "432010906",
-        "title": "외인 기관 공매넘들 똥줄타겠네",
+        "nid": "432012556",
+        "title": "이넘 혼자",
+        "likes": 5
+      },
+      {
+        "nid": "432011829",
+        "title": "이전같으면 마음대로 공매 때렸는데",
         "likes": 5
       },
       {
@@ -942,11 +957,6 @@
         "likes": 5
       },
       {
-        "nid": "431993832",
-        "title": "공장풀가동이랑 완판 기사",
-        "likes": 5
-      },
-      {
         "nid": "431993774",
         "title": "한화는 말이 대기업이지",
         "likes": 5
@@ -955,22 +965,12 @@
         "nid": "431991378",
         "title": "내년이 본게임",
         "likes": 5
-      },
-      {
-        "nid": "432011829",
-        "title": "이전같으면 마음대로 공매 때렸는데",
-        "likes": 4
-      },
-      {
-        "nid": "432011611",
-        "title": "대차가 어케 이리 많이되냐 ㄷㄷ",
-        "likes": 4
       }
     ],
     "sparkline_price": [
-      23950,
       24050,
-      24000
+      24000,
+      23900
     ],
     "range_history": [
       33550,
@@ -1016,8 +1016,8 @@
       145300386600,
       149482116750
     ],
-    "tick_power": 86.79,
-    "bid_ask_ratio": 0.5111228630881897,
+    "tick_power": 85.8,
+    "bid_ask_ratio": 0.8568478149024681,
     "frgn_fake_ntby_qty": -51000,
     "orgn_fake_ntby_qty": -12000,
     "sum_fake_ntby_qty": -63000,
@@ -1031,35 +1031,35 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -7.11,
+    "per": -7.08,
     "pbr": 0.5,
     "eps": -3377,
     "bps": 47898,
     "w52_hgpr": 59300,
     "w52_lwpr": 21100,
-    "mkt_cap": 53974,
+    "mkt_cap": 53749,
     "keywords": [
-      "태양광",
+      "유가 폭락",
       "공매도",
       "순차입금"
     ],
     "sparkline_posts": [
-      157,
       156,
-      160
+      160,
+      168
     ],
-    "avg_posts": 157.7,
-    "total_posts": 473
+    "avg_posts": 161.3,
+    "total_posts": 484
   },
   {
     "code": "034020",
     "name": "두산에너빌리티",
     "market": "KOSPI",
-    "price": 46500,
-    "recent_posts_count": 185,
-    "unique_posters": 116,
+    "price": 46350,
+    "recent_posts_count": 195,
+    "unique_posters": 121,
     "fact_score": 0.4,
-    "total_likes": 589,
+    "total_likes": 672,
     "foreign_rate": 22.4,
     "foreign_change": 0.23,
     "inst_net_buy": 50979,
@@ -1068,16 +1068,16 @@
     "day_high": 46700,
     "day_low": 45100,
     "prev_foreign_rate": 22.17,
-    "posts_summary": "미국 SMR 부품 수주 및 텍사스 발전소 건설 등 구체적인 계약 및 일감 확보 소식 기반. 전력 수요 증가 전망.",
-    "sentiment": "5",
+    "posts_summary": "미국 SMR 건설 허가 및 텍사스 가스발전 관련 대규모 투자 소식 기반 상승 기대. 외인 포지션 및 대차 잔고 주목.",
+    "sentiment": "4",
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "-0.96%",
+    "change_rate": "-1.28%",
     "signal": null,
-    "current_price": 46500,
-    "volume": 1704368,
-    "amount": 78397621775,
+    "current_price": 46350,
+    "volume": 1741669,
+    "amount": 80127819500,
     "posts": [
       {
         "nid": "431985772",
@@ -1118,6 +1118,11 @@
         "nid": "431989401",
         "title": "오늘 레드네. 양전된다",
         "likes": 9
+      },
+      {
+        "nid": "432013410",
+        "title": "내가 이걸산게. 한이다 한",
+        "likes": 8
       },
       {
         "nid": "432000345",
@@ -1175,6 +1180,11 @@
         "likes": 7
       },
       {
+        "nid": "432013610",
+        "title": "평단가 12만원입니다",
+        "likes": 6
+      },
+      {
         "nid": "432005458",
         "title": "U투브들",
         "likes": 6
@@ -1218,22 +1228,12 @@
         "nid": "431990709",
         "title": "어제의 양봉은",
         "likes": 6
-      },
-      {
-        "nid": "431990345",
-        "title": "기훈이는 아마 cpi일정도 몰랐을꺼임ㅋㅋㅋㅋㅋㅋㅋㅋㅋ",
-        "likes": 6
-      },
-      {
-        "nid": "431987809",
-        "title": "AI도 반도체도 전기없으면 아무것도 아니잔어요",
-        "likes": 6
       }
     ],
     "sparkline_price": [
-      46400,
       46500,
-      46500
+      46500,
+      46350
     ],
     "range_history": [
       68900,
@@ -1279,8 +1279,8 @@
       165363979750,
       149322871350
     ],
-    "tick_power": 106.89,
-    "bid_ask_ratio": 0.7796377371448193,
+    "tick_power": 105.47,
+    "bid_ask_ratio": 1.685036091060522,
     "frgn_fake_ntby_qty": -394000,
     "orgn_fake_ntby_qty": -117000,
     "sum_fake_ntby_qty": -511000,
@@ -1294,35 +1294,35 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 352.27,
-    "pbr": 3.83,
+    "per": 351.14,
+    "pbr": 3.81,
     "eps": 132,
     "bps": 12156,
     "w52_hgpr": 139200,
     "w52_lwpr": 42700,
-    "mkt_cap": 297861,
+    "mkt_cap": 296900,
     "keywords": [
       "SMR",
-      "원자력",
-      "미국 수주"
+      "대미 투자",
+      "외인 포지션"
     ],
     "sparkline_posts": [
-      166,
       180,
-      185
+      185,
+      195
     ],
-    "avg_posts": 177.0,
-    "total_posts": 531
+    "avg_posts": 186.7,
+    "total_posts": 560
   },
   {
     "code": "000660",
     "name": "SK하이닉스",
     "market": "KOSPI",
-    "price": 1266000,
+    "price": 1265000,
     "recent_posts_count": 800,
     "unique_posters": 448,
-    "fact_score": 0.4,
-    "total_likes": 1615,
+    "fact_score": 0.3,
+    "total_likes": 1593,
     "foreign_rate": 48.02,
     "foreign_change": 0.01,
     "inst_net_buy": -10640,
@@ -1331,31 +1331,31 @@
     "day_high": 1267000,
     "day_low": 1193000,
     "prev_foreign_rate": 48.01,
-    "posts_summary": "개인 투매 속 외인 및 기관의 매수세 유입, 선물 급등 등 긍정적 신호 포착. 130 이하 매수 기회 및 바닥론 제기. 글로벌 심사 통과 등 긍정적 뉴스 언급.",
+    "posts_summary": "개인 투매 속 외인 및 기관 매수세 유입으로 인한 반등 기대감 형성. 130 이하 매수 기회 및 150 목표 제시.",
     "sentiment": "5",
     "top_keywords": [],
     "consecutive_days": 2,
     "status": "활성",
-    "change_rate": "+4.46%",
+    "change_rate": "+4.37%",
     "signal": null,
-    "current_price": 1266000,
-    "volume": 1619177,
-    "amount": 1992501641000,
+    "current_price": 1265000,
+    "volume": 1678156,
+    "amount": 2067071421500,
     "posts": [
       {
         "nid": "432006227",
         "title": "개인투매계속나오네 이주식은 잘갈듯",
-        "likes": 11
+        "likes": 13
       },
       {
         "nid": "431998299",
         "title": "코스피 긍정 & 부정적인 요인 ",
-        "likes": 11
+        "likes": 12
       },
       {
         "nid": "432011496",
         "title": "▶▶▶11월 250만원 목표, 12월은",
-        "likes": 9
+        "likes": 10
       },
       {
         "nid": "432004655",
@@ -1448,6 +1448,16 @@
         "likes": 7
       },
       {
+        "nid": "432012847",
+        "title": "150 160 ",
+        "likes": 6
+      },
+      {
+        "nid": "432012108",
+        "title": "오늘",
+        "likes": 6
+      },
+      {
         "nid": "432010193",
         "title": "오늘 130 찍자.. 의외로 불기둥나올수도",
         "likes": 6
@@ -1481,22 +1491,12 @@
         "nid": "432002217",
         "title": "오늘 악재뜨지않는이상 급락 절대없을거라 생각",
         "likes": 6
-      },
-      {
-        "nid": "432000958",
-        "title": "글로벌 심사기관  보안.안전성 합격",
-        "likes": 6
-      },
-      {
-        "nid": "431996003",
-        "title": "윤석렬   계엄때보다   이익 대비 주가가  훨씬  안좋아  ",
-        "likes": 6
       }
     ],
     "sparkline_price": [
-      1249000,
       1258000,
-      1266000
+      1266000,
+      1265000
     ],
     "range_history": [
       1425000,
@@ -1542,8 +1542,8 @@
       4884077985000,
       4096826956000
     ],
-    "tick_power": 124.14,
-    "bid_ask_ratio": 2.864488636363636,
+    "tick_power": 123.04,
+    "bid_ask_ratio": 3.7238275698720984,
     "frgn_fake_ntby_qty": 35000,
     "orgn_fake_ntby_qty": 8000,
     "sum_fake_ntby_qty": 43000,
@@ -1557,17 +1557,17 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 21.47,
+    "per": 21.46,
     "pbr": 7.37,
     "eps": 58955,
     "bps": 171751,
     "w52_hgpr": 2987000,
     "w52_lwpr": 501000,
-    "mkt_cap": 9248033,
+    "mkt_cap": 9240728,
     "keywords": [
       "외인 매수",
       "기관 매수",
-      "바닥론"
+      "반등 기대"
     ],
     "sparkline_posts": [
       800,
@@ -1581,12 +1581,12 @@
     "code": "003495",
     "name": "대한항공우",
     "market": "KOSPI",
-    "price": 29550,
-    "recent_posts_count": 84,
-    "unique_posters": 49,
+    "price": 30950,
+    "recent_posts_count": 86,
+    "unique_posters": 51,
     "fact_score": 0.1,
-    "total_likes": 182,
-    "foreign_rate": 3.11,
+    "total_likes": 186,
+    "foreign_rate": 3.09,
     "foreign_change": -0.44,
     "inst_net_buy": -2832,
     "prev_close": 38150,
@@ -1599,16 +1599,16 @@
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "-22.54%",
+    "change_rate": "-18.87%",
     "signal": null,
-    "current_price": 29550,
-    "volume": 1582167,
-    "amount": 60888173625,
+    "current_price": 30950,
+    "volume": 1599273,
+    "amount": 61405093425,
     "posts": [
       {
         "nid": "431993500",
         "title": "예언하나할까? 오늘 대공우 마전한다 ",
-        "likes": 11
+        "likes": 12
       },
       {
         "nid": "432004269",
@@ -1619,6 +1619,11 @@
         "nid": "432000226",
         "title": "하 단타 치려다 망했네",
         "likes": 6
+      },
+      {
+        "nid": "432009337",
+        "title": "하한가에 30만주이상은 쌓아야",
+        "likes": 5
       },
       {
         "nid": "432007739",
@@ -1646,6 +1651,11 @@
         "likes": 5
       },
       {
+        "nid": "432012502",
+        "title": "오후에 빨간불 들어온다. 이글이 성지가 된다",
+        "likes": 4
+      },
+      {
         "nid": "432010362",
         "title": "무서워서 주식하겠냐 진짜 ",
         "likes": 4
@@ -1653,11 +1663,6 @@
       {
         "nid": "432009467",
         "title": "30850 1000만원 진입",
-        "likes": 4
-      },
-      {
-        "nid": "432009337",
-        "title": "하한가에 30만주이상은 쌓아야",
         "likes": 4
       },
       {
@@ -1706,11 +1711,6 @@
         "likes": 4
       },
       {
-        "nid": "432012502",
-        "title": "오후에 빨간불 들어온다. 이글이 성지가 된다",
-        "likes": 3
-      },
-      {
         "nid": "432009297",
         "title": "와 진짜 그냥 세력 놀이터였네 물려도 제대로 물렸네 하",
         "likes": 3
@@ -1757,9 +1757,9 @@
       }
     ],
     "sparkline_price": [
-      29150,
       29450,
-      29550
+      29550,
+      30950
     ],
     "range_history": [
       21550,
@@ -1805,8 +1805,8 @@
       7471013150,
       12185110000
     ],
-    "tick_power": 78.75,
-    "bid_ask_ratio": 0.6226415094339622,
+    "tick_power": 79.28,
+    "bid_ask_ratio": 1.3352685050798259,
     "frgn_fake_ntby_qty": 0,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": 0,
@@ -1826,7 +1826,7 @@
     "bps": 0,
     "w52_hgpr": 47500,
     "w52_lwpr": 20200,
-    "mkt_cap": 328,
+    "mkt_cap": 344,
     "keywords": [
       "우선주",
       "하한가",
@@ -1834,10 +1834,10 @@
     ],
     "sparkline_posts": [
       83,
-      83,
-      84
+      84,
+      86
     ],
-    "avg_posts": 83.3,
-    "total_posts": 250
+    "avg_posts": 84.3,
+    "total_posts": 253
   }
 ]

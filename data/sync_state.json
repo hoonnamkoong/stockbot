@@ -27,6 +27,16 @@
       "code": "009830",
       "name": "한화솔루션",
       "rank": 5
+    },
+    {
+      "code": "328130",
+      "name": "루닛",
+      "rank": 1
+    },
+    {
+      "code": "267850",
+      "name": "아시아나IDT",
+      "rank": 2
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +44,9 @@
     "047040",
     "034020",
     "005930",
-    "009830"
+    "009830",
+    "328130",
+    "267850"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +75,18 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "328130",
+      "name": "루닛",
+      "rank": 1
+    },
+    {
+      "code": "267850",
+      "name": "아시아나IDT",
+      "rank": 2
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

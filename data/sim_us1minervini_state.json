@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 5166.771999999994,
-  "invested": 14879.805,
+  "cash": 1422.6919999999936,
+  "invested": 18623.885000000002,
   "portfolio": {
     "MNST": {
       "name": "Monster Beverage Corporation",
@@ -16,7 +16,7 @@
       "quantity": 72,
       "avg_price": 53.19,
       "entry_date": "2026-11-05",
-      "peak_price": 54.685,
+      "peak_price": 55.44,
       "is_scaled_out": false
     },
     "RGA": {
@@ -33,6 +33,14 @@
       "avg_price": 122.54,
       "entry_date": "2026-11-11",
       "peak_price": 122.54,
+      "is_scaled_out": false
+    },
+    "NDAQ": {
+      "name": "Nasdaq, Inc. Common Stock",
+      "quantity": 34,
+      "avg_price": 110.12,
+      "entry_date": "2026-11-12",
+      "peak_price": 110.12,
       "is_scaled_out": false
     }
   },
@@ -91,31 +99,31 @@
     "CVX": "2026-11-10"
   },
   "raw_stats": {
-    "cash": 5166.771999999994,
-    "total_asset": 19891.356999999993,
-    "profit_rate": -0.5432150000000365,
-    "holdings_count": 4,
+    "cash": 1422.6919999999936,
+    "total_asset": 19904.051999999996,
+    "profit_rate": -0.4797400000000198,
+    "holdings_count": 5,
     "win_rate": 33.33333333333333,
     "profit_factor": 1.0523540405838356,
-    "mdd": 14.533547633683927,
-    "turnover": 4.1846495,
-    "frequency": 0.2857142857142857,
+    "mdd": 14.479001500265746,
+    "turnover": 4.3718535,
+    "frequency": 0.2948717948717949,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "MNST": 45.425,
-      "IOT": 41.33,
-      "RGA": 274.455,
-      "HNGE": 122.54,
-      "NDAQ": 109.345,
-      "FAST": 54.685,
-      "VEEV": 305.78
+      "IOT": 42.03,
+      "VEEV": 307.33,
+      "FAST": 55.44,
+      "MNST": 45.195,
+      "HNGE": 122.28,
+      "RGA": 273.23,
+      "NDAQ": 110.12
     }
   },
   "normalized_stats": {
     "승률": 33.33333333333333,
     "수익팩터": 21.047080811676715,
-    "MDD": 56.399357098948215,
-    "거래빈도": 1.4285714285714284,
-    "자본회전율": 8.369299
+    "MDD": 56.56299549920276,
+    "거래빈도": 1.4743589743589745,
+    "자본회전율": 8.743707
   }
 }

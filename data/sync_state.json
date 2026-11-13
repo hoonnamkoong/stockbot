@@ -27,6 +27,31 @@
       "code": "263860",
       "name": "지니언스",
       "rank": 5
+    },
+    {
+      "code": "024840",
+      "name": "KBI메탈",
+      "rank": 1
+    },
+    {
+      "code": "007810",
+      "name": "코리아써키트",
+      "rank": 2
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 3
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 4
+    },
+    {
+      "code": "009830",
+      "name": "한화솔루션",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "028050",
     "328130",
     "002990",
-    "263860"
+    "263860",
+    "024840",
+    "007810",
+    "005930",
+    "034020",
+    "009830"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "024840",
+      "name": "KBI메탈",
+      "rank": 1
+    },
+    {
+      "code": "007810",
+      "name": "코리아써키트",
+      "rank": 2
+    },
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "rank": 3
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "rank": 4
+    },
+    {
+      "code": "009830",
+      "name": "한화솔루션",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

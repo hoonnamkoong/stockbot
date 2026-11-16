@@ -5,7 +5,7 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "대통령 및 정부 정책에 대한 강한 불만 표출. 시장 부양 실패 및 경제 상황 악화에 대한 비판.",
+        "posts_summary": "정치적 비난과 함께 투자 실패를 정부 탓으로 돌리는 내용.",
         "sentiment": "-8",
         "keywords": []
       }
@@ -14,13 +14,9 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "SK하이닉스, 정부 정책 및 정치적 상황에 대한 불만 표출. 반도체 시장 및 투자 손실에 대한 부정적 전망.",
+        "posts_summary": "정치적 불만과 함께 반도체 시장 및 개인 투자 손실에 대한 부정적 언급.",
         "sentiment": "-7",
-        "keywords": [
-          "반도체",
-          "AI",
-          "투자 손실"
-        ]
+        "keywords": []
       }
     },
     "006400": {
@@ -40,12 +36,11 @@
       "name": "영광와이케이엠씨",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "영광와이케이엠씨, 실적 급성장 및 빅테크 고객사 확보, ASML/코닝 공급망 진입 등 긍정적 전망 제시. 주가 상승 기대감.",
-        "sentiment": "5",
+        "posts_summary": "실적 성장 및 고객사 확보 기반의 상승 기대감과 함께 단기 급등 가능성 언급.",
+        "sentiment": "6",
         "keywords": [
-          "실적 급성장",
-          "고객사 확보",
-          "공급망"
+          "실적",
+          "고객사"
         ]
       }
     },
@@ -118,12 +113,11 @@
       "name": "LG씨엔에스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "LG CNS, Claude Enterprise 도입 계약 체결. 프리마켓 상승세와 지수 대비 강한 흐름으로 8만 돌파 기대감 있으나, 일부 게시글에서는 하락 및 개미 달라붙는 현상 언급.",
-        "sentiment": "3",
+        "posts_summary": "프리마켓 상승 및 시장 대비 강한 흐름 속 8만 돌파 기대감.",
+        "sentiment": "2",
         "keywords": [
-          "LG CNS",
-          "Claude Enterprise",
-          "계약"
+          "시장",
+          "흐름"
         ]
       }
     },
@@ -157,12 +151,11 @@
       "name": "넥스아이",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "신규주 상장 후 주가 하락에 대한 부정적 의견 및 기업 평가 의문 제기.",
-        "sentiment": "-5",
+        "posts_summary": "공모가 대비 낮은 주가와 신규 상장주 부진 속 하락 가능성 언급.",
+        "sentiment": "-3",
         "keywords": [
-          "신규주",
-          "상장",
-          "주가하락"
+          "공모가",
+          "신규상장"
         ]
       }
     },
@@ -183,12 +176,11 @@
       "name": "아리바이오랩",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "아리바이오랩, 임상 3상 탑라인 수령 및 상업화 계약 성사 등 긍정적 뉴스 공유. 조단위 시총 및 주가 상승 기대.",
-        "sentiment": "6",
+        "posts_summary": "임상 결과 발표 및 상업화 계약 기반의 가파른 주가 상승 전망.",
+        "sentiment": "7",
         "keywords": [
-          "임상 3상",
-          "상업화 계약",
-          "주가 상승"
+          "임상",
+          "상업화"
         ]
       }
     },

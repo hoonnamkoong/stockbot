@@ -5,8 +5,8 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "이재명 대표 및 정부 정책에 대한 강한 비판. 주식 시장 조작 의혹 제기. 공매도 금지 요구.",
-        "sentiment": "-7",
+        "posts_summary": "정치적 불만 표출 및 정부 정책 비판. 금융위기 및 주가 하락 책임 전가.",
+        "sentiment": "-9",
         "keywords": []
       }
     },
@@ -14,11 +14,10 @@
       "name": "옵토닉스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "신규주로서의 높은 기대감. 단기 급등 가능성 언급 및 매수 의견 제시. 스페이스엑스 관련 루머.",
-        "sentiment": "3",
+        "posts_summary": "신규 상장주 관련 기대감 표출. 주가 상승 및 변동성에 대한 언급.",
+        "sentiment": "5",
         "keywords": [
-          "신규주",
-          "급등"
+          "신규주"
         ]
       }
     },
@@ -39,8 +38,8 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "대통령 및 정부 정책에 대한 강한 불만 표출. 부동산 매수를 통한 주식 투자 권유. 공매도 금지 촉구.",
-        "sentiment": "-7",
+        "posts_summary": "정치적 불만 표출 및 정부 정책 비판. 공매도 금지 촉구.",
+        "sentiment": "-9",
         "keywords": []
       }
     },
@@ -48,9 +47,11 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 및 시장 상황에 대한 불만. 공매도 비판 및 증안펀드, 공매도 금지 요구.",
-        "sentiment": "-6",
-        "keywords": []
+        "posts_summary": "정치적 불만 표출 및 공매도 관련 비판. 체코 원전 주기기 수주 관련 언급.",
+        "sentiment": "-8",
+        "keywords": [
+          "체코 원전"
+        ]
       }
     },
     "005500": {
@@ -69,12 +70,11 @@
       "name": "아리바이오랩",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "치매 신약 AR1001의 3상 임상 1차 평가 목표 달성 및 미국 FDA 허가 추진. 뉴스 왜곡 및 주가 조작 의혹 제기.",
-        "sentiment": "5",
+        "posts_summary": "치매 신약 임상 3상 성공에 대한 긍정적 평가 및 기대감. FDA 허가 추진 관련 뉴스 인용.",
+        "sentiment": "3",
         "keywords": [
-          "임상",
-          "FDA",
-          "치매 신약"
+          "치매 신약",
+          "임상 3상"
         ]
       }
     },
@@ -159,12 +159,11 @@
       "name": "지슨",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "AI 부정행위 탐지 장비 개발 완료 및 양산 소식. 국내 유일 기술력 부각 및 주가 상승 기대.",
+        "posts_summary": "AI 부정행위 탐지 장비 개발 완료 및 양산 기대. 시험 보안 및 통신 탐지 기술 관련 뉴스 언급.",
         "sentiment": "6",
         "keywords": [
           "AI",
-          "부정행위 탐지",
-          "기술력"
+          "부정행위 탐지"
         ]
       }
     },
@@ -198,12 +197,11 @@
       "name": "세미파이브",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "HBM 및 3D-IC 기술력에 대한 높은 평가. 한국판 엔비디아 가능성 및 폭발적인 도입 문의 언급. 삼성전자 부사장 긍정적 평가.",
-        "sentiment": "6",
+        "posts_summary": "AI 반도체 기술력 및 HBM 없는 AI 반도체 개발에 대한 긍정적 전망. 삼성전자 부사장 언급 인용.",
+        "sentiment": "5",
         "keywords": [
-          "HBM",
-          "3D-IC",
-          "AI 반도체"
+          "AI 반도체",
+          "HBM"
         ]
       }
     },
@@ -224,8 +222,8 @@
       "name": "한국전력",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 및 민주당에 대한 비판. 주가 하락 및 공매도 관련 불만 표출. 전기 요금 인상 기대.",
-        "sentiment": "-5",
+        "posts_summary": "정치적 불만 표출 및 현 정부 비판. 주가 하락 및 전기요금 인상 관련 언급.",
+        "sentiment": "-8",
         "keywords": []
       }
     },

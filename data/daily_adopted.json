@@ -1,210 +1,23 @@
 {
-  "date": "20261116",
+  "date": "20261117",
   "stocks": {
-    "005930": {
-      "name": "삼성전자",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "정부 정책 및 특정 정치인에 대한 강한 불만 표출.",
-        "sentiment": "-5",
-        "keywords": [
-          "정부 정책",
-          "정치인 비판"
-        ]
-      }
-    },
     "000660": {
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 이슈와 연계된 부정적 전망 및 정부 정책 비판.",
-        "sentiment": "-6",
-        "keywords": [
-          "정치적 이슈",
-          "공매도",
-          "정부 비판"
-        ]
+        "posts_summary": "전반적으로 부정적인 정치적 언급이 많으며, 시장 하락에 대한 불만 표출.",
+        "sentiment": "-5",
+        "keywords": []
       }
     },
-    "006400": {
-      "name": "삼성SDI",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "삼성SDI의 수조원대 ESS 배터리 수주 소식과 LFP 시장 공략 본격화에 대한 긍정적 전망.",
-        "sentiment": "3",
-        "keywords": [
-          "수주",
-          "ESS",
-          "LFP"
-        ]
-      }
-    },
-    "345290": {
-      "name": "영광와이케이엠씨",
+    "493260": {
+      "name": "옵토닉스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "실적 급성장 및 빅테크 고객사 확보 언급, 단기 급등 기대.",
-        "sentiment": "2",
-        "keywords": [
-          "실적 급성장",
-          "고객사 확보",
-          "신규 상장주"
-        ]
-      }
-    },
-    "190510": {
-      "name": "나무가",
-      "market": "KOSDAQ",
-      "ai": {
-        "posts_summary": "카메라 및 AI 관련 긍정적인 뉴스 언급에도 불구하고, 개인 투자자에게 떠넘기는 듯한 움직임 및 주가 하락에 대한 불만 표출.",
+        "posts_summary": "신규 상장주에 대한 경고와 함께 높은 변동성에 대한 우려 표출.",
         "sentiment": "-3",
         "keywords": [
-          "AI",
-          "초소형 카메라",
-          "주가 하락"
-        ]
-      }
-    },
-    "034020": {
-      "name": "두산에너빌리티",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "공매도에 대한 비판과 함께 정치적 요인으로 인한 주가 하락 및 시장 불안 심리 확산, 부정적 전망이 주를 이룸.",
-        "sentiment": "-7",
-        "keywords": [
-          "공매도",
-          "주가 하락",
-          "시장 불안"
-        ]
-      }
-    },
-    "002990": {
-      "name": "금호건설",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "대규모 증설 및 투자 협약 언급, 일부 긍정적 전망 제시.",
-        "sentiment": "0",
-        "keywords": [
-          "증설",
-          "투자 협약",
-          "흑자 전환"
-        ]
-      }
-    },
-    "047040": {
-      "name": "대우건설",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "원전 사업 및 외인 매집 긍정적 전망과 공매도 문제 제기.",
-        "sentiment": "2",
-        "keywords": [
-          "원전",
-          "외인 매집",
-          "공매도"
-        ]
-      }
-    },
-    "009830": {
-      "name": "한화솔루션",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "미국 태양광 사업 호재 언급, 그러나 주가 하락 및 매물 관련 우려 제기.",
-        "sentiment": "-3",
-        "keywords": [
-          "태양광",
-          "현지 공급망",
-          "악성 매물"
-        ]
-      }
-    },
-    "064400": {
-      "name": "LG씨엔에스",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "프리마켓 상승 예상 및 8만/9만원대 돌파 기대감. 지수 하락 대비 선방하는 흐름 속에 Anthropic 'Claude Enterprise' 도입 계약 체결 소식.",
-        "sentiment": "1",
-        "keywords": [
-          "AI",
-          "클라우드",
-          "주가 방어"
-        ]
-      }
-    },
-    "263860": {
-      "name": "지니언스",
-      "market": "KOSDAQ",
-      "ai": {
-        "posts_summary": "보안 관련 긍정적인 전망과 함께 신고가 및 상승 추세 언급. 외국인 매도에도 불구하고 주가 상승 가능성에 주목.",
-        "sentiment": "2",
-        "keywords": [
-          "보안",
-          "신고가",
-          "정보 전쟁"
-        ]
-      }
-    },
-    "024840": {
-      "name": "KBI메탈",
-      "market": "KOSDAQ",
-      "ai": {
-        "posts_summary": "3분기 흑자전환 및 전력주 테마 관련 긍정적 요인과 주가 하락 경고.",
-        "sentiment": "-2",
-        "keywords": [
-          "흑자전환",
-          "전력주",
-          "주가 하락"
-        ]
-      }
-    },
-    "493410": {
-      "name": "넥스아이",
-      "market": "KOSDAQ",
-      "ai": {
-        "posts_summary": "넥스아이, Pre IPO 단가 및 사모펀드/기존 투자자 관련 언급. 기업 평가 방식 및 주가 하락 우려 제기. LO 성공 이력 언급.",
-        "sentiment": "-2",
-        "keywords": [
-          "Pre IPO",
-          "기업 평가",
-          "LO 성공"
-        ]
-      }
-    },
-    "003010": {
-      "name": "혜인",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "급격한 주가 하락과 실적 부진에 대한 부정적 전망.",
-        "sentiment": "-8",
-        "keywords": [
-          "주가 하락",
-          "실적 부진",
-          "하한가"
-        ]
-      }
-    },
-    "261780": {
-      "name": "아리바이오랩",
-      "market": "KOSDAQ",
-      "ai": {
-        "posts_summary": "임상 결과 발표 임박, 긍정적 결과 기대 및 기술 이전 가능성 시사.",
-        "sentiment": "5",
-        "keywords": [
-          "임상 결과",
-          "발표",
-          "기술 이전"
-        ]
-      }
-    },
-    "028050": {
-      "name": "삼성E&A",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "수주 및 실적 기대감과 내부거래 의혹 등 복합적인 분석.",
-        "sentiment": "0",
-        "keywords": [
-          "수주",
-          "실적",
-          "내부거래"
+          "신규상장주"
         ]
       }
     },
@@ -212,25 +25,11 @@
       "name": "아리바이오홀딩스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "거래 정지 상태, 정보 유출 및 주가 하락 관련 논란.",
-        "sentiment": "-4",
+        "posts_summary": "임상 3상 단독군 성공에 대한 긍정적인 전망과 연구진 감사 언급.",
+        "sentiment": "8",
         "keywords": [
-          "거래 정지",
-          "정보 유출",
-          "주가 하락"
-        ]
-      }
-    },
-    "015760": {
-      "name": "한국전력",
-      "market": "KOSPI",
-      "ai": {
-        "posts_summary": "정치 상황 및 정부 정책에 대한 강한 비판과 함께, 한국전력의 재무 상태 및 주가 하락에 대한 우려 표출. PBR 지표 및 과거 투자 경험 언급.",
-        "sentiment": "-7",
-        "keywords": [
-          "정부",
-          "재무 상태",
-          "주가"
+          "임상성공",
+          "단독군"
         ]
       }
     }

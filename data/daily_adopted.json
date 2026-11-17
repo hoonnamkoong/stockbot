@@ -5,23 +5,19 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 정책 및 연기금 운용 비판, 개인 투자자 손실 우려 속 일부 긍정적 전망 혼재.",
+        "posts_summary": "정부 및 연기금의 시장 개입 비판과 함께 개미 투자자들의 손실 가중 우려. 공매도 금지 및 시장 안정화 요구.",
         "sentiment": "-7",
-        "keywords": [
-          "연기금",
-          "공매도"
-        ]
+        "keywords": []
       }
     },
     "493260": {
       "name": "옵토닉스",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "신규주 급등에 대한 기대감과 주의, 주포의 영향력 언급 및 정치적 이슈 연관성 제기.",
-        "sentiment": "6",
+        "posts_summary": "신규주 급등 및 급락 반복 속에서 주포의 움직임 주목. 스페이스엑스 연관성 및 기술력에 대한 기대감 혼재.",
+        "sentiment": "3",
         "keywords": [
-          "신규주",
-          "주포"
+          "신규주"
         ]
       }
     },
@@ -42,7 +38,7 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "전 정부 정책 비판 및 현 정부 정치적 논쟁으로 인한 주가 하락 및 불만 제기.",
+        "posts_summary": "현 정부의 경제 정책 실패로 인한 주가 하락 및 해외 자금 유출 비판. 공매도 금지 및 증안펀드 도입 촉구.",
         "sentiment": "-8",
         "keywords": []
       }
@@ -64,12 +60,10 @@
       "name": "삼진제약",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "아리바이오 임상 3상 결과에 대한 해석 차이 및 논란, 단독 투여군 결과의 유의미성 쟁점.",
-        "sentiment": "-4",
+        "posts_summary": "아리바이오 임상 3상 결과에 대한 해석 차이 및 주가 영향 불확실성. 경영진 책임 및 FDA 승인 여부 주목.",
+        "sentiment": "-3",
         "keywords": [
-          "임상 3상",
-          "아리바이오",
-          "결과 해석"
+          "임상3상"
         ]
       }
     },
@@ -102,12 +96,10 @@
       "name": "아난티",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "북미 정상회담 가능성에 따른 기대감 표출. 김정은, 트럼프 언급 및 관련 뉴스 인용.",
+        "posts_summary": "북미 정상회담 관련 기대감에 따른 주가 변동 가능성 언급. 프로그램 매매 동향 및 정상회담 결과 주목.",
         "sentiment": "4",
         "keywords": [
-          "북미 정상회담",
-          "김정은",
-          "트럼프"
+          "정상회담"
         ]
       }
     },
@@ -128,11 +120,10 @@
       "name": "영광와이케이엠씨",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "차세대 HBM 핵심 부품 개발 완료 및 글로벌 기업 ASML과의 협력 기반 첨단 반도체 장비 시장 공략 전망.",
-        "sentiment": "7",
+        "posts_summary": "차세대 HBM 핵심 부품 개발 완료 및 ASML EUV 장비 공급 기반으로 첨단 반도체 시장 공략 기대. 수급 개선 및 1만원 돌파 전망.",
+        "sentiment": "5",
         "keywords": [
           "HBM",
-          "ASML",
           "EUV"
         ]
       }
@@ -191,24 +182,20 @@
       "name": "한화솔루션",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "회사 경영진 비판 및 주가 하락에 대한 불만 표출, 공매도 금지 청원 언급.",
-        "sentiment": "-9",
-        "keywords": [
-          "금감원",
-          "공매도"
-        ]
+        "posts_summary": "주가 하락에 대한 불만 표출 및 회사 경영진 책임론 제기. 향후 기업 설명회 개최 및 구조조정 요구.",
+        "sentiment": "-6",
+        "keywords": []
       }
     },
     "490470": {
       "name": "세미파이브",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "3D-IC 기술 기반 HBM 시장의 혁신과 성장 잠재력 분석. 제2 엔비디아 가능성 및 기술 우위 강조.",
-        "sentiment": "5",
+        "posts_summary": "HBM 및 3D-IC 기술 기반 AI 반도체 시장 선도 전망. 하이닉스 사례 비교 및 제2 엔비디아 가능성 언급.",
+        "sentiment": "7",
         "keywords": [
-          "3D-IC",
           "HBM",
-          "AI 반도체"
+          "3D-IC"
         ]
       }
     },

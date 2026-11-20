@@ -5,8 +5,8 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "대통령 및 정부 정책 비판과 주가 하락 연관성 언급. 이재명 관련 정치적 비난 다수 포함.",
-        "sentiment": "-8",
+        "posts_summary": "정치적 논란과 경제 상황에 대한 불만 토로.",
+        "sentiment": "-8.5",
         "keywords": []
       }
     },
@@ -14,8 +14,8 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치인 및 정당 책임론과 주가 하락 연관성 언급. 이재명, 민주당 관련 부정적 내용 다수 포함.",
-        "sentiment": "-8",
+        "posts_summary": "정치적 불만과 경제 상황에 대한 비판.",
+        "sentiment": "-8.0",
         "keywords": []
       }
     },
@@ -23,13 +23,9 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 정책 및 금융 시장 상황에 대한 극심한 불만 표출. 주가 하락에 대한 불안감과 원전 수주 관련 의문 제기.",
-        "sentiment": "-8",
-        "keywords": [
-          "공매도 금지",
-          "금융 시장",
-          "원전 수주"
-        ]
+        "posts_summary": "정치 상황과 경제 정책에 대한 불만 및 주식 시장에 대한 비관론.",
+        "sentiment": "-7.5",
+        "keywords": []
       }
     },
     "010170": {
@@ -73,12 +69,12 @@
       "name": "SK텔레콤",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "엔트로픽 투자 관련 불확실성 속 주가 하락 및 국장 시장에 대한 불신.",
-        "sentiment": "-3",
+        "posts_summary": "엔트로픽 투자 및 상장 관련 투자자들의 혼란과 손실 경험.",
+        "sentiment": "-4.0",
         "keywords": [
           "엔트로픽",
           "투자",
-          "국장"
+          "상장"
         ]
       }
     },
@@ -98,11 +94,12 @@
       "name": "아리바이오랩",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "아리바이오+아리바이오랩 합병 및 지분구조 재편 언급. 스턴메디칼과 바디필러 공급계약 체결.",
-        "sentiment": "1",
+        "posts_summary": "아리바이오, 스턴메디칼과의 대규모 공급 계약 및 AR1001 임상 3상 관련 긍정적 전망.",
+        "sentiment": "3.5",
         "keywords": [
-          "합병",
-          "공급계약"
+          "AR1001",
+          "임상 3상",
+          "바디필러"
         ]
       }
     },
@@ -110,11 +107,12 @@
       "name": "에이엘로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "신규 상장 직후 급락 및 주가 회복 불확실성 언급. 로봇주 전반의 하락세 및 적자 기업 투자 위험 경고.",
-        "sentiment": "-7",
+        "posts_summary": "신규 상장 후 급락에 대한 투자자들의 실망과 비판.",
+        "sentiment": "-7.0",
         "keywords": [
           "신규 상장",
-          "적자"
+          "로봇주",
+          "급락"
         ]
       }
     },
@@ -159,11 +157,11 @@
       "name": "지슨",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "전파 탐지기 사업 등 AI 반도체 관련 신규 시장 형성 및 독보적 기술력 기반의 폭등 전망.",
-        "sentiment": "7",
+        "posts_summary": "전파탐지기 사업 관련 신규 시장 형성 및 최대 수혜주로서의 기대감.",
+        "sentiment": "6.5",
         "keywords": [
+          "전파탐지기",
           "AI 반도체",
-          "전파 탐지기",
           "신규 시장"
         ]
       }
@@ -273,8 +271,8 @@
       "name": "바이오니아",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "RNAi 플랫폼 기반 기술이전 및 탈모화장품 시장 진출 기대감. 다만, 과거 사례 언급 및 계약 뉴스 부재로 사실 기반은 미흡.",
-        "sentiment": "5",
+        "posts_summary": "RNAi 플랫폼 기술이전 타진 및 탈모 화장품 시장 진출에 대한 기대감.",
+        "sentiment": "2.0",
         "keywords": [
           "RNAi",
           "기술이전",

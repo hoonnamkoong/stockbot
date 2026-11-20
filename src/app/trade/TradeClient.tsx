@@ -423,12 +423,17 @@ function TradeContent() {
                                 <Alert color="orange" variant="light" mb="md" title="누적 수익률이 실제와 어긋납니다">
                                     <Text size="sm">
                                         실계좌에서 사라졌지만 손익을 계상하지 못한 청산이 {programUnreconciled.length}건 있습니다.
-                                        체결가가 기록에 없어 손익을 계산할 수 없으므로, 아래 누적 수치에는 이 금액이 빠져 있습니다.
+                                        다음 매매 사이클이 한국투자증권 확정 실현손익으로 정산을 시도합니다 —
+                                        정산되면 이 알림은 사라집니다. 그때까지 아래 누적 수치에는 이 금액이 빠져 있습니다.
                                     </Text>
                                     <Stack gap={2} mt={6}>
                                         {programUnreconciled.map((u, i) => (
                                             <Text key={`${u.code}-${u.date}-${i}`} size="xs" c="dimmed">
-                                                {u.date} · {u.name}({u.code}) {u.quantity.toLocaleString()}주 ·
+                                                {/* 날짜는 매도일이 아니라 '사라진 걸 알아챈 날'이다. 프로그램이
+                                                    멈춰 있으면 둘이 벌어지므로(2026-11-06 매도 → 11-10 발견)
+                                                    아는 만큼만 적는다 — 모르는 날짜를 확정해 보여주지 않는다. */}
+                                                {u.since ? `${u.since} ~ ${u.detected_on ?? u.date} 사이` : `${u.date} 확인`} ·
+                                                {' '}{u.name === u.code ? u.code : `${u.name}(${u.code})`} {u.quantity.toLocaleString()}주 ·
                                                 매입원가 {Math.round(u.cost_basis).toLocaleString()}원 — 손익 미정산
                                             </Text>
                                         ))}

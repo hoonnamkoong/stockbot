@@ -5,8 +5,8 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "총선 결과 및 정부 정책에 대한 불만 표출.",
-        "sentiment": "-5",
+        "posts_summary": "정치적 이슈와 거시 경제 상황에 대한 강한 불만 표출.",
+        "sentiment": "-9",
         "keywords": []
       }
     },
@@ -14,8 +14,8 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 정책 및 특정 정치인에 대한 강한 비난.",
-        "sentiment": "-5",
+        "posts_summary": "정치 상황 및 정부 정책에 대한 강한 비판과 주가 하락에 대한 불만.",
+        "sentiment": "-9",
         "keywords": []
       }
     },
@@ -57,11 +57,11 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 정책 비판 및 건설주 전반의 하락세 언급. 해외 교량 및 터널 준공 실적 포함.",
-        "sentiment": "-6",
+        "posts_summary": "국가 경제 상황 및 정부 정책 비판 속 공매도 관련 언급.",
+        "sentiment": "-7",
         "keywords": [
-          "건설주",
-          "정책 비판"
+          "공매도",
+          "건설주"
         ]
       }
     },
@@ -82,12 +82,12 @@
       "name": "하나에어로",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "기관 매도 물량에 대한 우려와 기술적 반등 기대.",
-        "sentiment": "0",
+        "posts_summary": "기타법인 매도와 기관의 매도 관련 언급, 신규 상장주에 대한 회의적 시각.",
+        "sentiment": "-1",
         "keywords": [
-          "기관",
-          "매도",
-          "반등"
+          "기타법인",
+          "기관매도",
+          "신규상장주"
         ]
       }
     },
@@ -108,12 +108,12 @@
       "name": "에이엘로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "에이엘로봇은 신규 상장 후 급락에 대한 불만과 함께 회복 가능성에 대한 부정적인 전망이 우세하며, 일부에서는 상장 자체에 대한 의문을 제기하고 있습니다.",
-        "sentiment": "-8.0",
+        "posts_summary": "신규 상장주의 급락과 상장 폐지 가능성에 대한 우려, 정치적 언급.",
+        "sentiment": "-6",
         "keywords": [
-          "신규상장",
-          "급락",
-          "불만"
+          "신규상장주",
+          "로봇주",
+          "상폐"
         ]
       }
     },

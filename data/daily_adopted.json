@@ -5,26 +5,18 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 이슈와 연계된 주가 하락에 대한 불만.",
-        "sentiment": "-7",
-        "keywords": [
-          "정치",
-          "주가",
-          "하락"
-        ]
+        "posts_summary": "정치적 이슈에 대한 강한 불만 표출 및 정치인 비난.",
+        "sentiment": "-8",
+        "keywords": []
       }
     },
     "000660": {
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 정책 비판과 주가 하락에 대한 불만.",
-        "sentiment": "-7",
-        "keywords": [
-          "정부",
-          "주가",
-          "하락"
-        ]
+        "posts_summary": "정치적 이슈와 관련된 부정적인 감정 및 시장 하락에 대한 불만 표출.",
+        "sentiment": "-8",
+        "keywords": []
       }
     },
     "034020": {
@@ -44,12 +36,11 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "투자경고에도 불구하고 주가 강세, 외인 매수세 유입 및 실적 기대.",
-        "sentiment": "1",
+        "posts_summary": "시장 하락 속에서의 선방 및 보유 독려, 공매도 및 투자경고에 대한 언급.",
+        "sentiment": "3",
         "keywords": [
-          "투자경고",
-          "외인",
-          "실적"
+          "공매도",
+          "추세"
         ]
       }
     },
@@ -57,12 +48,11 @@
       "name": "HLB",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "합병 관련 부정적 전망 및 제2의 신라젠 비유. 간암 승인 시 합병 불필요 언급.",
-        "sentiment": "-8",
+        "posts_summary": "합병에 대한 강한 반대 의사와 함께 신라젠과의 비교 및 부정적인 전망.",
+        "sentiment": "-7",
         "keywords": [
           "합병",
-          "간암 승인",
-          "신라젠"
+          "재무"
         ]
       }
     },
@@ -70,12 +60,11 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "건설 사업 수주 성과에도 불구하고 주가 부진 및 정부 정책 비판.",
-        "sentiment": "-5",
+        "posts_summary": "정치 상황 비판과 함께 회사의 실적 및 수주에 대한 언급.",
+        "sentiment": "-6",
         "keywords": [
-          "수주",
-          "주가",
-          "정책"
+          "무차입공매도",
+          "수주"
         ]
       }
     },
@@ -96,12 +85,11 @@
       "name": "하나에어로",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "고가 신규 상장 종목에 대한 도박성 투기 경고 및 급등 기대.",
-        "sentiment": "1",
+        "posts_summary": "기타법인 매도에 따른 하락 우려와 함께 흑자기업 및 수주 기대감 표출.",
+        "sentiment": "2",
         "keywords": [
-          "신규상장",
-          "투기",
-          "급등"
+          "기타법인",
+          "흑자기업"
         ]
       }
     },
@@ -122,10 +110,9 @@
       "name": "에이엘로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "신규 상장주의 급락 및 공모주 시장 전반에 대한 부정적 인식. 주가 하락 지속 및 반등 가능성 희박 전망.",
+        "posts_summary": "상장 후 급락 및 공모주 시장에 대한 부정적인 전망.",
         "sentiment": "-7",
         "keywords": [
-          "신규상장주",
           "공모주",
           "급락"
         ]
@@ -148,12 +135,11 @@
       "name": "아난티",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "남북 대화 및 북미 정상 회담 관련 이벤트 종료 및 한한령 해제에 따른 기대감 혼재. 서양 관광객 증가 및 중국 대형 고객 유입 가능성 언급.",
-        "sentiment": "1",
+        "posts_summary": "정치적 이벤트 종료에 따른 하락 전망 및 한한령 해제에 대한 기대감.",
+        "sentiment": "-5",
         "keywords": [
-          "남북대화",
           "한한령",
-          "실적"
+          "이벤트"
         ]
       }
     },

@@ -13,7 +13,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.trade.realized_pnl import lookup_realized_pnl
+from src.trade.realized_pnl import (
+    lookup_realized_pnl, lookup_realized_pnl_range)
 
 CODE = '001210'
 DATE = '2026-08-12T15:29:21'
@@ -86,3 +87,53 @@ def test_bad_date_is_a_failure():
 
     assert ok is False
     assert got is None
+
+# ── 구간 조회 — 실제 매도일을 모를 때 ──────────────────────────────
+
+def test_range_groups_by_trade_date():
+    """수동 청산은 '언제 팔았는지'를 우리가 모른다. 창으로 물어 날짜를 받아온다."""
+    ok, rows = lookup_realized_pnl_range(
+        CODE, '20261101', '20261110',
+        request=_rows(_row(qty=2, amount=-5000.0, dt='20261106'),
+                      _row(qty=3, amount=+1500.0, dt='20261109')))
+
+    assert ok is True
+    assert rows == [{'date': '20261106', 'qty': 2, 'amount': -5000.0},
+                    {'date': '20261109', 'qty': 3, 'amount': 1500.0}]
+
+
+def test_range_sums_split_fills_on_the_same_day():
+    ok, rows = lookup_realized_pnl_range(
+        CODE, '20261101', '20261110',
+        request=_rows(_row(qty=2, amount=-100.0, dt='20261106'),
+                      _row(qty=5, amount=-250.0, dt='20261106')))
+
+    assert ok is True
+    assert rows == [{'date': '20261106', 'qty': 7, 'amount': -350.0}]
+
+
+def test_range_failure_is_not_an_empty_window():
+    ok, rows = lookup_realized_pnl_range(CODE, '20261101', '20261110',
+                                         request=lambda f, t, c: None)
+    assert (ok, rows) == (False, None)
+
+
+def test_range_empty_window_is_a_fact():
+    ok, rows = lookup_realized_pnl_range(CODE, '20261101', '20261110',
+                                         request=_rows())
+    assert (ok, rows) == (True, [])
+
+
+def test_range_unreadable_rows_are_a_failure_not_a_zero():
+    """매도 행은 있었는데 값을 못 읽었다 — '매도 없음'과 다르다."""
+    bad = {'pdno': CODE, 'trad_dt': '20261106', 'sll_qty': '', 'rlzt_pfls': None}
+    ok, rows = lookup_realized_pnl_range(CODE, '20261101', '20261110',
+                                         request=_rows(bad))
+    assert (ok, rows) == (False, None)
+
+
+def test_range_ignores_other_codes():
+    ok, rows = lookup_realized_pnl_range(
+        CODE, '20261101', '20261110',
+        request=_rows(_row(qty=9, amount=1.0, code='000000', dt='20261106')))
+    assert (ok, rows) == (True, [])

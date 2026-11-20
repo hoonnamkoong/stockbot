@@ -1078,6 +1078,16 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         return
     real_holdings = {h['code']: h for h in bal.get('holdings', []) if h.get('code')}
 
+    # 미정산 청산분을 KIS 확정 실현손익으로 닫는다. **예산 계산보다 먼저** 한다 —
+    # 정산 결과가 realized_pnl에 들어가고 그게 곧 effective_budget이다. 뒤에 두면
+    # 이번 사이클이 빠진 금액으로 주문 크기를 정한다. 미정산이 없으면 즉시 반환하므로
+    # 평소 경로에 비용이 없다. 여기서 바꾼 원장은 이 아래 어느 경로로 빠져나가도
+    # 저장된다(_release_payload가 원장 전체를 복사한다).
+    try:
+        settle_unreconciled_exits(ledger, log=log, log_error=log_error)
+    except Exception as e:
+        log_error(f'[Program] 미정산 청산 정산 실패(무시하고 계속): {e}')
+
     # [복리 반영] 프로그램 자체 실현손익(realized_pnl, 원장 누적)을 설정 budget에 더해
     # '이번 실행에서 실제 쓸 수 있는 예산(effective_budget)'을 만든다. 수익이 나면 다음
     # 실행부터 그 수익까지 포함해 굴리고(복리), 손실이 나면 그만큼 줄어든다(사용자 확정 설계).
@@ -1202,7 +1212,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                 return True       # 주문 자체는 나갔다. 되살리면 이중 매수가 된다.
             register_pending(ledger, code, odno, 'buy', qty, live_px or decided,
                              now_kst.isoformat(), tag=(ledger.get('turn') or {}).get('active_tag'),
-                             log_error=log_error)
+                             log_error=log_error, name=entry.get('name'))
             return True
 
         settle_pending_orders(
@@ -1422,14 +1432,16 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
                     if odno:
                         register_pending(ledger, code, odno, 'sell', qty, price,
                                          now_kst.isoformat(), avg_price=avg, tag=active_tag,
-                                         snapshot=pre_sell_snapshot, log_error=log_error)
+                                         snapshot=pre_sell_snapshot, log_error=log_error,
+                                         name=o.get('name'))
                 else:
                     # 매수는 원장에 넣지 않는다 — 체결 확인 후 다음 사이클
                     # (settle_pending_orders)에 들어간다. 여기서 넣으면 "주문 접수 =
                     # 체결"로 간주하던 옛 버그가 지정가에서 재발한다.
                     if odno:
                         register_pending(ledger, code, odno, 'buy', qty, limit_price,
-                                         now_kst.isoformat(), tag=active_tag, log_error=log_error)
+                                         now_kst.isoformat(), tag=active_tag, log_error=log_error,
+                                         name=o.get('name'))
                 append_order_history({
                     'executed_at': now_kst.isoformat(), 'side': side, 'code': code,
                     'name': o.get('name', ''), 'qty': qty, 'price': price,
@@ -1551,10 +1563,18 @@ def reconcile_positions(ledger: dict, real_holdings: dict, today: str, log_error
     좋아 보였다.
 
     체결가는 우리 기록에 없으므로 손익을 만들어 채우지 않는다. 매입원가만 적고
-    '미정산'으로 남겨 나중에 사람이 정산할 수 있게 한다.
+    '미정산'으로 남긴 뒤, `settle_unreconciled_exits`가 KIS 확정 실현손익으로 닫는다.
+
+    **`today`는 매도일이 아니라 발견일이다.** 둘은 프로그램이 멈춘 만큼 벌어진다
+    — 태스커가 멈춰 있으면 수동 매도를 며칠 뒤에야 알아챈다.
+    발견일 하나로 KIS에 물으면 0건이 나오므로, 정산이 쓸 **구간**을 함께 적는다:
+    `since`(마지막으로 완주한 날) ~ `detected_on`. `last_run`은 런 끝에서야
+    갱신되므로 여기서 읽는 값이 곧 직전 완주일이다. 없으면 적지 않는다 —
+    모르는 값을 지어내면 정산이 엉뚱한 구간을 뒤진다.
     """
     prev = ledger.get('positions', {}) or {}
     kept = {c: dict(p) for c, p in prev.items() if c in real_holdings}
+    since = str(ledger.get('last_run') or '')[:10]
 
     for code in prev:
         if code in kept:
@@ -1563,13 +1583,116 @@ def reconcile_positions(ledger: dict, real_holdings: dict, today: str, log_error
         qty = p.get('quantity', 0)
         avg = p.get('avg_price', 0)
         cost = round(float(avg) * float(qty), 2)
-        ledger.setdefault('unreconciled_exits', []).append({
+        rec = {
             'date': today, 'code': code, 'name': p.get('name', code),
             'quantity': qty, 'avg_price': avg, 'cost_basis': cost,
-        })
+            'detected_on': today,
+        }
+        if _ymd(since):
+            rec['since'] = since
+        ledger.setdefault('unreconciled_exits', []).append(rec)
         log_error(f"[Program] 원장에서 사라진 포지션 {code}({p.get('name', '?')}) "
                   f"{qty}주 매입원가 {cost:,.0f}원 — 실계좌에 없음. 손익 미계상(수동 매도 추정)")
     return kept
+
+
+def _ymd(value) -> str:
+    """'2026-01-02' / '2026-01-02T09:05:00' / '20260102' → '20260102'. 못 읽으면 ''."""
+    s = str(value or '')[:10].replace('-', '')
+    return s if len(s) == 8 and s.isdigit() else ''
+
+
+def _shift_ymd(ymd: str, days: int) -> str:
+    return (datetime.strptime(ymd, '%Y%m%d') + timedelta(days=days)).strftime('%Y%m%d')
+
+
+# `since`가 없는 옛 항목을 닫기 위한 되돌아보기 폭. 실제로 나흘 늦게 알아챈
+# 사례가 있고, 태스커가 멈추면 그보다 길어질 수 있다.
+EXIT_LOOKBACK_DAYS = 30
+
+
+def settle_unreconciled_exits(ledger: dict, lookup_range=None, log=print,
+                              log_error=print,
+                              lookback_days: int = EXIT_LOOKBACK_DAYS) -> int:
+    """미정산 청산분을 KIS 확정 실현손익으로 닫는다. 반환은 닫은 건수.
+
+    `reconcile_positions`는 사라진 포지션을 **적기만** 했다. 체결가가 우리 기록에
+    없다는 이유였는데(시장가 수동 매도는 history.json에 `price: 0`으로 박힌다),
+    한투에는 있다 — TTTC8715R이 종목·매매일별 확정 실현손익을 준다. 같은 조회를
+    `_sweep_stale_pending`이 이미 쓰고 있었고 여기만 연결이 없었다. 그래서
+    그래서 수동 청산분이 `realized_pnl`에서 통째로 빠진 채 화면에 경고만 떠
+    있었다.
+
+    **날짜 하나로 묻지 않는다.** 원장이 적는 날짜는 매도일이 아니라 사라진 걸
+    알아챈 날이다. 프로그램이 멈춰 있으면 둘이 벌어진다.
+    `since`(직전 완주일)부터 발견일까지의 **구간**을 묻고, 옛 항목처럼 `since`가
+    없으면 `lookback_days`만큼 되돌아본다.
+
+    수량으로 맞춘다. 딱 맞는 한 건이면 그것이고, 아니면 구간 합이 맞을 때만
+    받는다. 어느 쪽도 아니면 **고르지 않는다** — 틀린 정산은 미정산보다 나쁘다.
+    조회 실패도, '그 구간에 매도 없음'도 닫지 않는다. 후자는 다른 이유로 사라진
+    것(대체출고·합병 등)이라 0원으로 닫으면 없는 사실을 만든다.
+
+    실현손익만 더한다. 턴 비용(`fees_realized`)은 건드리지 않는다 — 턴 회계는
+    프로그램이 낸 주문의 것이고 이건 사람이 손으로 낸 매도다.
+    """
+    exits = ledger.get('unreconciled_exits') or []
+    if not exits:
+        return 0
+    if lookup_range is None:
+        from src.trade.realized_pnl import lookup_realized_pnl_range as lookup_range
+
+    kept, settled = [], 0
+    for e in exits:
+        code = str(e.get('code') or '')
+        try:
+            want = int(e.get('quantity') or 0)
+        except (TypeError, ValueError):
+            want = 0
+        to_d = _ymd(e.get('detected_on') or e.get('date'))
+        if not code or want <= 0 or not to_d:
+            kept.append(e)
+            log_error(f"[Program] 미정산 항목을 읽을 수 없습니다 — 그대로 둡니다: {e}")
+            continue
+        from_d = _ymd(e.get('since')) or _shift_ymd(to_d, -lookback_days)
+
+        ok, rows = lookup_range(code, from_d, to_d)
+        if not ok:
+            kept.append(e)
+            log_error(f"[Program] {code} 확정 실현손익 조회 실패({from_d}~{to_d}) "
+                      f"— 미정산으로 둡니다(모르는 채로 확정하지 않습니다).")
+            continue
+        if not rows:
+            kept.append(e)
+            log_error(f"[Program] {code} {from_d}~{to_d} 구간에 매도 기록이 없습니다 "
+                      f"— 매도가 아닌 사유로 사라졌을 수 있습니다. 사람이 봐야 합니다.")
+            continue
+
+        exact = [r for r in rows if r['qty'] == want]
+        if len(exact) == 1:
+            picked, amount = [exact[0]], exact[0]['amount']
+        elif sum(r['qty'] for r in rows) == want:
+            picked, amount = rows, sum(r['amount'] for r in rows)
+        else:
+            kept.append(e)
+            log_error(
+                f"[Program] {code} 수량이 맞는 매도를 특정하지 못했습니다 "
+                f"(원장 {want}주 vs 조회 {[(r['date'], r['qty']) for r in rows]}) "
+                f"— 미정산으로 둡니다.")
+            continue
+
+        ledger['realized_pnl'] = round(float(ledger.get('realized_pnl', 0)) + amount, 2)
+        settled += 1
+        when = '·'.join(r['date'] for r in picked)
+        log(f"[Program] 미정산 청산 정산 완료 — {code}({e.get('name', code)}) "
+            f"{want}주, 매도일 {when}, 확정 실현손익 {amount:,.0f}원 "
+            f"(누적 {ledger['realized_pnl']:,.0f}원)")
+
+    if kept:
+        ledger['unreconciled_exits'] = kept
+    else:
+        ledger.pop('unreconciled_exits', None)
+    return settled
 
 
 def _apply_order_to_positions(positions: dict, o: dict, today: str) -> None:

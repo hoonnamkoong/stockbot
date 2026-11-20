@@ -16,7 +16,8 @@ from src.trade.fees import realized_pnl_after_fees, roundtrip_cost
 
 
 def register_pending(ledger, code, odno, side, qty, price, ordered_at,
-                     avg_price=None, tag=None, snapshot=None, log_error=None):
+                     avg_price=None, tag=None, snapshot=None, log_error=None,
+                     name=None):
     """주문을 pending에 올린다. **종목당 1건** — 이미 있으면 덮어쓰지 않는다.
 
     덮어쓰면 먼저 낸 주문의 주문번호를 잃어 영원히 정산도 취소도 못 한다.
@@ -43,6 +44,10 @@ def register_pending(ledger, code, odno, side, qty, price, ordered_at,
         'odno': odno, 'side': side, 'qty': int(qty), 'price': float(price),
         'ordered_at': ordered_at, 'avg_price': avg_price, 'tag': tag,
         'snapshot': snapshot or {}, 'applied_qty': 0,
+        # 지정가 매수는 여기를 거쳐야 포지션이 된다(_enter_position). 이름을
+        # 안 실으면 그 함수의 `p.get('name', code)`가 항상 코드로 떨어져,
+        # 프로그램이 산 포지션은 전부 이름이 종목코드가 된다.
+        'name': name or code,
     }
 
 

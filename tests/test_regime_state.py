@@ -94,6 +94,26 @@ def test_analyzer_alone_does_not_make_a_producer():
     assert producers[0]['analyzer'], '국면 생산자는 매매하지 않는 심이어야 한다'
 
 
+def test_regime_stage_entry_point_resolves_the_producer():
+    """Stage 0가 실제로 불러오는 심이 국면 생산자인가.
+
+    2026-10-07에 `regime_state_filename()`은 `produces_regime`로 고쳤는데
+    같은 전제를 쓰는 `registry.get_analyzer_simulator()`가 `analyzer`에 남았다.
+    Sim17이 두 번째 분석기로 들어온 그 날부터 Stage 0은 ValueError를 받고
+    조용히 국면 갱신을 건너뛰었다 — sim_libero_state.json이 44일 동결됐다.
+    test_regime_stage.py는 이 함수를 mock해서 CI가 내내 초록이었다.
+
+    그래서 **mock 없이 실매니페스트로** 부른다. 분석기가 몇 개로 늘어도
+    통과해야 하고, 생산자 표시가 어긋나면 여기서 죽어야 한다.
+    """
+    from src.strategy.registry import get_analyzer_simulator, get_sim_registry
+    producers = [s for s in get_sim_registry(include_analyzers=True)
+                 if s.get('produces_regime')]
+    assert len(producers) == 1
+    sim = get_analyzer_simulator()
+    assert os.path.basename(sim.state_file) == producers[0]['state_file']
+
+
 def test_two_producers_is_an_error(monkeypatch):
     """생산자가 둘이면 '어느 국면이냐'에 답이 없다 — 조용히 첫 번째를 고르지 않는다."""
     import src.strategy.regime_state as rs

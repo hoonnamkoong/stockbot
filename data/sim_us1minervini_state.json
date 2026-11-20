@@ -1,38 +1,14 @@
 {
   "initial_cash": 20000,
-  "cash": 1422.6919999999936,
-  "invested": 18623.885000000002,
+  "cash": 11626.801999999992,
+  "invested": 7311.995000000001,
   "portfolio": {
-    "MNST": {
-      "name": "Monster Beverage Corporation",
-      "quantity": 78,
-      "avg_price": 48.795,
-      "entry_date": "2026-11-05",
-      "peak_price": 48.795,
-      "is_scaled_out": false
-    },
-    "FAST": {
-      "name": "Fastenal Company Common Stock",
-      "quantity": 72,
-      "avg_price": 53.19,
-      "entry_date": "2026-11-05",
-      "peak_price": 55.49,
-      "is_scaled_out": false
-    },
     "RGA": {
       "name": "Reinsurance Group of America, Incorporated Common Stock",
       "quantity": 13,
       "avg_price": 274.455,
       "entry_date": "2026-11-11",
       "peak_price": 274.77,
-      "is_scaled_out": false
-    },
-    "HNGE": {
-      "name": "Hinge Health, Inc. Class A Common Stock",
-      "quantity": 30,
-      "avg_price": 122.54,
-      "entry_date": "2026-11-11",
-      "peak_price": 122.54,
       "is_scaled_out": false
     },
     "NDAQ": {
@@ -85,6 +61,18 @@
     {
       "date": "2026-11-07",
       "is_win": false
+    },
+    {
+      "date": "2026-11-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-11-21",
+      "is_win": false
+    },
+    {
+      "date": "2026-11-21",
+      "is_win": false
     }
   ],
   "cooldown_codes": {
@@ -96,36 +84,48 @@
     "AAPL": "2026-11-07",
     "PSX": "2026-11-08",
     "EXPD": "2026-11-09",
-    "CVX": "2026-11-10"
+    "CVX": "2026-11-10",
+    "MNST": "2026-11-24",
+    "FAST": "2026-11-24",
+    "HNGE": "2026-11-24"
   },
   "raw_stats": {
-    "cash": 1422.6919999999936,
-    "total_asset": 19742.246999999996,
-    "profit_rate": -1.2887650000000213,
-    "holdings_count": 5,
-    "win_rate": 33.33333333333333,
-    "profit_factor": 1.0523540405838356,
-    "mdd": 15.174223014068538,
-    "turnover": 4.3718535,
-    "frequency": 0.2875,
+    "cash": 11626.801999999992,
+    "total_asset": 18577.221999999994,
+    "profit_rate": -7.113890000000028,
+    "holdings_count": 2,
+    "win_rate": 25.0,
+    "profit_factor": 0.4712170724903354,
+    "mdd": 20.17994251666796,
+    "turnover": 4.882059000000001,
+    "frequency": 0.2988505747126437,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "HNGE": 115.99,
-      "MNST": 46.21,
-      "NDAQ": 108.435,
-      "IOT": 41.585,
-      "RGA": 274.225,
-      "WTS": 359.63,
-      "FAST": 55.33,
-      "ICLR": 195.9,
-      "GKOS": 248.61
+      "RGA": 265.59,
+      "LLYVK": 102.55,
+      "SN": 211.99,
+      "NDAQ": 102.875,
+      "WELL": 240.2,
+      "CBOE": 355.96,
+      "WTS": 344.9,
+      "FAST": 50.57,
+      "CPAY": 431.12,
+      "NTSK": 23.84,
+      "MNST": 43.565,
+      "RS": 397.86,
+      "ICLR": 186.53,
+      "BTSG": 62.595,
+      "HNGE": 105.5,
+      "GKOS": 236.33,
+      "LLYVA": 99.705,
+      "LYV": 175.2
     }
   },
   "normalized_stats": {
-    "승률": 33.33333333333333,
-    "수익팩터": 21.047080811676715,
-    "MDD": 54.477330957794386,
-    "거래빈도": 1.4375,
-    "자본회전율": 8.743707
+    "승률": 25.0,
+    "수익팩터": 9.424341449806708,
+    "MDD": 39.46017244999612,
+    "거래빈도": 1.4942528735632186,
+    "자본회전율": 9.764118000000002
   }
 }

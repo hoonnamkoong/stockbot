@@ -13,6 +13,7 @@
 간격만 있으면 밤새 깨운다.
 """
 import datetime as dt
+from unittest import mock
 
 from scripts import gh_dispatch as gh
 
@@ -98,3 +99,40 @@ def test_간격과_상한은_호출자가_정한다():
     assert gh.should_skip(runs, NOW, SINCE, cooldown_min=120)[0] is True
     assert gh.should_skip(runs, NOW, SINCE, cooldown_min=25)[0] is False
     assert gh.should_skip(runs, NOW, SINCE, max_attempts=1)[0] is True
+
+# ── 좀비 queued 런은 '실행 중'이 아니다 ──────────────────────────────
+
+def test_오래된_queued_런은_실행_중으로_보지_않는다():
+    """2026-10-20T17:04:15Z에 queued로 박힌 us_trading 런 하나가 한 달 동안
+    dispatch를 전부 막았다. is_running()이 total_count만 봐서 영원히 True였고,
+    trading.yml은 2분마다 '이미 실행 중 — 생략'을 찍었다. 남은 발화 경로는
+    throttle된 cron뿐이라 11-16~11-19 네 세션의 장중 런이 0건이 됐다.
+
+    us_trading의 timeout-minutes는 8이다. 30분 넘게 큐에 있는 런은 곧 돌 런이
+    아니라 죽은 런이다.
+    """
+    import datetime as dt
+    now = dt.datetime(2026, 11, 20, 12, 0, tzinfo=dt.timezone.utc)
+    zombie = {'total_count': 1,
+              'workflow_runs': [{'created_at': '2026-10-20T17:04:15Z'}]}
+    with mock.patch.object(gh, 'token', return_value='t'),          mock.patch.object(gh, '_get_json', return_value=zombie):
+        logs = []
+        assert gh.is_running('us_trading.yml', log=logs.append, now=now) is False
+    assert any('좀비' in m or '무시' in m for m in logs), logs
+
+
+def test_방금_들어온_queued_런은_실행_중이다():
+    import datetime as dt
+    now = dt.datetime(2026, 11, 20, 12, 0, tzinfo=dt.timezone.utc)
+    fresh = {'total_count': 1,
+             'workflow_runs': [{'created_at': '2026-11-20T11:58:00Z'}]}
+    with mock.patch.object(gh, 'token', return_value='t'),          mock.patch.object(gh, '_get_json', return_value=fresh):
+        assert gh.is_running('us_trading.yml', log=lambda *_: None, now=now) is True
+
+
+def test_생성시각을_못_읽으면_실행_중으로_본다():
+    """fail-closed. 시각이 없으면 노화를 판정할 수 없고, 그때는 대기열을
+    취소시키지 않는 쪽(생략)이 싸다 — 모듈 docstring의 선택과 같다."""
+    with mock.patch.object(gh, 'token', return_value='t'),          mock.patch.object(gh, '_get_json',
+                           return_value={'total_count': 1, 'workflow_runs': []}):
+        assert gh.is_running('us_trading.yml', log=lambda *_: None) is True

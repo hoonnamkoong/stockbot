@@ -5,8 +5,8 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 불만 표출 및 정부 비판 일색으로, 주가 관련 객관적 정보 부재.",
-        "sentiment": "-5",
+        "posts_summary": "정치적 논란 속 주가 관련 언급 부족.",
+        "sentiment": "-9.0",
         "keywords": []
       }
     },
@@ -14,8 +14,8 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 불만과 정부 정책 비판이 압도적으로, 주가 관련 객관적 정보 및 분석 내용은 전무.",
-        "sentiment": "-7",
+        "posts_summary": "정치적 논란으로 인한 주가 하락에 대한 불만 제기. 근거 없는 추락이라는 주장.",
+        "sentiment": "-8",
         "keywords": []
       }
     },
@@ -36,12 +36,11 @@
       "name": "대한광통신",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "투자경고 제도 관련 언급과 외인/기관 매수세 포착되나, 정치적 언급 및 불확실성으로 명확한 분석 부재.",
-        "sentiment": "0",
+        "posts_summary": "투자경고 제도 관련 언급, 외인·기관 매수세 및 주가 상승 기대.",
+        "sentiment": "1.0",
         "keywords": [
           "투자경고",
-          "외인매수",
-          "기관매수"
+          "외인 매수"
         ]
       }
     },
@@ -62,12 +61,11 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주요 공사 수주 및 준공 내용 언급 있으나, 정치적 비판과 증권사 관련 불만으로 일관.",
-        "sentiment": "-2",
+        "posts_summary": "정치적 언급과 함께 대형 건설 사업 언급, 주가 하락에 대한 우려.",
+        "sentiment": "-6.0",
         "keywords": [
-          "교량",
-          "터널",
-          "공사비"
+          "건설 사업",
+          "주가 하락"
         ]
       }
     },
@@ -75,12 +73,11 @@
       "name": "SK텔레콤",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "앤트로픽 투자 성과 및 상장 관련 내용 일부 포함, 긍정적 기대감 있으나 불확실성 상존.",
-        "sentiment": "3",
+        "posts_summary": "앤트로픽 투자 관련 언급, 주가 변동성에 대한 혼조된 반응.",
+        "sentiment": "-5.0",
         "keywords": [
           "앤트로픽",
-          "투자",
-          "상장"
+          "투자"
         ]
       }
     },
@@ -88,12 +85,11 @@
       "name": "하나에어로",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "신규 상장 종목에 대한 높은 기대감과 단기 급등 전망이 주를 이루나, 구체적 근거는 부족.",
-        "sentiment": "7",
+        "posts_summary": "신규 상장 관련 언급, 단기적 급등 가능성 및 주의 요구.",
+        "sentiment": "2.0",
         "keywords": [
-          "신규상장",
-          "급등",
-          "수익주"
+          "신규 상장",
+          "단기 급등"
         ]
       }
     },
@@ -101,12 +97,12 @@
       "name": "아리바이오랩",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "합병 및 공급계약 관련 내용 언급되나, FDA 관련 불확실성과 공매도에 대한 부정적 인식이 혼재.",
-        "sentiment": "0",
+        "posts_summary": "합병, 공급 계약 등 사업 관련 공시 확인, 주가 하락 및 공매도 언급.",
+        "sentiment": "-3.0",
         "keywords": [
           "합병",
-          "공급계약",
-          "FDA"
+          "공급 계약",
+          "공매도"
         ]
       }
     },
@@ -114,13 +110,45 @@
       "name": "에이엘로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "신규 상장 종목에 대한 기대감과 실망감이 혼재하며, 타 종목과의 비교 및 개인적인 전망 위주.",
-        "sentiment": "-3",
+        "posts_summary": "신규 상장 후 주가 하락에 대한 불만, 반도체 섹터 연동 언급.",
+        "sentiment": "-5.0",
         "keywords": [
-          "신규상장",
-          "반도체",
-          "로봇"
+          "신규 상장",
+          "주가 하락"
         ]
+      }
+    },
+    "009830": {
+      "name": "한화솔루션",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "유상증자 및 주가 하락에 대한 부정적 언급.",
+        "sentiment": "-7.0",
+        "keywords": [
+          "유상증자",
+          "주가 하락"
+        ]
+      }
+    },
+    "025980": {
+      "name": "아난티",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "정치적 이슈와 한한령 해제 관련 언급, 실적 개선 기대.",
+        "sentiment": "-4.0",
+        "keywords": [
+          "한한령",
+          "실적 개선"
+        ]
+      }
+    },
+    "290690": {
+      "name": "아리바이오홀딩스",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "주가 하락 및 투자자 동참 요구.",
+        "sentiment": "-6.0",
+        "keywords": []
       }
     }
   }

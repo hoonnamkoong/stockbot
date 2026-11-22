@@ -39,16 +39,46 @@ def _get_json(url: str, tok: str) -> dict:
         return json.loads(res.read().decode())
 
 
-def is_running(wf: str, log=print) -> bool | None:
-    """실행 중(또는 대기 중)인가. 조회 자체가 실패하면 None."""
+# 이 나이를 넘긴 queued/in_progress 런은 '곧 돌 런'이 아니라 죽은 런으로 본다.
+# us_trading의 timeout-minutes는 8이고 태스커는 2분마다 들어온다.
+ZOMBIE_RUN_AGE_MIN = 30
+
+
+def is_running(wf: str, log=print, now=None,
+               max_age_min: int = ZOMBIE_RUN_AGE_MIN) -> bool | None:
+    """실행 중(또는 대기 중)인가. 조회 자체가 실패하면 None.
+
+    `max_age_min`보다 오래된 런은 세지 않는다. 전에는 total_count만 봤는데,
+    2026-10-20T17:04:15Z에 queued로 박힌 us_trading 런 하나가 **한 달 동안**
+    이 함수를 True로 고정해 dispatch를 전부 막았다. trading.yml은 2분마다
+    '이미 실행 중 — 생략'을 찍었고, 남은 발화 경로는 throttle된 cron뿐이라
+    2026-11-16~19 네 세션의 장중 런이 0건이 됐다. 호출부가 fail-closed라
+    (조회 실패도 '생략') 이 거짓 True는 영구 침묵이 된다.
+
+    나이를 읽을 수 없으면 True로 둔다 — 같은 fail-closed 쪽이다. 거른 런은
+    로그에 남긴다(스킵과 미발화가 같은 모양이면 안 된다).
+    """
+    import datetime as _dt
     tok = token()
     if not tok:
         return None
+    now = now or _dt.datetime.now(_dt.timezone.utc)
     base = _BASE.format(repo=repo(), wf=wf) + '/runs'
     try:
         for status in ('in_progress', 'queued'):
-            if _get_json(f'{base}?status={status}&per_page=1', tok).get('total_count', 0) > 0:
+            res = _get_json(f'{base}?status={status}&per_page=1', tok)
+            if res.get('total_count', 0) <= 0:
+                continue
+            runs = res.get('workflow_runs') or []
+            raw = runs[0].get('created_at') if runs else None
+            if not raw:
                 return True
+            age = (now - _dt.datetime.fromisoformat(
+                raw.replace('Z', '+00:00'))).total_seconds() / 60
+            if age <= max_age_min:
+                return True
+            log(f'[Dispatch] {wf} {status} 런이 {age:.0f}분째다 '
+                f'({max_age_min}분 상한) — 좀비로 보고 무시한다 (시작 {raw})')
         return False
     except (error.URLError, OSError, ValueError) as e:
         log(f'[Dispatch] {wf} 실행 여부 조회 실패: {e}')

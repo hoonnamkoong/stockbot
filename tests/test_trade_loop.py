@@ -863,3 +863,41 @@ def test_국면을_올리는데_시각이_없으면_시끄럽게_실패한다(tm
     (tmp_path / 'data').mkdir()
     with pytest.raises(ValueError):
         trade_loop._write_deploy_manifest(None, log=lambda *a: None, include_regime=True)
+
+
+# ── 국면 갱신 실패에는 사람 경로가 있다 ─────────────────────────────
+
+def test_regime_refresh_failure_calls_a_human(monkeypatch):
+    """'판단 불가'는 로그만 남기고 끝나면 안 된다.
+
+    2026-10-07~11-20: get_analyzer_simulator()가 ValueError를 내서 Stage 0이
+    국면 갱신을 건너뛰었다. run_regime_stage는 log_error(=print) 후 None을
+    돌려주고, refresh_regime은 예외를 안 올려서 게이트가 '갱신했다'로 찍혔다 —
+    44일 동안 실전 프로그램 매매가 동결된 국면으로 소유권을 정했는데 알림은
+    한 통도 없었다. 결손을 처음 알려준 건 하루 1회 도는 data_audit이었다.
+    """
+    import src.alerts as alerts
+    sent = []
+    monkeypatch.setattr(alerts, 'notify_regime_refresh_failed',
+                        lambda *a, **k: sent.append(a or k) or True)
+    monkeypatch.setattr(
+        'src.pipeline.workers.trade_engine.TradeEngineWorker.run_regime_stage',
+        lambda self: None)
+
+    ctx = _Ctx()
+    assert trade_loop.refresh_regime(ctx, storage=None, log=ctx.log) is None
+    assert sent, '국면 판단 불가인데 알림이 나가지 않았다'
+
+
+def test_regime_refresh_success_stays_quiet(monkeypatch):
+    import src.alerts as alerts
+    sent = []
+    monkeypatch.setattr(alerts, 'notify_regime_refresh_failed',
+                        lambda *a, **k: sent.append(1) or True)
+    monkeypatch.setattr(
+        'src.pipeline.workers.trade_engine.TradeEngineWorker.run_regime_stage',
+        lambda self: 'BULL')
+
+    ctx = _Ctx()
+    assert trade_loop.refresh_regime(ctx, storage=None, log=ctx.log) == 'BULL'
+    assert not sent

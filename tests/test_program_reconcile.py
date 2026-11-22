@@ -65,3 +65,33 @@ def test_empty_ledger_is_noop():
     out = reconcile_positions(ledger, {'005930': {}}, '2026-07-08', lambda _m: None)
     assert out == {}
     assert 'unreconciled_exits' not in ledger
+
+
+# ── 사라진 날이 아니라 '언제부터 사이'인지 남긴다 ─────────────────────
+
+def test_records_the_window_not_a_false_sell_date():
+    """`date`는 발견일이지 매도일이 아니다. 둘을 같다고 적으면 조회가 0건이 된다.
+
+    태스커가 멈춰 있으면 수동 매도를 며칠 뒤에야 알아챈다. 원장은 그 발견일을
+    적고, KIS에 그 날짜로 물으면 해당 종목 매도는 없다. 정산하려면 **직전
+    완주일부터 발견일까지**의 구간이 필요하다 — 그 값은 원장의 `last_run`이
+    이미 들고 있다.
+    """
+    ledger = {'positions': {'000111': _pos(50, 10000, '테스트항공')},
+              'last_run': '2026-01-02T12:48:04.746813'}
+
+    reconcile_positions(ledger, {}, '2026-01-07', lambda _m: None)
+
+    rec = ledger['unreconciled_exits'][0]
+    assert rec['since'] == '2026-01-02'       # 마지막으로 정상이었던 날
+    assert rec['detected_on'] == '2026-01-07'
+    assert rec['date'] == '2026-01-07'        # 기존 소비자 호환
+
+
+def test_window_start_is_omitted_when_the_ledger_never_ran():
+    """모르면 적지 않는다 — 정산이 되돌아보기 기본값으로 떨어진다."""
+    ledger = {'positions': {'000111': _pos(50, 10000, '테스트항공')}}
+
+    reconcile_positions(ledger, {}, '2026-01-07', lambda _m: None)
+
+    assert 'since' not in ledger['unreconciled_exits'][0]

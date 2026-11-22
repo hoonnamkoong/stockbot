@@ -13,7 +13,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.trade.executions import FILLED, UNFILLED, UNKNOWN
 from src.trade.fees import realized_pnl_after_fees
-from src.trade.pending import reconcile_pending, register_pending
+from src.trade.pending import (
+    _enter_position, reconcile_pending, register_pending)
 
 TODAY = '2026-08-11'
 
@@ -260,3 +261,34 @@ def test_register_rejects_second_order_for_same_code():
 
     assert led['pending_orders']['353200']['odno'] == 'OD1', '기존 주문을 덮어쓰면 안 된다'
     assert logged, '거부됐다는 사실이 사람에게 보여야 한다'
+
+
+# ── 종목명은 pending을 거쳐야 포지션에 남는다 ────────────────────────
+
+def test_confirmed_buy_keeps_the_stock_name():
+    """`register_pending`에 name이 없어서 프로그램 포지션은 전부 이름이 코드였다.
+
+    지정가 매수는 주문 즉시 포지션이 되지 않는다 — pending에 올랐다가 체결 확인
+    후 `_enter_position`이 만든다. 그 함수는 `p.get('name', code)`로 읽는데
+    `register_pending`이 name을 받지도 저장하지도 않았다. 주문 단계에는 이름이
+    있었는데(orders의 'name') 거기서 끊겼다. 그래서 화면 미정산 목록이
+    `000111(000111)`처럼 떴다.
+    """
+    led = {'positions': {}}
+    register_pending(led, '000111', 'OD9', 'buy', 50, 10000,
+                     '2026-01-02T09:40:14', name='테스트항공')
+
+    assert led['pending_orders']['000111']['name'] == '테스트항공'
+
+    positions = {}
+    _enter_position(positions, '000111', led['pending_orders']['000111'],
+                    50, 10000, '2026-01-02')
+
+    assert positions['000111']['name'] == '테스트항공'
+
+
+def test_name_falls_back_to_the_code_when_unknown():
+    led = {'positions': {}}
+    register_pending(led, '000111', 'OD9', 'buy', 50, 10000, '2026-01-02T09:40:14')
+
+    assert led['pending_orders']['000111']['name'] == '000111'

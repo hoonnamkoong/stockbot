@@ -140,3 +140,61 @@ def lookup_realized_pnl(code: str, date: str, request=None):
     if not read:
         return False, None
     return True, {'qty': qty, 'amount': amount}
+
+def _read_rows(rows, code):
+    """행 목록 → {날짜: [수량, 손익]}. 읽은 행 수를 함께 돌려준다."""
+    by_date = {}
+    read = 0
+    seen = 0
+    for r in rows:
+        if str(r.get('pdno') or '') != code:
+            continue
+        seen += 1
+        d = _kis_date(str(r.get('trad_dt') or ''))
+        if len(d) != 8:
+            continue
+        if r.get('rlzt_pfls') in (None, '') or r.get('sll_qty') in (None, ''):
+            continue
+        try:
+            q = int(float(r['sll_qty']))
+            a = float(r['rlzt_pfls'])
+        except (TypeError, ValueError):
+            continue
+        if q <= 0:
+            continue
+        cur = by_date.setdefault(d, [0, 0.0])
+        cur[0] += q
+        cur[1] += a
+        read += 1
+    return by_date, read, seen
+
+
+def lookup_realized_pnl_range(code, from_date, to_date, request=None):
+    """그 종목이 **그 구간에** 확정한 실현손익을 매매일별로.
+
+    `lookup_realized_pnl`은 날짜를 안다고 전제한다. 수동 청산은 그 전제가 깨진다
+    — 우리는 '언제 팔았는지'를 모른다. 원장이 적는 날짜는 매도일이 아니라
+    **사라진 걸 알아챈 날**이고, 프로그램이 며칠 멈추면 둘이 벌어진다
+    (2026-11-06 매도를 11-10에 발견했다). 그 날짜 하나로 물으면 0건이 나온다.
+
+    반환 `(ok, rows)`:
+      - `(False, None)` — 조회 실패, 또는 매도 행은 있는데 값을 못 읽음. **모른다.**
+      - `(True, [])`    — 조회는 됐고 그 구간에 그 종목 매도가 없다.
+      - `(True, [{'date': 'YYYYMMDD', 'qty': int, 'amount': float}, ...])` — 날짜순.
+
+    같은 날 분할 체결은 합산한다(`lookup_realized_pnl`과 같은 규칙).
+    """
+    f, t = _kis_date(from_date), _kis_date(to_date)
+    if not code or len(f) != 8 or len(t) != 8 or f > t:
+        return False, None
+
+    rows = (request or _request_period_profit)(f, t, code)
+    if rows is None:
+        return False, None
+
+    by_date, read, seen = _read_rows(rows, code)
+    if seen and not read:
+        # 내 종목 행이 있었는데 한 줄도 못 읽었다 — '매도 없음'이 아니다.
+        return False, None
+    return True, [{'date': d, 'qty': by_date[d][0], 'amount': by_date[d][1]}
+                  for d in sorted(by_date)]

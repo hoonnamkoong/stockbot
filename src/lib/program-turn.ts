@@ -43,12 +43,20 @@ export type TurnResult = {
  * 누락 사실을 드러내기 위한 타입이다.
  */
 export type UnreconciledExit = {
+    /** 사라진 걸 알아챈 날. **매도일이 아니다** — 아래 since/detected_on 참고. */
     date: string;
     code: string;
     name: string;
     quantity: number;
     avg_price: number;
     cost_basis: number;
+    /**
+     * 실제 매도가 일어난 구간. 프로그램이 멈춰 있으면 매도일과 발견일이 벌어진다
+     * (수동 매도 → 트리거가 멈춰 있어 며칠 뒤 발견). 그래서
+     * 파이썬이 '마지막 완주일 ~ 발견일'을 함께 적는다. 옛 기록에는 없다.
+     */
+    since?: string;
+    detected_on?: string;
 };
 
 export type LastTurnResult = {

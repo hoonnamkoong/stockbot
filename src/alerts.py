@@ -26,15 +26,22 @@ def _telegram_manager():
     return TelegramManager()
 
 
-def send_alert(text: str, log=print) -> bool:
+ALERT_TITLE = '🚨 <b>StockBot 장애</b>'
+# 장애가 아닌 통지(정산 완료 등)의 머리글. 전부 "장애"로 보내면 사람이 길들여진다.
+NOTICE_TITLE = '📒 <b>StockBot 알림</b>'
+
+
+def send_alert(text: str, log=print, title: str = ALERT_TITLE) -> bool:
     """장애 알림을 즉시 보낸다. 반복 억제 없음.
 
     발송 실패로 예외를 올리지 않는다 — 알림이 터져서 매매 경로가 죽으면
     원래 알리려던 문제보다 나빠진다. 대신 실패 자체를 로그에 남긴다: 알림이
     안 갔다는 사실까지 조용하면 "장애가 없었다"와 구분이 안 된다.
+
+    title은 장애가 아닌 통지를 같은 경로로 보내기 위한 것이다(NOTICE_TITLE).
     """
     try:
-        ok = bool(_telegram_manager().send_message(f"🚨 <b>StockBot 장애</b>\n\n{text}"))
+        ok = bool(_telegram_manager().send_message(f"{title}\n\n{text}"))
         if not ok:
             log('[Alerts] 알림 발송에 실패했습니다: send_message가 False를 반환했습니다.')
         return ok
@@ -44,7 +51,8 @@ def send_alert(text: str, log=print) -> bool:
 
 
 def send_alert_once(key: str, text: str, now: datetime, cooldown_min: int = 60,
-                    data_dir: str | None = None, log=print) -> bool:
+                    data_dir: str | None = None, log=print,
+                    title: str = ALERT_TITLE) -> bool:
     """같은 key의 알림을 cooldown_min 안에서는 한 번만 보낸다.
 
     태스커가 2분 주기가 되면서 필요해졌다. 휴장 판정 실패처럼 하루 종일
@@ -66,7 +74,7 @@ def send_alert_once(key: str, text: str, now: datetime, cooldown_min: int = 60,
         except Exception:
             pass  # 파싱 불가한 기록은 '보낸 적 없다'로 본다 — 침묵보다 중복이 낫다
 
-    if not send_alert(text, log):
+    if not send_alert(text, log, title=title):
         return False
 
     state[key] = now.isoformat()
@@ -133,6 +141,69 @@ def notify_regime_refresh_failed(now: datetime, log=print) -> bool:
         cooldown_min=REGIME_ALERT_COOLDOWN_MIN,
         log=log,
     )
+
+
+PROGRAM_SETTLE_COOLDOWN_MIN = 60
+
+
+def notify_program_settled(count: int, before, after, budget, now: datetime,
+                           log=print) -> bool:
+    """수동 청산분 정산 완료 — **다음 실주문 크기가 이 금액으로 바뀐다.**
+
+    쿨다운을 쓰지 않는다. 정산된 항목은 원장에서 사라지므로 다음 사이클엔
+    미정산이 0건이고 이 알림도 없다 — 반복될 수 없는 사건이다.
+
+    로그와 대시보드 배너만으로는 장이 열리는 09:00에 사람에게 닿지 않는다.
+    둘 다 사람이 찾아가서 봐야 하는 경로다.
+    """
+    def _won(x):
+        try:
+            return f'{float(x):+,.0f}원'
+        except (TypeError, ValueError):
+            return '측정 불가'
+
+    try:
+        moved = f' ({float(after) - float(before):+,.0f}원)'
+    except (TypeError, ValueError):
+        moved = ''
+    try:
+        eff = f'{float(budget) + float(after):,.0f}원'
+    except (TypeError, ValueError):
+        eff = '측정 불가'
+
+    return send_alert(
+        f"<b>수동 청산 {count}건 정산 완료</b>\n\n"
+        f"누적 실현손익: {_won(before)} → {_won(after)}{moved}\n"
+        f"다음 주문 기준: {eff}  (= budget + 누적 실현손익)\n\n"
+        f"{now.strftime('%Y-%m-%d %H:%M')} — 대시보드의 '누적 수익률이 실제와 "
+        f"어긋납니다' 배너가 사라졌는지 함께 확인하세요.",
+        log, title=NOTICE_TITLE)
+
+
+def notify_program_settle_failed(remaining: int, reasons, now: datetime,
+                                 log=print) -> bool:
+    """정산하지 못한 청산분이 남았다 — 누적 수익률과 주문 크기가 계속 어긋난다.
+
+    **쿨다운이 필수다.** 프로그램 사이클은 2분마다 돌고 실패는 매번 재현되므로
+    억제가 없으면 하루 195통이 된다(그러면 알림이 없는 것과 같다).
+
+    사유를 본문에 싣는다. '조회 실패'와 '매도 기록 없음'은 조치가 다르다 —
+    앞은 KIS·토큰 쪽이고, 뒤는 대체출고·합병 등 사람이 판단할 일이다.
+    """
+    lines = [f"· {str(r).replace('[Program] ', '')}" for r in (reasons or [])[:5]]
+    body = '\n'.join(lines) if lines else '· 사유가 로그에 남지 않았습니다'
+    return send_alert_once(
+        'program_settle_failed',
+        f"<b>미정산 청산 {remaining}건이 닫히지 않았습니다</b>\n\n"
+        f"{body}\n\n"
+        f"{now.strftime('%Y-%m-%d %H:%M')} — 원장은 건드리지 않았습니다"
+        f"(틀린 정산은 미정산보다 나쁩니다).\n"
+        f"그동안 누적 수익률과 주문 기준 금액이 그만큼 어긋난 채 돕니다.",
+        now=now,
+        cooldown_min=PROGRAM_SETTLE_COOLDOWN_MIN,
+        log=log,
+    )
+
 
 # 전량 결손이 몇 런 연속인지 세는 자리. **쿨다운 기록과 같은 파일**에 둔다.
 # 이 파일만 trading·scraper 양쪽 배포 경로에 이미 실려 있어서, 새 파일을 만들면

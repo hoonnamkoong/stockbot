@@ -179,10 +179,16 @@ def refresh_regime(ctx, storage, log=print) -> str | None:
     writer를 매매 쪽에 둔 이유: 국면은 매매의 입력이다(소유권 판정과 Sim10의
     하위 전략 선택이 이걸 읽는다). 스크래퍼에 두면 스크래퍼가 죽었을 때 국면이
     굳고, 매매가 굳은 국면으로 계속 돈다.
+
+    판단 불가는 **예외 없이** None으로 돌아온다(run_regime_stage가 log_error 후
+    None). 그래서 호출부는 성공과 구분하지 못하고 게이트를 '갱신했다'로 찍는다 —
+    여기서 사람을 부르는 이유다(→ src/alerts.notify_regime_refresh_failed).
     """
     from src.pipeline.workers.trade_engine import TradeEngineWorker
     regime = TradeEngineWorker(ctx, storage).run_regime_stage()
     log(f'[국면] 갱신 완료: {regime or "판단 불가"}')
+    if regime is None:
+        alerts.notify_regime_refresh_failed(ctx.now_kst, log=log)
     return regime
 
 

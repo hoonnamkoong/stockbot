@@ -107,6 +107,33 @@ def notify_holiday_check_failed(today_display: str, now: datetime, log=print) ->
     )
 
 
+REGIME_ALERT_COOLDOWN_MIN = 60
+
+
+def notify_regime_refresh_failed(now: datetime, log=print) -> bool:
+    """국면 갱신 실패 — 매매가 동결된 국면으로 계속 돈다는 신호.
+
+    국면은 매매의 입력이다(프로그램 매매 소유권 판정과 Sim10의 하위 전략 선택이
+    이걸 읽는다). 갱신이 실패하면 루프는 멈추지 않고 **직전 값으로 계속 매매한다**
+    — 설계된 동작이고(한 격자 실패로 매매를 멈출 이유는 없다) 그래서 조용하다.
+
+    2026-10-07~11-20에 그 조용함의 값을 치렀다: Stage 0이 44일 내내 같은 예외로
+    스킵됐는데 로그는 print뿐이라 한 통도 나가지 않았고, 실전 매매가 10-07 15:40의
+    SIDEWAYS로 소유권을 정했다. 결손을 알려준 건 하루 1회 도는 data_audit이었다.
+    """
+    return send_alert_once(
+        'regime_refresh_failed',
+        f"<b>국면 갱신 실패</b>\n\n"
+        f"{now.strftime('%Y-%m-%d %H:%M')} — 리베로가 국면을 내지 못했습니다.\n"
+        f"매매는 <b>직전 국면 값으로 계속 돕니다</b> — 멈추지 않습니다.\n"
+        f"반복되면 동결된 국면으로 실전 소유권이 정해집니다.\n\n"
+        f"확인: trading.yml 최근 런의 '국면 갱신' 스텝 로그\n"
+        f"대조: data/sim_libero_state.json의 last_run이 오늘인가",
+        now=now,
+        cooldown_min=REGIME_ALERT_COOLDOWN_MIN,
+        log=log,
+    )
+
 # 전량 결손이 몇 런 연속인지 세는 자리. **쿨다운 기록과 같은 파일**에 둔다.
 # 이 파일만 trading·scraper 양쪽 배포 경로에 이미 실려 있어서, 새 파일을 만들면
 # 동기화 목록에 또 한 자리가 생긴다 — 2026-07-30 통합에서 빠진 일곱 번째 자리가

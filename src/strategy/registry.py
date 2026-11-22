@@ -186,20 +186,29 @@ def get_tradeable_simulator_ids() -> list[str]:
 
 
 def get_analyzer_simulator():
-    """유일한 분석기 심(현재 Sim0 리베로) 인스턴스.
+    """국면을 생산하는 심(현재 Sim0 리베로) 인스턴스.
 
     tradeable 화이트리스트와 무관하게 로드한다 — 국면 판단을 스크래핑보다
     먼저 돌리는 Stage 0(trade_engine.run_regime_stage)의 유일한 진입점이다.
-    분석기가 정확히 하나라는 전제는 regime_state.regime_state_filename()과 같다.
+    고르는 기준은 `produces_regime`이며 regime_state.regime_state_filename()과
+    같다 — 두 곳이 같은 심을 가리켜야 갱신한 국면이 읽히는 파일에 들어간다.
+
+    전에는 `analyzer`로 골랐는데 '매매하지 않는 심이 하나뿐'이라는 전제가
+    2026-10-07 Sim17(패닉바닥)으로 깨졌다. 같은 날 regime_state와
+    trade_loop.regime_output_files는 `produces_regime`로 옮겼지만 여기만
+    남아서, Stage 0이 그날부터 ValueError를 받고 국면 갱신을 건너뛰었다 —
+    sim_libero_state.json이 2026-10-07 15:40 값으로 44일 동결됐고 실전
+    프로그램 매매가 그 국면으로 소유권을 정했다. 실패가 아니라 스킵이라
+    워크플로는 내내 초록이었다.
     """
     manifest = _load_manifest()
-    analyzers = [s for s in manifest.get('simulators', [])
-                 if s.get('active', True) and s.get('analyzer', False)]
-    if len(analyzers) != 1:
+    producers = [s for s in manifest.get('simulators', [])
+                 if s.get('active', True) and s.get('produces_regime', False)]
+    if len(producers) != 1:
         raise ValueError(
-            f"[Registry] 분석기 심이 {len(analyzers)}개다(1개여야 한다): "
-            f"{[s['id'] for s in analyzers]}")
-    s = analyzers[0]
+            f"[Registry] 국면 생산자가 {len(producers)}개다(1개여야 한다): "
+            f"{[s['id'] for s in producers]}")
+    s = producers[0]
     cls = _load_class(s['module'], s['class'])
     return cls()
 

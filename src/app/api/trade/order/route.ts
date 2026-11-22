@@ -5,6 +5,7 @@ import { placeRealOrder } from '@/lib/kis-api';
 import { authorizeManualOrder } from '@/lib/trade-auth';
 import { kstTimestamp } from '@/lib/kst';
 import { brokerRejection, classifyOrderFailure } from '@/lib/order-error';
+import { buildHistoryEntry } from '@/lib/trade-history-entry';
 
 /**
  * [V8.9.9.22] Trade Order API (Remote Sync Version)
@@ -148,15 +149,13 @@ export async function POST(request: Request) {
             const { sha: hSha, content: history } = await getFileFromGithub('history.json', SECRET_REPO, SECRET_BRANCH);
             const historyList = Array.isArray(history) ? history : (history?.data || []);
             
-            historyList.unshift({
-                time: now,
-                symbol: code,
-                action: side.toUpperCase(),
-                price: Number(price) || 0,
-                qty: Number(qty),
-                type: isVirtual ? 'virtual' : 'real',
-                reason: 'Manual Dashboard Trade'
-            });
+            // 기록 조립은 src/lib/trade-history-entry.ts가 한다. 여기서 직접
+            // `price: Number(price) || 0`으로 적던 것이 수동 시장가 매도를
+            // 전부 "0원에 팔았다"로 남긴 원인이다(매도는 항상 시장가다).
+            historyList.unshift(buildHistoryEntry({
+                time: now, code, side, qty: Number(qty), price, ordType,
+                isVirtual: Boolean(isVirtual),
+            }));
 
             // Keep last 500 entries
             const prunedHistory = historyList.slice(0, 500);

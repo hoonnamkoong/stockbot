@@ -16,7 +16,7 @@ should_reconnect에서 이미 두 번 겪었다.
 """
 import datetime as dt
 
-from src.session_gate import kr_session_open
+from src.session_gate import kr_session_open, KR_CLOSE_HHMM, KR_OPEN_HHMM
 from src.core import clock
 
 _KST = clock.KST
@@ -33,6 +33,9 @@ OK = 'ok'
 STALE = 'stale'
 OFF_SESSION = 'off_session'
 UNKNOWN = 'unknown'
+# 장 밖인데 **지난 세션을 통째로 빼먹었다.** STALE과 섞지 않는다 — 조치가 다르고
+# (지금 깨우기 vs 어제부터 죽어 있었다) 발화 빈도도 다르다.
+SESSION_MISSED = 'session_missed'
 
 
 def _aware(t: dt.datetime | None) -> dt.datetime | None:
@@ -65,9 +68,58 @@ def last_success_at(runs: list[dict]) -> dt.datetime | None:
     return newest
 
 
+def last_closed_session(now_kst: dt.datetime, days: dict,
+                        max_lookback: int = 14) -> str | None:
+    """지금 기준으로 **이미 끝난** 가장 최근 거래 세션(YYYYMMDD). 모르면 None.
+
+    달력(`data/market_calendar.json`의 days)을 뒤로 훑는다. 구멍을 만나면 즉시
+    None — 모르는 채로 "세션을 빼먹었다"고 알리면 공휴일마다 거짓 경보가 난다.
+    주말은 달력을 안 봐도 장이 없으므로 건너뛴다(달력이 부분 저장돼 있어도
+    주말 때문에 눈이 멀지 않게).
+
+    `market_calendar.lookup`을 쓰지 않고 여기서 읽는다. 그 모듈은 최상단에서
+    requests를 import해서, 끌어오면 requests 없는 워크플로 스텝이 같이 죽는다
+    (2026-09-09 토큰 갱신이 정확히 그렇게 죽었다).
+    """
+    now_kst = _aware(now_kst)
+    day = now_kst.date()
+    # 오늘 세션이 아직 안 끝났으면 오늘은 후보가 아니다. 마감 정각은 끝난 것으로 센다.
+    if (now_kst.hour, now_kst.minute) < KR_CLOSE_HHMM:
+        day -= dt.timedelta(days=1)
+
+    for _ in range(max_lookback):
+        if day.weekday() < 5:
+            state = (days or {}).get(day.strftime('%Y%m%d'))
+            if state not in ('Y', 'N'):
+                return None
+            if state == 'Y':
+                return day.strftime('%Y%m%d')
+        day -= dt.timedelta(days=1)
+    return None
+
+
+def _ran_in_session(beat_at: dt.datetime | None, session: str) -> bool:
+    """그 세션 개장 이후에 완주가 있었나.
+
+    세션 **안**이 아니라 개장 **이후**로 재는 이유: beat_at은 가장 최근 완주
+    하나뿐이라 "세션 안에 하나라도 있었나"를 물을 수 없다. 개장 이후면
+    적어도 그 세션이 통째로 비지는 않았다. 세션 일부만 죽은 경우는 여기서
+    못 잡고 STALE의 몫으로 남는다 — 두 질문을 한 함수에 섞지 않는다.
+    """
+    if beat_at is None:
+        return False
+    try:
+        opened = dt.datetime.strptime(session, '%Y%m%d').replace(
+            hour=KR_OPEN_HHMM[0], minute=KR_OPEN_HHMM[1], tzinfo=_KST)
+    except (TypeError, ValueError):
+        return True          # 못 읽으면 판정하지 않는다(침묵 쪽으로)
+    return _aware(beat_at) >= opened
+
+
 def judge(now_kst: dt.datetime, beat_at: dt.datetime | None,
-          trading_day: bool | None, max_age_min: int = MAX_AGE_MIN) -> str:
-    """OK / STALE / OFF_SESSION / UNKNOWN 넷 중 하나.
+          trading_day: bool | None, max_age_min: int = MAX_AGE_MIN,
+          last_session: str | None = None) -> str:
+    """OK / STALE / SESSION_MISSED / OFF_SESSION / UNKNOWN 다섯 중 하나.
 
     trading_day는 KIS 휴장 판정의 3값을 그대로 받는다(True/False/None).
     None을 STALE로 뭉개면 공휴일마다 거짓 경보가 나가고, OFF_SESSION으로
@@ -75,8 +127,13 @@ def judge(now_kst: dt.datetime, beat_at: dt.datetime | None,
     """
     now_kst = _aware(now_kst)
 
-    # 장 밖이면 달력을 몰라도 알릴 것이 없다 — 루프는 원래 안 돈다.
+    # 장 밖이면 "지금 멎었나"는 물을 수 없다 — 루프는 원래 안 돈다. 하지만
+    # "지난 세션을 돌았나"는 물을 수 있고, 그 둘은 다른 질문이다. 예전에는
+    # 여기서 바로 반환해 2026-11-06에 `마지막완주 33시간 전`을 찍고도
+    # 침묵했다(태스커 정지로 금·월 두 세션 상실).
     if not kr_session_open(now_kst):
+        if last_session and not _ran_in_session(beat_at, last_session):
+            return SESSION_MISSED
         return OFF_SESSION
     if trading_day is None:
         return UNKNOWN

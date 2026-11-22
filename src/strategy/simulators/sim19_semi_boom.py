@@ -92,7 +92,7 @@ class SemiBoomSimulator(BaseSimulator):
     def __init__(self, initial_cash=0):
         super().__init__("SemiBoom", initial_cash)
         self.state.setdefault('quality', UNKNOWN)
-        self.state.setdefault('history', [])
+        self.observation_log()
 
     def get_universe(self):
         return []
@@ -130,7 +130,7 @@ class SemiBoomSimulator(BaseSimulator):
         if quality != prev:
             self.state['quality'] = quality
             self.state['quality_since'] = today
-            h = self.state.setdefault('history', [])
+            h = self.observation_log()
             h.append({'date': today, 'month': k[:7], 'quality': quality,
                       'reason': reason})
             del h[:-200]
@@ -147,9 +147,12 @@ class SemiBoomSimulator(BaseSimulator):
         if prev == UNKNOWN and quality == MIXED:
             return      # 기동 시 '혼합'은 사건이 아니다
         try:
+            # 장애가 아니라 상태 통지다. 본문에 "관찰용이고 매매 근거가 아니다"라고
+            # 적어 보내면서 머리글만 🚨 장애였다.
             alerts.send_alert_once(
                 'semi_boom_%s' % quality,
                 format_notice(quality, reason, prev, metrics),
-                now, cooldown_min=ALERT_COOLDOWN_MIN)
+                now, cooldown_min=ALERT_COOLDOWN_MIN,
+                title=alerts.NOTICE_TITLE)
         except Exception as e:
             print('[Sim19 반도체붐] 알림 실패: %s: %s' % (type(e).__name__, e))

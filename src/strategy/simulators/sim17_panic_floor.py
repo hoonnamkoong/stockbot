@@ -91,7 +91,7 @@ class PanicFloorSimulator(BaseSimulator):
         super().__init__("PanicFloor", initial_cash)
         self.state.setdefault('stage', UNKNOWN)
         self.state.setdefault('stage_since', None)
-        self.state.setdefault('history', [])
+        self.observation_log()
 
     def get_universe(self):
         return []       # 종목을 고르지 않는다
@@ -120,7 +120,7 @@ class PanicFloorSimulator(BaseSimulator):
         return []       # 매매 신호를 내지 않는다
 
     def _append_history(self, date, stage, reason):
-        h = self.state.setdefault('history', [])
+        h = self.observation_log()
         h.append({'date': date, 'stage': stage, 'reason': reason})
         del h[:-200]
 
@@ -133,8 +133,11 @@ class PanicFloorSimulator(BaseSimulator):
         if prev_stage == UNKNOWN and stage == NORMAL:
             return
         try:
+            # 장애가 아니라 상태 통지다. 🚨로 보내면 사람이 길들여져서
+            # 정작 돈이 걸린 경고를 흘려 읽는다.
             alerts.send_alert_once(f'panic_floor_{stage}',
                                    format_notice(stage, reason, metrics, prev_stage),
-                                   now, cooldown_min=ALERT_COOLDOWN_MIN)
+                                   now, cooldown_min=ALERT_COOLDOWN_MIN,
+                                   title=alerts.NOTICE_TITLE)
         except Exception as e:
             print(f'[Sim17 패닉바닥] 알림 실패: {type(e).__name__}: {e}')

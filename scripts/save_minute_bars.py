@@ -22,7 +22,8 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src import alerts
-from src.data.minute_bars import anchor_times, codes_for_date, drop_date, merge_bars
+from src.data.minute_bars import (anchor_times, codes_for_date,
+                                  collection_verdict, drop_date, merge_bars)
 from src.core import clock
 
 COLUMNS = ['date', 'code', 'hhmm', 'price', 'volume']
@@ -129,21 +130,27 @@ def main() -> None:
         print(f'[분봉] 예산 {BUDGET_SEC}초 소진 — {left}종목을 남기고 중단합니다. '
               '뒤 스텝(배포)이 돌 수 있도록 여기서 비켜줍니다.')
 
-    if total == 0:
-        # 로그만으로는 부족하다. 이 잡은 `|| echo`로 감싸여 있어 워크플로가 초록색이고,
-        # KIS 분봉은 **당일치만** 조회되므로 다음 날 알아채도 복구할 방법이 없다.
+    # 로그만으로는 부족하다. 이 잡은 `|| echo`로 감싸여 있어 워크플로가 초록색이고,
+    # KIS 분봉은 **당일치만** 조회되므로 다음 날 알아채도 복구할 방법이 없다.
+    # 다만 문턱을 둔다 — 3.8% 결손으로 🚨를 보내면 사람이 길들여진다.
+    verdict = collection_verdict(len(codes), total, left, failed)
+    if verdict == 'empty':
         alerts.send_alert(
             f"<b>분봉 저장 실패</b>\n\n"
             f"{date_str} — 대상 {len(codes)}종목이 전부 빈 응답({failed}콜)입니다.\n"
             f"KIS 토큰 또는 유량을 확인하세요.\n"
             f"⚠️ 분봉은 당일치만 조회됩니다 — 이 하루의 가격 해상도는 복구할 수 없습니다.")
-    elif left:
-        # 중단도 결손이다. 로그만 남기면 '그날은 종목이 적었다'로 오독된다 —
-        # 이 스크립트가 비켜준 덕에 워크플로는 초록색이라 더더욱 그렇다.
+    elif verdict == 'partial':
+        # 빈 응답 수를 **같이** 싣는다. 2026-11-18에 9종목이 남은 진짜 원인은
+        # 빈 응답 69콜(29%)이 예산을 먹은 것이었는데, 알림은 9종목만 말했다.
+        got = len(codes) - left
+        empty_txt = (f"빈 응답·실패 {failed}콜 ({100 * failed / len(codes):.0f}%)"
+                     if failed else "빈 응답 없음")
         alerts.send_alert(
             f"<b>분봉 부분 수집</b>\n\n"
-            f"{date_str} — {len(codes)}종목 중 {len(codes) - left}종목만 받고 "
-            f"예산({BUDGET_SEC}초)이 끝났습니다.\n"
+            f"{date_str} — {len(codes)}종목 중 {got}종목 수집, {left}종목 남김"
+            + (f" (예산 {BUDGET_SEC}초 소진)" if left else "") + "\n"
+            f"{empty_txt}  ← 예산을 먹는 쪽은 보통 이것입니다\n"
             f"나머지 배포(감시목록·종가 CSV)는 정상 진행됩니다.\n"
             f"⚠️ 분봉은 당일치만 조회됩니다 — 남은 {left}종목은 복구할 수 없습니다.")
 

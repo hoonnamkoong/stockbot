@@ -16,7 +16,8 @@ from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.data.minute_bars import anchor_times, parse_rows, merge_bars
+from src.data.minute_bars import (anchor_times, collection_verdict,
+                                  merge_bars, parse_rows)
 
 
 # ── 앵커 ────────────────────────────────────────────────────────────
@@ -302,3 +303,43 @@ def test_partial_scan_tells_a_human(monkeypatch, tmp_path):
 
     assert alert.call_count == 1, '부분 수집이 조용히 지나갔다'
     assert '분봉' in alert.call_args[0][0]
+
+
+# ── 결손 알림 문턱 ──────────────────────────────────────────────────
+# 2026-11-18 실측: 234종목 중 225종목 수집, 9종목(3.8%) 남김 → 🚨가 나갔다.
+# 사람이 할 수 있는 조치가 없는 3.8%에 장애 알림을 보내면 길들여져서 정작 돈이
+# 걸린 경고를 흘려 읽는다. 그런데 같은 날 진짜 원인은 알림이 말하지 않았다 —
+# 빈 응답·실패 69콜(29%)이 예산을 먹은 것이다.
+
+def test_정상_수집은_알리지_않는다():
+    assert collection_verdict(255, 99450, 0, 0) is None
+
+
+def test_작은_결손만으로는_알리지_않는다():
+    """3.8% 결손. 예산은 이미 2100초이고 사람이 돌릴 손잡이가 없다."""
+    assert collection_verdict(234, 85920, 9, 0) is None
+
+
+def test_빈_응답이_많으면_결손이_작아도_알린다():
+    """2026-11-18 실측. 증상(9종목)이 아니라 원인(69콜 = 29%)으로 걸려야 한다."""
+    assert collection_verdict(234, 85920, 9, 69) == 'partial'
+
+
+def test_결손이_문턱을_넘으면_알린다():
+    assert collection_verdict(234, 80000, 40, 0) == 'partial'
+
+
+def test_한_행도_못_받으면_비율과_무관하게_알린다():
+    """그날의 가격 해상도가 통째로 없다. 분봉은 당일치만 조회된다."""
+    assert collection_verdict(200, 0, 200, 200) == 'empty'
+    assert collection_verdict(1, 0, 0, 1) == 'empty'
+
+
+def test_대상이_없으면_알릴_것도_없다():
+    """휴장일·최초 배포. 여기서 알리면 주말마다 울린다."""
+    assert collection_verdict(0, 0, 0, 0) is None
+
+
+def test_음수는_0으로_본다():
+    """left·failed가 음수로 들어와도 비율이 뒤집히지 않는다."""
+    assert collection_verdict(100, 1000, -5, -5) is None

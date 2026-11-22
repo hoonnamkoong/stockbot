@@ -124,3 +124,34 @@ def codes_for_date(csv_path: str, yyyymmdd: str) -> list[str]:
     except Exception:
         return []
     return sorted(out)
+
+
+# ── 결손 알림 판정 ──────────────────────────────────────────────────
+# 2026-11-18 실측: 대상 234종목 중 225종목 수집, 9종목(3.8%)을 남기고 예산 소진.
+# 그걸로 🚨가 나갔다. 사람이 할 수 있는 조치가 없는 3.8%에 장애 알림을 보내면
+# 길들여져서 정작 돈이 걸린 경고를 흘려 읽는다.
+#
+# 같은 날 진짜 신호는 알림이 말하지 않는 쪽에 있었다 — **빈 응답·실패 69콜(29%)**.
+# 그게 예산을 먹어서 9종목이 남은 것이다. 증상(남은 종목)이 아니라 원인(빈 응답)으로
+# 문턱을 잡고, 본문에 둘 다 싣는다.
+SHORTFALL_RATIO = 0.10      # 결손이 10% 넘으면 알린다
+EMPTY_CALL_RATIO = 0.20     # 빈 응답이 20% 넘으면 결손이 작아도 알린다
+
+
+def collection_verdict(n_codes: int, total: int, left: int, failed: int):
+    """분봉 수집 결과 → 알릴 것이 있나. 'empty' | 'partial' | None.
+
+    'empty'  = 한 행도 못 받았다. 비율과 무관하게 알린다 — 그날의 가격 해상도가
+               통째로 없고 KIS 분봉은 당일치만 조회되므로 복구할 수 없다.
+    'partial' = 결손이 문턱을 넘거나, 빈 응답이 문턱을 넘었다.
+    None      = 로그만 남긴다.
+    """
+    if n_codes <= 0:
+        return None
+    if total == 0:
+        return 'empty'
+    if max(left, 0) / n_codes >= SHORTFALL_RATIO:
+        return 'partial'
+    if max(failed, 0) / n_codes >= EMPTY_CALL_RATIO:
+        return 'partial'
+    return None

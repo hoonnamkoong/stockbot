@@ -141,7 +141,7 @@ class MeltupPhaseSimulator(BaseSimulator):
         self.state.setdefault('stage', INACTIVE)
         self.state.setdefault('anchor', None)
         self.state.setdefault('anchor_level', None)
-        self.state.setdefault('history', [])
+        self.observation_log()
 
     def get_universe(self):
         return []       # 종목을 고르지 않는다
@@ -180,7 +180,7 @@ class MeltupPhaseSimulator(BaseSimulator):
         if stage != prev_stage:
             self.state['stage'] = stage
             self.state['stage_since'] = today
-            h = self.state.setdefault('history', [])
+            h = self.observation_log()
             h.append({'date': today, 'stage': stage, 'anchor': anchor,
                       'elapsed': elapsed})
             del h[:-200]
@@ -202,10 +202,12 @@ class MeltupPhaseSimulator(BaseSimulator):
         if prev_stage in (INACTIVE, UNKNOWN) and stage == INACTIVE:
             return
         try:
+            # 장애가 아니라 상태 통지다(이 심은 매매 신호를 내지 않는다).
             alerts.send_alert_once(
                 'meltup_phase_%s' % stage,
                 format_notice(stage, prev_stage, anchor, anchor_level,
                               elapsed, last),
-                now, cooldown_min=ALERT_COOLDOWN_MIN)
+                now, cooldown_min=ALERT_COOLDOWN_MIN,
+                title=alerts.NOTICE_TITLE)
         except Exception as e:
             print('[Sim18 급등고점] 알림 실패: %s: %s' % (type(e).__name__, e))

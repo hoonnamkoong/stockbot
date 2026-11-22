@@ -270,6 +270,33 @@ class BaseSimulator:
             self.reset_state()
 
 
+    OBSERVATION_KEY = 'observations'
+
+    def observation_log(self):
+        """관찰 기록 전용 목록. `history`와 섞지 않는다.
+
+        관찰 심(17·18·19)이 국면·단계 변화를 `history`에 쌓고 있었다. 그런데
+        `history`는 **NAV 숫자 배열**이다(위 템플릿의 `[cash]`, load_state의
+        `setdefault('history', [initial_cash])`). 그래서 두 가지가 섞였다:
+          - 목록 첫 원소가 초기자본 숫자다 — 관찰 기록에 `0`이 한 줄 박힌다
+          - 이름이 거짓이 된다(숫자 시계열이라고 적힌 자리에 dict가 들어간다)
+
+        옛 기록은 처음 호출될 때 한 번 옮긴다. 비어 있을 때만 옮기므로 반복
+        호출해도 중복되지 않는다.
+
+        ⚠ 리셋은 여전히 이 기록을 지운다 — `buildResetState`가 템플릿 전체를
+        새로 쓰고 옛 상태를 보지 않는다. 그건 리셋 경로를 고쳐야 하는 별개 일이다.
+        """
+        log = self.state.setdefault(self.OBSERVATION_KEY, [])
+        old = self.state.get('history')
+        if not log and isinstance(old, list):
+            moved = [x for x in old if isinstance(x, dict)]
+            if moved:
+                log.extend(moved)
+                kept = [x for x in old if not isinstance(x, dict)]
+                self.state['history'] = kept or [self.initial_cash]
+        return log
+
     def reset_state(self):
         """[V8.6.2 Hotfix] 5,000,000원 클린 시작"""
         print(f"[Sim] {self.name} 상태를 {self.initial_cash:,}원으로 초기화합니다.")

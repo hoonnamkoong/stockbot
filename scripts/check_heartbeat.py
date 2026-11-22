@@ -77,14 +77,33 @@ def main(log=print) -> int:
     # 달력이 없거나 낡으면 lookup이 None을 주고 판정은 UNKNOWN이 된다.
     # 그 자체는 여기서 안 알린다 — market_calendar.json은 신선도 감사가
     # 따로 보고 있다(config/data_freshness.yaml, max_age_sessions 3).
-    trading_day = lookup(load_calendar(), now.strftime('%Y%m%d'))
-    state = heartbeat.judge(now, beat, trading_day)
+    calendar = load_calendar()
+    trading_day = lookup(calendar, now.strftime('%Y%m%d'))
+    # 장외 판정이 '지난 세션을 통째로 빼먹었다'를 가리지 않게 같이 넘긴다.
+    last_session = heartbeat.last_closed_session(now, calendar)
+    state = heartbeat.judge(now, beat, trading_day, last_session=last_session)
 
     # 판정을 반드시 남긴다. 안 남기면 "조용히 통과"와 "아예 안 돌았다"가
     # 로그에서 같은 모양이 된다.
     beat_txt = beat.strftime('%Y-%m-%d %H:%M KST') if beat else '없음'
     log(f'[Heartbeat] 판정={state} 마지막완주={beat_txt} '
-        f'거래일={trading_day} 지금={now.strftime("%H:%M")} KST')
+        f'거래일={trading_day} 지난세션={last_session or "모름"} '
+        f'지금={now.strftime("%H:%M")} KST')
+
+    if state == heartbeat.SESSION_MISSED:
+        # 쿨다운(send_alert_once)을 쓰지 않는다. 이 워크플로는 db-data에서
+        # alert_dedup.json을 받아오지도 올리지도 않아 쿨다운 기록이 매 런
+        # 초기화되고, 그러면 억제가 되는 척만 한다. 대신 발화 자체가 드물다 —
+        # 장외 감시 발화는 실측 하루 1~2회다(2026-11-06 그날 총 2런).
+        session_txt = f'{last_session[:4]}-{last_session[4:6]}-{last_session[6:]}'
+        alerts.send_alert(
+            f'🪦 지난 거래 세션을 통째로 건너뛰었습니다\n'
+            f'빼먹은 세션: {session_txt}\n'
+            f'마지막 완주: {beat_txt}\n\n'
+            f'{_WATCHED}이 그 세션에 한 번도 완주하지 않았습니다. '
+            f'태스커(폰)가 멈춰 있을 가능성이 가장 큽니다 — '
+            f'폰의 /api/cron 트리거부터 확인하세요.', log)
+        return 0
 
     if state != heartbeat.STALE:
         return 0

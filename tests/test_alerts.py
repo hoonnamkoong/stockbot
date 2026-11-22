@@ -108,3 +108,62 @@ def test_send_alert_once_state_is_json_readable(spy, tmp_path):
                            cooldown_min=60, data_dir=str(tmp_path))
     raw = json.loads((tmp_path / alerts.STATE_FILENAME).read_text(encoding='utf-8'))
     assert raw['holiday'] == '2026-08-10T09:00:00'
+
+
+# ── 정산 알림 ───────────────────────────────────────────────────────
+# 정산은 realized_pnl → effective_budget → 실주문 크기다. 그 결과가 print로만
+# 남아 출근한 사람에게 닿지 않았다. 본문에 금액이 실제로 들어가는지, 그리고
+# 실패 알림이 2분마다 도배되지 않는지를 고정한다.
+
+def test_정산_완료는_장애가_아니라_알림으로_간다(spy):
+    assert alerts.notify_program_settled(
+        5, -100000.0, -300000.0, 1000000,
+        datetime(2026, 11, 23, 9, 2)) is True
+    body, = spy.sent
+    assert alerts.NOTICE_TITLE in body, '장애 머리글로 보내면 사람이 길들여진다'
+    assert alerts.ALERT_TITLE not in body
+
+
+def test_정산_완료_본문에_전후_금액과_주문기준이_있다(spy):
+    alerts.notify_program_settled(5, -100000.0, -300000.0, 1000000,
+                                  datetime(2026, 11, 23, 9, 2))
+    body, = spy.sent
+    assert '5건' in body
+    assert '-100,000원' in body       # 전
+    assert '-300,000원' in body        # 후
+    assert '700,000원' in body         # 1,000,000 + (-300,000) = 다음 주문 기준
+
+
+def test_정산_완료는_금액을_못_읽어도_지어내지_않는다(spy):
+    alerts.notify_program_settled(1, None, 'x', None, datetime(2026, 11, 23, 9, 2))
+    body, = spy.sent
+    assert body.count('측정 불가') >= 2
+    assert '0원' not in body
+
+
+def test_정산_실패는_쿨다운으로_도배를_막는다(spy, tmp_path):
+    now = datetime(2026, 11, 23, 9, 2)
+    first = alerts.notify_program_settle_failed(
+        2, ['[Program] 000111 확정 실현손익 조회 실패'], now, log=lambda *_: None)
+    second = alerts.notify_program_settle_failed(
+        2, ['[Program] 000111 확정 실현손익 조회 실패'], now, log=lambda *_: None)
+    assert first is True and second is False, '2분마다 재시도되므로 억제가 필수다'
+    assert len(spy.sent) == 1
+
+
+def test_정산_실패_본문에_사유가_실린다(spy):
+    alerts.notify_program_settle_failed(
+        2, ['[Program] 000111 확정 실현손익 조회 실패',
+            '[Program] 000222 수량이 맞는 매도를 특정하지 못했습니다'],
+        datetime(2026, 11, 23, 9, 2), log=lambda *_: None)
+    body, = spy.sent
+    assert '2건' in body
+    assert '조회 실패' in body and '수량' in body
+    assert '[Program]' not in body, '텔레그램 본문에 로그 태그는 군더더기다'
+
+
+def test_정산_실패는_사유가_없어도_보낸다(spy):
+    alerts.notify_program_settle_failed(1, [], datetime(2026, 11, 23, 9, 2),
+                                        log=lambda *_: None)
+    body, = spy.sent
+    assert '사유가 로그에 남지 않았습니다' in body

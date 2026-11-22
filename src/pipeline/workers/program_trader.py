@@ -1083,10 +1083,7 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
     # 이번 사이클이 빠진 금액으로 주문 크기를 정한다. 미정산이 없으면 즉시 반환하므로
     # 평소 경로에 비용이 없다. 여기서 바꾼 원장은 이 아래 어느 경로로 빠져나가도
     # 저장된다(_release_payload가 원장 전체를 복사한다).
-    try:
-        settle_unreconciled_exits(ledger, log=log, log_error=log_error)
-    except Exception as e:
-        log_error(f'[Program] 미정산 청산 정산 실패(무시하고 계속): {e}')
+    settle_and_notify(ledger, budget, now_kst, log=log, log_error=log_error)
 
     # [복리 반영] 프로그램 자체 실현손익(realized_pnl, 원장 누적)을 설정 budget에 더해
     # '이번 실행에서 실제 쓸 수 있는 예산(effective_budget)'을 만든다. 수익이 나면 다음
@@ -1692,6 +1689,50 @@ def settle_unreconciled_exits(ledger: dict, lookup_range=None, log=print,
         ledger['unreconciled_exits'] = kept
     else:
         ledger.pop('unreconciled_exits', None)
+    return settled
+
+
+def settle_and_notify(ledger: dict, budget, now_kst, log=print, log_error=print,
+                      settle=None, alerts_mod=None) -> int:
+    """정산을 돌리고 **그 결과를 사람에게 보낸다.** 반환은 닫은 건수.
+
+    정산은 `realized_pnl`을 바꾸고 그게 곧 `effective_budget`, 즉 다음 실주문
+    크기다. 그런데 결과가 `print`로만 남았다 — 확인하려면 Actions 로그를 열거나
+    대시보드를 봐야 하고, 09:00에 사람이 거기 없을 수 있다. 돈 관련 신호는
+    src/alerts.py로 보낸다는 게 이 레포의 규칙이고 정산이 거기서 빠져 있었다.
+
+    사유는 `log_error`를 가로채서 모은다 — 정산 함수의 반환형을 건드리지 않기
+    위해서다(돈 계산 쪽은 손대지 않는다).
+
+    여기서 예외를 올리지 않는다. 알림이 터져서 주문 경로가 죽으면 원래
+    알리려던 문제보다 나쁘다.
+    """
+    _settle = settle or settle_unreconciled_exits
+    _alerts = alerts_mod or alerts
+    before = ledger.get('realized_pnl', 0)
+    reasons = []
+
+    def _capture(msg):
+        log_error(msg)
+        reasons.append(msg)
+
+    settled = 0
+    try:
+        settled = _settle(ledger, log=log, log_error=_capture)
+    except Exception as e:
+        log_error(f'[Program] 미정산 청산 정산 실패(무시하고 계속): {e}')
+
+    try:
+        if settled:
+            _alerts.notify_program_settled(settled, before,
+                                           ledger.get('realized_pnl', 0),
+                                           budget, now_kst, log=log)
+        left = len(ledger.get('unreconciled_exits') or [])
+        if left:
+            _alerts.notify_program_settle_failed(left, reasons, now_kst, log=log)
+    except Exception as e:
+        log_error(f'[Program] 정산 알림 발송 실패(무시하고 계속): {e}')
+
     return settled
 
 

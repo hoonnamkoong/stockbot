@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 11626.801999999992,
-  "invested": 7311.995000000001,
+  "cash": 8158.161999999993,
+  "invested": 10780.635,
   "portfolio": {
     "RGA": {
       "name": "Reinsurance Group of America, Incorporated Common Stock",
@@ -17,6 +17,14 @@
       "avg_price": 110.12,
       "entry_date": "2026-11-12",
       "peak_price": 110.12,
+      "is_scaled_out": false
+    },
+    "GKOS": {
+      "name": "Glaukos Corporation Common Stock",
+      "quantity": 14,
+      "avg_price": 247.76,
+      "entry_date": "2026-11-23",
+      "peak_price": 247.76,
       "is_scaled_out": false
     }
   },
@@ -90,37 +98,37 @@
     "HNGE": "2026-11-24"
   },
   "raw_stats": {
-    "cash": 11626.801999999992,
-    "total_asset": 18662.969999999994,
-    "profit_rate": -6.68515000000003,
-    "holdings_count": 2,
+    "cash": 8158.161999999993,
+    "total_asset": 18704.036999999993,
+    "profit_rate": -6.479815000000035,
+    "holdings_count": 3,
     "win_rate": 25.0,
     "profit_factor": 0.4712170724903354,
-    "mdd": 19.81151228048514,
-    "turnover": 4.882059000000001,
-    "frequency": 0.29213483146067415,
+    "mdd": 19.635061231955497,
+    "turnover": 5.055491,
+    "frequency": 0.30337078651685395,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "CBOE": 358.45,
-      "WELL": 240.21,
-      "LLYVA": 100.02,
-      "NDAQ": 104.942,
-      "FROG": 108.765,
-      "PAYC": 241.45,
-      "U": 47.305,
-      "NTSK": 25.325,
-      "LLYVK": 103.96,
-      "LYV": 176.33,
-      "CPAY": 437.88,
-      "RGA": 266.78,
-      "GKOS": 244.705
+      "NDAQ": 105.735,
+      "PAYC": 241.67,
+      "NTSK": 25.93,
+      "WELL": 241.59,
+      "RGA": 267.865,
+      "LLYVA": 101.04,
+      "GKOS": 247.76,
+      "LYV": 176.2,
+      "LLYVK": 104.15,
+      "FROG": 107.995,
+      "U": 47.26,
+      "CBOE": 361.1,
+      "CPAY": 435.615
     }
   },
   "normalized_stats": {
     "승률": 25.0,
     "수익팩터": 9.424341449806708,
-    "MDD": 40.56546315854458,
-    "거래빈도": 1.4606741573033708,
-    "자본회전율": 9.764118000000002
+    "MDD": 41.09481630413351,
+    "거래빈도": 1.5168539325842698,
+    "자본회전율": 10.110982
   }
 }

@@ -155,6 +155,9 @@ export async function POST(request: Request) {
             historyList.unshift(buildHistoryEntry({
                 time: now, code, side, qty: Number(qty), price, ordType,
                 isVirtual: Boolean(isVirtual),
+                // 프로그램은 Bearer WEBHOOK_SECRET, 사람은 세션+PIN으로 들어온다.
+                // 이 구분을 안 적어서 정산이 프로그램 매도와 수동 매도를 못 갈랐다.
+                origin: isAuthorizedByWebhook ? 'program' : 'manual',
             }));
 
             // Keep last 500 entries

@@ -51,7 +51,7 @@ def test_정산되면_건수와_전후_금액과_주문기준이_간다():
     led = _ledger()
     spy = _Spy()
 
-    def _settle(ledger, log=print, log_error=print):
+    def _settle(ledger, log=print, log_error=print, orders=None):
         ledger['realized_pnl'] = -300000.0
         ledger.pop('unreconciled_exits', None)
         return 5
@@ -73,7 +73,8 @@ def test_미정산이_없으면_조용하다():
     spy = _Spy()
     n = settle_and_notify(_ledger(exits=None), BUDGET, NOW, log=lambda *_: None,
                           log_error=lambda *_: None,
-                          settle=lambda ledger, log=print, log_error=print: 0,
+                          settle=lambda ledger, log=print, log_error=print,
+                                        orders=None: 0,
                           alerts_mod=spy)
 
     assert n == 0
@@ -84,7 +85,7 @@ def test_닫히지_않은_항목이_남으면_사유와_함께_알린다():
     led = _ledger(exits=[{'code': '000111'}, {'code': '000222'}])
     spy = _Spy()
 
-    def _settle(ledger, log=print, log_error=print):
+    def _settle(ledger, log=print, log_error=print, orders=None):
         log_error('[Program] 000111 확정 실현손익 조회 실패(20261011~20261110)')
         log_error('[Program] 000222 수량이 맞는 매도를 특정하지 못했습니다')
         return 0
@@ -105,7 +106,7 @@ def test_일부만_정산되면_둘_다_간다():
     led = _ledger(exits=[{'code': '000222'}, {'code': '000333'}])
     spy = _Spy()
 
-    def _settle(ledger, log=print, log_error=print):
+    def _settle(ledger, log=print, log_error=print, orders=None):
         ledger['realized_pnl'] = -200000.0
         log_error('[Program] 000222 구간에 매도 기록이 없습니다')
         return 3
@@ -122,7 +123,7 @@ def test_정산이_터져도_매매를_멈추지_않는다():
     led = _ledger(exits=[{'code': '000111'}])
     errs = []
 
-    def _boom(ledger, log=print, log_error=print):
+    def _boom(ledger, log=print, log_error=print, orders=None):
         raise RuntimeError('조회 폭발')
 
     class _AngrySpy(_Spy):

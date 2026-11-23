@@ -15,6 +15,16 @@
  * src/lib/program-turn.ts와 같은 이유다.
  */
 
+/**
+ * 누가 낸 주문인가. 프로그램은 `Bearer WEBHOOK_SECRET`으로, 사람은 세션+PIN으로
+ * 같은 라우트를 지난다 — 라우트는 원래부터 둘을 구분할 수 있었는데 적지 않았다.
+ *
+ * 2026-11-23에 그 대가를 치렀다. 정산이 "수량이 맞는 매도를 특정하지 못했습니다"로
+ * 세 건 막혔는데, 한투 조회에 잡힌 같은 수량 매도 셋 중 둘이 프로그램 매도였다.
+ * 기록만 봐서는 구분이 안 돼 사람이 반복 매매한 것으로 오독까지 했다.
+ */
+export type OrderOrigin = 'program' | 'manual';
+
 export type HistoryEntry = {
     time: string;
     symbol: string;
@@ -24,6 +34,8 @@ export type HistoryEntry = {
     qty: number;
     /** price가 null인 이유를 기록 자체가 설명하게 한다. */
     ord_type: 'market' | 'limit';
+    /** 프로그램이 낸 것인가 사람이 낸 것인가. 정산이 매도일을 특정하는 데 쓴다. */
+    origin: OrderOrigin;
     type: 'virtual' | 'real';
     reason: string;
 };
@@ -49,6 +61,7 @@ export function buildHistoryEntry(args: {
     price: unknown;
     ordType: string | undefined;
     isVirtual: boolean;
+    origin: OrderOrigin;
     reason?: string;
 }): HistoryEntry {
     const priced = orderCarriedAPrice(args.side, args.ordType, args.price);
@@ -59,7 +72,11 @@ export function buildHistoryEntry(args: {
         price: priced ? Number(args.price) : null,
         qty: Number(args.qty),
         ord_type: priced ? 'limit' : 'market',
+        origin: args.origin,
         type: args.isVirtual ? 'virtual' : 'real',
-        reason: args.reason || 'Manual Dashboard Trade',
+        // 사유의 기본값도 출처를 따른다. 'Manual Dashboard Trade'가 프로그램
+        // 주문에까지 붙어 있어서 기록을 읽는 사람이 속았다.
+        reason: args.reason
+            || (args.origin === 'program' ? 'Program Order' : 'Manual Dashboard Trade'),
     };
 }

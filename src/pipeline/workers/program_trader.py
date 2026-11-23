@@ -1610,7 +1610,8 @@ EXIT_LOOKBACK_DAYS = 30
 
 def settle_unreconciled_exits(ledger: dict, lookup_range=None, log=print,
                               log_error=print,
-                              lookback_days: int = EXIT_LOOKBACK_DAYS) -> int:
+                              lookback_days: int = EXIT_LOOKBACK_DAYS,
+                              orders=None) -> int:
     """미정산 청산분을 KIS 확정 실현손익으로 닫는다. 반환은 닫은 건수.
 
     `reconcile_positions`는 사라진 포지션을 **적기만** 했다. 체결가가 우리 기록에
@@ -1653,6 +1654,14 @@ def settle_unreconciled_exits(ledger: dict, lookup_range=None, log=print,
             continue
         from_d = _ymd(e.get('since')) or _shift_ymd(to_d, -lookback_days)
 
+        # 우리 주문 기록이 매도일을 알고 있으면 그 하루만 묻는다. 계좌 전체를
+        # 보는 조회에서 프로그램 매도까지 섞여 들어오는 것을 막는 유일한 방법이다.
+        on = exit_date_from_orders(orders, code, want, from_d, to_d)
+        if on:
+            log(f"[Program] {code} 매도일을 주문 기록에서 특정했습니다: {on} "
+                f"(구간 {from_d}~{to_d} 대신 그 하루만 조회)")
+            from_d = to_d = on
+
         ok, rows = lookup_range(code, from_d, to_d)
         if not ok:
             kept.append(e)
@@ -1692,6 +1701,79 @@ def settle_unreconciled_exits(ledger: dict, lookup_range=None, log=print,
     return settled
 
 
+_ORDER_HISTORY_PATH = 'history.json'
+
+
+def load_order_history(log_error=print):
+    """비공개 레포의 주문 기록(history.json). 못 읽으면 None.
+
+    None이면 호출부는 구간 조회로 돌아간다 — 지금까지의 동작과 같으므로
+    더 나빠지지 않는다. 다만 '기록이 없다'와 '못 읽었다'를 로그에서 가른다.
+    """
+    try:
+        from src.trade import secret_store
+        text, _sha = secret_store.fetch_text(_ORDER_HISTORY_PATH, log=log_error)
+        if not text:
+            return None
+        data = json.loads(text)
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get('data')
+        return None
+    except Exception as e:
+        log_error(f'[Program] 주문 기록 조회 실패({type(e).__name__}: {e}) '
+                  f'— 구간 조회로 진행합니다')
+        return None
+
+
+def exit_date_from_orders(orders, code: str, qty: int,
+                          from_d: str, to_d: str) -> str:
+    """우리 주문 기록에서 그 포지션을 뺀 매도의 날짜(YYYYMMDD). 못 찾으면 ''.
+
+    한투 조회는 **계좌 전체**를 본다. 2026-11-23 첫 정산에서 세 건이 막힌 이유가
+    이것이다 — 같은 수량 매도가 구간에 세 번 있었는데 앞의 둘은 프로그램이 낸
+    매도였다(sim_risk 가치페어 타임스탑·손절). 수량만 보면 구분이 안 된다.
+
+    **그런데 우리는 그 주문을 낼 때 이미 기록했다.** 프로그램 주문도 수동 주문도
+    전부 `/api/trade/order`를 지나고 라우트가 history.json에 적는다. 날짜가
+    특정되면 한투에 그 하루만 물으면 되고 모호함이 사라진다.
+
+    찾는 것은 **프로그램이 내지 않은 매도**다. 프로그램 매도는 원장이 그 자리에서
+    정산하므로 미정산으로 남지 않는다 — 미정산 항목은 정의상 그 밖의 사유로
+    사라진 포지션이다.
+
+    `origin`은 2026-11-24부터 적힌다. 없는 옛 기록은 창 안의 **마지막** 매도를
+    쓴다. 원장이 발견 직전까지 들고 있었으므로 앞선 동일 수량 매도는 되산 뒤의
+    다른 왕복이다.
+
+    판단하지 못하면 ''를 준다 — 호출부는 그때 구간 조회로 돌아가고 fail-closed를
+    유지한다. 여기서 틀린 날짜를 고르면 틀린 금액이 실주문 크기가 된다.
+    """
+    best = ''
+    for r in (orders or []):
+        if not isinstance(r, dict):
+            continue
+        if str(r.get('symbol') or '') != str(code):
+            continue
+        if str(r.get('action') or '').upper() != 'SELL':
+            continue
+        try:
+            if int(r.get('qty') or 0) != int(qty):
+                continue
+        except (TypeError, ValueError):
+            continue
+        d = _ymd(r.get('time'))
+        if not d or not (from_d <= d <= to_d):
+            continue
+        origin = r.get('origin')
+        if origin == 'program':
+            continue            # 원장이 이미 정산했다. 고르면 두 번 계상된다.
+        if d > best:
+            best = d
+    return best
+
+
 def settle_and_notify(ledger: dict, budget, now_kst, log=print, log_error=print,
                       settle=None, alerts_mod=None) -> int:
     """정산을 돌리고 **그 결과를 사람에게 보낸다.** 반환은 닫은 건수.
@@ -1711,6 +1793,7 @@ def settle_and_notify(ledger: dict, budget, now_kst, log=print, log_error=print,
     _alerts = alerts_mod or alerts
     before = ledger.get('realized_pnl', 0)
     reasons = []
+    orders = load_order_history(log_error)
 
     def _capture(msg):
         log_error(msg)
@@ -1718,7 +1801,7 @@ def settle_and_notify(ledger: dict, budget, now_kst, log=print, log_error=print,
 
     settled = 0
     try:
-        settled = _settle(ledger, log=log, log_error=_capture)
+        settled = _settle(ledger, log=log, log_error=_capture, orders=orders)
     except Exception as e:
         log_error(f'[Program] 미정산 청산 정산 실패(무시하고 계속): {e}')
 

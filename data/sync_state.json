@@ -27,6 +27,31 @@
       "code": "005930",
       "name": "삼성전자",
       "rank": 5
+    },
+    {
+      "code": "028050",
+      "name": "삼성E&A",
+      "rank": 1
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 2
+    },
+    {
+      "code": "035720",
+      "name": "카카오",
+      "rank": 3
+    },
+    {
+      "code": "017670",
+      "name": "SK텔레콤",
+      "rank": 4
+    },
+    {
+      "code": "035420",
+      "name": "NAVER",
+      "rank": 5
     }
   ],
   "daily_deep_dive_codes": [
@@ -34,7 +59,12 @@
     "034020",
     "471800",
     "047040",
-    "005930"
+    "005930",
+    "028050",
+    "000660",
+    "035720",
+    "017670",
+    "035420"
   ],
   "morning_reported_info": [
     {
@@ -63,7 +93,33 @@
       "rank": 5
     }
   ],
-  "afternoon_reported_info": [],
+  "afternoon_reported_info": [
+    {
+      "code": "028050",
+      "name": "삼성E&A",
+      "rank": 1
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "rank": 2
+    },
+    {
+      "code": "035720",
+      "name": "카카오",
+      "rank": 3
+    },
+    {
+      "code": "017670",
+      "name": "SK텔레콤",
+      "rank": 4
+    },
+    {
+      "code": "035420",
+      "name": "NAVER",
+      "rank": 5
+    }
+  ],
   "morning_complete": false,
   "afternoon_complete": false,
   "daily_complete": false

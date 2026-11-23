@@ -5,7 +5,7 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치 관련 부정적 언급과 타국 증시 비교로 구성된 의견.",
+        "posts_summary": "정치적 발언과 함께 대만 증시 상승을 언급하며 부정적인 시장 전망을 제시.",
         "sentiment": "-5",
         "keywords": []
       }
@@ -14,7 +14,7 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "타사 주가 비교 및 정치 관련 부정적 언급이 주를 이룸.",
+        "posts_summary": "정부 정책 실패를 지적하며 주가 하락에 대한 부정적 전망 제시.",
         "sentiment": "-6",
         "keywords": []
       }
@@ -23,20 +23,16 @@
       "name": "두산에너빌리티",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 급락 및 정부 무능 비판. 주가 하락세 지속 및 정부 정책 실패 언급.",
-        "sentiment": "-8",
-        "keywords": [
-          "주가 하락",
-          "정부 무능",
-          "공매도"
-        ]
+        "posts_summary": "정부 정책 실패와 무정부 상태를 언급하며 주가 하락에 대한 부정적 전망 제시.",
+        "sentiment": "-7",
+        "keywords": []
       }
     },
     "047040": {
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "실적 대비 주가 부진 및 공매도 관련 불만 제기.",
+        "posts_summary": "실적 대비 주가 하락에 대한 불만과 정부 정책 비판. 공매도 언급.",
         "sentiment": "-7",
         "keywords": [
           "공매도",
@@ -74,12 +70,11 @@
       "name": "삼성E&A",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정부 레버리지 정책 비판 및 공매도 제한 조치 촉구. 10조 수주 공시에도 불구하고 주가 하락.",
-        "sentiment": "-9",
+        "posts_summary": "정부 정책 비판과 함께 주가 폭락에 대한 우려 표출. 대규모 수주 가능성 언급.",
+        "sentiment": "-8",
         "keywords": [
-          "레버리지",
-          "공매도",
-          "수주 공시"
+          "수주",
+          "공매도"
         ]
       }
     },
@@ -87,9 +82,12 @@
       "name": "하나에어로",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "매도 물량 및 주가 하락에 대한 부정적 의견.",
-        "sentiment": "-4",
-        "keywords": []
+        "posts_summary": "실적 대비 저평가된 주가에 대한 기대감과 매도 물량에 대한 우려 혼재.",
+        "sentiment": "-5",
+        "keywords": [
+          "실적",
+          "매도"
+        ]
       }
     },
     "446840": {
@@ -122,9 +120,12 @@
       "name": "NAVER",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "주가 하락 및 경영진 사퇴 요구 등 부정적 의견.",
-        "sentiment": "-7",
-        "keywords": []
+        "posts_summary": "경영진 교체 요구와 함께 주가 하락에 대한 심각한 우려 표출. 과매도 상태 지적.",
+        "sentiment": "-8",
+        "keywords": [
+          "경영진",
+          "과매도"
+        ]
       }
     },
     "035720": {
@@ -156,11 +157,10 @@
       "name": "에이엘로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "글로벌 고객사 확보 공시 기반, 상승 기대감 표출.",
-        "sentiment": "3",
+        "posts_summary": "글로벌 고객사 확보 등 긍정적 공시 기반으로 주가 상승 기대감 표출.",
+        "sentiment": "5",
         "keywords": [
           "공시",
-          "고객사",
           "화낙"
         ]
       }
@@ -194,11 +194,11 @@
       "name": "SK텔레콤",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "투자 전략 및 엔트로픽 호재 미반영에 대한 의견.",
-        "sentiment": "-5",
+        "posts_summary": "공매도 금지 청원과 함께 주가 부진에 대한 불만 표출. AI 사업 관련 호재 언급.",
+        "sentiment": "-4",
         "keywords": [
-          "엔트로픽",
-          "공매도"
+          "공매도",
+          "AI"
         ]
       }
     }

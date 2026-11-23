@@ -18,7 +18,7 @@ const AT = '2026-01-07 09:30:00';
 function entry(over: Partial<Parameters<typeof buildHistoryEntry>[0]> = {}) {
   return buildHistoryEntry({
     time: AT, code: '000111', side: 'sell', qty: 10,
-    price: 0, ordType: 'market', isVirtual: false, ...over,
+    price: 0, ordType: 'market', isVirtual: false, origin: 'manual', ...over,
   });
 }
 
@@ -103,4 +103,25 @@ test('주문 라우트가 기록을 직접 조립하지 않는다', () => {
     '라우트가 buildHistoryEntry를 안 쓴다 — 기록 규칙이 두 곳에 갈린다');
   assert.ok(!/price:\s*Number\(price\)\s*\|\|\s*0/.test(ROUTE_CODE),
     '라우트에 `price: Number(price) || 0`이 남아 있다 — 시장가가 0원으로 박힌다');
+});
+
+// ── 누가 낸 주문인지 적는다 ─────────────────────────────────────────
+// 프로그램도 사람도 같은 라우트를 지나는데 기록은 전부 'Manual Dashboard Trade'였다.
+// 2026-11-23 정산이 세 건 막힌 원인이고, 나까지 "사용자가 반복 매매했다"고 오독했다.
+
+test('출처를 기록에 남긴다', () => {
+  assert.equal(entry({ origin: 'manual' }).origin, 'manual');
+  assert.equal(entry({ origin: 'program' }).origin, 'program');
+});
+
+test('사유 기본값도 출처를 따른다 — 프로그램 주문에 Manual을 붙이지 않는다', () => {
+  assert.equal(entry({ origin: 'manual' }).reason, 'Manual Dashboard Trade');
+  assert.equal(entry({ origin: 'program' }).reason, 'Program Order');
+  assert.equal(entry({ origin: 'program', reason: '[프로그램:sim4_bull] 손절' }).reason,
+    '[프로그램:sim4_bull] 손절', '명시한 사유가 이긴다');
+});
+
+test('주문 라우트가 웹훅 인증으로 출처를 가른다', () => {
+  assert.ok(/origin:\s*isAuthorizedByWebhook\s*\?\s*'program'\s*:\s*'manual'/.test(ROUTE_CODE),
+    '라우트가 출처를 안 넘기면 기록이 다시 전부 manual이 된다');
 });

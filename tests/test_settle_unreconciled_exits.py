@@ -160,3 +160,70 @@ def test_empty_ledger_is_a_noop():
     led = {'realized_pnl': 5.0}
     assert settle_unreconciled_exits(led, lookup_range=_found()) == 0
     assert led == {'realized_pnl': 5.0}
+
+
+# ── 주문 기록이 모호함을 푼다 ───────────────────────────────────────
+# 2026-11-23 첫 정산에서 3건이 "수량이 맞는 매도를 특정하지 못했습니다"로 막혔다.
+# 한투 조회는 계좌 전체를 보는데 같은 수량 매도가 구간에 세 번 있었고, 앞의 둘은
+# 프로그램이 낸 매도였다. 수량만으로는 영원히 못 가린다.
+
+SELLS = {'20261016': 2, '20261023': 2, '20261106': 2}   # 전부 같은 수량
+
+
+def _range_lookup(calls):
+    """구간을 실제로 지키는 가짜 조회. 좁혀 물으면 한 건만 준다."""
+    def _fn(code, f, t):
+        calls.append((f, t))
+        rows = [{'date': d, 'qty': q, 'amount': -1000.0 * int(d[-2:])}
+                for d, q in sorted(SELLS.items()) if f <= d <= t]
+        return True, rows
+    return _fn
+
+
+def _ambiguous():
+    # `since`가 없는 옛 항목이다 — 창이 발견일 −30일까지 벌어져 세 건이 다 들어온다.
+    # 실제로 막힌 3건이 정확히 이 모양이었다(2026-11-10 발견, since 없음).
+    return _ledger(_exit(code='000111', qty=2, cost=400000.0, date='2026-11-10'))
+
+
+def test_주문_기록이_없으면_예전처럼_미정산이다():
+    """회귀 방지 — 기록을 못 읽었을 때 동작이 바뀌면 안 된다."""
+    calls = []
+    led = _ambiguous()
+    n = settle_unreconciled_exits(led, lookup_range=_range_lookup(calls),
+                                  log=lambda *_: None, log_error=lambda *_: None,
+                                  orders=None, lookback_days=30)
+    assert n == 0
+    assert len(led['unreconciled_exits']) == 1
+    assert calls == [('20261011', '20261110')], '구간 전체로 물었다'
+
+
+def test_주문_기록이_수동_매도일을_집으면_닫힌다():
+    calls = []
+    led = _ambiguous()
+    orders = [
+        {'time': '2026-10-16 09:01:26', 'symbol': '000111', 'action': 'SELL',
+         'qty': 2, 'origin': 'program'},
+        {'time': '2026-11-06 08:40:11', 'symbol': '000111', 'action': 'SELL',
+         'qty': 2, 'origin': 'manual'},
+    ]
+    n = settle_unreconciled_exits(led, lookup_range=_range_lookup(calls),
+                                  log=lambda *_: None, log_error=lambda *_: None,
+                                  orders=orders, lookback_days=30)
+
+    assert n == 1, '주문 기록으로 날짜를 특정했으면 닫혀야 한다'
+    assert calls == [('20261106', '20261106')], '그 하루만 물어야 한다'
+    assert 'unreconciled_exits' not in led
+    assert led['realized_pnl'] == -6100.0          # -100 + (-1000*6)
+
+
+def test_주문_기록이_프로그램_매도만_가지면_여전히_미정산이다():
+    """프로그램 매도를 고르면 원장이 이미 반영한 손익을 두 번 계상한다."""
+    led = _ambiguous()
+    orders = [{'time': '2026-10-16 09:01:26', 'symbol': '000111',
+               'action': 'SELL', 'qty': 2, 'origin': 'program'}]
+    n = settle_unreconciled_exits(led, lookup_range=_range_lookup([]),
+                                  log=lambda *_: None, log_error=lambda *_: None,
+                                  orders=orders, lookback_days=30)
+    assert n == 0
+    assert len(led['unreconciled_exits']) == 1

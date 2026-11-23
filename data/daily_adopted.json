@@ -5,26 +5,18 @@
       "name": "삼성전자",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치 관련 부정적 언급과 대만 증시 비교. 정부 정책에 대한 불만 표출.",
-        "sentiment": "-8",
-        "keywords": [
-          "정치",
-          "대만 증시",
-          "정부 정책"
-        ]
+        "posts_summary": "정치 관련 부정적 언급과 타국 증시 비교로 구성된 의견.",
+        "sentiment": "-5",
+        "keywords": []
       }
     },
     "000660": {
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치 관련 부정적 언급과 대만 증시 비교. 정부 정책 실패 및 무능 비판.",
-        "sentiment": "-8",
-        "keywords": [
-          "정치",
-          "대만 증시",
-          "정부 책임"
-        ]
+        "posts_summary": "타사 주가 비교 및 정치 관련 부정적 언급이 주를 이룸.",
+        "sentiment": "-6",
+        "keywords": []
       }
     },
     "034020": {
@@ -44,12 +36,11 @@
       "name": "대우건설",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "실적 대비 주가 부진, 공매도 금지 요구 및 수주 소식 언급. 정부의 각성 촉구.",
+        "posts_summary": "실적 대비 주가 부진 및 공매도 관련 불만 제기.",
         "sentiment": "-7",
         "keywords": [
-          "실적",
           "공매도",
-          "수주"
+          "실적"
         ]
       }
     },
@@ -70,12 +61,12 @@
       "name": "아리바이오랩",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "먹는 치매약 'AR1001' 임상 3상 성공 관련 긍정적 소식. 푸싱제약 협력 및 FDA 허가 기대.",
-        "sentiment": "5",
+        "posts_summary": "먹는 치매약 3상 성공 및 해외 극찬, 투자 유치 기대감.",
+        "sentiment": "6",
         "keywords": [
-          "AR1001",
-          "임상 3상",
-          "푸싱제약"
+          "임상3상",
+          "기자간담회",
+          "치매약"
         ]
       }
     },
@@ -96,13 +87,9 @@
       "name": "하나에어로",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "주가 하락 및 매도세에 대한 부정적 전망. 실적 기반 우주항공주지만 하락세.",
-        "sentiment": "-2",
-        "keywords": [
-          "매도세",
-          "주가 하락",
-          "우주항공주"
-        ]
+        "posts_summary": "매도 물량 및 주가 하락에 대한 부정적 의견.",
+        "sentiment": "-4",
+        "keywords": []
       }
     },
     "446840": {
@@ -135,13 +122,9 @@
       "name": "NAVER",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "경영진 사퇴 요구 및 주가 하락에 대한 비판. 과매도 및 기관 매도세 지적.",
-        "sentiment": "-9",
-        "keywords": [
-          "경영진 사퇴",
-          "주가 하락",
-          "과매도"
-        ]
+        "posts_summary": "주가 하락 및 경영진 사퇴 요구 등 부정적 의견.",
+        "sentiment": "-7",
+        "keywords": []
       }
     },
     "035720": {
@@ -161,12 +144,11 @@
       "name": "휴림로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "로봇 관련 호재 및 급등 기대감 표출. 한화로보틱스 협력 및 3연상 가능성 언급.",
-        "sentiment": "6",
+        "posts_summary": "한화로보틱스와의 협력 가능성 및 주가 상승 기대.",
+        "sentiment": "5",
         "keywords": [
-          "로봇",
           "공시",
-          "급등"
+          "로봇"
         ]
       }
     },
@@ -174,11 +156,12 @@
       "name": "에이엘로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "글로벌 고객사 확보(화낙) 공시 기반 주가 상승 기대감.",
+        "posts_summary": "글로벌 고객사 확보 공시 기반, 상승 기대감 표출.",
         "sentiment": "3",
         "keywords": [
-          "화낙",
-          "고객사"
+          "공시",
+          "고객사",
+          "화낙"
         ]
       }
     },
@@ -203,6 +186,18 @@
         "sentiment": "-8",
         "keywords": [
           "데이터센터",
+          "공매도"
+        ]
+      }
+    },
+    "017670": {
+      "name": "SK텔레콤",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "투자 전략 및 엔트로픽 호재 미반영에 대한 의견.",
+        "sentiment": "-5",
+        "keywords": [
+          "엔트로픽",
           "공매도"
         ]
       }

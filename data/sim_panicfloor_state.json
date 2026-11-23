@@ -6,7 +6,53 @@
   "peak_nav": 0,
   "total_fees": 0,
   "history": [
-    0,
+    0
+  ],
+  "daily_trades": [],
+  "cooldown_codes": {},
+  "stage": "정상",
+  "stage_since": "2026-11-06",
+  "metrics": {
+    "asof": "2026-11-23",
+    "ready": true,
+    "epu_month": "2026-11",
+    "epu_level": 312.51,
+    "epu_obs": 19,
+    "epu_month_partial": false,
+    "epu_12m_pct": 27.7,
+    "epu_z": 0.81,
+    "stress_month": "2026-11",
+    "stress_level": -0.68,
+    "stress_obs": 2,
+    "stress_z": 0.43,
+    "aux_유가WTI_yoy": 54.4,
+    "aux_원달러_yoy": -7.9,
+    "aux_곡선10_2": 0.3,
+    "errors": []
+  },
+  "reason": "EPU 분위 28 · 스트레스 z=+0.43 · EPU z=+0.81",
+  "checked_at": "2026-11-23 16:08:13",
+  "raw_stats": {
+    "cash": 0,
+    "total_asset": 0,
+    "profit_rate": 0,
+    "holdings_count": 0,
+    "win_rate": 0,
+    "profit_factor": 1.0,
+    "mdd": 0,
+    "turnover": 0,
+    "frequency": 0,
+    "total_fees": 0,
+    "current_prices": {}
+  },
+  "normalized_stats": {
+    "승률": 0,
+    "수익팩터": 20.0,
+    "MDD": 100,
+    "거래빈도": 0,
+    "자본회전율": 0
+  },
+  "observations": [
     {
       "date": "2026-10-07",
       "stage": "관찰",
@@ -27,49 +73,5 @@
       "stage": "정상",
       "reason": "EPU 분위 66 · 스트레스 z=+0.45 · EPU z=+1.25"
     }
-  ],
-  "daily_trades": [],
-  "cooldown_codes": {},
-  "stage": "정상",
-  "stage_since": "2026-11-06",
-  "metrics": {
-    "asof": "2026-11-20",
-    "ready": true,
-    "epu_month": "2026-11",
-    "epu_level": 319.17,
-    "epu_obs": 18,
-    "epu_month_partial": true,
-    "epu_12m_pct": 33.8,
-    "epu_z": 0.88,
-    "stress_month": "2026-11",
-    "stress_level": -0.68,
-    "stress_obs": 2,
-    "stress_z": 0.43,
-    "aux_유가WTI_yoy": 54.4,
-    "aux_원달러_yoy": -7.9,
-    "aux_곡선10_2": 0.3,
-    "errors": []
-  },
-  "reason": "EPU 분위 34 · 스트레스 z=+0.43 · EPU z=+0.88",
-  "checked_at": "2026-11-21 01:03:48",
-  "raw_stats": {
-    "cash": 0,
-    "total_asset": 0,
-    "profit_rate": 0,
-    "holdings_count": 0,
-    "win_rate": 0,
-    "profit_factor": 1.0,
-    "mdd": 0,
-    "turnover": 0,
-    "frequency": 0,
-    "total_fees": 0,
-    "current_prices": {}
-  },
-  "normalized_stats": {
-    "승률": 0,
-    "수익팩터": 20.0,
-    "MDD": 100,
-    "거래빈도": 0,
-    "자본회전율": 0
-  }
+  ]
 }

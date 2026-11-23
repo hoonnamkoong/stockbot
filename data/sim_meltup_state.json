@@ -6,13 +6,7 @@
   "peak_nav": 0,
   "total_fees": 0,
   "history": [
-    0,
-    {
-      "date": "2026-10-12",
-      "stage": "관찰",
-      "anchor": "2026-01-27",
-      "elapsed": 8
-    }
+    0
   ],
   "daily_trades": [],
   "cooldown_codes": {},
@@ -20,9 +14,9 @@
   "anchor": "2026-01-27",
   "anchor_level": 5084.85,
   "elapsed": 9,
-  "kospi": 4869.96,
+  "kospi": 4708.54,
   "last_error": null,
-  "checked_at": "2026-11-21 01:03:48",
+  "checked_at": "2026-11-23 16:08:14",
   "stage_since": "2026-10-12",
   "raw_stats": {
     "cash": 0,
@@ -43,5 +37,13 @@
     "MDD": 100,
     "거래빈도": 0,
     "자본회전율": 0
-  }
+  },
+  "observations": [
+    {
+      "date": "2026-10-12",
+      "stage": "관찰",
+      "anchor": "2026-01-27",
+      "elapsed": 8
+    }
+  ]
 }

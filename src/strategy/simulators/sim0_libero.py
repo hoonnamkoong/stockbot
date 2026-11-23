@@ -1,6 +1,8 @@
+import os
 import statistics
 
 from .. import regime_state as rs
+from .. import regime_scorecard
 from .base_simulator import BaseSimulator, get_kst_now
 
 
@@ -357,7 +359,12 @@ def regime6_metrics(rows):
     ret10 = level - 1
     vol10 = statistics.stdev(ew[-R6_VOL_WIN:]) * 100
     d = 0.5 * (ab20 - 50) / 25 + 0.5 * max(-1.0, min(1.0, ret10 / R6_RET_SCALE))
-    return {'D': d, 'ab20': ab20, 'ret10': ret10, 'vol10': vol10}, None
+    # ret1 = 판정일 하루치 등가중 수익률. 판정에는 안 쓰지만 채점표가 쓴다 —
+    # 종가 CSV가 100행 롤링이라 창 밖으로 밀린 날은 되계산할 수 없고, 이 한
+    # 숫자만 보존하면 임의 구간의 누적수익률·실현변동성이 전부 복원된다
+    # (src/strategy/regime_scorecard.py).
+    return {'D': d, 'ab20': ab20, 'ret10': ret10, 'vol10': vol10,
+            'ret1': ew[-1]}, None
 
 
 def direction_level(d):
@@ -592,6 +599,27 @@ class LiberoSimulator(BaseSimulator):
         trend_n = self._clamp(trend)                  # ADX 근사 0~100
         return round(breadth * 0.40 + momentum_n * 0.35 + trend_n * 0.25, 1)
 
+    def _write_scorecard(self, out):
+        """확정된 하루를 채점표에 한 줄 남긴다. 판정에는 영향이 없다.
+
+        "이 국면이 무엇을 맞히는가"를 **손계산 없이** 재기 위한 기록이다.
+        2026-11-23에 그 질문을 받았을 때 79일을 손으로 재생해야 했다 — 재는
+        루틴이 없었기 때문이다.
+
+        여기서 예외를 올리지 않는다. 채점표 하나 때문에 국면이 멈추면 원래
+        막으려던 것보다 나쁘다.
+        """
+        try:
+            base = (out.get('state') or {}).get('base')
+            if not base:
+                return
+            label = regime6_label(base.get('level'), base.get('vol10'))
+            regime_scorecard.append_row(
+                os.path.join(self.data_dir, regime_scorecard.FILENAME),
+                regime_scorecard.build_row(base, label))
+        except Exception as e:
+            print(f'[Libero] 국면 채점표 기록 실패(무시): {type(e).__name__}: {e}')
+
     def _update_regime6(self, now):
         """6단계 국면을 갱신하고 current_regime 등 파생 필드를 state에 쓴다.
 
@@ -609,6 +637,7 @@ class LiberoSimulator(BaseSimulator):
         raw = out['raw_level']
         # instant_regime = 오늘 원시 방향 단계(미확정)의 3단계. 10시 전·판정 불가면 None.
         instant = None if raw is None else ('BEAR' if raw < 0 else 'BULL' if raw > 0 else 'SIDEWAYS')
+        self._write_scorecard(out)
         history = list(self.state.get('regime_history', []))
         if instant is not None:
             history = (history + [instant])[-5:]

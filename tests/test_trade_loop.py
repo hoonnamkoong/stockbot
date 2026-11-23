@@ -901,3 +901,17 @@ def test_regime_refresh_success_stays_quiet(monkeypatch):
     ctx = _Ctx()
     assert trade_loop.refresh_regime(ctx, storage=None, log=ctx.log) == 'BULL'
     assert not sent
+
+
+def test_국면_채점표가_배포_목록에_있다():
+    """누적 파일이 배포 목록에서 빠지면 매 런 db-data 사본으로 덮인다.
+
+    심9-1 매매기록이 정확히 그렇게 8건 중 2행만 남았다. 채점표는 하루 한 줄씩
+    쌓이는 파일이라 같은 함정에 그대로 걸린다.
+    """
+    import datetime as _dt
+    from src.strategy import regime_scorecard
+    from scripts.trade_loop import regime_output_files
+
+    now = _dt.datetime(2026, 11, 24, 9, 5)
+    assert regime_scorecard.FILENAME in regime_output_files(now)

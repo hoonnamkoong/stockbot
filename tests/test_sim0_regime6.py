@@ -448,3 +448,44 @@ def test_read_regime6_missing_or_unknown_field_is_none(tmp_path):
     assert rs.read_regime6(_write_state(tmp_path, {'current_regime': 'SIDEWAYS'})) is None
     assert rs.read_regime6(_write_state(tmp_path, {'regime6': 'SIDEWAYS'})) is None
     assert rs.read_regime6(_write_state(tmp_path, {'regime6': None})) is None
+
+
+# ── 채점표 배선 ─────────────────────────────────────────────────────
+# 순수 함수가 맞아도 호출부가 없으면 아무것도 안 쌓인다. 그리고 쌓이지 않으면
+# 다섯 달 뒤에 "정확도 확인했어?"가 또 손계산으로 돌아온다(2026-11-23).
+
+def test_확정된_하루가_채점표에_쌓인다(tmp_path, monkeypatch):
+    from src.strategy import regime_scorecard
+
+    monkeypatch.setattr(lib, 'get_kst_now', lambda: _at(29, '09:30'))
+    s = _sim(tmp_path)
+    s.data_dir = str(tmp_path)
+    s.live_market_metrics = {'breadth': 50.0, 'momentum': 0.0, 'trend': 10.0, 'sample': 100}
+    s.regime6_inputs = {'closes': _real_closes(30, 0.9), 'live': None}
+    s.run([], current_prices={})
+
+    path = tmp_path / regime_scorecard.FILENAME
+    assert path.exists(), '채점표가 생기지 않았다'
+    lines = path.read_text(encoding='utf-8').splitlines()
+    assert lines[0] == regime_scorecard.HEADER
+    assert len(lines) == 2, f'확정일 한 줄이어야 한다: {lines}'
+
+    cells = lines[1].split(',')
+    assert cells[1] == '2', '단계가 들어간다'
+    assert cells[7] not in ('', '0', '0.0'), f'ret1이 비었다: {cells}'
+
+
+def test_같은_날_여러_번_돌아도_한_줄이다(tmp_path, monkeypatch):
+    """루프는 2분 격자다. 중복이 쌓이면 채점이 그날에 가중된다."""
+    from src.strategy import regime_scorecard
+
+    monkeypatch.setattr(lib, 'get_kst_now', lambda: _at(29, '09:30'))
+    s = _sim(tmp_path)
+    s.data_dir = str(tmp_path)
+    s.live_market_metrics = {'breadth': 50.0, 'momentum': 0.0, 'trend': 10.0, 'sample': 100}
+    s.regime6_inputs = {'closes': _real_closes(30, 0.9), 'live': None}
+    for _ in range(3):
+        s.run([], current_prices={})
+
+    lines = (tmp_path / regime_scorecard.FILENAME).read_text(encoding='utf-8').splitlines()
+    assert len(lines) == 2, f'하루 한 줄이어야 한다: {lines}'

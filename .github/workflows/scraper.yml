@@ -231,6 +231,9 @@ jobs:
             case "$(basename "$f")" in
               trade_history_real.csv) continue ;;
               regime_observations*.csv|trade_history_sim_libero.csv) continue ;;
+              # 국면 채점표 — 누적 파일이고 writer는 trading.yml(리베로)뿐이다.
+              # 여기서 밀면 런 시작 시점 사본으로 되돌아가 쌓인 줄이 잘린다.
+              regime6_scorecard.csv) continue ;;
               money_*.csv) continue ;;   # 순위 스냅샷 — writer는 trading.yml
               # sim6/9/12/13은 버즈 불필요 심이라 trading.yml의 60초 루프로
               # 옮겨갔고, 그 diag는 거기서 매 사이클 배포한다(script/trade_loop.py

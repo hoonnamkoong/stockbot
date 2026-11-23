@@ -291,11 +291,17 @@ def regime_output_files(now) -> list[str]:
     """
     from src.strategy.registry import get_sim_registry
     from src.strategy.regime_observations import month_path
+    from src.strategy import regime_scorecard
 
     # 게이트 파일도 함께 올린다. 이게 db-data에 도달하지 못하면 다음 런이 "아직
     # 안 갱신했다"로 읽어 격자당 3회로 되돌아간다 — 게이트를 만든 의미가 사라진다.
     # 아카이브(regime_observations.csv)는 올리지 않는다 — 읽기 전용이라 안 바뀐다.
-    out = [os.path.basename(month_path(now)), 'regime_gate_state.json']
+    # 채점표는 **누적 파일**이다. 배포 목록에서 빠지면 로컬에서만 쌓이고 매 런
+    # db-data 사본으로 덮여 영영 한 줄짜리가 된다(심9-1 매매기록이 그랬다).
+    # 복원은 trading.yml이 `git checkout db-data -- data/`로 폴더째 하므로 별도
+    # 목록이 필요 없다.
+    out = [os.path.basename(month_path(now)), 'regime_gate_state.json',
+           regime_scorecard.FILENAME]
     # `analyzer`가 아니라 `produces_regime`로 고른다. 2026-10-07 Sim17(패닉바닥)이
     # 두 번째 분석기로 들어왔지만 EOD 심이라 이 루프에서 돌지 않는다 — 여기 얹으면
     # 쓰지도 않은 파일을 trading.yml이 '내 소유'라고 주장하게 된다.

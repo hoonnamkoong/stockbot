@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 8158.161999999993,
-  "invested": 10780.635,
+  "cash": 4599.761999999993,
+  "invested": 14339.035,
   "portfolio": {
     "RGA": {
       "name": "Reinsurance Group of America, Incorporated Common Stock",
@@ -24,7 +24,15 @@
       "quantity": 14,
       "avg_price": 247.76,
       "entry_date": "2026-11-23",
-      "peak_price": 255.345,
+      "peak_price": 256.121,
+      "is_scaled_out": false
+    },
+    "OMC": {
+      "name": "Omnicom Group Inc. Common Stock",
+      "quantity": 40,
+      "avg_price": 88.96,
+      "entry_date": "2026-11-25",
+      "peak_price": 88.96,
       "is_scaled_out": false
     }
   },
@@ -98,40 +106,40 @@
     "HNGE": "2026-11-24"
   },
   "raw_stats": {
-    "cash": 8158.161999999993,
-    "total_asset": 18954.066999999992,
-    "profit_rate": -5.229665000000041,
-    "holdings_count": 3,
+    "cash": 4599.761999999993,
+    "total_asset": 18961.700999999994,
+    "profit_rate": -5.191495000000032,
+    "holdings_count": 4,
     "win_rate": 25.0,
     "profit_factor": 0.4712170724903354,
-    "mdd": 18.56076664837581,
-    "turnover": 5.055491,
-    "frequency": 0.3,
+    "mdd": 18.52796592505841,
+    "turnover": 5.233411,
+    "frequency": 0.3111111111111111,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "U": 49.535,
-      "FROG": 104.13,
-      "NDAQ": 107.205,
-      "CBOE": 363.34,
-      "CPAY": 437.62,
-      "ICLR": 198.04,
-      "EXPD": 193.26,
-      "RGA": 275.085,
-      "PAYC": 248.03,
-      "WELL": 242.315,
-      "LYV": 182.71,
-      "GKOS": 255.345,
-      "OMC": 88.805,
-      "LLYVK": 107.48,
-      "LLYVA": 104.84,
-      "SN": 226.495
+      "GKOS": 256.121,
+      "LLYVA": 105.19,
+      "LLYVK": 108.16,
+      "CPAY": 438.3,
+      "FROG": 104.69,
+      "EXPD": 192.675,
+      "WELL": 242.88,
+      "RGA": 274.745,
+      "OMC": 88.96,
+      "PAYC": 244.5,
+      "NDAQ": 107.24,
+      "U": 49.61,
+      "CBOE": 363.05,
+      "ICLR": 198.41,
+      "SN": 226.777,
+      "LYV": 182.97
     }
   },
   "normalized_stats": {
     "승률": 25.0,
     "수익팩터": 9.424341449806708,
-    "MDD": 44.31770005487257,
-    "거래빈도": 1.5,
-    "자본회전율": 10.110982
+    "MDD": 44.41610222482477,
+    "거래빈도": 1.5555555555555556,
+    "자본회전율": 10.466822
   }
 }

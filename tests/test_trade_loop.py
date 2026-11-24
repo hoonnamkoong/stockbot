@@ -317,18 +317,18 @@ def test_manifest_contains_regime_and_sim_files(tmp_path, monkeypatch):
 
 # ── extra_sim_ids: 버즈 불필요 심 전체 배포 (2026-08-19) ────────────────
 # 선택 심 하나만 올리던 매니페스트에, 60초 루프로 옮긴 나머지 버즈 불필요
-# 심들(Sim2/3/4/6/8/9 등)의 상태 파일도 실려야 한다 — 안 그러면 매분 계산한
+# 심들(Sim3/4/6/8/9 등)의 상태 파일도 실려야 한다 — 안 그러면 매분 계산한
 # 매매가 컨테이너 종료와 함께 증발한다.
 
 def test_extra_sim_ids_are_included_in_the_manifest(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     trade_loop._write_deploy_manifest(
         None, log=lambda *a: None,
-        extra_sim_ids={'sim_spillover', 'sim_risk'})
+        extra_sim_ids={'sim6_bear', 'sim_risk'})
     lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
         encoding='utf-8').split()
-    assert 'sim_spillover_state.json' in lines
-    assert 'trade_history_sim_spillover.csv' in lines
+    assert 'sim_bear_state.json' in lines
+    assert 'trade_history_sim_bear.csv' in lines
     assert 'sim_risk_state.json' in lines
 
 
@@ -361,18 +361,6 @@ def test_sim9_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
         encoding='utf-8').split()
     assert 'sim_gapfade_state.json' in lines
     assert os.path.basename(day_path('sim9', now.strftime('%Y%m%d'))) in lines
-
-
-def test_sim12_extra_sim_id_also_carries_its_diag_file(tmp_path, monkeypatch):
-    from src.data.sim_diag import day_path
-    monkeypatch.chdir(tmp_path)
-    now = _Ctx().now_kst
-    trade_loop._write_deploy_manifest(
-        None, log=lambda *a: None, now=now, extra_sim_ids={'sim12_regime_dual'})
-    lines = (tmp_path / 'data' / '.lite_deploy_manifest').read_text(
-        encoding='utf-8').split()
-    assert 'sim_regimedual_state.json' in lines
-    assert os.path.basename(day_path('sim12', now.strftime('%Y%m%d'))) in lines
 
 
 def test_both_diag_files_carried_when_both_sims_ran(tmp_path, monkeypatch):
@@ -411,14 +399,14 @@ def test_extra_sim_ids_combine_with_the_selected_sim_without_duplicating():
         try:
             trade_loop._write_deploy_manifest(
                 'sim4_bull_daytrading', log=lambda *a: None,
-                extra_sim_ids={'sim4_bull_daytrading', 'sim_spillover'})
+                extra_sim_ids={'sim4_bull_daytrading', 'sim6_bear'})
             lines = (open(_os.path.join(d, 'data', '.lite_deploy_manifest'),
                           encoding='utf-8').read().split())
         finally:
             _os.chdir(cwd)
     assert len(lines) == len(set(lines)), '중복 없이 기록돼야 한다'
     assert 'sim_bulldaytrade_state.json' in lines
-    assert 'sim_spillover_state.json' in lines
+    assert 'sim_bear_state.json' in lines
 
 
 def test_no_extra_sim_ids_behaves_like_before(tmp_path, monkeypatch):

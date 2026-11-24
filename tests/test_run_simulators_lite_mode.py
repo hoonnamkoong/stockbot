@@ -237,19 +237,19 @@ def test_nothing_is_excluded_when_no_owner_is_given():
 
 
 # ── exclude_sim_ids / include_only_sim_ids (2026-08-19) ────────────────
-# 버즈 불필요 심 전체(Sim2,3,4,6,8,9 등)를 trading.yml의 60초 루프로 옮기면서
+# 버즈 불필요 심 전체(Sim3,4,6,8,9 등)를 trading.yml의 60초 루프로 옮기면서
 # 필요해진 것들. exclude_sim_id(단일)의 다중판이 scraper.yml 쪽에서, 그
 # 역(포함만) 버전이 trading.yml 쪽에서 쓰인다.
 
 def test_exclude_sim_ids_excludes_the_whole_set():
-    a = _NamedSim('sim_spillover_state.json')
+    a = _NamedSim('sim_bear_state.json')
     b = _NamedSim('sim_risk_state.json')
     c = _NamedSim('sim_psych_state.json')
     w = _worker()
 
     with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
                     return_value=[a, b, c]):
-        w._run_simulators([], exclude_sim_ids={'sim_spillover', 'sim_risk'})
+        w._run_simulators([], exclude_sim_ids={'sim6_bear', 'sim_risk'})
 
     assert a.ran_with is None
     assert b.ran_with is None
@@ -258,7 +258,7 @@ def test_exclude_sim_ids_excludes_the_whole_set():
 
 def test_exclude_sim_id_and_exclude_sim_ids_combine():
     """단일 exclude_sim_id와 복수 exclude_sim_ids를 같이 줘도 합집합으로 제외된다."""
-    a = _NamedSim('sim_spillover_state.json')
+    a = _NamedSim('sim_bear_state.json')
     b = _NamedSim('sim_bulldaytrade_state.json')
     c = _NamedSim('sim_psych_state.json')
     w = _worker()
@@ -266,7 +266,7 @@ def test_exclude_sim_id_and_exclude_sim_ids_combine():
     with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
                     return_value=[a, b, c]):
         w._run_simulators([], exclude_sim_id='sim4_bull_daytrading',
-                          exclude_sim_ids={'sim_spillover'})
+                          exclude_sim_ids={'sim6_bear'})
 
     assert a.ran_with is None
     assert b.ran_with is None
@@ -274,14 +274,14 @@ def test_exclude_sim_id_and_exclude_sim_ids_combine():
 
 
 def test_include_only_sim_ids_runs_just_that_set():
-    a = _NamedSim('sim_spillover_state.json')
+    a = _NamedSim('sim_bear_state.json')
     b = _NamedSim('sim_risk_state.json')
     c = _NamedSim('sim_psych_state.json')
     w = _worker()
 
     with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
                     return_value=[a, b, c]):
-        w._run_simulators([], include_only_sim_ids={'sim_spillover', 'sim_risk'})
+        w._run_simulators([], include_only_sim_ids={'sim6_bear', 'sim_risk'})
 
     assert a.ran_with is not None
     assert b.ran_with is not None
@@ -290,7 +290,7 @@ def test_include_only_sim_ids_runs_just_that_set():
 
 def test_include_only_sim_ids_empty_set_runs_nothing():
     """빈 집합은 'None(필터 없음)'과 다르다 — '아무도 포함되지 않았다'로 읽는다."""
-    a = _NamedSim('sim_spillover_state.json')
+    a = _NamedSim('sim_bear_state.json')
     w = _worker()
 
     with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',
@@ -302,7 +302,7 @@ def test_include_only_sim_ids_empty_set_runs_nothing():
 
 def test_include_only_sim_ids_none_does_not_filter():
     """None(기본값)은 기존 동작 그대로 — 전 심이 돈다."""
-    a = _NamedSim('sim_spillover_state.json')
+    a = _NamedSim('sim_bear_state.json')
     w = _worker()
 
     with mock.patch('src.pipeline.workers.trade_engine.get_active_simulators',

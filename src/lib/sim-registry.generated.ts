@@ -23,7 +23,6 @@ export interface SimRegistryEntry {
 
 export const SIM_REGISTRY: SimRegistryEntry[] = [
   { id: 'sim_psych', uiKey: 'sim1', label: '심리 괴리형 (Sim 1)', shortDesc: 'Buzz 급증·가격 정체 종목 매집', color: 'blue', chartGroup: 1, stateFile: 'sim_psych_state.json', csvFile: 'trade_history_sim_psych.csv', tradeable: true },
-  { id: 'sim_spillover', uiKey: 'sim2', label: '수급 동승형 (Sim 2)', shortDesc: '외인 수급 + 감정 발산 스코어', color: 'violet', chartGroup: 1, stateFile: 'sim_spillover_state.json', csvFile: 'trade_history_sim_spillover.csv', tradeable: true },
   { id: 'sim_risk', uiKey: 'sim3', label: '가치 페어형 (Sim 3)', shortDesc: '추세 돌파 / 횡보 반등 + 트레일링', color: 'red', chartGroup: 1, stateFile: 'sim_risk_state.json', csvFile: 'trade_history_sim_risk.csv', tradeable: true },
   { id: 'sim4_bull', uiKey: 'sim4', label: '상승 모멘텀형 (Sim 4)', shortDesc: '주도주 탑승·불타기, 고정익절 없이 라이딩', color: 'green', chartGroup: 2, stateFile: 'sim_bull_state.json', csvFile: 'trade_history_sim_bull.csv', tradeable: true },
   { id: 'sim4_bull_daytrading', uiKey: 'sim4_daytrading', label: '상승 단타형 (Sim 4-1)', shortDesc: '상승률 상위 단기 회전 — 분할 익절(+5%/+10%) · 2일/5일 강제청산', color: 'teal', chartGroup: 2, stateFile: 'sim_bulldaytrade_state.json', csvFile: 'trade_history_sim_bulldaytrade.csv', tradeable: true },
@@ -34,9 +33,6 @@ export const SIM_REGISTRY: SimRegistryEntry[] = [
   { id: 'sim9_1_donchian', uiKey: 'sim9_1', label: '돈치안 돌파 (Sim 9-1)', shortDesc: '20일 채널 상단 돌파 추종 · 5일 채널 이탈 / 2ATR 청산', color: 'lime', chartGroup: 4, stateFile: 'sim_donchian_state.json', csvFile: 'trade_history_sim_donchian.csv', tradeable: false },
   { id: 'sim10_orchestrator', uiKey: 'sim10', label: '오케스트레이터 (Sim 10)', shortDesc: 'Sim0 국면에 따라 전략 파라미터 동적 전환 · 300만 독립 운용', color: 'grape', chartGroup: 4, stateFile: 'sim_orchestrator_state.json', csvFile: 'trade_history_sim_orchestrator.csv', tradeable: true },
   { id: 'sim11_minervini', uiKey: 'sim11', label: '미너비니 추세형 (Sim 11)', shortDesc: '추세 템플릿 + 실적 가속(EPS·매출) + VCP 압축 돌파', color: 'gray', chartGroup: 5, stateFile: 'sim_minervini_state.json', csvFile: 'trade_history_sim_minervini.csv', tradeable: false },
-  { id: 'sim12_regime_dual', uiKey: 'sim12', label: '국면이원 반등/추세형 (Sim 12)', shortDesc: 'BULL=모멘텀 지속 / SIDEWAYS·BEAR=급락반등(거래대금+기관수급 확인)', color: 'dark', chartGroup: 5, stateFile: 'sim_regimedual_state.json', csvFile: 'trade_history_sim_regimedual.csv', tradeable: false },
-  { id: 'sim13_theme_cascade', uiKey: 'sim13', label: '테마 캐스케이드 (Sim 13)', shortDesc: '테마모멘텀+ADX/거래대금서프라이즈+외국인수급 이벤트탐지, PER게이트+그룹집중상한', color: '#a1662f', chartGroup: 5, stateFile: 'sim_themecascade_state.json', csvFile: 'trade_history_sim_themecascade.csv', tradeable: false },
-  { id: 'sim14_squeeze_breakout', uiKey: 'sim14', label: '수축 돌파형 (Sim 14)', shortDesc: '강한횡보 전용 · 밴드폭 수축 후 20일 고가 돌파 · MA10 이탈/-5%/10일 청산', color: 'pink', chartGroup: 5, stateFile: 'sim_squeeze_state.json', csvFile: 'trade_history_sim_squeeze.csv', tradeable: false },
   { id: 'sim15_adm', uiKey: 'sim15', label: '듀얼모멘텀 1배 (Sim 15)', shortDesc: '코스피200 vs 나스닥100 · 1+3+6개월 점수 승자 100% · 0 이하면 국고채 · 월 1회 (관찰)', color: '#7d8500', chartGroup: 3, stateFile: 'sim_adm_state.json', csvFile: 'trade_history_sim_adm.csv', tradeable: false },
   { id: 'sim16_adm_lev', uiKey: 'sim16', label: '듀얼모멘텀 2배 (Sim 16)', shortDesc: 'Sim15와 같은 판정 · 보유는 2배 레버리지 ETF(122630·418660) · 월 1회 (관찰)', color: '#1b3a6b', chartGroup: 3, stateFile: 'sim_admlev_state.json', csvFile: 'trade_history_sim_admlev.csv', tradeable: false },
 ];
@@ -124,7 +120,6 @@ export const SIM_CHART_HEX: Record<string, string> = {
   // theme.colors에 등록된 이름이 아니어도 Mantine의 color prop은 유효한 CSS
   // 색상값을 그대로 받아들인다(공식 지원 동작). shade 자동계산(filled/light
   // variant의 밝기 단계)은 못 받지만 Badge/Text 등에서 문제없이 렌더된다.
-  '#a1662f': '#a1662f',
   '#7d8500': '#7d8500',
   '#1b3a6b': '#1b3a6b',
   '#b24d00': '#b24d00',

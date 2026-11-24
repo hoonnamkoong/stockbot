@@ -266,10 +266,13 @@ def test_exit_below_50day_ma_in_closing_window():
     assert len(s) == 1 and '50일선 이탈(마감 판정)' in s[0]['reason']
 
 
-def test_closing_window_bounds_match_sim14():
-    """15:15 포함, 15:20 미포함(동시호가) — Sim14 EXIT_WINDOW와 같은 비교."""
-    from src.strategy.simulators.sim14_squeeze_breakout import EXIT_WINDOW
-    assert sim11.MA_EXIT_TIME_WINDOW == EXIT_WINDOW == ('15:15', '15:20')
+def test_closing_window_bounds():
+    """15:15 포함, 15:20 미포함(동시호가).
+
+    전에는 Sim14의 EXIT_WINDOW와 같은지까지 봤는데, 2026-11-24에 Sim14가
+    제거돼 비교 대상이 없어졌다. 지키려던 불변식은 경계값 자체다.
+    """
+    assert sim11.MA_EXIT_TIME_WINDOW == ('15:15', '15:20')
     below_ma = 149.0
 
     def sells_at(h, m):

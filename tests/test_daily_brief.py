@@ -176,7 +176,7 @@ def test_collect_ignores_raw_stats_profit_rate_uses_calculated_value(tmp_path):
     # → 정상 계산: (5,500,000 - 5,000,000) / 5,000,000 * 100 = +10.0%
     # 하지만 raw_stats.profit_rate = 83.33 (옛 버그: 분모 3,000,000)
     # → (5,500,000 - 3,000,000) / 3,000,000 * 100 = 83.33
-    _write(tmp_path, 'sim_spillover_state.json',
+    _write(tmp_path, 'sim_risk_state.json',
            json.dumps({
                'cash': 5_500_000,
                'initial_cash': 5_000_000,
@@ -184,9 +184,9 @@ def test_collect_ignores_raw_stats_profit_rate_uses_calculated_value(tmp_path):
                'raw_stats': {'profit_rate': 83.33, 'current_prices': {}}
            }))
     rows = collect_sim_brief(str(tmp_path), '2026-07-22')
-    spillover = next(r for r in rows if 'Sim 2' in r['label'])
+    sim = next(r for r in rows if 'Sim 3' in r['label'])
     # 10.0%가 나와야 함 (83.33 아님)
-    assert abs(spillover['profit_rate'] - 10.0) < 1e-9
+    assert abs(sim['profit_rate'] - 10.0) < 1e-9
 
 
 def test_corrupted_state_json_logs_error_and_returns_none(tmp_path, capsys):

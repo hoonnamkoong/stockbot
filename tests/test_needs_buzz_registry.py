@@ -19,7 +19,6 @@ from src.strategy.registry import needs_buzz, list_buzz_free_sim_ids, _load_mani
 EXPECTED_STATIC = {
     'sim0_libero': False,
     'sim_psych': True,
-    'sim_spillover': False,
     'sim_risk': False,
     'sim4_bull': False,
     'sim5_sideways': True,
@@ -31,8 +30,6 @@ EXPECTED_STATIC = {
     'sim11_minervini': False,  # 08-20 재설계: 무거운 계산은 EOD 배치가 감시 목록에
                                # 미리 남기고, get_universe()는 그 파일만 읽는다 —
                                # 자체 유니버스 심들과 같은 60초 루프에서 돈다
-    'sim12_regime_dual': False,  # KIS 등락률 순위 자체 유니버스, 버즈 무관 —
-                                 # 자체 유니버스 심들과 같은 60초 루프에서 돈다
 }
 
 
@@ -122,6 +119,6 @@ def test_buzz_needing_sims_never_appear():
 def test_static_buzz_free_sims_are_always_present_regardless_of_regime():
     for regime in ('BULL', 'SIDEWAYS', 'BEAR', None):
         buzz_free = list_buzz_free_sim_ids(regime)
-        for sid in ('sim_spillover', 'sim_risk', 'sim4_bull',
+        for sid in ('sim_risk', 'sim4_bull',
                     'sim6_bear', 'sim8_accumulation', 'sim9_gap_fade'):
             assert sid in buzz_free, f'{sid}는 정적 버즈 불필요라 국면과 무관해야 한다({regime})'

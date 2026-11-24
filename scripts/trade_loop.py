@@ -73,8 +73,7 @@ DEPLOY_MANIFEST = os.path.join('data', '.lite_deploy_manifest')
 # 매 사이클 push하는 파일을 scraper.yml도 같은 이름으로 밀어 non-fast-forward
 # 충돌이 난다(2026-08-24). sim1처럼 이 루프로 안 옮겨온 심의 diag는 여기 없고
 # scraper.yml의 `data/*.csv` 기본 경로로만 나간다.
-DIAG_LOG_SIM_IDS = {'sim6_bear': 'sim6', 'sim9_gap_fade': 'sim9',
-                     'sim12_regime_dual': 'sim12', 'sim13_theme_cascade': 'sim13'}
+DIAG_LOG_SIM_IDS = {'sim6_bear': 'sim6', 'sim9_gap_fade': 'sim9'}
 
 _SCRAPER_WORKFLOW = 'scraper.yml'
 _REPO = os.environ.get('GITHUB_REPOSITORY') or 'hoonnamkoong/stockbot'

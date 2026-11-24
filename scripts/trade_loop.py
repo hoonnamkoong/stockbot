@@ -666,6 +666,17 @@ def run_trade_loop(ctx: PipelineContext) -> None:
     # 써야 한다 — 페이퍼 요약이 실전 주문을 밀어내면 안 된다.
     us_brief_sent = _send_us_brief_if_due(ctx.now_kst, ctx.log)
 
+    # **state_was_written() 앞에 둔다.** 여기서 알림이 나가면 쿨다운 기록이
+    # 생기는데, 그 뒤에 판정하면 이 런의 배포 목록에 alert_dedup.json이 안 들어가
+    # 다음 런이 백지에서 또 울린다([[alert-cooldown-needs-persisted-state]]).
+    try:
+        from src.trade.kis_data_provider import KISDataProvider
+        alerts.notify_kis_refusals(KISDataProvider.attempt_counts,
+                                   KISDataProvider.reject_counts,
+                                   now=ctx.now_kst, log=ctx.log)
+    except Exception as e:
+        ctx.log(f'[TradeLoop] KIS 거부율 점검 실패(무시): {e}')
+
     alerts_written = alerts.state_was_written()
     if (traded_sim_id or regime_refreshed or money_at or alerts_written
             or buzz_free_ran or us_brief_sent):

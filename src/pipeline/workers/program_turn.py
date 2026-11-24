@@ -15,7 +15,18 @@ MTM-리셋 설계가 지키던 '턴별 손익 합 = 누적 실현손익' 불변�
 이 모듈은 I/O를 하지 않는다. 원장 dict을 받아 제자리에서 갱신할 뿐이다.
 """
 
-# Sim10의 국면 → 하위 전략 태그 (manifest의 실제 심 id)
+# Sim10의 슬롯 → 하위 전략 태그 (manifest의 실제 심 id).
+# 'cash'가 'sim6'인 것은 **옛 태그 이름을 유지**하는 것이다 — 인버스 위임(구 심6)은
+# 2026-10-01에 폐지돼 그 슬롯은 현금 대기지만, 이름을 바꾸면 원장의 턴 이력이
+# 그 지점에서 갈려 앞뒤를 비교할 수 없게 된다.
+SLOT_TAG = {
+    'daytrade': 'sim4_bull_daytrading',
+    'sideways': 'sim5_sideways',
+    'cash': 'sim6',
+}
+
+# 옛 스냅샷용 폴백. 2026-11-24 이전 스냅샷에는 active_slot이 없고 3단계 국면만
+# 있다 — 그때의 라우팅 축이 3단계였으므로 그 매핑으로 읽으면 당시 슬롯이 나온다.
 REGIME_TAG = {
     'BULL': 'sim4_bull_daytrading',
     'SIDEWAYS': 'sim5_sideways',

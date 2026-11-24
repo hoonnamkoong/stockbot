@@ -205,7 +205,7 @@ simulators:
   - id: "sim10_orchestrator"
     module: "src.strategy.simulators.sim10_orchestrator"
     class: "Sim10OrchestratorSimulator"
-    description: "Sim10 오케스트레이터 — Sim0 국면(BULL/SIDEWAYS/BEAR)에 따라 전략 파라미터 동적 전환 (300만 독립 운용)"
+    description: "Sim10 오케스트레이터 — 리베로 전일 확정 6단계에 따라 하위 전략 전환(상승계=단타, 하락계=눌림목, 횡보계=현금) (300만 독립 운용)"
     state_file: "sim_orchestrator_state.json"
     csv_file: "trade_history_sim_orchestrator.csv"
     label: "오케스트레이터 (Sim 10)"
@@ -216,7 +216,9 @@ simulators:
     color: "grape"
     active: true
     tradeable: true
-    needs_buzz: dynamic  # BULL/BEAR=자체 유니버스(불필요), SIDEWAYS=공통 버즈 후보(필요)
+    needs_buzz: dynamic  # 소유 워크플로를 가르는 값. 2026-11-24 라우팅 축이 6단계로
+                         # 바뀐 뒤로는 세 슬롯 모두 자체 유니버스를 쓰므로 버즈가
+                         # 실제로 필요하진 않다 — 클래스 docstring의 ⚠ 참조
 
   - id: "sim8_accumulation"
     module: "src.strategy.simulators.sim8_accumulation"

@@ -42,7 +42,7 @@ from src.trade.executions import UNKNOWN
 from src.trade.pending import register_pending
 from src.trade.realized_pnl import lookup_realized_pnl as _lookup_realized_pnl
 from src.pipeline.workers.program_turn import (
-    REGIME_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
+    REGIME_TAG, SLOT_TAG, new_turn, switch_tag, record_buy, record_sell, prune_basis,
 )
 
 
@@ -371,12 +371,21 @@ def _release_lock(ledger: dict, sha: str | None, log=print) -> None:
 def _resolve_active_tag(sim_id: str, snapshot: dict) -> str:
     """턴 회계용 활성 전략 태그.
 
-    Sim10은 Sim0 국면에 따라 하위 전략(Sim4-1/Sim5/현금)을 갈아타므로 그 하위 전략을
-    태그로 쓴다. active_regime은 Sim10이 run() 중 self.state(=스냅샷)에 써둔 값이라
+    Sim10은 국면에 따라 하위 전략(Sim4-1/Sim5/현금)을 갈아타므로 그 하위 전략을
+    태그로 쓴다. active_slot은 Sim10이 run() 중 self.state(=스냅샷)에 써둔 값이라
     Sim10을 수정하지 않고 읽기만 하면 된다. 나머지 심은 자기 id가 곧 태그다.
+
+    **슬롯을 먼저 읽는다.** 2026-11-24에 Sim10의 라우팅 축이 '오늘의 3단계'에서
+    '전일 확정 6단계'로 바뀌었고, 그래서 active_regime만으로는 어느 슬롯이 돌았는지
+    알 수 없다(6단계 하락계는 3단계 BEAR인데 그 슬롯은 눌림목이다). 그 전에 쓰인
+    스냅샷에는 active_slot이 없으므로 3단계 매핑으로 폴백한다 — 원장을 거슬러
+    읽을 수 있어야 한다.
     """
     if sim_id != 'sim10_orchestrator':
         return sim_id
+    slot = snapshot.get('active_slot')
+    if slot in SLOT_TAG:
+        return SLOT_TAG[slot]
     return REGIME_TAG.get(snapshot.get('active_regime'), sim_id)
 
 

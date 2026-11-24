@@ -177,31 +177,35 @@ def test_sim3_value_can_buy(tmp_path):
 
 # ── 심10 오케스트레이터 (국면별 위임) ────────────────────────────────
 
-@pytest.mark.parametrize('regime, maker', [('SIDEWAYS', _box), ('BULL', _momentum)])
-def test_sim10_can_buy_in_each_regime(tmp_path, monkeypatch, regime, maker):
+@pytest.mark.parametrize('regime6, maker', [('BEAR', _box), ('BULL', _momentum)])
+def test_sim10_can_buy_in_each_regime(tmp_path, monkeypatch, regime6, maker):
     """심10은 자체 진입 로직이 없다 — 국면에 따라 하위 전략을 그대로 부른다.
     그래서 하위 전략이 막히면 심10도 같이 막힌다(8월 0건이 그랬다).
 
-    SIDEWAYS 위임은 심5의 6단계 게이트(전일 확정값)도 받는다(10-01) — 진입 허용
-    국면(약한횡보)으로 고정한다. 게이트 자체는 test_sim10_regime_gate.py가 본다."""
+    **라우팅 축은 전일 확정 6단계다**(2026-11-24). 하락계=눌림목(심5 게이트가
+    열리는 국면), 상승계=단타. 축 자체는 test_sim10_regime_gate.py가 본다."""
     from src.strategy.simulators import sim10_orchestrator
     from src.strategy.simulators.sim10_orchestrator import Sim10OrchestratorSimulator
-    monkeypatch.setattr(sim10_orchestrator, 'read_regime6_confirmed', lambda *a, **k: 'BEAR')  # 10-02 G2: 허용 국면=하락계
+    monkeypatch.setattr(sim10_orchestrator, 'read_regime6_confirmed', lambda *a, **k: regime6)
     s = _sim(Sim10OrchestratorSimulator, tmp_path)
-    s._read_regime = lambda: (regime, 70.0)
+    s._read_regime = lambda: ('SIDEWAYS', 70.0)   # 3단계는 기록용이라 라우팅을 안 바꾼다
     cands = [maker(i) for i in range(8)]
 
     s.run(cands, {c['code']: c['price'] for c in cands})
 
-    assert s.state['portfolio'], f'{regime} 국면에서 한 종목도 못 샀다'
+    assert s.state['portfolio'], f'{regime6}에서 한 종목도 못 샀다'
 
 
-def test_sim10_bear_does_not_buy(tmp_path):
-    """BEAR는 '살 수 있다'가 아니라 '사지 않는다'다(10-01: 현금 대기, 보유분 청산).
-    구 심6 진입 조건을 완벽히 만족하는 인버스 후보를 줘도 0건이어야 한다."""
+@pytest.mark.parametrize('regime6', ['WEAK_SIDEWAYS', 'STRONG_SIDEWAYS'])
+def test_sim10_sideways_does_not_buy(tmp_path, monkeypatch, regime6):
+    """횡보계는 '살 수 있다'가 아니라 '사지 않는다'다(현금 대기, 보유분 청산 —
+    10-01의 결정을 2026-11-24에 6단계 축으로 옮겼다). 구 심6 진입 조건을 완벽히
+    만족하는 인버스 후보를 줘도 0건이어야 한다."""
+    from src.strategy.simulators import sim10_orchestrator
     from src.strategy.simulators.sim10_orchestrator import Sim10OrchestratorSimulator
+    monkeypatch.setattr(sim10_orchestrator, 'read_regime6_confirmed', lambda *a, **k: regime6)
     s = _sim(Sim10OrchestratorSimulator, tmp_path)
-    s._read_regime = lambda: ('BEAR', 20.0)
+    s._read_regime = lambda: ('SIDEWAYS', 20.0)
     inv = {'code': '114800', 'name': 'KODEX 인버스', 'price': 1200,
            'sparkline_price': [1000, 1050, 1100, 1150, 1200], 'change_rate': '+2.00%'}
 

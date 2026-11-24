@@ -8,7 +8,7 @@
       "quantity": 13,
       "avg_price": 274.455,
       "entry_date": "2026-11-11",
-      "peak_price": 274.77,
+      "peak_price": 275.0,
       "is_scaled_out": false
     },
     "NDAQ": {
@@ -24,7 +24,7 @@
       "quantity": 14,
       "avg_price": 247.76,
       "entry_date": "2026-11-23",
-      "peak_price": 252.93,
+      "peak_price": 253.525,
       "is_scaled_out": false
     }
   },
@@ -99,38 +99,38 @@
   },
   "raw_stats": {
     "cash": 8158.161999999993,
-    "total_asset": 18881.356999999993,
-    "profit_rate": -5.593215000000037,
+    "total_asset": 18915.411999999993,
+    "profit_rate": -5.422940000000035,
     "holdings_count": 3,
     "win_rate": 25.0,
     "profit_factor": 0.4712170724903354,
-    "mdd": 18.87317699582243,
+    "mdd": 18.726854146389137,
     "turnover": 5.055491,
     "frequency": 0.3,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "WELL": 241.28,
+      "CBOE": 360.99,
+      "ICLR": 198.9,
+      "PAYC": 246.242,
+      "FROG": 105.68,
+      "OMC": 88.47,
       "LLYVK": 106.98,
-      "PAYC": 245.31,
-      "LYV": 181.75,
-      "SN": 226.045,
-      "FROG": 105.59,
-      "CBOE": 358.52,
-      "EXPD": 193.835,
-      "GKOS": 252.63,
-      "NDAQ": 106.8,
-      "CPAY": 438.26,
-      "RGA": 273.475,
-      "OMC": 88.3,
-      "ICLR": 197.88,
-      "LLYVA": 103.065,
-      "U": 49.0
+      "NDAQ": 106.85,
+      "U": 49.295,
+      "WELL": 242.02,
+      "SN": 224.44,
+      "RGA": 275.0,
+      "EXPD": 193.75,
+      "GKOS": 253.525,
+      "LYV": 181.78,
+      "CPAY": 436.855,
+      "LLYVA": 103.065
     }
   },
   "normalized_stats": {
     "승률": 25.0,
     "수익팩터": 9.424341449806708,
-    "MDD": 43.380469012532714,
+    "MDD": 43.81943756083259,
     "거래빈도": 1.5,
     "자본회전율": 10.110982
   }

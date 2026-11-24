@@ -192,27 +192,6 @@ export interface PortfolioData {
 }
 
 /**
- * KIS HashKey 발급 (POST 요청용 무결성 검증)
- */
-async function getHashKey(body: any): Promise<string> {
-    const config = getKISConfig();
-    try {
-        const res = await axios.post(`${config.BASE_URL}/uapi/hashkey`, body, {
-            headers: {
-                'content-type': 'application/json',
-                'appkey': config.APP_KEY,
-                'appsecret': config.APP_SECRET,
-            }
-        });
-        if (res.data.HASH) return res.data.HASH;
-        throw new Error('Hashkey 발급에 실패했습니다.');
-    } catch (error: any) {
-        console.error('[KIS-API] Hashkey Error:', error.response?.data || error.message);
-        throw new Error(`Hashkey 생성 실패: ${error.message}`);
-    }
-}
-
-/**
  * KIS OAuth2 Access Token 발급 (GitHub Sync Mode)
  * [V8.9.9.39 Logic] Vercel은 더 이상 직접 토큰을 발급하지 않고 깃허브 캐시만 읽습니다.
  */
@@ -515,8 +494,12 @@ export function buildOrderRequest(
                 limitPrice: price,
             });
 
-            const hashKey = await getHashKey(body);
-
+            // hashkey 헤더를 싣지 않는다 — KIS가 hashkey 발급 엔드포인트를 폐지했다.
+            // 2026-11-24 실측: 실전·모의 양쪽이 HTTP 500 + EGW00318
+            // "Hashkey는 더이상 사용하지 않습니다. 해당 값 없이 주문 처리가능합니다".
+            // 그걸 주문 직전에 부르고 있었으므로 매수·매도 **전부**가 KIS에 닿지도
+            // 못했다(그날 10:15 KST부터 2분마다 502). src/lib/kis-order.test.ts가
+            // 되살아나는 것을 막는다.
             const res = await axios.post(`${config.BASE_URL}/uapi/domestic-stock/v1/trading/order-cash`, body, {
                 headers: {
                     'content-type': 'application/json',
@@ -524,7 +507,6 @@ export function buildOrderRequest(
                     'appkey': config.APP_KEY,
                     'appsecret': config.APP_SECRET,
                     'tr_id': tr_id,
-                    'hashkey': hashKey
                 }
             });
 

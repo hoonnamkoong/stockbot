@@ -123,3 +123,19 @@ test('qty가 정상 범위의 양의 정수면 통과한다', () => {
   assert.equal(buildOrderRequest('005930', 1, 'buy', REAL).body.ORD_QTY, '1');
   assert.equal(buildOrderRequest('005930', 10, 'buy', REAL).body.ORD_QTY, '10');
 });
+
+// KIS가 hashkey 엔드포인트를 폐지했다(2026-11-24 실측: 실전·모의 양쪽이 HTTP 500 +
+// EGW00318 "Hashkey는 더이상 사용하지 않습니다. 해당 값 없이 주문 처리가능합니다").
+// 주문 직전에 이걸 부르고 있었으므로 **모든 실주문이 KIS에 닿지도 못했다** —
+// 매수·매도 공통 경로라 손절도 못 나갔다. 되살아나면 같은 사고가 그대로 재발한다.
+//
+// placeRealOrder는 네트워크를 타서 단위테스트로 못 잡는다. 그래서 소스를 읽어
+// 폐지된 경로가 다시 들어오지 않았는지만 본다 — 약하지만 이 회귀는 확실히 막는다.
+test('폐지된 hashkey 엔드포인트를 다시 부르지 않는다', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('./kis-api.ts', import.meta.url), 'utf8');
+  assert.ok(!src.includes('/uapi/hashkey'),
+    'KIS가 폐지한 /uapi/hashkey를 호출하면 모든 주문이 500으로 막힌다');
+  assert.ok(!/['"]hashkey['"]\s*:/.test(src),
+    '주문 헤더에 hashkey를 실으면 안 된다');
+});

@@ -1,7 +1,7 @@
 {
   "initial_cash": 20000,
-  "cash": 4599.761999999993,
-  "invested": 14339.035,
+  "cash": 1117.8219999999937,
+  "invested": 17820.975,
   "portfolio": {
     "RGA": {
       "name": "Reinsurance Group of America, Incorporated Common Stock",
@@ -32,7 +32,15 @@
       "quantity": 40,
       "avg_price": 88.96,
       "entry_date": "2026-11-25",
-      "peak_price": 89.18,
+      "peak_price": 89.19,
+      "is_scaled_out": false
+    },
+    "LYV": {
+      "name": "Live Nation Entertainment, Inc. Common Stock",
+      "quantity": 19,
+      "avg_price": 183.26,
+      "entry_date": "2026-11-25",
+      "peak_price": 183.26,
       "is_scaled_out": false
     }
   },
@@ -106,40 +114,40 @@
     "HNGE": "2026-11-24"
   },
   "raw_stats": {
-    "cash": 4599.761999999993,
-    "total_asset": 18860.031999999992,
-    "profit_rate": -5.69984000000004,
-    "holdings_count": 4,
+    "cash": 1117.8219999999937,
+    "total_asset": 18878.751999999993,
+    "profit_rate": -5.606240000000034,
+    "holdings_count": 5,
     "win_rate": 25.0,
     "profit_factor": 0.4712170724903354,
-    "mdd": 18.964803328641842,
-    "turnover": 5.233411,
-    "frequency": 0.3076923076923077,
+    "mdd": 18.88436980224656,
+    "turnover": 5.407508,
+    "frequency": 0.31868131868131866,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "GKOS": 250.625,
-      "LYV": 183.02,
-      "NDAQ": 106.59,
-      "LLYVK": 108.495,
-      "RGA": 274.02,
-      "PAYC": 246.18,
+      "FROG": 106.02,
+      "RGA": 274.25,
+      "OMC": 89.19,
+      "ICLR": 198.42,
+      "CPAY": 442.9,
+      "PAYC": 246.405,
+      "EXPD": 195.34,
+      "CBOE": 365.135,
+      "WELL": 244.89,
       "LLYVA": 105.77,
-      "ICLR": 197.965,
-      "CPAY": 441.215,
-      "OMC": 89.13,
-      "CBOE": 365.2,
-      "WELL": 244.73,
-      "EXPD": 195.12,
-      "SN": 229.56,
-      "U": 48.205,
-      "FROG": 105.805
+      "LYV": 183.26,
+      "NDAQ": 106.735,
+      "SN": 230.053,
+      "LLYVK": 108.56,
+      "GKOS": 251.225,
+      "U": 48.2
     }
   },
   "normalized_stats": {
     "승률": 25.0,
     "수익팩터": 9.424341449806708,
-    "MDD": 43.10559001407447,
-    "거래빈도": 1.5384615384615385,
-    "자본회전율": 10.466822
+    "MDD": 43.34689059326032,
+    "거래빈도": 1.5934065934065933,
+    "자본회전율": 10.815016
   }
 }

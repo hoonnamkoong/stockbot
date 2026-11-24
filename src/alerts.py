@@ -287,3 +287,59 @@ def _save_state(path: str, state: dict, log=print) -> None:
         _state_written = True
     except Exception as e:
         log(f'[Alerts] 쿨다운 기록 실패(다음 사이클에 중복 발송될 수 있음): {e}')
+
+
+# ── KIS 엔드포인트 사망 감지 ────────────────────────────────────────────────
+#
+# 2026-11-11 16:00에 KIS가 국내주식 종목분석 API 7종을 막았다. financial-ratio가
+# 404가 되자 심3(TTM PER/PBR)과 심11(EPS 성장률)이 모든 후보를 fail-closed로
+# 탈락시켰고, 그 상태로 **13일**이 지났다.
+#
+# 계측은 있었다 — EOD 로그가 `KIS 거부: FHKST66430300 HTTP 404×295`를 매일 찍었다.
+# 없던 것은 발화다. 기존 가드(sim11_fetch_problems)는 `failed`와 EGW00201만 봤고
+# 404는 둘 다에 안 들어갔다. 산출물 신선도도 못 잡는다 — 감시 목록은 비어 있어도
+# 매일 갱신되므로 초록이다.
+#
+# 그래서 깔때기(하류)가 아니라 조회 계층(상류)에서 잰다. 분모가 깨끗하다:
+# 295번 시도해서 295번 거부당한 것과 종목 세 개가 결손인 것이 섞이지 않는다.
+KIS_REFUSAL_MIN_ATTEMPTS = 20    # 이보다 적게 시도한 tr_id로는 사망을 말할 수 없다
+KIS_REFUSAL_RATIO = 0.5          # 시도의 절반 이상이 거부당하면 엔드포인트 쪽 문제다
+KIS_REFUSAL_COOLDOWN_MIN = 360   # 하루 EOD 1회 + 장중 다수 — 6시간이면 하루 2~3건
+
+
+def notify_kis_refusals(attempt_counts, reject_counts, now, log=print) -> int:
+    """tr_id별로 '시도 대비 거부'를 보고 임계를 넘은 것만 알린다. 발화 건수 반환.
+
+    tr_id마다 따로 보는 이유: 하나가 죽었는데 다른 엔드포인트의 정상 호출로
+    비율이 희석되면 발화가 영영 안 온다.
+
+    시도 기록이 없는 tr_id는 건너뛴다 — 비율을 못 내는데 지어내지 않는다.
+    """
+    fired = 0
+    for tr_id, attempts in sorted(attempt_counts.items()):
+        if attempts < KIS_REFUSAL_MIN_ATTEMPTS:
+            continue
+        reasons = {code: n for (tr, code), n in reject_counts.items() if tr == tr_id}
+        refused = sum(reasons.values())
+        if not refused or refused / attempts < KIS_REFUSAL_RATIO:
+            continue
+        # 사유 코드를 싣는다 — HTTP 404(경로 사망)와 EGW00123(appkey 불일치)은
+        # 고치는 곳이 완전히 다르다. 값(토큰·앱키·파라미터)은 절대 싣지 않는다.
+        detail = ', '.join(f'{code}×{n}' for code, n in sorted(reasons.items()))
+        pct = refused / attempts * 100
+        send_alert_once(
+            f'kis_refused_{tr_id}',
+            f"<b>KIS 조회 거부 {pct:.0f}% — {tr_id}</b>\n\n"
+            f"시도 {attempts}건 중 {refused}건 거부.\n"
+            f"사유: {detail}\n\n"
+            f"이 tr_id를 먹는 심은 후보를 전량 탈락시킨다(fail-closed라 "
+            f"잘못 사지는 않지만 <b>거래가 멈춘다</b>).\n"
+            f"HTTP 404면 경로가 폐지된 것이고, EGW00123이면 appkey 불일치다.\n"
+            f"자격증명 의심 전에 가짜 키로 경로 생사를 먼저 가를 것 "
+            f"(404=경로 없음, 500=경로 있고 인증 실패).",
+            now=now,
+            cooldown_min=KIS_REFUSAL_COOLDOWN_MIN,
+            log=log,
+        )
+        fired += 1
+    return fired

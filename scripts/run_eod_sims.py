@@ -616,6 +616,23 @@ def main() -> int:
             fn()
         except Exception as e:
             print(f'[EOD] {tag} 실행 실패: {type(e).__name__}: {e}')
+
+    # 배치 전체가 끝난 뒤 한 번 본다 — 심별이 아니라 tr_id별이라 여기가 맞다.
+    # `_report_sim11_fetch`의 알림과 겹치지 않는다: 그쪽은 심11의 조회 결손
+    # (예산 소진·실패율·유량제한)이고 이쪽은 엔드포인트 사망이다. 2026-11-11
+    # 종목분석 7종 차단은 그쪽 세 조건 전부를 비껴갔다.
+    # ⚠ eod_data.yml은 alert_dedup.json을 배포하지 않으므로 이 쿨다운은 런 사이에
+    #   남지 않는다 — EOD는 하루 1회라 "하루 한 번 울린다"가 되고, 13일 침묵보다
+    #   낫다. 기존 심11 알림도 같은 조건이다.
+    try:
+        from src import alerts as _alerts
+        from src.core import clock as _clock
+        from src.trade.kis_data_provider import KISDataProvider as _KIS
+        import datetime as _dt
+        _alerts.notify_kis_refusals(_KIS.attempt_counts, _KIS.reject_counts,
+                                    now=_dt.datetime.now(_clock.KST))
+    except Exception as e:
+        print(f'[EOD] KIS 거부율 점검 실패(무시): {e}')
     return 0 if (r1 == 0 or r2 == 0) else 1
 
 

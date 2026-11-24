@@ -192,6 +192,11 @@ class KISDataProvider:
     # 출력은 사유당 한 번이지만 **횟수는 전부** 센다. 한 줄만 남아서는 "HTTP 500이
     # 몇 종목이었나"를 알 수 없었다(2026-09-18 심11 EOD). 배치가 끝에 읽어 요약한다.
     reject_counts: collections.Counter = collections.Counter()
+    # 거부의 **분모**. 거부 횟수만으로는 "엔드포인트가 죽었다"와 "종목 몇 개가
+    # 결손이다"를 못 가른다 — 2026-11-11에 KIS가 종목분석 7종을 막았는데 거부가
+    # 295건 찍히고도 13일을 몰랐다. 시도 대비 비율이 있으면 발화할 수 있다.
+    # 재시도는 한 건으로 센다(분모가 재시도에 늘면 비율이 희석돼 발화가 늦는다).
+    attempt_counts: collections.Counter = collections.Counter()
 
     def _get(self, url: str, tr_id: str, params: dict, timeout: int = READ_TIMEOUT) -> dict:
         """실패하면 {}를 돌려준다 — 없는 값을 0으로 지어내지 않는다.
@@ -206,6 +211,9 @@ class KISDataProvider:
             return {}
         if KISDataProvider._conn_fail_streak >= self.CONN_BREAKER_STREAK:
             return {}
+        # 여기서 센다 — 위 두 조기 반환은 네트워크에 나가지 않았으므로 '시도'가
+        # 아니다. 루프 안이 아니라 밖인 이유는 재시도를 한 건으로 세기 위함이다.
+        KISDataProvider.attempt_counts[tr_id] += 1
         for attempt in range(self.GET_ATTEMPTS):
             try:
                 r = requests.get(

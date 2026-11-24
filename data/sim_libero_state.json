@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-11-24 11:51:08",
+  "last_run": "2026-11-24 12:02:59",
   "current_regime": "BEAR",
   "instant_regime": null,
   "regime_confidence": null,
-  "bull_score": 73.4,
+  "bull_score": 73.8,
   "metrics": {
-    "breadth_score": 95.0,
-    "momentum_score": 4.81,
+    "breadth_score": 96.0,
+    "momentum_score": 4.79,
     "trend_strength": 38.1,
     "foreign_score": null,
     "volatility_score": null
@@ -868,6 +868,10 @@
       {
         "t": "11:00",
         "breadth": 92.0
+      },
+      {
+        "t": "12:00",
+        "breadth": 96.0
       }
     ],
     "predictions": [
@@ -909,7 +913,7 @@
         "type": "h1",
         "model": "naive",
         "value": 92.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "11:00",
@@ -918,19 +922,26 @@
         "model": "naive",
         "value": 92.0,
         "scored": false
+      },
+      {
+        "made_at": "12:00",
+        "target": "13:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 96.0,
+        "scored": false
+      },
+      {
+        "made_at": "12:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 96.0,
+        "scored": false
       }
     ]
   },
   "intraday_score_log": [
-    {
-      "date": "2026-07-24",
-      "type": "h1",
-      "made_at": "10:00",
-      "target": "11:00",
-      "pred": 56.0,
-      "actual": 26.0,
-      "gap": 30.0
-    },
     {
       "date": "2026-07-24",
       "type": "h1",
@@ -12753,6 +12764,16 @@
       "pred": 91.0,
       "actual": 92.0,
       "gap": -1.0
+    },
+    {
+      "date": "2026-11-24",
+      "type": "h1",
+      "made_at": "11:00",
+      "model": "naive",
+      "target": "12:00",
+      "pred": 92.0,
+      "actual": 96.0,
+      "gap": -4.0
     }
   ],
   "regime6_state": {
@@ -12786,7 +12807,7 @@
     "vol10": 2.284,
     "raw_level": null,
     "source": "prev_confirmed:2026-11-23",
-    "judged_at": "2026-11-24 11:51:08",
+    "judged_at": "2026-11-24 12:02:59",
     "reason": "csv last row(2026-11-23) is not previous close (36/99 match)"
   }
 }

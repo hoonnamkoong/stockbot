@@ -116,7 +116,11 @@ def _buzz(i, hot=False, rng=None):
             'frgn_fake_ntby_qty': 50_000, 'orgn_fake_ntby_qty': 50_000,
             'posts': posts, 'recent_posts_count': n, 'unique_posters': n,
             'total_likes': sum(p['likes'] for p in posts),
-            'buzz_ratio': 6.0 if hot else 1.0}
+            # 심1은 `buzz_ratio`를 입력으로 읽지 않는다 — posts/avg_posts로 직접
+            # 계산한다. 전에 여기 있던 'buzz_ratio' 키는 아무도 안 읽었고, 진짜
+            # 입력인 avg_posts가 빠져 있어 `or 1` 폴백이 비율을 글 수로 만들었다
+            # (2026-11-24). 의도한 배수를 실제 입력으로 준다: hot 300/50=6.0x.
+            'avg_posts': 50 if hot else n}
 
 
 def test_sim1_psych_can_buy():

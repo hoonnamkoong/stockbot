@@ -249,8 +249,15 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
         change_rate = _parse_change_rate(stock)
         sparkline = stock.get('sparkline_price', []) or []
         adx = BaseSimulator.calculate_adx(sparkline) if len(sparkline) >= 3 else 0.0
-        avg_posts = float(stock.get('avg_posts', 1) or 1)
-        buzz_ratio = f.get('posts', 0) / (avg_posts if avg_posts > 0 else 1)
+        # 기준선이 없으면 1로 메우지 않는다. 메우면 buzz_ratio가 글 수와 같아져
+        # '평상시 대비 2.2배'가 '글 2.2개 이상'이 되고, 남는 절대 개수 조건이
+        # 대형주 필터가 된다 — 2026-11-24 실측: 라이브 diag 37,032행 전부
+        # avg_posts=1.0, 진입 18건 중 12건이 삼성전자.
+        try:
+            avg_posts = float(stock.get('avg_posts'))
+        except (TypeError, ValueError):
+            avg_posts = 0.0
+        buzz_ratio = (f.get('posts', 0) / avg_posts) if avg_posts > 0 else None
 
         d = {
             'code': code, 'name': stock.get('name', ''), 'price': price,
@@ -258,7 +265,9 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
             'adx': f"{adx:.1f}", 'tick_power': stock.get('tick_power', 0),
             'posts': f.get('posts', 0), 'unique_posters': f.get('posters', 0),
             'posts_per_poster': f"{f.get('posts_per_poster', 0):.2f}",
-            'avg_posts': avg_posts, 'buzz_ratio': f"{buzz_ratio:.2f}",
+            # 측정 불가는 빈 칸으로 남긴다 — 0으로 적으면 '안 쟀다'와 '0이다'가 합쳐진다.
+            'avg_posts': avg_posts if buzz_ratio is not None else '',
+            'buzz_ratio': f"{buzz_ratio:.2f}" if buzz_ratio is not None else '',
             'total_likes': stock.get('total_likes', 0),
             'likes_per_post': f"{f.get('likes_per_post', 0):.2f}",
             'sov': f"{f.get('sov', 0):.4f}",
@@ -327,6 +336,9 @@ def _skip_reason(stock, view, code, price, amount, change_rate,
         return 'no_posters'
     if f.get('posts_per_poster', 0) >= POSTS_PER_POSTER_MAX:
         return 'spam'
+    # 평상시 글 수를 모르면 '폭발'을 판정할 수 없다. 조회 실패를 통과로 읽지 않는다.
+    if buzz_ratio is None:
+        return 'no_buzz_baseline'
     # `or buzz_count>=500` 삭제. 소형주를 하나도 더 잡지 못하고 평상시
     # 대형주만 통과시키던 OR절이었다.
     if not (buzz_ratio >= BUZZ_RATIO_MIN and f.get('posts', 0) >= BUZZ_COUNT_MIN):

@@ -296,6 +296,26 @@ class TradeEngineWorker(BaseWorker):
             # 세션 이름을 붙이지 않는다 — 슬롯이 안 열렸으면 어느 세션인지도 없다.
             self.log("브리핑 슬롯 아님 - 종목 상태 기록 생략")
 
+        # 6-0. 버즈 기준선 — 심1의 "평상시 대비" 분모. 오늘 글 수를 적고, 어제까지의
+        #      평균을 후보 dict에 **제자리로** 넣는다.
+        #
+        #      전에는 이 값을 Stage 4의 notifier가 만들었다. 소비자(Stage 3)보다
+        #      한 단계 뒤라 심1에 영영 닿지 않았고, `or 1` 폴백이 걸려 비율이 글
+        #      수와 같아졌다 — 그 게이트가 배포 이래 죽어 있었다(2026-11-24).
+        #      기준선은 오늘을 빼고 계산하므로 record/apply 순서는 결과를 바꾸지
+        #      않는다. 제자리 보강이라 아래 페이퍼 경로와 7번 실전 경로가 같은
+        #      입력을 본다(심 선택 = 실전 동일 동작).
+        try:
+            from src.data import buzz_baseline
+            _today = self.ctx.now_kst.strftime('%Y-%m-%d')
+            buzz_baseline.record(candidates, _today)
+            _applied, _total = buzz_baseline.apply(candidates, _today)
+            self.log(f"버즈 기준선 {_applied}/{_total}종목 "
+                     f"(창 {buzz_baseline.WINDOW_DAYS}거래일, 최소 {buzz_baseline.MIN_DAYS}일)")
+        except Exception as e:
+            # 실패하면 기준선이 없는 것과 같다 — 심1이 no_buzz_baseline으로 거른다.
+            self.log_error(f"버즈 기준선 처리 실패(심1은 측정 불가로 거른다): {e}")
+
         # 6. 시뮬레이터 실행 (Registry에서 자동 로드; sim0_libero는 run_regime_stage()가 별도로 돔)
         self._run_simulators(candidates, exclude_sim_ids=paper_owned_elsewhere)
 

@@ -44,6 +44,7 @@ DB_DATA_WRITERS = {
     'US EOD Watchlist (미국 심 감시목록)',
     'Fast Token Refresh',
     'Monthly Data Archive (월간 아카이브)',
+    'DART Fundamentals (심3·심11 재무)',
 }
 
 

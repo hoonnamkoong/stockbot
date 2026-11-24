@@ -1,0 +1,104 @@
+# .github/workflows/dart_fundamentals.yml
+name: DART Fundamentals (심3·심11 재무)
+
+# KIS 종목분석 7종이 2026-11-11 16:00에 막혀(FHKST66430300 → 404) 심3은 판정 전부
+# `no_ttm_val`, 심11은 100% `no_eps`가 됐다. 분기 보고서는 **분기당 한 번만** 바뀌니
+# 매매 사이클에서 조회할 이유가 없다 — 여기서 모아 캐시하고 심은 그 파일만 읽는다.
+#
+# 주기: 분기보고서 제출 기한(5/15·8/14·11/14)과 사업보고서(3/31) 직후. 거기에
+# 주간 보충을 둔다 — 이미 목표 보고서로 채워진 종목은 건너뛰므로 평소 실행은
+# API 호출이 거의 0이고, 첫 채움이 중간에 끊겼거나 신규 상장이 생겼을 때만 돈다.
+# 고빈도 cron은 GitHub이 드롭한다(us_trading이 그래서 90% 결손이다) — 저빈도만 쓴다.
+on:
+  schedule:
+    - cron: '0 20 16 3,5,8,11 *'  # 제출 기한 다음날 05:00 KST
+    - cron: '0 20 * * 6'          # 토요일 보충(평소 0회 호출)
+  workflow_dispatch: {}
+
+concurrency:
+  group: dart-fundamentals
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    # 상장사 4,020개 × (호출 2~4회 + 0.12초 간격) ≈ 80분. 첫 채움이 한 런에
+    # 끝나야 심3·심11이 그날부터 돈다. 두 번째 이후 실행은 건너뛰기라 1분이다.
+    timeout-minutes: 120
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      TZ: Asia/Seoul
+    permissions:
+      contents: write
+      # 실패 알림이 직전 완료 런의 결과를 읽어 도배를 억제한다. permissions를
+      # 명시하면 적지 않은 스코프는 none이 되므로, 이게 없으면 그 조회가 403이고
+      # 감지기는 '판정 생략'으로 조용히 지나간다.
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: 'scripts/requirements-trade.txt'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements-trade.txt
+
+      # 직전 캐시를 복원해야 '이미 채운 종목 건너뛰기'가 작동한다. 복원하지 않으면
+      # 매 런이 4,020개를 처음부터 받아 한도를 태우고, 더 나쁘게는 이번 런이
+      # 실패한 종목의 **지난 분기 값까지 잃는다**.
+      - name: Restore cache (db-data)
+        run: |
+          git fetch --depth 1 origin db-data 2>/dev/null || echo "[Info] db-data 없음"
+          git checkout FETCH_HEAD -- data/dart_fundamentals.json 2>/dev/null \
+            || echo "[Info] 재무 캐시 없음 — 첫 채움이다"
+          git checkout FETCH_HEAD -- data/dart_corp_codes.json 2>/dev/null \
+            || echo "[Info] 법인코드 매핑 없음 — 새로 받는다"
+
+      - name: Collect
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: python scripts/collect_dart_fundamentals.py
+
+      # 수집이 실패해도 그때까지 모은 것은 올린다 — 중간 저장을 하므로 다음 런이
+      # 거기서 이어받는다. always()가 없으면 타임아웃 한 번에 80분이 버려진다.
+      - name: Deploy (db-data)
+        if: always()
+        run: |
+          [ -f data/dart_fundamentals.json ] || { echo "[Deploy] 캐시 파일 없음 — 올릴 것이 없다"; exit 0; }
+          git config user.name "StockBot"
+          git config user.email "bot@stockbot.local"
+          rm -rf db_data_repo
+          git clone --depth 1 --branch db-data \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {
+            echo "[Deploy] db-data clone 실패"; exit 1; }
+          mkdir -p db_data_repo/data
+          cp data/dart_fundamentals.json db_data_repo/data/ 2>/dev/null || true
+          cp data/dart_corp_codes.json db_data_repo/data/ 2>/dev/null || true
+          cd db_data_repo
+          git add -A data/
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "chore(dart): fundamentals $(date +'%Y-%m-%d %H:%M KST')"
+          for i in 1 2 3; do
+            if git push origin db-data; then exit 0; fi
+            git fetch --unshallow origin db-data 2>/dev/null || git fetch origin db-data
+            git pull --rebase origin db-data || { echo "rebase 실패"; exit 1; }
+          done
+          exit 1
+
+      # 알림 없는 워크플로에만 실패가 쌓인다 — 분기에 한 번 도는 잡이 조용히
+      # 죽으면 심3·심11이 한 분기를 낡은 값으로 보낸다.
+      #
+      # `failure()`가 아닌 이유: 잡 타임아웃의 결론은 cancelled이고 `failure()`는
+      # 거기 안 걸린다. 이 잡은 120분 예산이라 **타임아웃이 가장 그럴듯한
+      # 실패 모양**이다 — 그걸 못 잡는 조건을 쓰면 알림이 있다는 착각만 남는다.
+      - name: Notify on failure
+        if: always() && job.status != 'success'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_FILE: dart_fundamentals.yml
+        run: python3 scripts/notify_workflow_failure.py

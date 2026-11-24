@@ -893,6 +893,22 @@ class TradeEngineWorker(BaseWorker):
         except Exception:
             pass
 
+        # DART 재무 — 심3의 TTM 밸류(per_ttm·pbr_ttm)와 심11의 성장률.
+        # KIS 종목분석 7종이 2026-11-11 16:00에 막혀(FHKST66430300 → 404) 심3은
+        # 판정 전부 `no_ttm_val`, 심11은 100% `no_eps`가 됐다. 분기 보고서는
+        # 분기당 한 번만 바뀌므로 캐시만 읽는다 — 여기서 API를 부르지 않는다.
+        # 이 함수는 프로그램(실전) 경로와 페이퍼 경로가 **같이** 쓴다(파리티).
+        # self.log를 쓰지 않는다 — 이 함수는 ctx 없이도 불린다(보강 로직만 쓰는
+        # 호출부·테스트가 그렇게 만든다). ctx를 참조하면 보강 전체가 죽는다.
+        try:
+            from src.data import dart_fundamentals
+            _applied, _total = dart_fundamentals.apply(enriched)
+            if _total:
+                print(f"[Enrich] DART 재무 {_applied}/{_total}종목")
+        except Exception as e:
+            # 캐시가 없으면 심3·심11이 각자 측정 불가로 거른다 — 0을 넣지 않는다.
+            print(f"[Enrich] DART 재무 적용 실패(심3·심11은 측정 불가로 거른다): {e}")
+
         return enriched
 
     @staticmethod

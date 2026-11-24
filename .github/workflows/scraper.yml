@@ -190,6 +190,9 @@ jobs:
               sim_libero_state.json|regime_gate_state.json) continue ;;
               # 리셋 표지 — writer는 대시보드 리셋 API뿐이다(scripts/reset_epoch_guard.py).
               sim_reset_epoch.json) continue ;;
+              # DART 재무 캐시 — writer는 dart_fundamentals.yml뿐이다. 여기서 올리면
+              # 런 시작 시점 사본이 그 워크플로가 방금 채운 분기 갱신을 되돌린다.
+              dart_fundamentals.json|dart_corp_codes.json) continue ;;
               # 미국장 마감 브리핑(09:00 KST) 슬롯 — writer는 trading.yml이다.
               # 여기서 올리면 런 시작 시점 사본이 덮어써서 방금 닫은 슬롯이 다시
               # 열리고, 09:00~09:40 창의 트리거 20번이 전부 브리핑을 보낸다.

@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-11-24 09:51:02",
+  "last_run": "2026-11-24 10:00:11",
   "current_regime": "BEAR",
   "instant_regime": null,
   "regime_confidence": null,
-  "bull_score": 69.6,
+  "bull_score": 71.6,
   "metrics": {
-    "breadth_score": 89.0,
-    "momentum_score": 3.98,
+    "breadth_score": 91.0,
+    "momentum_score": 4.65,
     "trend_strength": 38.1,
     "foreign_score": null,
     "volatility_score": null
@@ -860,6 +860,10 @@
       {
         "t": "09:00",
         "breadth": 72.0
+      },
+      {
+        "t": "10:00",
+        "breadth": 91.0
       }
     ],
     "predictions": [
@@ -869,7 +873,7 @@
         "type": "h1",
         "model": "naive",
         "value": 72.0,
-        "scored": false
+        "scored": true
       },
       {
         "made_at": "09:00",
@@ -878,19 +882,26 @@
         "model": "naive",
         "value": 72.0,
         "scored": false
+      },
+      {
+        "made_at": "10:00",
+        "target": "11:00",
+        "type": "h1",
+        "model": "naive",
+        "value": 91.0,
+        "scored": false
+      },
+      {
+        "made_at": "10:00",
+        "target": "EOD",
+        "type": "eod",
+        "model": "naive",
+        "value": 91.0,
+        "scored": false
       }
     ]
   },
   "intraday_score_log": [
-    {
-      "date": "2026-07-23",
-      "type": "eod",
-      "made_at": "15:00",
-      "target": "EOD",
-      "pred": 91.5,
-      "actual": 91.0,
-      "gap": 0.5
-    },
     {
       "date": "2026-07-24",
       "type": "h1",
@@ -12711,6 +12722,16 @@
       "pred": 10.0,
       "actual": 10.0,
       "gap": 0.0
+    },
+    {
+      "date": "2026-11-24",
+      "type": "h1",
+      "made_at": "09:00",
+      "model": "naive",
+      "target": "10:00",
+      "pred": 72.0,
+      "actual": 91.0,
+      "gap": -19.0
     }
   ],
   "regime6_state": {
@@ -12736,7 +12757,7 @@
   "regime6_candidate": "STRONG_BEAR",
   "regime6_candidate_days": 1,
   "regime6_confirmed_since": "2026-11-05",
-  "regime6_status": "hold_pre10",
+  "regime6_status": "stale",
   "regime6_metrics": {
     "D": -1.1493,
     "ab20": 10.0,
@@ -12744,7 +12765,7 @@
     "vol10": 2.284,
     "raw_level": null,
     "source": "prev_confirmed:2026-11-23",
-    "judged_at": "2026-11-24 09:51:02",
-    "reason": "before 10:00: previous confirmed kept"
+    "judged_at": "2026-11-24 10:00:11",
+    "reason": "csv last row(2026-11-23) is not previous close (36/99 match)"
   }
 }

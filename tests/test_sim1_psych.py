@@ -191,3 +191,39 @@ def test_atr_stop_loss():
     orders, _, _ = decide_psych(_view(_held()), cand, {'T001': 900})
     sells = [o for o in orders if o['action'] == 'SELL']
     assert len(sells) == 1 and '손절' in sells[0]['reason']
+
+
+# ── 버즈 기준선: 없으면 지어내지 않는다 (2026-11-24) ──────────────────
+# 이 파일의 픽스처는 전부 `avg_posts`를 손으로 넣어준다. 프로덕션 입력에는
+# 그 키가 없었다 — trade_engine._enrich_universe가 `sparkline_price`는 채우는데
+# 게시글 이력을 채우는 줄이 없고, 유일한 생산자(notifier._aggregate_multi_day)는
+# 심 입력 경로가 아니다. 그래서 `or 1` 폴백이 매번 걸려 buzz_ratio == posts가
+# 됐고(라이브 diag 37,032행 100%), '평상시 대비 2.2배'가 '글 2.2개 이상'으로
+# 무력화됐다. 남은 절대 개수 조건은 대형주 필터라 진입 18건 중 12건이
+# 삼성전자였고, 리셋 후 5건은 전부 삼성전자·전부 손절·0/5였다.
+# 아래 두 테스트는 **프로덕션 입력 모양**(그 키가 없는 dict)을 쓴다.
+
+def test_missing_avg_posts_is_fail_closed():
+    s = _target()
+    del s['avg_posts']
+    orders, diags, _ = decide_psych(_view(), [s] + _filler(), {'T001': 1000})
+    assert _buys(orders) == []
+    assert _reason(diags, 'T001') == 'no_buzz_baseline'
+
+
+def test_zero_avg_posts_is_fail_closed():
+    """0은 '관심이 없었다'가 아니라 '못 쟀다'다 — 나누면 비율이 무한이 된다."""
+    orders, diags, _ = decide_psych(_view(), [_target(avg_posts=0)] + _filler(),
+                                    {'T001': 1000})
+    assert _buys(orders) == []
+    assert _reason(diags, 'T001') == 'no_buzz_baseline'
+
+
+def test_diag_leaves_buzz_ratio_blank_when_unmeasurable():
+    """측정 불가와 값을 같은 칸에 적지 않는다 — 0으로 적으면 두 갈래가 합쳐진다."""
+    s = _target()
+    del s['avg_posts']
+    _, diags, _ = decide_psych(_view(), [s] + _filler(), {'T001': 1000})
+    row = next(d for d in diags if d['code'] == 'T001')
+    assert row['buzz_ratio'] == ''
+    assert row['avg_posts'] == ''

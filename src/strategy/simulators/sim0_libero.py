@@ -582,7 +582,7 @@ class LiberoSimulator(BaseSimulator):
 
     REGIME_TO_SIMS = {
         "BULL":     ["sim4_bull", "sim_psych", "sim_risk"],
-        "SIDEWAYS": ["sim5_sideways", "sim_psych", "sim_spillover"],
+        "SIDEWAYS": ["sim5_sideways", "sim_psych"],
         "BEAR":     ["sim6_bear"],  # 나머지는 슬립 모드 권고
     }
 

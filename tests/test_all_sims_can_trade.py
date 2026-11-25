@@ -144,20 +144,6 @@ def _sim(cls, tmp_path):
     return s
 
 
-def test_sim2_spillover_can_buy(tmp_path):
-    from src.strategy.simulators.sim2_spillover import MAX_HOLDINGS, SectorSpilloverSimulator
-    s = _sim(SectorSpilloverSimulator, tmp_path)
-    cands = [{'code': f'{i:06d}', 'name': f'수급{i}', 'price': 1000, 'amount': BIG_AMOUNT,
-              'change_rate': '+1.50%', 'frgn_fake_ntby_qty': 100_000,
-              'orgn_fake_ntby_qty': 100_000, 'foreign_change': 1.5,
-              'sparkline_price': [900, 950, 1000, 1020, 1000]}
-             for i in range(MAX_HOLDINGS + 3)]
-
-    s.run(cands, {c['code']: 1000 for c in cands})
-
-    assert len(s.state['portfolio']) == MAX_HOLDINGS
-
-
 def test_sim3_value_can_buy(tmp_path):
     from src.strategy.simulators.sim3_risk import SmartRiskSimulator
     s = _sim(SmartRiskSimulator, tmp_path)

@@ -25,7 +25,7 @@ SIM_DIR = os.path.join(ROOT, 'src', 'strategy', 'simulators')
 # sim1_original.py·sim2_conservative.py·sim3_aggressive.py는 매니페스트에 없는
 # 죽은 파일이라 제외한다 — 안 도는 코드를 지키는 것은 소음이다.
 GUARDED = (
-    'base_simulator.py', 'sim0_libero.py', 'sim1_psych.py', 'sim2_spillover.py',
+    'base_simulator.py', 'sim0_libero.py', 'sim1_psych.py',
     'sim3_risk.py', 'sim4_bull_daytrading.py', 'sim4_bull_momentum.py',
     'sim5_sideways_swing.py', 'sim6_bear_hedge.py',
     'sim8_accumulation.py', 'sim9_gap_fade.py', 'sim9_1_donchian.py',

@@ -301,14 +301,14 @@ def test_the_sim_owned_by_trading_yml_is_excluded_from_stage3():
 
 def test_buzz_free_set_is_still_excluded_when_the_scraper_owns_the_trading():
     """2026-08-19: 선택 심이 버즈 필요라 스크래퍼가 그 심을 직접 매매해도,
-    Sim2/3/4/6/8/9 같은 버즈 불필요 심들의 페이퍼 쌍둥이는 여전히
+    Sim3/4/6/8/9 같은 버즈 불필요 심들의 페이퍼 쌍둥이는 여전히
     trading.yml 소관이다 — 이 집합은 국면에서 정해지지, 선택 심 매매 여부와
     무관하다(list_buzz_free_sim_ids)."""
     tw, _ = _run(buzz_needed=True)
 
     excluded = tw.return_value.run.call_args.kwargs['paper_owned_elsewhere']
     assert excluded, '버즈 필요 심을 스크래퍼가 매매해도 버즈 불필요 심들은 여전히 제외돼야 한다'
-    assert 'sim_spillover' in excluded, 'Sim2 같은 버즈 불필요 심은 선택 심과 무관하게 제외돼야 한다'
+    assert 'sim_risk' in excluded, 'Sim3 같은 버즈 불필요 심은 선택 심과 무관하게 제외돼야 한다'
 
 
 def test_buzz_free_set_is_still_excluded_when_ownership_is_undecidable():

@@ -54,24 +54,24 @@ def _run(traded, buzz_free_ids, worker=None):
 
 def test_buzz_free_sims_run_even_when_nothing_was_traded():
     """프로그램 매매 OFF(선택 심 없음)여도 버즈 불필요 심들은 계속 돈다."""
-    (traded, ran), worker = _run(None, {'sim_spillover', 'sim_risk'})
+    (traded, ran), worker = _run(None, {'sim6_bear', 'sim_risk'})
 
     assert traded is None
-    assert ran == {'sim_spillover', 'sim_risk'}
+    assert ran == {'sim6_bear', 'sim_risk'}
     worker._run_simulators.assert_called_once_with(
-        [], allow_price_fallback=False, include_only_sim_ids={'sim_spillover', 'sim_risk'})
+        [], allow_price_fallback=False, include_only_sim_ids={'sim6_bear', 'sim_risk'})
 
 
 def test_the_traded_sim_is_excluded_from_its_own_sweep():
     """선택 심은 위에서 이미 universe_override로 따로 갱신했다 — 여기서 또
     돌리면 다른 유니버스로 두 번 갱신해 파리티가 깨진다."""
     (traded, ran), worker = _run(
-        'sim4_bull_daytrading', {'sim4_bull_daytrading', 'sim_spillover', 'sim_risk'})
+        'sim4_bull_daytrading', {'sim4_bull_daytrading', 'sim6_bear', 'sim_risk'})
 
     assert traded == 'sim4_bull_daytrading'
-    assert ran == {'sim_spillover', 'sim_risk'}
+    assert ran == {'sim6_bear', 'sim_risk'}
     call = worker._run_simulators.call_args
-    assert call.kwargs['include_only_sim_ids'] == {'sim_spillover', 'sim_risk'}
+    assert call.kwargs['include_only_sim_ids'] == {'sim6_bear', 'sim_risk'}
 
 
 def test_empty_buzz_free_set_does_not_call_run_simulators_for_the_sweep():
@@ -89,7 +89,7 @@ def test_sweep_failure_does_not_raise():
     worker = mock.MagicMock()
     worker._run_simulators.side_effect = RuntimeError('boom')
 
-    (traded, ran), worker = _run('sim4_bull_daytrading', {'sim_spillover'}, worker=worker)
+    (traded, ran), worker = _run('sim4_bull_daytrading', {'sim6_bear'}, worker=worker)
 
     assert traded == 'sim4_bull_daytrading'
     assert ran == set(), '실패했으면 배포 대상에 넣으면 안 된다'
@@ -97,7 +97,7 @@ def test_sweep_failure_does_not_raise():
 
 def test_returns_a_tuple_of_traded_id_and_ran_set():
     """반환 계약이 (traded_sim_id, ran_buzz_free_ids)다 — trade_loop이 그대로 언팩한다."""
-    result, _ = _run('sim4_bull_daytrading', {'sim_spillover'})
+    result, _ = _run('sim4_bull_daytrading', {'sim6_bear'})
     assert isinstance(result, tuple) and len(result) == 2
     assert result[0] == 'sim4_bull_daytrading'
-    assert result[1] == {'sim_spillover'}
+    assert result[1] == {'sim6_bear'}

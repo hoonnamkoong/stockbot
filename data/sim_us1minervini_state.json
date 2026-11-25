@@ -8,7 +8,7 @@
       "quantity": 13,
       "avg_price": 274.455,
       "entry_date": "2026-11-11",
-      "peak_price": 278.13,
+      "peak_price": 278.35,
       "is_scaled_out": false
     },
     "NDAQ": {
@@ -24,7 +24,7 @@
       "quantity": 14,
       "avg_price": 247.76,
       "entry_date": "2026-11-23",
-      "peak_price": 257.075,
+      "peak_price": 258.14,
       "is_scaled_out": false
     },
     "OMC": {
@@ -32,7 +32,7 @@
       "quantity": 40,
       "avg_price": 88.96,
       "entry_date": "2026-11-25",
-      "peak_price": 90.6,
+      "peak_price": 90.82,
       "is_scaled_out": false
     },
     "LYV": {
@@ -115,38 +115,38 @@
   },
   "raw_stats": {
     "cash": 1117.8219999999937,
-    "total_asset": 19019.831999999995,
-    "profit_rate": -4.900840000000025,
+    "total_asset": 19060.911999999993,
+    "profit_rate": -4.695440000000035,
     "holdings_count": 5,
     "win_rate": 25.0,
     "profit_factor": 0.4712170724903354,
-    "mdd": 18.278196623622293,
+    "mdd": 18.101689718477104,
     "turnover": 5.407508,
     "frequency": 0.31521739130434784,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "LYV": 180.85,
-      "EXPD": 196.86,
-      "RGA": 278.13,
-      "PAYC": 250.085,
-      "WELL": 246.14,
-      "JHX": 28.715,
-      "LLYVK": 107.155,
+      "FROG": 99.25,
+      "CPAY": 451.79,
+      "EXPD": 197.745,
+      "CBOE": 355.245,
+      "LLYVK": 107.475,
+      "U": 49.03,
+      "LYV": 181.22,
+      "SN": 229.85,
+      "NDAQ": 106.9,
+      "RGA": 278.35,
+      "OMC": 90.82,
       "LLYVA": 104.91,
-      "OMC": 90.6,
-      "SN": 228.92,
-      "CPAY": 450.105,
-      "GKOS": 257.075,
-      "CBOE": 355.03,
-      "NDAQ": 106.68,
-      "U": 48.95,
-      "FROG": 99.57
+      "WELL": 246.34,
+      "JHX": 28.76,
+      "PAYC": 250.97,
+      "GKOS": 258.14
     }
   },
   "normalized_stats": {
     "승률": 25.0,
     "수익팩터": 9.424341449806708,
-    "MDD": 45.16541012913312,
+    "MDD": 45.69493084456869,
     "거래빈도": 1.5760869565217392,
     "자본회전율": 10.815016
   }

@@ -5,25 +5,20 @@
       "name": "SK하이닉스",
       "market": "KOSPI",
       "ai": {
-        "posts_summary": "정치적 이슈와 시장 상황에 대한 불만 표출. 주가 하락에 대한 고통 호소.",
-        "sentiment": "-5",
-        "keywords": [
-          "정치",
-          "시장",
-          "주가"
-        ]
+        "posts_summary": "정치적 이슈와 주식 시장 부진에 대한 불만 표출.",
+        "sentiment": "-8",
+        "keywords": []
       }
     },
     "090710": {
       "name": "휴림로봇",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "로봇주 강세와 미국 시장 호조에 따른 기대감 표출. 삼성전자 휴머노이드 관련 뉴스 언급.",
-        "sentiment": "5",
+        "posts_summary": "로봇주 강세 및 북미 공급 기대감.",
+        "sentiment": "3",
         "keywords": [
-          "로봇",
-          "삼성전자",
-          "휴머노이드"
+          "로봇주",
+          "북미공급"
         ]
       }
     },
@@ -31,12 +26,43 @@
       "name": "루닛",
       "market": "KOSDAQ",
       "ai": {
-        "posts_summary": "미국 암 학회 발표 뉴스 기반 주가 상승 기대. 경쟁사 비교 결과 및 FDA 승인 언급.",
-        "sentiment": "7",
+        "posts_summary": "기업 설명회 및 학회 발표 관련 내용, 경쟁사 비교.",
+        "sentiment": "0",
         "keywords": [
-          "암 학회",
-          "FDA",
+          "학회발표",
           "경쟁사"
+        ]
+      }
+    },
+    "005930": {
+      "name": "삼성전자",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "정치적 논란으로 인한 시장 불안감 표출.",
+        "sentiment": "-8",
+        "keywords": []
+      }
+    },
+    "034020": {
+      "name": "두산에너빌리티",
+      "market": "KOSPI",
+      "ai": {
+        "posts_summary": "공매도 관련 정부 정책 및 시장 흐름에 대한 혼란과 불만.",
+        "sentiment": "-5",
+        "keywords": [
+          "공매도"
+        ]
+      }
+    },
+    "498150": {
+      "name": "엠비디",
+      "market": "KOSDAQ",
+      "ai": {
+        "posts_summary": "개별 종목 분석 및 바이오 섹터 동향.",
+        "sentiment": "1",
+        "keywords": [
+          "바이오",
+          "재무상태"
         ]
       }
     }

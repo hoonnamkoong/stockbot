@@ -8,7 +8,7 @@
       "quantity": 13,
       "avg_price": 274.455,
       "entry_date": "2026-11-11",
-      "peak_price": 276.98,
+      "peak_price": 277.475,
       "is_scaled_out": false
     },
     "NDAQ": {
@@ -24,7 +24,7 @@
       "quantity": 14,
       "avg_price": 247.76,
       "entry_date": "2026-11-23",
-      "peak_price": 256.575,
+      "peak_price": 256.78,
       "is_scaled_out": false
     },
     "OMC": {
@@ -32,7 +32,7 @@
       "quantity": 40,
       "avg_price": 88.96,
       "entry_date": "2026-11-25",
-      "peak_price": 90.23,
+      "peak_price": 90.44,
       "is_scaled_out": false
     },
     "LYV": {
@@ -115,38 +115,38 @@
   },
   "raw_stats": {
     "cash": 1117.8219999999937,
-    "total_asset": 18928.841999999993,
-    "profit_rate": -5.355790000000034,
+    "total_asset": 18980.346999999994,
+    "profit_rate": -5.098265000000028,
     "holdings_count": 5,
     "win_rate": 25.0,
     "profit_factor": 0.4712170724903354,
-    "mdd": 18.669149965860896,
+    "mdd": 18.4478503517055,
     "turnover": 5.407508,
     "frequency": 0.31521739130434784,
     "total_fees": 7.344450000000001,
     "current_prices": {
-      "LLYVA": 104.18,
-      "NDAQ": 106.16,
-      "LYV": 179.68,
-      "U": 48.32,
-      "SN": 227.15,
-      "PAYC": 249.345,
-      "RGA": 276.4,
-      "GKOS": 256.09,
-      "OMC": 90.23,
-      "CPAY": 447.41,
-      "FROG": 98.745,
-      "CBOE": 354.675,
-      "JHX": 28.41,
-      "LLYVK": 106.82,
-      "WELL": 245.665,
-      "EXPD": 196.02
+      "LLYVA": 104.61,
+      "U": 48.4,
+      "FROG": 99.09,
+      "SN": 228.14,
+      "GKOS": 256.78,
+      "LYV": 180.15,
+      "RGA": 277.475,
+      "CBOE": 356.295,
+      "LLYVK": 106.94,
+      "WELL": 246.16,
+      "NDAQ": 106.47,
+      "OMC": 90.44,
+      "JHX": 28.59,
+      "PAYC": 250.51,
+      "CPAY": 448.63,
+      "EXPD": 196.65
     }
   },
   "normalized_stats": {
     "승률": 25.0,
     "수익팩터": 9.424341449806708,
-    "MDD": 43.99255010241731,
+    "MDD": 44.65644894488349,
     "거래빈도": 1.5760869565217392,
     "자본회전율": 10.815016
   }

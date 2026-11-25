@@ -245,6 +245,15 @@ def candidates_from_kis_live(pairs: list[tuple[str, str]], kis, log=print,
                 results[i] = r
     recovered = sum(1 for i in retry_idx if results[i] is not failed and results[i] is not skipped)
     out = [r for r in results if isinstance(r, dict)]
+    # DART 재무 — 심11의 EPS·매출 성장률. KIS 종목분석(get_earnings_growth)이
+    # 2026-11-11 16:00에 막혀 그 뒤로 템플릿 통과분 100%가 `no_eps`였다.
+    # 캐시를 종목마다 다시 읽지 않도록 수집이 끝난 뒤 한 번에 붙인다.
+    try:
+        from src.data import dart_fundamentals
+        applied, total = dart_fundamentals.apply(out)
+        log(f'[EOD][Sim11] DART 재무 {applied}/{total}종목')
+    except Exception as e:
+        log(f'[EOD][Sim11] DART 재무 적용 실패(성장률 없는 종목은 no_eps로 거른다): {e}')
     remaining = sum(1 for r in results if r is skipped)
     if remaining:
         log(f'[EOD][Sim11] 예산 {budget_sec:.0f}초 소진 — '

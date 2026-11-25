@@ -128,3 +128,16 @@ outputs:
   # .csv를 찾는데 파일은 .xlsx, 파일명 시각부 형식, 컬럼 스키마 전면 불일치).
   # 5개월 죽어 있었고 아무도 안 찾았다. reports/monthly_research_*.xlsx는
   # 별개의 살아있는 산출물이며 대시보드가 storage_manager로 동기화한다.
+
+  # ── 분기 재무 (dart_fundamentals.yml) ─────────────────────────────
+  - path: data/dart_fundamentals.json
+    producer: dart_fundamentals.yml
+    calendar: kr
+    # 분기 보고서는 분기당 한 번만 바뀐다(분기 ≈ 61거래일). 그보다 짧게 잡으면
+    # 정상인 분기 중간에 매일 경보가 울려 침묵과 같아진다. 길게 잡으면 분기
+    # 하나를 통째로 낡은 값으로 보낸다 — 한 분기 + 여유로 둔다.
+    max_age_sessions: 70
+    why: >
+      심3의 TTM 밸류(per_ttm·pbr_ttm)와 심11의 EPS·매출 성장률 원천.
+      KIS 종목분석 7종이 2026-11-11에 막혀 이게 유일한 경로가 됐다 —
+      멈추면 심3은 판정 전부 no_ttm_val, 심11은 100% no_eps로 **거래가 0이 된다**.

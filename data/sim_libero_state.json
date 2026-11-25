@@ -10,15 +10,15 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-11-24 15:42:22",
+  "last_run": "2026-11-25 09:01:11",
   "current_regime": "BEAR",
   "instant_regime": null,
   "regime_confidence": null,
-  "bull_score": 75.7,
+  "bull_score": 28.4,
   "metrics": {
-    "breadth_score": 99.0,
-    "momentum_score": 5.19,
-    "trend_strength": 38.1,
+    "breadth_score": 14.0,
+    "momentum_score": -1.75,
+    "trend_strength": 33.5,
     "foreign_score": null,
     "volatility_score": null
   },
@@ -35,12 +35,6 @@
   "sample_size": 100,
   "cooldown_codes": {},
   "daily_regime_log": [
-    {
-      "date": "2026-08-26",
-      "regime": "SIDEWAYS",
-      "bull_score": 47.7,
-      "breadth": 62.0
-    },
     {
       "date": "2026-08-27",
       "regime": "SIDEWAYS",
@@ -219,6 +213,13 @@
       "breadth": 72.0,
       "regime": "BEAR",
       "regime6": "BEAR"
+    },
+    {
+      "date": "2026-11-25",
+      "bull_score": 28.4,
+      "breadth": 14.0,
+      "regime": "BEAR",
+      "regime6": "STRONG_BEAR"
     }
   ],
   "calibration_log": [
@@ -864,39 +865,11 @@
   ],
   "breadth_source": "top100_live",
   "intraday": {
-    "date": "2026-11-24",
+    "date": "2026-11-25",
     "measurements": [
       {
         "t": "09:00",
-        "breadth": 72.0
-      },
-      {
-        "t": "10:00",
-        "breadth": 91.0
-      },
-      {
-        "t": "11:00",
-        "breadth": 92.0
-      },
-      {
-        "t": "12:00",
-        "breadth": 96.0
-      },
-      {
-        "t": "13:00",
-        "breadth": 97.0
-      },
-      {
-        "t": "14:00",
-        "breadth": 97.0
-      },
-      {
-        "t": "15:00",
-        "breadth": 99.0
-      },
-      {
-        "t": "15:30",
-        "breadth": 98.0
+        "breadth": 14.0
       }
     ],
     "predictions": [
@@ -905,104 +878,16 @@
         "target": "10:00",
         "type": "h1",
         "model": "naive",
-        "value": 72.0,
-        "scored": true
+        "value": 14.0,
+        "scored": false
       },
       {
         "made_at": "09:00",
         "target": "EOD",
         "type": "eod",
         "model": "naive",
-        "value": 72.0,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "11:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 91.0,
-        "scored": true
-      },
-      {
-        "made_at": "10:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 91.0,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "12:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 92.0,
-        "scored": true
-      },
-      {
-        "made_at": "11:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 92.0,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "13:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 96.0,
-        "scored": true
-      },
-      {
-        "made_at": "12:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 96.0,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "14:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 97.0,
-        "scored": true
-      },
-      {
-        "made_at": "13:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 97.0,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "15:00",
-        "type": "h1",
-        "model": "naive",
-        "value": 97.0,
-        "scored": true
-      },
-      {
-        "made_at": "14:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 97.0,
-        "scored": true
-      },
-      {
-        "made_at": "15:00",
-        "target": "EOD",
-        "type": "eod",
-        "model": "naive",
-        "value": 99.0,
-        "scored": true
+        "value": 14.0,
+        "scored": false
       }
     ]
   },
@@ -12853,36 +12738,36 @@
   ],
   "regime6_state": {
     "base": {
-      "date": "2026-11-23",
-      "level": -1,
-      "candidate": -2,
-      "candidate_days": 1,
-      "confirmed_since": "2026-11-05",
-      "vol10": 2.283823529385592,
+      "date": "2026-11-24",
+      "level": -2,
+      "candidate": null,
+      "candidate_days": 0,
+      "confirmed_since": "2026-11-24",
+      "vol10": 2.3402268163088524,
       "metrics": {
-        "D": -1.1492932048971378,
-        "ab20": 10.0,
-        "ret10": -0.04191518458765653,
-        "vol10": 2.283823529385592,
-        "ret1": -0.030829227081933946
+        "D": -1.086259676264116,
+        "ab20": 18.0,
+        "ret10": -0.05355116115169389,
+        "vol10": 2.3402268163088524,
+        "ret1": 0.03408211796087827
       }
     },
     "today": null
   },
-  "regime6": "BEAR",
-  "regime6_level": -1,
-  "regime6_candidate": "STRONG_BEAR",
-  "regime6_candidate_days": 1,
-  "regime6_confirmed_since": "2026-11-05",
-  "regime6_status": "stale",
+  "regime6": "STRONG_BEAR",
+  "regime6_level": -2,
+  "regime6_candidate": null,
+  "regime6_candidate_days": 0,
+  "regime6_confirmed_since": "2026-11-24",
+  "regime6_status": "hold_pre10",
   "regime6_metrics": {
-    "D": -1.1493,
-    "ab20": 10.0,
-    "ret10": -4.19,
-    "vol10": 2.284,
+    "D": -1.0863,
+    "ab20": 18.0,
+    "ret10": -5.36,
+    "vol10": 2.34,
     "raw_level": null,
-    "source": "prev_confirmed:2026-11-23",
-    "judged_at": "2026-11-24 15:42:22",
-    "reason": "csv last row(2026-11-23) is not previous close (36/99 match)"
+    "source": "prev_confirmed:2026-11-24",
+    "judged_at": "2026-11-25 09:01:11",
+    "reason": "before 10:00: previous confirmed kept"
   }
 }

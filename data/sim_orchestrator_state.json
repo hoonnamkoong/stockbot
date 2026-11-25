@@ -96,7 +96,7 @@
     "055550": "2026-10-13"
   },
   "active_regime": "BEAR",
-  "active_bull_score": 75.7,
+  "active_bull_score": 28.4,
   "regime_log": [
     {
       "date": "2026-09-22",
@@ -363,6 +363,13 @@
       "bull_score": 59.9,
       "nav": 2822927.6845500004,
       "holdings": 0
+    },
+    {
+      "date": "2026-11-25",
+      "regime": "BEAR",
+      "bull_score": 28.4,
+      "nav": 2822927.6845500004,
+      "holdings": 0
     }
   ],
   "raw_stats": {
@@ -376,7 +383,13 @@
     "turnover": 6.459205,
     "frequency": 0.53125,
     "total_fees": 20205.31545,
-    "current_prices": {}
+    "current_prices": {
+      "003490": 30700,
+      "011200": 22150,
+      "003530": 3425,
+      "010140": 14590,
+      "042660": 41550
+    }
   },
   "normalized_stats": {
     "승률": 23.52941176470588,

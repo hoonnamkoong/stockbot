@@ -49,10 +49,19 @@ def main() -> int:
               '값은 GitHub Secrets/Vercel env에만 둔다(public 레포).')
         return 1
 
+    # 세션 **하나**를 만들어 런 전체가 쓴다. 이게 없으면 호출마다 TCP+TLS를
+    # 새로 열고, 러너(westus)에서 OpenDART(한국)까지는 그 왕복이 길다 —
+    # 종목당 2~4콜 × 상장사 약 4,020개 = 1만여 콜이 전부 그 비용을 낸다.
+    # 2026-11-25 첫 채움 런은 119분에 타임아웃으로 취소됐고, 핸드셰이크가
+    # 그 시간의 큰 몫이다(`SLEEP_SEC` 0.12 × 4,020 = 8분은 작은 몫이다).
+    # 이 루프는 단일 스레드라 세션 하나로 충분하다 — `requests.Session`은
+    # 스레드 안전이 아니므로 스레드가 늘면 스레드마다 만들어야 한다.
+    session = df.new_session()
+
     codes = df.load_corp_codes(args.data_dir)
     if args.refresh_codes or not codes:
         print('[dart] 법인코드 매핑 조회 중...')
-        codes = df.build_corp_code_map(key)
+        codes = df.build_corp_code_map(key, session=session)
         if not codes:
             print('[dart] 법인코드 매핑 실패 — 중단한다(빈 매핑으로 덮어쓰지 않는다)')
             return 2
@@ -85,7 +94,8 @@ def main() -> int:
     try:
         for i, (code, corp_code) in enumerate(todo[:budget], 1):
             try:
-                out = df.fetch(corp_code, year, quarter, key=key)
+                out = df.fetch(corp_code, year, quarter, key=key,
+                               session=session)
             except Exception as e:
                 print(f'[dart] {code} 조회 실패: {e}')
                 out = {}

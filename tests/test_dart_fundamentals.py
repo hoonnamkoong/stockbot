@@ -450,3 +450,94 @@ def test_collector_output_is_unbuffered():
     생기지 않았다. 레포의 다른 워크플로는 전부 `-u`를 쓴다.
     """
     assert 'python -u scripts/collect_dart_fundamentals.py' in _dart_yml()
+
+
+# ── 연결 재사용 (2026-11-27) ───────────────────────────────────────
+# `src/core/net.py`의 `request()`는 `session=`을 **이미 받는데**(`caller = session
+# if session is not None else requests`) 이 모듈이 안 넘겼다. 그래서 호출마다
+# 새 TCP+TLS 핸드셰이크를 한다 — 러너는 westus, OpenDART는 한국이라 왕복이 길고,
+# 종목당 2~4콜 × 상장사 약 4,020개 = 1만여 콜이 전부 그 비용을 낸다.
+#
+# 이건 성능 항목이 아니라 **첫 채움이 120분 예산에 들어가게 하는 선행 조건**이다
+# (2026-11-25 런은 119분에 취소됐다). `SLEEP_SEC`(0.12 × 4,020 = 8분)는 그중
+# 작은 몫이다.
+
+class _Rec:
+    """`net.get`을 가로채 kwargs를 기록한다. 응답은 자료 없음(status 013)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, url, **kw):
+        self.calls.append(kw)
+
+        class R:
+            @staticmethod
+            def json():
+                return {'status': '013'}
+        return R()
+
+
+def test_every_dart_call_reuses_the_caller_session(monkeypatch):
+    """`fetch`가 받은 세션을 **모든** net.get에 넘긴다.
+
+    호출부를 하나 빠뜨리면 그 경로만 조용히 새 연결을 쓴다 — 지금 `_rows`는
+    종목당 최대 4회(CFS/OFS × 분기/직전연간) 부른다. 전수로 검사해야 한다.
+    """
+    rec = _Rec()
+    monkeypatch.setattr(df.net, 'get', rec)
+    sentinel = object()
+    df.fetch('00126380', 2026, 3, key='K', session=sentinel)
+    assert rec.calls, 'net.get이 한 번도 안 불렸으면 이 테스트는 공허하다'
+    missed = [i for i, kw in enumerate(rec.calls) if kw.get('session') is not sentinel]
+    assert not missed, f'세션을 안 넘긴 호출: {missed}/{len(rec.calls)}'
+
+
+def test_corp_code_map_reuses_the_caller_session(monkeypatch):
+    """법인코드 zip도 같은 세션으로 받는다 — 런 첫 호출이라 핸드셰이크를 연다."""
+    rec = _Rec()
+    monkeypatch.setattr(df.net, 'get', rec)
+    sentinel = object()
+    df.build_corp_code_map(key='K', session=sentinel)
+    assert rec.calls and rec.calls[0].get('session') is sentinel
+
+
+def test_session_defaults_to_none_so_callers_are_unaffected(monkeypatch):
+    """안 넘기면 종전대로 — `net`이 모듈 레벨 `requests`를 쓴다.
+
+    `fetch`는 스레드에서도 불릴 수 있고 `requests.Session`은 **스레드 안전이
+    아니다**(net.py 독스트링). 그래서 모듈이 세션을 혼자 만들어 들고 있지 않는다.
+    """
+    rec = _Rec()
+    monkeypatch.setattr(df.net, 'get', rec)
+    df.fetch('00126380', 2026, 3, key='K')
+    assert all(kw.get('session') is None for kw in rec.calls)
+
+
+def test_collector_creates_one_session_and_reuses_it(monkeypatch, tmp_path):
+    """수집기가 세션을 **하나** 만들어 전 종목에 같은 것을 넘긴다.
+
+    종목마다 새로 만들면 연결 재사용이 0이라 고치기 전과 같아진다.
+    """
+    import scripts.collect_dart_fundamentals as collect
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    monkeypatch.setattr(sys, 'argv', ['collect_dart_fundamentals.py'])
+    monkeypatch.setattr(df, 'api_key', lambda: 'KEY')
+    monkeypatch.setattr(df, 'load_corp_codes',
+                        lambda d: {f'{i:06d}': f'c{i}' for i in range(4)})
+    monkeypatch.setattr(collect, 'SLEEP_SEC', 0)
+
+    got = []
+
+    def fetch(corp_code, year, quarter, key=None, session=None, **kw):
+        got.append(session)
+        return {'eps_ttm': 1, 'report': f'{year}-11014'}
+
+    monkeypatch.setattr(df, 'fetch', fetch)
+    collect.main()
+
+    assert len(got) == 4
+    assert got[0] is not None, '세션을 안 넘기면 매 호출이 새 TLS 핸드셰이크다'
+    assert len(set(map(id, got))) == 1, f'세션이 {len(set(map(id, got)))}개 — 하나여야 한다'

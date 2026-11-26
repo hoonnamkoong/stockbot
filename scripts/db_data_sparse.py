@@ -35,9 +35,14 @@ _ROOT = '/data/'
 # 각 줄의 숫자는 2026-11-26 db-data 실측이다.
 _HEAVY = [
     '!/data/minute_*',       # 165MB — 분봉은 KIS API로 직접 받는다
-    '!/data/post_titles_*',  # 100MB — 스크래퍼 산출물, 루프는 안 읽는다
-    '!/data/decisions_*',    # 215MB / 333파일 — 오늘 것만 아래에서 되살린다
-    '!/data/money_2*',       #  25MB+ — 월별·과거 일별. 오늘 것만 되살린다
+    '!/data/post_titles_*',  #  84MB — 스크래퍼 산출물, 루프는 안 읽는다
+    '!/data/decisions_*',    # 233MB / 652파일 — 오늘 것만 아래에서 되살린다
+    '!/data/money_2*',       # 113MB — 월별·과거 일별. 오늘 것만 되살린다
+    # 심12·심13은 2026-11-24에 코드에서 제거됐다(PR #158). 남은 진단 파일
+    # 75.9MB가 **복원분의 51%**였다 — 더 이상 존재하지 않는 심의 과거 기록을
+    # 2분마다 받고 있었다. 매니페스트에도 없다(등록부에서 빠졌으므로).
+    '!/data/sim12_diag_*',   #  50MB — 제거된 심
+    '!/data/sim13_diag_*',   #  26MB — 제거된 심
 ]
 
 
@@ -59,10 +64,16 @@ def patterns(today_ymd: str) -> list[str]:
 
 
 def keeps(name: str, today_ymd: str) -> bool:
-    """`data/<name>`이 범위에 남는가 — 위 패턴을 git과 같은 규칙으로 판정한다.
+    """`data/<name>`이 범위에 남는가. 마지막 일치가 이기는 규칙으로 판정한다.
 
     tests/test_db_data_sparse.py가 이걸로 "배포 목록 ⊆ 복원 범위"를 지킨다.
     git에게 물어보려면 clone이 필요해서 테스트가 네트워크에 매인다.
+
+    ⚠ **git과 동일한 구현이 아니라 근사다.** `fnmatch`의 `*`는 `/`를 넘지만 git
+    비-cone(wildmatch + WM_PATHNAME)의 `*`는 못 넘는다. 2026-11-26 db-data의
+    2,471경로 전수 대조에서는 결과가 완전히 일치했다(`data/`가 거의 평면이고
+    `data/reports/` 12파일은 양쪽 모두 포함). `data/` 아래 중첩 디렉터리가 늘면
+    두 규칙이 갈릴 수 있으니, 그때는 이 함수를 wildmatch 쪽으로 맞춰야 한다.
     """
     verdict = False
     for pat in patterns(today_ymd):

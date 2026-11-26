@@ -75,10 +75,57 @@ def test_loop_inputs_stay_in_range(name):
     'decisions_20261125_10_actions-trading.csv',  # 어제 것
     'money_2026-08.csv',        # 월별 누적
     'money_2026-11-25.csv',     # 어제 일별
+    # 심12·심13은 PR #158에서 코드에서 제거됐다. 남은 진단 파일 75.9MB가
+    # 복원분의 51%였다 — 없는 심의 기록을 2분마다 받고 있었다.
+    'sim12_diag_2026-09.csv',
+    'sim13_diag_2026-09.csv',
 ])
 def test_heavy_families_are_excluded(name):
     """배제가 실제로 걸려야 절감이 생긴다 — 안 걸리면 예산이 그대로다."""
     assert not sparse.keeps(name, TODAY), f'{name}이 범위 안이면 절감이 없다'
+
+
+@pytest.mark.parametrize('name', ['sim6_diag_2026-11-26.csv',
+                                  'sim9_diag_2026-11-26.csv'])
+def test_live_sims_diag_stays_in_range(name):
+    """살아 있는 심의 진단 파일은 매니페스트에 실린다 — 배제하면 안 된다.
+
+    심12·심13 배제 패턴이 `sim*_diag_*`로 넓어지면 이 테스트가 막는다.
+    """
+    assert sparse.keeps(name, TODAY), f'{name}은 배포 대상이다'
+
+
+# ── 워크플로와 스크립트를 묶는 불변식 ──────────────────────────────
+# 이 설계의 핵심은 "복원과 배포가 같은 범위를 쓴다"인데, 위 테스트는 스크립트
+# **안쪽**만 본다. 한 스텝만 다른 범위로 바꿔도 CI는 초록이고, 런타임 가드는
+# 원격에 이미 있는 파일에 대해서만 발화한다(그 경우에도 멈추기는 하지만,
+# 어긋난 걸 병합 전에 아는 게 낫다).
+
+def _trading_yml() -> str:
+    path = os.path.join(os.path.dirname(__file__), '..',
+                        '.github', 'workflows', 'trading.yml')
+    with open(path, encoding='utf-8') as f:
+        return f.read()
+
+
+def test_both_steps_use_the_shared_sparse_range():
+    """복원·배포 두 스텝이 각각 db_data_sparse.py를 부른다."""
+    assert _trading_yml().count('scripts/db_data_sparse.py') >= 2, (
+        '복원과 배포가 같은 범위를 쓰지 않으면 배포하는데 복원되지 않는 '
+        '파일이 생긴다')
+
+
+def test_restore_failure_stops_the_run():
+    """복원 실패가 빈 data/로 흘러가면 전 심이 백지로 리셋돼 db-data를 덮는다.
+
+    eod_data.yml은 이 가드를 갖고 있었고("백지 상태 매매 방지") 돈 경로에만
+    없었다. `base_simulator`가 `if os.path.exists(self.state_file)`이라 파일이
+    없으면 초기 자본 템플릿으로 시작한다 — 그 상태가 매니페스트에 실린다.
+    """
+    body = _trading_yml()
+    assert 'db-data clone 실패 — 백지 상태로 매매하지 않는다' in body
+    assert "find data -maxdepth 1 -name 'sim_*_state.json'" in body, (
+        '복원 결과에 하한 검사가 없으면 clone·cp가 성공한 채 비어 있을 수 있다')
 
 
 @pytest.mark.parametrize('name', [

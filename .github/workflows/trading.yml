@@ -183,11 +183,38 @@ jobs:
         run: |
           # --depth 1: 최신 스냅샷만 필요하다. 2분마다 도는 경로에서 전체 이력을
           # 받으면 그 비용이 매 트리거마다 든다(db-data는 하루 수십 커밋이 쌓인다).
-          git fetch --depth 1 origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet"
-          if git show-ref --verify refs/heads/db-data 2>/dev/null; then
-            git checkout db-data -- data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
-          fi
+          #
+          # 거기에 **받는 파일 수까지** 줄인다(2026-11-26). `git checkout db-data -- data/`는
+          # 트리 전체를 실체화하는데 data/가 713MB·2,471파일로 커져 실측 38초가 됐다.
+          # 배포 clone도 38초라 3분 예산에 189초가 필요해졌고, 그날 장중 80런 중
+          # 성공은 1건이었다 — 매 런이 `Deploy state`에서 잘렸다. 주문은 나가고
+          # 심 상태만 db-data에 도달하지 못하는, 제일 나쁜 모양이다.
+          #
+          # 예산을 늘려서 풀 수 없다: 이 타임아웃은 원장 락 리스(4분)보다 짧아야
+          # 중복 주문이 안 난다. 그래서 받는 양을 줄인다 — blob 필터 + sparse로
+          # 실측 713MB/42초 → 146MB/11초(같은 회선).
+          #
+          # 범위는 scripts/db_data_sparse.py 하나가 정하고 배포 스텝도 같은 목록을
+          # 쓴다. 두 목록이 갈리면 "배포하는데 복원되지 않는" 파일이 생기고, 그 파일은
+          # 매 런 앞부분이 잘린다(2026-08-05 심9-1 매매기록 8건이 2행만 남은 고장).
+          # `--stdin`인 이유: 패턴에 `*`가 들어 인자로 넘기면 셸이 글롭으로 먹는다.
           mkdir -p data
+          # 패턴을 파일로 받고 **비었는지 검사한 뒤** 넘긴다. 파이프로 바로 물리면
+          # `bash -e`가 파이프라인의 마지막 명령만 보므로, 패턴 생성이 실패해도
+          # git은 빈 목록을 받아 성공한다 — 그러면 data/가 통째로 비고 루프가
+          # 백지에서 시작한다. 조회 실패가 "값 없음"으로 번역되는 바로 그 모양이다.
+          python3 scripts/db_data_sparse.py > _sparse_patterns.txt
+          [ -s _sparse_patterns.txt ] || { echo "[Fetch] sparse 패턴 생성 실패 — 받지 않는다"; exit 1; }
+          rm -rf _db_fetch
+          if git clone --depth 1 --filter=blob:none --sparse --branch db-data \
+               "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+               _db_fetch 2>/dev/null; then
+            git -C _db_fetch sparse-checkout set --no-cone --stdin < _sparse_patterns.txt
+            cp -a _db_fetch/data/. data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
+            rm -rf _db_fetch
+          else
+            echo "[Info] db-data branch does not exist yet"
+          fi
           # 리베로 trend(ADX 근사)는 output/kospi_top100_close.csv를 읽는다. 이 파일은
           # main에 없고 db-data의 data/ 아래에만 있다 — 08-08 매매/스크래핑 분리 때
           # 이 복사가 scraper.yml에만 남아 08-10부터 trend가 전량 결측이었고,
@@ -267,8 +294,28 @@ jobs:
           # 반환값: 0=성공 2=clone실패(생략) 3=변경없음 1=push충돌 4=git오류
           attempt() {
             rm -rf db_data_repo
-            git clone --depth 1 --branch db-data "$REPO_URL" db_data_repo || return 2
+            # 복원 스텝과 **같은 범위**로 받는다(scripts/db_data_sparse.py). 전체
+            # 트리를 받으면 실측 38초로 3분 예산이 터진다 — 2026-11-26 장중 80런 중
+            # 79런이 바로 이 줄에서 잘렸다.
+            git clone --depth 1 --filter=blob:none --sparse --branch db-data \
+              "$REPO_URL" db_data_repo || return 2
+            # 복원 스텝과 같은 이유로 파일을 거쳐 넘긴다 — 빈 패턴이 들어가면
+            # 매니페스트 파일 전부가 범위 밖이 되고, 아래 가드가 그걸 잡는다.
+            python3 scripts/db_data_sparse.py > _sparse_patterns.txt || return 4
+            [ -s _sparse_patterns.txt ] || return 4
+            git -C db_data_repo sparse-checkout set --no-cone --stdin \
+              < _sparse_patterns.txt || return 4
             mkdir -p db_data_repo/data
+            # 범위 밖(skip-worktree) 경로는 `git add`가 **말없이 무시한다** — 그러면
+            # 런은 초록인데 그 심 상태만 사라진다. 범위와 배포 목록이 갈리는 순간
+            # 여기서 멈춘다(조용한 누락보다 시끄러운 실패가 낫다).
+            while IFS= read -r name; do
+              [ -n "$name" ] || continue
+              case "$(git -C db_data_repo ls-files -v "data/$name")" in
+                S*) echo "[Deploy] '$name'이 sparse 범위 밖이다 — 올려도 무시된다"
+                    return 4 ;;
+              esac
+            done < data/.lite_deploy_manifest
             # 이 런이 도는 사이 대시보드 리셋이 들어왔으면 리셋된 심 파일은 올리지
             # 않는다 — 2026-09-17 리셋을 2분 뒤 이 스텝이 되돌렸다(dd1810e52).
             python3 scripts/reset_epoch_guard.py db_data_repo/data || return 4

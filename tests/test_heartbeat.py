@@ -153,3 +153,108 @@ def test_조회_실패는_알림이_아니라_실패로_끝난다(monkeypatch):
 
     assert chk.main(log=lambda *a: None) == 1
     assert sent == []
+
+
+# ── 멎은 원인을 가른다 (2026-11-27) ───────────────────────────────
+# 2026-11-26 장중에 `🫀 매매 루프가 멎었습니다 / 마지막 완주: 없음`이 30분마다 왔다.
+# 경보는 **참**이었다(장중 200런 중 성공 2건). 그런데 메시지는 "trading.yml이 장중인데
+# 트리거를 못 받고 있습니다. 태스커(폰) → /api/cron 경로를 확인하세요"였고,
+# **트리거는 2분 간격으로 정확히 도착하고 있었다**(createdAt 00:00:09 / 00:02:08 /
+# 00:04:06 …). 런은 생성됐고 예산을 넘겨 전부 취소됐다.
+#
+# 런이 0건인 것과, 런은 도는데 완주가 0건인 것은 **원인도 고칠 곳도 전혀 다르다**.
+# 전자는 태스커, 후자는 잡 예산이다. 판정에 필요한 정보(런 목록)는 이미 손에 있다.
+
+def _run(minutes_ago, conclusion, now=None):
+    now = now or dt.datetime(2026, 11, 26, 11, 0, tzinfo=heartbeat._KST)
+    ts = (now - dt.timedelta(minutes=minutes_ago)).astimezone(dt.timezone.utc)
+    return {'created_at': ts.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'conclusion': conclusion}
+
+
+_NOW = dt.datetime(2026, 11, 26, 11, 0, tzinfo=heartbeat._KST)
+
+
+def test_창_안에_런이_없으면_트리거_미도착():
+    """태스커가 멈춘 모양. 2026-11-05~10 전체 정지가 이것이었다."""
+    runs = [_run(40, 'success'), _run(60, 'success')]
+    assert heartbeat.stale_cause(runs, _NOW) == heartbeat.TRIGGER_MISSING
+
+
+def test_런은_도는데_전부_취소면_예산_초과():
+    """2026-11-26의 실제 모양 — 2분마다 생성되고 3분 예산에 잘렸다."""
+    runs = [_run(m, 'cancelled') for m in (2, 4, 6, 8, 10, 12)]
+    assert heartbeat.stale_cause(runs, _NOW) == heartbeat.RUNS_CUT
+
+
+def test_런은_도는데_전부_실패면_실패():
+    runs = [_run(m, 'failure') for m in (2, 4, 6, 8)]
+    assert heartbeat.stale_cause(runs, _NOW) == heartbeat.RUNS_FAILED
+
+
+def test_생성됐지만_아무것도_안_끝났으면_정체():
+    """conclusion이 없는 런만 있는 경우 — 큐에 박혔거나 전부 진행 중이다."""
+    runs = [_run(m, None) for m in (2, 4, 6)]
+    assert heartbeat.stale_cause(runs, _NOW) == heartbeat.RUNS_STUCK
+
+
+def test_섞여_있으면_단정하지_않는다():
+    """원인을 모를 때 아는 척하면 지금 고장의 재현이다."""
+    runs = [_run(2, 'cancelled'), _run(4, 'failure')]
+    assert heartbeat.stale_cause(runs, _NOW) == heartbeat.RUNS_MIXED
+
+
+def test_창_밖_런은_세지_않는다():
+    """40분 전 취소는 지금 멎은 원인이 아니다."""
+    runs = [_run(40, 'cancelled'), _run(50, 'cancelled')]
+    assert heartbeat.stale_cause(runs, _NOW) == heartbeat.TRIGGER_MISSING
+
+
+def test_원인마다_지시문이_다르다():
+    """같은 문구를 쓰면 가른 의미가 없다 — 그게 2026-11-26에 사람을 폰으로 보냈다."""
+    texts = {c: heartbeat.stale_hint(c) for c in (
+        heartbeat.TRIGGER_MISSING, heartbeat.RUNS_CUT,
+        heartbeat.RUNS_FAILED, heartbeat.RUNS_STUCK, heartbeat.RUNS_MIXED)}
+    assert len(set(texts.values())) == len(texts), f'중복 지시문: {texts}'
+    # 트리거 미도착에만 태스커가 나와야 한다.
+    assert '태스커' in texts[heartbeat.TRIGGER_MISSING]
+    for c in (heartbeat.RUNS_CUT, heartbeat.RUNS_FAILED, heartbeat.RUNS_STUCK):
+        assert '태스커' not in texts[c], f'{c}가 태스커를 지목한다'
+
+
+def test_알림_본문이_원인을_담는다(monkeypatch):
+    """11-26 재현: 런이 2분마다 도는데 전부 취소 → 태스커를 지목해선 안 된다."""
+    import scripts.check_heartbeat as chk
+
+    sent = []
+    monkeypatch.setattr(chk.alerts, 'send_alert', lambda m, log=None: sent.append(m))
+    monkeypatch.setattr(chk, 'fetch_runs',
+                        lambda log=None: [_run(m, 'cancelled') for m in (2, 4, 6, 8)])
+    monkeypatch.setattr(chk, 'load_calendar', lambda: {})
+    monkeypatch.setattr(chk, 'lookup', lambda c, d: True)
+    monkeypatch.setattr(chk.dt, 'datetime', _FrozenNow)
+
+    chk.main(log=lambda *a: None)
+    assert sent, '장중에 멎었으면 알림이 나가야 한다'
+    body = sent[0]
+    assert '태스커' not in body, f'런이 도는데 태스커를 지목한다: {body}'
+    assert '예산' in body or '취소' in body, f'원인이 안 담겼다: {body}'
+
+
+class _FrozenNow(dt.datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return _NOW if tz else _NOW.replace(tzinfo=None)
+
+
+def test_창은_상한도_본다():
+    """하한만 보면 창이 'cutoff 이후 전부'가 된다.
+
+    2026-11-26 11:00 시점으로 리허설했더니 15분 창에 **442건**이 들어와
+    판정이 runs_mixed로 뒤집혔다(정답은 runs_cut). 운영에서는 now가 실시간이라
+    티가 안 나고, 그래서 틀린 채로 오래 살 수 있는 모양이다.
+    """
+    runs = [_run(2, 'cancelled'), _run(-30, 'success')]  # 음수 = 미래
+    recent = heartbeat.runs_within(runs, _NOW)
+    assert len(recent) == 1, f'미래 런이 창에 들어왔다: {len(recent)}건'
+    assert heartbeat.stale_cause(runs, _NOW) == heartbeat.RUNS_CUT

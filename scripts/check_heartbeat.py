@@ -109,13 +109,33 @@ def main(log=print) -> int:
         return 0
 
     age = f'{int((now - beat).total_seconds() // 60)}분 전' if beat else '오늘 한 번도 없음'
+    # "멎었다"와 "왜 멎었다"를 가른다. 2026-11-26에 이 둘이 한 문구였고, 경보는
+    # 참인데 지시문이 태스커를 지목했다 — 트리거는 2분마다 정확히 왔고 런이
+    # 예산을 넘겨 전부 취소되고 있었다. 사람을 멀쩡한 곳으로 보낸 셈이다.
+    cause = heartbeat.stale_cause(runs, now)
+    recent = heartbeat.runs_within(runs, now)
+    log(f'[Heartbeat] 원인={cause} 창내런={len(recent)}건')
     alerts.send_alert(
         f'🫀 매매 루프가 멎었습니다\n'
         f'마지막 완주: {beat_txt} ({age})\n'
-        f'임계: {heartbeat.MAX_AGE_MIN}분 / 지금: {now.strftime("%H:%M")} KST\n\n'
-        f'{_WATCHED}이 장중인데 트리거를 못 받고 있습니다. '
-        f'태스커(폰) → /api/cron 경로를 확인하세요.', log)
+        f'임계: {heartbeat.MAX_AGE_MIN}분 / 지금: {now.strftime("%H:%M")} KST\n'
+        f'최근 {heartbeat.MAX_AGE_MIN}분 런: {len(recent)}건'
+        f'{_conclusion_summary(recent)}\n\n'
+        f'{heartbeat.stale_hint(cause)}', log)
     return 0
+
+
+def _conclusion_summary(recent: list[dict]) -> str:
+    """`(취소 4 · 진행중 1)`처럼. 사람이 알림만 보고 판정을 검산할 수 있게 한다."""
+    if not recent:
+        return ''
+    labels = {'cancelled': '취소', 'failure': '실패', 'success': '완주',
+              'skipped': '스킵', None: '진행중'}
+    counts: dict = {}
+    for run in recent:
+        k = labels.get(run.get('conclusion'), str(run.get('conclusion')))
+        counts[k] = counts.get(k, 0) + 1
+    return ' (' + ' · '.join(f'{k} {v}' for k, v in counts.items()) + ')'
 
 
 if __name__ == '__main__':

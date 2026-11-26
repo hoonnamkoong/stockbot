@@ -108,11 +108,22 @@ def _trading_yml() -> str:
         return f.read()
 
 
-def test_both_steps_use_the_shared_sparse_range():
-    """복원·배포 두 스텝이 각각 db_data_sparse.py를 부른다."""
-    assert _trading_yml().count('scripts/db_data_sparse.py') >= 2, (
-        '복원과 배포가 같은 범위를 쓰지 않으면 배포하는데 복원되지 않는 '
-        '파일이 생긴다')
+def test_the_sparse_range_is_generated_exactly_once():
+    """범위를 **한 번** 만들고 배포는 그 파일을 재사용한다.
+
+    각자 만들면 둘 다 `clock.now()`를 불러 날짜를 독립으로 계산한다 — 수동
+    디스패치가 자정을 넘으면 범위가 갈려 매니페스트의 `decisions_<전날>_*`가
+    배포 범위 밖이 된다(fail-closed라 데이터는 안 깨지지만 force_run은 사람의
+    유일한 복구 경로다). 한 번만 만들면 드리프트가 구조적으로 불가능하다.
+    """
+    body = _trading_yml()
+    # 주석에도 파일 이름이 나오므로 **실행 형태**만 센다.
+    calls = body.count('python3 scripts/db_data_sparse.py')
+    assert calls == 1, (
+        f'범위 생성이 {calls}회 — 두 번 만들면 날짜가 갈릴 수 있다. '
+        '한 번 만들어 파일로 넘길 것')
+    assert '$SPARSE_PATTERNS' in body, (
+        '배포 스텝이 복원 스텝이 만든 패턴 파일을 쓰지 않으면 범위가 갈린다')
 
 
 def test_restore_failure_stops_the_run():

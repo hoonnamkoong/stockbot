@@ -541,3 +541,70 @@ def test_collector_creates_one_session_and_reuses_it(monkeypatch, tmp_path):
     assert len(got) == 4
     assert got[0] is not None, '세션을 안 넘기면 매 호출이 새 TLS 핸드셰이크다'
     assert len(set(map(id, got))) == 1, f'세션이 {len(set(map(id, got)))}개 — 하나여야 한다'
+
+
+# ── 빈 결과 래칫 (2026-11-27) ─────────────────────────────────────
+# 건너뛰기 조건이 `cache[code]['report'] != target`인데, `fetch`가 빈 dict를 주면
+# 캐시를 **안 쓴다**(지난 분기 값을 지키려는 의도다). 그래서 `report`가 영원히
+# target에 못 미치고 **자료 없는 종목이 매 보충 런마다 전수 재시도**된다.
+# 수집기 독스트링의 "다시 돌려도 거의 0회"는 그 비율만큼 거짓이다.
+#
+# 재시도 자체는 없애지 않는다 — 늦게 제출하는 회사가 있고, 지난 분기 값을 지키는
+# 의도도 옳다. 대신 **순서를 바꾼다**: 이번 목표에서 이미 자료 없음으로 확인된
+# 종목을 뒤로 보내 예산·데드라인의 절단이 그쪽에 떨어지게 한다. 늦은 제출도
+# 여전히 잡히고(앞 종목이 끝나면 돈다) 새 작업이 먼저 처리된다.
+
+def test_자료_없음을_기록하고_기존_값은_지킨다(tmp_path, monkeypatch):
+    import scripts.collect_dart_fundamentals as collect
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    monkeypatch.setattr(sys, 'argv', ['x'])
+    monkeypatch.setattr(df, 'api_key', lambda: 'K')
+    monkeypatch.setattr(df, 'load_corp_codes', lambda d: {'000001': 'c1'})
+    monkeypatch.setattr(collect, 'SLEEP_SEC', 0)
+    # 지난 분기 값이 이미 있다
+    df.save_cache({'000001': {'eps_ttm': 500, 'report': '2025-11011'}}, 'data')
+    monkeypatch.setattr(df, 'fetch', lambda *a, **k: {})      # 이번엔 자료 없음
+    collect.main()
+
+    entry = df.load_cache('data')['000001']
+    assert entry['eps_ttm'] == 500, '지난 분기 값을 지워선 안 된다'
+    assert entry['report'] == '2025-11011', 'report를 올려선 안 된다(자료가 없으니)'
+    assert entry.get('tried'), '시도했다는 사실이 남아야 다음 런이 뒤로 보낼 수 있다'
+
+
+def test_이미_자료없음으로_확인된_종목은_뒤로_간다(tmp_path, monkeypatch):
+    """예산·데드라인의 절단이 **새 작업이 아니라** 재시도에 떨어지게 한다."""
+    import scripts.collect_dart_fundamentals as collect
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    monkeypatch.setattr(sys, 'argv', ['x'])
+    monkeypatch.setattr(df, 'api_key', lambda: 'K')
+    monkeypatch.setattr(df, 'load_corp_codes',
+                        lambda d: {'000001': 'c1', '000002': 'c2', '000003': 'c3'})
+    monkeypatch.setattr(collect, 'SLEEP_SEC', 0)
+    now = df.latest_report(__import__('datetime').date(2026, 11, 27))
+    target = f'{now[0]}-{df.reprt_code(now[1])}'
+    # 000001만 이번 목표에서 자료 없음으로 확인됐다
+    df.save_cache({'000001': {'tried': target}}, 'data')
+
+    order = []
+    monkeypatch.setattr(df, 'fetch',
+                        lambda cc, *a, **k: order.append(cc) or {})
+    collect.main()
+
+    assert order[-1] == 'c1', f'재시도 종목이 맨 뒤여야 한다 — 실제 순서 {order}'
+    assert order[:2] == ['c2', 'c3'], f'미시도 종목이 먼저여야 한다 — {order}'
+
+
+def test_tried만_있는_항목은_값을_지어내지_않는다(tmp_path):
+    """`tried` 기록이 심 입력을 오염시키면 안 된다 — 금융 수치에 거짓 금지."""
+    target = '2026-11014'
+    df.save_cache({'000001': {'tried': target}}, str(tmp_path))
+    cands = [{'code': '000001', 'price': 10000}]
+    applied, total = df.apply(cands, str(tmp_path))
+    assert (applied, total) == (0, 1)
+    assert 'per_ttm' not in cands[0] and 'pbr_ttm' not in cands[0]
+    assert 'eps_growth_yoy' not in cands[0]

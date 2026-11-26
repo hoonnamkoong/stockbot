@@ -72,14 +72,44 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git clone --branch db-data --depth 1 \
-            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo
-          mkdir -p db_data_repo/data
-          cp data/market_calendar.json db_data_repo/data/
-          cd db_data_repo
-          git add data/market_calendar.json
-          git diff --staged --quiet || git commit -m "chore(calendar): 개장일 달력 갱신 [skip ci]"
-          git push origin db-data
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          # db-data writer가 아홉이고 전부 concurrency 그룹이 달라 **동시에 돈다**.
+          # 재시도가 없으면 `! [rejected] (fetch first)` 한 번에 그 런의 산출물이
+          # 사라진다 — eod_data가 2026-11-25에 실제로 그렇게 죽었다.
+          #
+          # rebase가 아니라 **다시 clone**이다: db-data는 커밋 8,800개가 넘어
+          # `fetch --unshallow` 후 rebase가 실측 142초인데(trading.yml 주석),
+          # 여기서 하는 일은 "남의 최신 위에 내 파일 얹기"이고 그건 depth 1
+          # 재clone이면 된다. 결과는 같고 비용은 이력 길이와 무관하다.
+          #
+          # 달력 자체는 여러 날치(실측 24일)라 하루 실패를 견디지만,
+          # `config/data_freshness.yaml`이 `max_age_sessions: 3`이고 낡으면
+          # 휴장 판정이 fail-closed로 **매매를 통째로 멈춘다** — 연속 실패가
+          # 그 선을 넘는다. 그래서 조용히 넘기지 않고 세 번 시도한 뒤 실패로 낸다.
+          attempt() {
+            rm -rf db_data_repo
+            git clone --branch db-data --depth 1 "$REPO_URL" db_data_repo || return 2
+            mkdir -p db_data_repo/data
+            cp data/market_calendar.json db_data_repo/data/ || return 4
+            git -C db_data_repo add data/market_calendar.json || return 4
+            if git -C db_data_repo diff --staged --quiet; then return 3; fi
+            git -C db_data_repo commit -m "chore(calendar): 개장일 달력 갱신 [skip ci]" || return 4
+            git -C db_data_repo push origin db-data || return 1
+            return 0
+          }
+          for i in 1 2 3; do
+            rc=0
+            attempt || rc=$?
+            case "$rc" in
+              0) echo "[달력] db-data 배포 완료 (시도 $i)"; exit 0 ;;
+              3) echo "[달력] 변경사항 없음"; exit 0 ;;
+              1) echo "[달력] push 충돌 — 최신 db-data 위에서 다시 시도 ($i/3)" ;;
+              2) echo "[달력] db-data clone 실패 ($i/3)" ;;
+              *) echo "[달력] git 오류(rc=$rc) — 달력이 db-data에 도달하지 못했다"; exit 1 ;;
+            esac
+          done
+          echo "[달력] 3회 모두 실패 — 달력이 db-data에 도달하지 못했다"
+          exit 1
 
       # 실패 **연속당 1통**이다. 런마다 보내면 지속 실패에 수백 통이 나가고,
       # 도배는 침묵과 같다 — scripts/notify_workflow_failure.py가 직전 완료 런의

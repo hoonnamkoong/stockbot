@@ -396,21 +396,43 @@ jobs:
           fi
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git clone --branch db-data --depth 1 \
-            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_repo
-          # 파일별로 나눠서 add한다 — 한 줄로 묶으면 하나가 없을 때 전체가
-          # 원자적으로 실패한다(2026-08-05 심9-1 사고와 같은 모양).
-          for f in data/minute_*.csv; do
-            cp "$f" "db_repo/data/$(basename "$f")" && (cd db_repo && git add "data/$(basename "$f")")
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          # 재시도가 없으면 푸시 충돌 한 번에 그 날 분봉이 사라진다. db-data
+          # writer가 아홉이고 전부 concurrency 그룹이 달라 동시에 돈다 —
+          # 2026-11-25에 같은 잡의 CSV 배포가 `! [rejected] (fetch first)`로
+          # 즉시 죽었다. rebase 대신 재clone인 이유는 trading.yml 주석과 같다
+          # (db-data 커밋 8,800개 → unshallow+rebase 실측 142초).
+          #
+          # 원본(`data/minute_*.csv`)이 클론 **밖**에 있어 재clone으로 잃는 것이
+          # 없고, cp·add는 멱등이다 — 재시도의 전제가 성립한다.
+          attempt() {
+            rm -rf db_repo
+            git clone --branch db-data --depth 1 "$REPO_URL" db_repo || return 2
+            mkdir -p db_repo/data
+            # 파일별로 나눠서 add한다 — 한 줄로 묶으면 하나가 없을 때 전체가
+            # 원자적으로 실패한다(2026-08-05 심9-1 사고와 같은 모양).
+            for f in data/minute_*.csv; do
+              b="$(basename "$f")"
+              cp "$f" "db_repo/data/$b" && git -C db_repo add "data/$b"
+            done
+            if git -C db_repo diff --cached --quiet; then return 3; fi
+            git -C db_repo commit -m "data: 1분봉 갱신 $(date +'%Y-%m-%d KST')" || return 4
+            git -C db_repo push origin db-data || return 1
+            return 0
+          }
+          for i in 1 2 3; do
+            rc=0
+            attempt || rc=$?
+            case "$rc" in
+              0) echo "[분봉] db-data 배포 완료 (시도 $i)"; exit 0 ;;
+              3) echo "[분봉] 변경사항 없음"; exit 0 ;;
+              1) echo "[분봉] push 충돌 — 최신 db-data 위에서 다시 시도 ($i/3)" ;;
+              2) echo "[분봉] db-data clone 실패 ($i/3)" ;;
+              *) echo "[분봉] git 오류(rc=$rc)"; exit 1 ;;
+            esac
           done
-          cd db_repo
-          if ! git diff --cached --quiet; then
-            git commit -m "data: 1분봉 갱신 $(date +'%Y-%m-%d KST')"
-            git push origin db-data
-            echo "[분봉] db-data 배포 완료"
-          else
-            echo "[분봉] 변경사항 없음"
-          fi
+          echo "[분봉] 3회 모두 실패 — 이 날 분봉이 db-data에 도달하지 못했다"
+          exit 1
 
       - name: Notify on failure
         if: always() && job.status != 'success'

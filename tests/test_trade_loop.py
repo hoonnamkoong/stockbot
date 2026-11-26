@@ -903,3 +903,80 @@ def test_국면_채점표가_배포_목록에_있다():
 
     now = _dt.datetime(2026, 11, 24, 9, 5)
     assert regime_scorecard.FILENAME in regime_output_files(now)
+
+
+# ── 실효 매매 주기 (2026-11-27) ───────────────────────────────────
+# 모듈 독스트링의 타임라인은 `t≈20s 1바퀴 / t≈80s 2바퀴`로 "2분 트리거 안에서 두
+# 바퀴 = 1분 매매"를 적고 있었다. **그게 2026-08-19 이후 한 번도 사실이 아니었다.**
+#
+# 실측 `TradeLoop 완료 (1바퀴)` + `루프 예산 소진(N/85초)`:
+#   2026-11-19  71/85 · 1바퀴
+#   2026-11-25  77/85 · 1바퀴
+#   2026-11-26  88/85 · 1바퀴   ← 자기 예산도 넘겼다
+#
+# 아무도 몰랐던 이유는 "예산 소진"이 매 런 찍혀 정상 종료로 읽혔기 때문이다
+# (skip-and-nonfire-look-alike의 cadence 판). 산수를 테스트로 고정해 상수를 바꾸는
+# 사람이 보게 둔다 — 이 값을 올려 "3바퀴"를 노리는 안이 실제로 제안됐다.
+
+def test_두_바퀴는_1바퀴가_25초_안에_끝나야_가능하다():
+    assert trade_loop.TRADE_INTERVAL_SEC == 60
+    assert trade_loop.LOOP_BUDGET_SEC == 85
+    # e + 60 <= 85  →  e <= 25
+    assert trade_loop.has_budget_for_another_turn(25) is True
+    assert trade_loop.has_budget_for_another_turn(26) is False
+
+
+def test_실측_1바퀴_소요에서는_두_바퀴가_불가능하다():
+    """즉 실효 매매 주기는 60초가 아니라 **트리거 간격**이다."""
+    for measured in (71, 77, 88):
+        assert trade_loop.has_budget_for_another_turn(measured) is False, (
+            f'1바퀴 {measured}초에서 2바퀴가 허가되면 실측과 어긋난다')
+
+
+def test_예산을_140으로_올려도_세_바퀴는_안_된다():
+    """3바퀴에는 elapsed ≤ 20초가 필요하다 — 실측 71~88초와 멀다.
+
+    `LOOP_BUDGET_SEC`는 예산이 아니라 **다음 바퀴 허가 게이트**다. 그 위에 쌓은
+    산수는 전부 틀린다.
+    """
+    budget = 140
+    assert budget - trade_loop.TRADE_INTERVAL_SEC * 2 == 20
+    for measured in (71, 77, 88):
+        # 140 예산에서도 2바퀴까지만: e+60<=140 → e<=80
+        assert (measured + trade_loop.TRADE_INTERVAL_SEC <= budget) == (measured <= 80)
+
+
+# ── 심별 유니버스 개수 계측 (2026-11-27) ──────────────────────────
+# 공유 보강 비용은 유일 종목 수에 선형이다(`_pace`가 전역 직렬이라 종목당 0.35초가
+# 상수). 그런데 `[계측] 자체 유니버스 수집`이 **시간만** 찍고 심별 개수를 안 찍어서,
+# 2026-11-26에 풀이 126→177로 늘어 장중 런의 99%가 잘렸을 때 "어느 심이 키웠나"를
+# 심 등록부와 병합 이력 대조로 추론해야 했다.
+
+def _sim(name):
+    """클래스 이름만 쓰는 가짜 심 — 로그가 `sim.__class__.__name__`을 쓴다."""
+    return type(name, (), {})()
+
+
+def test_유니버스_개수를_많이_요청한_순으로_남긴다():
+    from src.pipeline.workers.trade_engine import TradeEngineWorker as W
+    sims = [_sim('Sim4Bull'), _sim('Sim10Orchestrator'), _sim('Sim6Bear')]
+    unis = [[{}] * 30, [{}] * 100, [{}] * 6]
+    line = W._universe_sizes_line(sims, unis)
+    assert line.startswith('요청 136건:'), line
+    assert line.index('Sim10Orchestrator') < line.index('Sim4Bull') < line.index('Sim6Bear')
+    assert 'Sim10Orchestrator 100' in line
+
+
+def test_유니버스가_없는_심은_안_센다():
+    """`IS_EOD` 심은 None이고, 빈 유니버스를 돌려주는 심도 있다."""
+    from src.pipeline.workers.trade_engine import TradeEngineWorker as W
+    line = W._universe_sizes_line([_sim('A'), _sim('B')], [None, []])
+    assert line == '자체 유니버스 심 없음', line
+
+
+def test_요청_합계가_유일_종목_수와_구분된다():
+    """합계와 유일 수의 차가 중복 제거량이다 — 둘이 벌어지는 모양을 읽으려면
+    합계가 로그에 있어야 한다(2026-11-26: 요청 232건 → 유일 177종목)."""
+    from src.pipeline.workers.trade_engine import TradeEngineWorker as W
+    line = W._universe_sizes_line([_sim('X'), _sim('Y')], [[{}] * 30, [{}] * 30])
+    assert '요청 60건' in line

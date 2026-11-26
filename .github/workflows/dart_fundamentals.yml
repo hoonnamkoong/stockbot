@@ -60,7 +60,13 @@ jobs:
       - name: Collect
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
-        run: python scripts/collect_dart_fundamentals.py
+        # `-u`가 없으면 stdout이 파이프라 블록 버퍼링된다. 진행 출력은 50종목당
+        # 한 줄(약 60~75B)이라 4,000종목을 돌아도 버퍼 8,192B를 못 채워 **영원히
+        # flush되지 않는다**. 2026-11-25 런은 119분을 돌고 타임아웃에 잘렸는데
+        # 로그가 한 줄도 없었고, 그래서 몇 종목이 처리됐는지 알 수 없었다 —
+        # 벽시계 예산을 설계할 근거가 생기지 않았다. 이 잡은 타임아웃이 가장
+        # 그럴듯한 실패 모양이라(120분 예산) 특히 필요하다.
+        run: python -u scripts/collect_dart_fundamentals.py
 
       # 수집이 실패해도 그때까지 모은 것은 올린다 — 중간 저장을 하므로 다음 런이
       # 거기서 이어받는다. always()가 없으면 타임아웃 한 번에 80분이 버려진다.
@@ -68,8 +74,16 @@ jobs:
         if: always()
         run: |
           [ -f data/dart_fundamentals.json ] || { echo "[Deploy] 캐시 파일 없음 — 올릴 것이 없다"; exit 0; }
-          git config user.name "StockBot"
-          git config user.email "bot@stockbot.local"
+          # `--global`이어야 한다. 로컬이면 **바깥 체크아웃의 .git/config에만**
+          # 걸리고, 아래에서 새로 clone하는 db_data_repo에는 ident가 없다 —
+          # 러너에 전역 ident도 없으므로 `git commit`이
+          # `fatal: empty ident name ... not allowed` → exit 128로 죽는다.
+          # 2026-11-25 첫 채움 런이 정확히 이렇게 죽었고, 그래서 **수집이 성공해도
+          # 파일이 db-data에 한 바이트도 올라가지 못했다** — 심3·심11이 거래 0건인
+          # 직접 원인이다. trading.yml·eod_data.yml·token_refresh.yml은 전부
+          # `--global`을 쓴다. 이 파일만 어긋나 있었다.
+          git config --global user.name "StockBot"
+          git config --global user.email "bot@stockbot.local"
           rm -rf db_data_repo
           git clone --depth 1 --branch db-data \
             https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_data_repo || {

@@ -255,10 +255,38 @@ def load_corp_codes(data_dir: str = 'data') -> dict:
         return {}
 
 
+def _save_json(path: str, payload: dict) -> None:
+    """임시 파일에 쓰고 `os.replace`로 바꾼다 — 잘린 파일이 남지 않는다.
+
+    `open(..., 'w')`는 **먼저 잘라낸 뒤** 쓴다. 잡 타임아웃의 취소 신호가 그 창에
+    떨어지면 잘린 JSON이 남고, 배포 스텝은 `if: always()`라 그걸 db-data에 올린다.
+    그러면 `load_cache`가 예외를 삼켜 `{}`를 돌려주므로(아래) 다음 런이 **조용히
+    0에서 다시 시작**한다 — 한 분기 수집이 사라진다.
+
+    창은 넓지 않다: 저장 80회(`SAVE_EVERY=50` × 상장사 약 4,020) × 약 15ms =
+    총 1.2초로 런(4,800초)의 **0.025%**다. 그래도 막는 이유는 비용이 세 줄이고
+    이 잡이 **분기에 한 번**뿐이라 한 번 잃으면 다음 기회가 멀다는 것이다.
+
+    임시 파일을 같은 디렉터리에 두는 이유: `os.replace`는 같은 파일시스템에서만
+    원자적이다. 실패하면 지운다 — 남기면 `git add -A data/`가 db-data에 올린다.
+    """
+    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+    tmp = f'{path}.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False,
+                      separators=(',', ':'), sort_keys=True)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def save_corp_codes(mapping: dict, data_dir: str = 'data') -> None:
-    os.makedirs(data_dir, exist_ok=True)
-    with open(os.path.join(data_dir, CORP_CODES_FILE), 'w', encoding='utf-8') as f:
-        json.dump(mapping, f, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+    _save_json(os.path.join(data_dir, CORP_CODES_FILE), mapping)
 
 
 def load_cache(data_dir: str = 'data') -> dict:
@@ -271,9 +299,7 @@ def load_cache(data_dir: str = 'data') -> dict:
 
 
 def save_cache(cache: dict, data_dir: str = 'data') -> None:
-    os.makedirs(data_dir, exist_ok=True)
-    with open(os.path.join(data_dir, CACHE_FILE), 'w', encoding='utf-8') as f:
-        json.dump(cache, f, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+    _save_json(os.path.join(data_dir, CACHE_FILE), cache)
 
 
 def apply(candidates: list[dict], data_dir: str = 'data') -> tuple[int, int]:

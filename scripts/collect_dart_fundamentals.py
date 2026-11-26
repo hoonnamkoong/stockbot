@@ -75,26 +75,34 @@ def main() -> int:
 
     ok = empty = 0
     started = time.time()
-    for i, (code, corp_code) in enumerate(todo[:budget], 1):
-        try:
-            out = df.fetch(corp_code, year, quarter, key=key)
-        except Exception as e:
-            print(f'[dart] {code} 조회 실패: {e}')
-            out = {}
-        if out:
-            cache[code] = out
-            ok += 1
-        else:
-            # 캐시를 지우지 않는다 — 지난 분기 값이 지어낸 값보다 낫고,
-            # `report`가 낡은 채로 남아 다음 실행이 다시 시도한다.
-            empty += 1
-        if i % SAVE_EVERY == 0:
-            df.save_cache(cache, args.data_dir)
-            print(f'[dart] {i}/{min(len(todo), budget)} '
-                  f'(수집 {ok} · 자료없음 {empty} · {time.time() - started:.0f}초)')
-        time.sleep(SLEEP_SEC)
-
-    df.save_cache(cache, args.data_dir)
+    # `finally`인 이유: 잡 타임아웃의 취소 신호는 `KeyboardInterrupt`로 들어오고
+    # 그건 BaseException이라 아래 `except Exception`이 안 잡는다. 그러면 루프
+    # **뒤**의 최종 저장을 건너뛰어 마지막 체크포인트 이후(최대 49종목)가 버려진다.
+    #
+    # 이게 예외적인 경로가 아니다. 상장사 약 4,020개가 120분 예산에 들어가지
+    # 않으므로(2026-11-25 런은 119분에 취소됐다) **취소가 당분간 정상 경로**다.
+    # 배포 스텝이 `if: always()`라 저장만 되면 그 결과는 db-data에 올라간다.
+    try:
+        for i, (code, corp_code) in enumerate(todo[:budget], 1):
+            try:
+                out = df.fetch(corp_code, year, quarter, key=key)
+            except Exception as e:
+                print(f'[dart] {code} 조회 실패: {e}')
+                out = {}
+            if out:
+                cache[code] = out
+                ok += 1
+            else:
+                # 캐시를 지우지 않는다 — 지난 분기 값이 지어낸 값보다 낫고,
+                # `report`가 낡은 채로 남아 다음 실행이 다시 시도한다.
+                empty += 1
+            if i % SAVE_EVERY == 0:
+                df.save_cache(cache, args.data_dir)
+                print(f'[dart] {i}/{min(len(todo), budget)} '
+                      f'(수집 {ok} · 자료없음 {empty} · {time.time() - started:.0f}초)')
+            time.sleep(SLEEP_SEC)
+    finally:
+        df.save_cache(cache, args.data_dir)
     left = max(0, len(todo) - budget)
     print(f'[dart] 완료 — 수집 {ok} · 자료없음 {empty} · 캐시 {len(cache)}종목 '
           f'· {time.time() - started:.0f}초')

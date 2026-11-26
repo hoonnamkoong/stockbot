@@ -329,3 +329,124 @@ def test_financial_holdings_have_no_revenue_tag():
     out = df.derive(rows, [])
     assert 'revenue_growth_yoy' not in out
     assert 'eps_growth_yoy' in out
+
+
+# ── 캐시 영속화의 원자성 (2026-11-27) ──────────────────────────────
+# 첫 채움 런(45655655366)은 수집 119분 뒤 잡 타임아웃으로 취소됐다. 지금은 배포
+# 스텝이 `git config`에 `--global`이 없어 exit 128로 죽기 때문에 그 결과가 db-data에
+# 도달하지 못하는데, **그 한 줄을 고치는 순간** 다른 위험이 실현된다:
+# `save_cache`가 `open(...,'w')`로 **먼저 잘라낸 뒤** `json.dump`하므로, 취소 신호가
+# 그 창에 떨어지면 **잘린 JSON**이 남고 그게 push된다. `load_cache`는 예외를 삼켜
+# `{}`를 돌려주므로(위 test_corrupted_cache_is_treated_as_empty) 다음 런은 조용히
+# 0에서 다시 시작한다 — 한 분기의 수집이 통째로 사라진다.
+
+def _boom(*a, **k):
+    raise RuntimeError('쓰기 도중 죽는다')
+
+
+def test_save_cache_does_not_destroy_the_previous_file_on_failure(tmp_path, monkeypatch):
+    """쓰기가 실패해도 **이전 값이 그대로** 남아야 한다.
+
+    잘린 파일보다 지난 분기 값이 낫다 — `report`가 낡은 채로 남으면 다음 런이
+    다시 시도한다. 빈 `{}`는 그 재시도 경로마저 지운다.
+    """
+    df.save_cache({'005930': {'eps_ttm': 12372, 'report': '2026-11014'}},
+                  str(tmp_path))
+    before = (tmp_path / df.CACHE_FILE).read_bytes()
+    monkeypatch.setattr(df.json, 'dump', _boom)
+    try:
+        df.save_cache({'005930': {'eps_ttm': 1}}, str(tmp_path))
+    except RuntimeError:
+        pass
+    assert (tmp_path / df.CACHE_FILE).read_bytes() == before, '이전 캐시가 깨졌다'
+    assert df.load_cache(str(tmp_path)), 'load_cache가 {}를 돌려주면 다음 런이 0에서 시작한다'
+
+
+def test_save_corp_codes_does_not_destroy_the_previous_file_on_failure(tmp_path, monkeypatch):
+    """법인코드 매핑도 같은 패턴이다 — 둘 다 db-data로 push된다."""
+    df.save_corp_codes({'005930': '00126380'}, str(tmp_path))
+    before = (tmp_path / df.CORP_CODES_FILE).read_bytes()
+    monkeypatch.setattr(df.json, 'dump', _boom)
+    try:
+        df.save_corp_codes({'005930': 'X'}, str(tmp_path))
+    except RuntimeError:
+        pass
+    assert (tmp_path / df.CORP_CODES_FILE).read_bytes() == before
+
+
+def test_no_temp_file_is_left_behind(tmp_path):
+    """임시 파일이 남으면 `git add -A data/`가 그걸 db-data에 올린다."""
+    df.save_cache({'005930': {'report': 'x'}}, str(tmp_path))
+    names = sorted(p.name for p in tmp_path.iterdir())
+    assert names == [df.CACHE_FILE], f'군더더기 파일: {names}'
+
+
+# ── 취소가 마지막 저장을 건너뛴다 ─────────────────────────────────
+# 잡 타임아웃의 취소 신호는 `KeyboardInterrupt`(BaseException)로 들어온다. 수집
+# 루프의 `except Exception`은 그걸 안 잡고, 그래서 루프 **뒤**의 최종
+# `save_cache`(scripts/collect_dart_fundamentals.py)를 건너뛴다. 중간 저장이
+# 50종목마다이므로 **최대 49종목이 매 런 버려진다**.
+
+def test_cancellation_still_saves_what_was_collected(tmp_path, monkeypatch):
+    import scripts.collect_dart_fundamentals as collect
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    # main()이 argparse를 쓰므로 pytest의 argv가 새어들면 SystemExit 2가 난다.
+    monkeypatch.setattr(sys, 'argv', ['collect_dart_fundamentals.py'])
+    monkeypatch.setattr(df, 'api_key', lambda: 'KEY')
+    monkeypatch.setattr(df, 'load_corp_codes',
+                        lambda d: {f'{i:06d}': f'c{i}' for i in range(5)})
+    monkeypatch.setattr(collect, 'SLEEP_SEC', 0)
+
+    seen = []
+
+    def fetch(corp_code, year, quarter, key=None, **kw):
+        seen.append(corp_code)
+        if len(seen) == 3:            # 세 번째 종목에서 취소 신호가 온다
+            raise KeyboardInterrupt
+        return {'eps_ttm': 100, 'report': f'{year}-11014'}
+
+    monkeypatch.setattr(df, 'fetch', fetch)
+    try:
+        collect.main()
+    except (KeyboardInterrupt, SystemExit):
+        pass
+
+    cache = df.load_cache('data')
+    assert len(cache) == 2, (
+        f'취소 전에 모은 2종목이 저장돼야 한다 — 실제 {len(cache)}종목. '
+        '중간 저장이 50종목마다이므로 이게 없으면 최대 49종목이 매 런 버려진다')
+
+
+# ── 워크플로 배선 (돈이 아니라 배달 경로다) ────────────────────────
+
+def _dart_yml() -> str:
+    path = os.path.join(os.path.dirname(__file__), '..',
+                        '.github', 'workflows', 'dart_fundamentals.yml')
+    with open(path, encoding='utf-8') as f:
+        return f.read()
+
+
+def test_git_identity_is_global_so_the_fresh_clone_inherits_it():
+    """`git config`가 로컬이면 **새 clone에는 ident가 없다**.
+
+    2026-11-25 첫 채움 런이 `fatal: empty ident name` → exit 128로 죽었다.
+    수집이 아무리 성공해도 파일이 db-data에 한 바이트도 올라가지 않는다 —
+    심3·심11이 거래 0건인 직접 원인이다. trading.yml·eod_data.yml·
+    token_refresh.yml은 전부 `--global`을 쓴다. 이 파일만 어긋나 있었다.
+    """
+    body = _dart_yml()
+    assert 'git config --global user.name' in body
+    assert 'git config --global user.email' in body
+
+
+def test_collector_output_is_unbuffered():
+    """버퍼링되면 타임아웃에 잘린 런의 로그가 **한 줄도** 안 남는다.
+
+    진행 출력은 50종목당 1줄(약 60~75B)이라 4,000종목을 돌아도 파이썬 블록
+    버퍼 8,192B를 한 번도 못 채운다 — 영원히 flush되지 않는다. 그래서 119분
+    동안 몇 종목이 처리됐는지 알 수 없었고, 벽시계 예산을 설계할 근거가
+    생기지 않았다. 레포의 다른 워크플로는 전부 `-u`를 쓴다.
+    """
+    assert 'python -u scripts/collect_dart_fundamentals.py' in _dart_yml()

@@ -260,8 +260,13 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
         price = float(stock.get('price', 0) or 0)
         amount = float(stock.get('amount', 0) or 0)
         change_rate = _parse_change_rate(stock)
-        sparkline = stock.get('sparkline_price', []) or []
-        adx = BaseSimulator.calculate_adx(sparkline) if len(sparkline) >= 3 else 0.0
+        # 진입은 장중 판단이라 오늘 값을 본다(당일 제외는 청산에만): 직전 4개 종가 + 현재가.
+        # 이력이 모자랄 때 adx=0.0으로 메우면 'no_trend'(전략 탈락)로 기록돼 "못 재서 안
+        # 샀다"가 "추세가 약해 안 샀다"와 섞인다. 못 쟀으면 None으로 두고 후보를 버린다 —
+        # 진입은 가만히 있는 비용이 기회비용뿐이라 결손이면 포기가 맞다(청산은 반대).
+        # 날짜는 청산과 같이 clock(KST) 한 곳에서만 받는다.
+        prior4 = prior_closes_for(code, cand_by_code, view, today or clock.date_compact(), 4)
+        adx = BaseSimulator.calculate_adx(prior4 + [price]) if prior4 is not None else None
         # 기준선이 없으면 1로 메우지 않는다. 메우면 buzz_ratio가 글 수와 같아져
         # '평상시 대비 2.2배'가 '글 2.2개 이상'이 되고, 남는 절대 개수 조건이
         # 대형주 필터가 된다 — 2026-11-24 실측: 라이브 diag 37,032행 전부
@@ -275,7 +280,8 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
         d = {
             'code': code, 'name': stock.get('name', ''), 'price': price,
             'change_rate': f"{change_rate:.2f}", 'amount': amount,
-            'adx': f"{adx:.1f}", 'tick_power': stock.get('tick_power', 0),
+            # 못 잰 ADX는 빈 칸 — 0.0으로 적으면 '안 쟀다'와 '추세 0이다'가 합쳐진다.
+            'adx': f"{adx:.1f}" if adx is not None else '', 'tick_power': stock.get('tick_power', 0),
             'posts': f.get('posts', 0), 'unique_posters': f.get('posters', 0),
             'posts_per_poster': f"{f.get('posts_per_poster', 0):.2f}",
             # 측정 불가는 빈 칸으로 남긴다 — 0으로 적으면 '안 쟀다'와 '0이다'가 합쳐진다.
@@ -297,7 +303,7 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
         }
 
         skip = _skip_reason(stock, view, code, price, amount, change_rate,
-                            sparkline, adx, buzz_ratio, f, portfolio, sold, held,
+                            adx, buzz_ratio, f, portfolio, sold, held,
                             tick_outage)
         if skip:
             d['decision'], d['reason'] = 'skip', skip
@@ -326,7 +332,7 @@ def _fmt(v):
 
 
 def _skip_reason(stock, view, code, price, amount, change_rate,
-                 sparkline, adx, buzz_ratio, f, portfolio, sold, held,
+                 adx, buzz_ratio, f, portfolio, sold, held,
                  tick_outage=False):
     """첫 번째로 걸린 게이트 이름. 통과하면 None.
 
@@ -342,8 +348,8 @@ def _skip_reason(stock, view, code, price, amount, change_rate,
         return 'no_price'
     if amount < MIN_AMOUNT:
         return 'illiquid'
-    if len(sparkline) < 3:
-        return 'no_sparkline'
+    if adx is None:
+        return 'no_history'
     # 도배 배제. 한 사람이 여러 글을 쓰는 판은 '관심'이 아니다.
     if f.get('posters', 0) <= 0:
         return 'no_posters'

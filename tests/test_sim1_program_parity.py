@@ -38,11 +38,16 @@ def _diag_files(d):
     return sorted(f for f in os.listdir(d) if f.endswith('.csv'))
 
 
+def _own_hist(closes):
+    """후보가 직접 든 날짜 붙은 직전 종가(항상 과거 날짜)."""
+    return [{'date': f'200001{i:02d}', 'close': c} for i, c in enumerate(closes, 1)]
+
+
 def _cand(code, name, posts=300, avg=50, posters=200, likes=600, change='+1.00%'):
     return {'code': code, 'name': name, 'price': 1000, 'amount': 5_000_000_000,
             'recent_posts_count': posts, 'avg_posts': avg, 'unique_posters': posters,
             'total_likes': likes, 'change_rate': change,
-            'sparkline_price': [900, 940, 970, 990, 1000],
+            'price_history': _own_hist([900, 940, 970, 990]),
             'tick_power': 130.0, 'fact_score': 0.5, 'posts': [{'title': '3분기 공시 확인'}]}
 
 
@@ -53,7 +58,7 @@ def _filler(n=MIN_SAMPLE + 2):
              'amount': 2_000_000_000, 'recent_posts_count': 30 + i * 3,
              'avg_posts': 30 + i * 3, 'unique_posters': 24 + i * 2,
              'total_likes': 30 + i * 3, 'change_rate': '+0.50%',
-             'sparkline_price': [980, 990, 1000, 1005, 1000], 'tick_power': 130.0,
+             'price_history': _own_hist([980, 990, 1000, 1005]), 'tick_power': 130.0,
              'posts': []} for i in range(n)]
 
 

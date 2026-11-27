@@ -114,6 +114,9 @@ def _buzz(i, hot=False, rng=None):
               'likes': rng.randint(1, 50)} for j in range(n)]
     return {'code': f'{i:06d}', 'name': f'버즈{i}', 'price': 1000,
             'amount': BIG_AMOUNT, 'sparkline_price': [980, 1000, 985, 1000, 1000],
+            # 심1 진입 ADX는 날짜 붙은 직전 4종가 + 현재가(1000)를 읽는다: ADX 40(문턱 15)
+            'price_history': [{'date': f'200001{k:02d}', 'close': c}
+                              for k, c in enumerate([980, 1000, 985, 1000], 1)],
             'change_rate': '+0.80%',            # 아직 안 오른 상태여야 산다
             'tick_power': 180.0, 'sentiment': '긍정',
             'frgn_fake_ntby_qty': 50_000, 'orgn_fake_ntby_qty': 50_000,

@@ -27,8 +27,13 @@ writer는 `trade_engine.run()`(=scraper.yml의 Stage 3) **하나**다. trading.y
 60초 루프는 버즈 불필요 심만 돌리므로 이 파일을 쓰지 않는다 — 두 워크플로가
 같은 누적 파일을 쓰면 lost update가 난다.
 
-- 복원: scraper.yml·trading.yml 모두 런 시작에 `git checkout db-data -- data/`로
-  **data/ 전체**를 받는다. 그래서 별도 조회 목록에 넣을 필요가 없다.
+- 복원: scraper.yml은 런 시작에 `git checkout db-data -- data/`로 data/ 전체를
+  받는다. **trading.yml은 2026-11-26부터 아니다** — db-data가 713MB로 커져 그
+  복원이 38초가 됐고 3분 예산을 넘겨 장중 런의 99%가 잘렸다. 지금은
+  `scripts/db_data_sparse.py`가 정한 범위만 받는다(무거운 계열을 배제한다).
+  `buzz_baseline.json`은 그 배제에 걸리지 않아 **여전히 복원되지만, "전체를
+  받으니 신경 쓸 필요 없다"는 전제는 더 이상 사실이 아니다** — 이 파일 이름이
+  배제 패턴에 걸리게 되면 돈 루프가 기준선을 못 읽는다.
 - 배포: scraper.yml이 `for f in data/*.json`으로 올린다(제외 목록에 없다).
 - `record()`는 **반드시 먼저 load()** 한다. 새로 시작하면 누적 파일이 매 런
   잘린다 — 배포 목록과 복원 목록이 갈렸을 때 심9-1 매매기록 8건이 2행으로

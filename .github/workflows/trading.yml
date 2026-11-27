@@ -183,11 +183,60 @@ jobs:
         run: |
           # --depth 1: 최신 스냅샷만 필요하다. 2분마다 도는 경로에서 전체 이력을
           # 받으면 그 비용이 매 트리거마다 든다(db-data는 하루 수십 커밋이 쌓인다).
-          git fetch --depth 1 origin db-data:db-data 2>/dev/null || echo "[Info] db-data branch does not exist yet"
-          if git show-ref --verify refs/heads/db-data 2>/dev/null; then
-            git checkout db-data -- data/ 2>/dev/null || echo "[Info] No data folder on db-data yet"
-          fi
+          #
+          # 거기에 **받는 파일 수까지** 줄인다(2026-11-26). `git checkout db-data -- data/`는
+          # 트리 전체를 실체화하는데 data/가 713MB·2,471파일로 커져 실측 38초가 됐다.
+          # 배포 clone도 38초라 3분 예산에 189초가 필요해졌고, 그날 장중 80런 중
+          # 성공은 1건이었다 — 매 런이 `Deploy state`에서 잘렸다. 주문은 나가고
+          # 심 상태만 db-data에 도달하지 못하는, 제일 나쁜 모양이다.
+          #
+          # 예산을 늘려서 풀 수 없다: 이 타임아웃은 원장 락 리스(4분)보다 짧아야
+          # 중복 주문이 안 난다. 그래서 받는 양을 줄인다 — blob 필터 + sparse로
+          # 실측 713MB/42초 → 74MB/8초(같은 회선).
+          #
+          # 범위는 scripts/db_data_sparse.py 하나가 정하고, **여기서 한 번 만들어**
+          # 배포 스텝이 그 파일을 다시 쓴다. 두 목록이 갈리면 "배포하는데 복원되지
+          # 않는" 파일이 생기고, 그 파일은 매 런 앞부분이 잘린다(2026-08-05 심9-1
+          # 매매기록 8건이 2행만 남은 고장).
+          # `--stdin`인 이유: 패턴에 `*`가 들어 인자로 넘기면 셸이 글롭으로 먹는다.
           mkdir -p data
+          # 패턴을 파일로 받고 **비었는지 검사한 뒤** 넘긴다. 파이프로 바로 물리면
+          # `bash -e`가 파이프라인의 마지막 명령만 보므로, 패턴 생성이 실패해도
+          # git은 빈 목록을 받아 성공한다 — 그러면 data/가 통째로 비고 루프가
+          # 백지에서 시작한다. 조회 실패가 "값 없음"으로 번역되는 바로 그 모양이다.
+          # 배포 스텝은 이 파일을 쓰지 않는다 — 그쪽 범위는 **배포 목록에서
+          # 파생**하므로 날짜가 아예 안 들어가고, 따라서 자정을 넘는 수동
+          # 디스패치에서 두 범위가 갈릴 여지도 없다(db_data_sparse.deploy_patterns).
+          #
+          # 레포 루트가 아니라 RUNNER_TEMP에 둔다 — 산출물이 작업 트리에 섞이면
+          # 언젠가 `git add`에 걸려 db-data로 올라간다.
+          PAT="${RUNNER_TEMP:-.}/sparse_patterns.txt"
+          python3 scripts/db_data_sparse.py > "$PAT"
+          [ -s "$PAT" ] || { echo "[Fetch] sparse 패턴 생성 실패 — 받지 않는다"; exit 1; }
+          # 복원 실패는 **멈춰야 한다**. 예전 코드는 `|| echo`로 넘겼는데, 받는 데
+          # 실패하면 data/가 빈 채로 루프가 돌고 base_simulator가
+          # `if os.path.exists(self.state_file)`이라 **전 심이 초기 자본 템플릿으로
+          # 리셋**된다. 그 백지가 매니페스트에 실려 db-data의 진짜 이력을 덮는다.
+          # eod_data.yml은 이미 이 가드를 갖고 있다("백지 상태 매매 방지") —
+          # 돈 경로에만 없었다. 2026-08-05 심9-1(매매기록 8건→2행)과 같은 계열이다.
+          #
+          # `2>/dev/null`을 쓰지 않는 이유: 네트워크 실패와 "브랜치가 없다"가
+          # 로그에서 같은 모양이 된다. URL은 변수에 담아 토큰이 안 찍히게 한다.
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          rm -rf _db_fetch
+          git clone --depth 1 --filter=blob:none --sparse --branch db-data \
+            "$REPO_URL" _db_fetch || {
+            echo "[Fetch] db-data clone 실패 — 백지 상태로 매매하지 않는다"; exit 1; }
+          git -C _db_fetch sparse-checkout set --no-cone --stdin < "$PAT"
+          cp -a _db_fetch/data/. data/
+          rm -rf _db_fetch
+          # 하한 검사. clone·sparse·cp가 각자 성공해도 결과가 비어 있을 수 있다
+          # (범위가 빈 경우, 부분 복사). 심 상태가 **하나도** 없으면 그건 복원이
+          # 아니라 백지다 — 개수 대신 "심 상태가 있는가"로 재는 이유는 파일 수가
+          # 배제 목록에 따라 변하지만 이 조건은 변하지 않기 때문이다.
+          restored=$(find data -maxdepth 1 -name 'sim_*_state.json' | wc -l)
+          [ "$restored" -gt 0 ] || { echo "[Fetch] 심 상태 0개 — 복원이 비었다. 멈춘다"; exit 1; }
+          echo "[Fetch] 심 상태 ${restored}개 복원"
           # 리베로 trend(ADX 근사)는 output/kospi_top100_close.csv를 읽는다. 이 파일은
           # main에 없고 db-data의 data/ 아래에만 있다 — 08-08 매매/스크래핑 분리 때
           # 이 복사가 scraper.yml에만 남아 08-10부터 trend가 전량 결측이었고,
@@ -247,6 +296,21 @@ jobs:
           git config --global user.name "github-actions[bot]"
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
+          # 이 clone의 범위는 **배포 목록에서 파생**한다. 이 스텝이 db-data에서
+          # 실제로 읽는 건 `alert_dedup.json`(병합)과 `sim_reset_epoch.json`
+          # (리셋 가드) 둘뿐이고 나머지는 전부 로컬 사본으로 덮으므로, 받는 이유는
+          # `git add`가 "범위 안"이라고 인정해주게 하는 것뿐이다. 그래서 열거가
+          # 가능하고, 열거하면 **"배포 목록 ⊄ 배포 범위"가 구성적으로 불가능**해진다
+          # (2026-08-05 심9-1 고장의 유형이 바로 그것이다).
+          # 실측 1,635파일/72MB·sparse set 6.36초 → 58파일/731KB·0.63초.
+          DEPLOY_PAT="${RUNNER_TEMP:-.}/deploy_patterns.txt"
+          python3 scripts/db_data_sparse.py --deploy data/.lite_deploy_manifest \
+            > "$DEPLOY_PAT"
+          # 빈 패턴이 들어가면 매니페스트 전부가 범위 밖이 되고, 원격에 이미 있는
+          # 파일은 `git add`가 말없이 무시한다 — 런은 초록이고 심 상태만 사라진다.
+          [ -s "$DEPLOY_PAT" ] || {
+            echo "[Deploy] 배포 범위 생성 실패 — 올리지 않는다"; exit 1; }
+
           # 스크래퍼가 그 사이 push했으면 non-fast-forward가 난다. 남의 커밋 위에
           # 내 것을 얹어 다시 시도한다(덮어쓰지 않는다).
           #
@@ -267,23 +331,69 @@ jobs:
           # 반환값: 0=성공 2=clone실패(생략) 3=변경없음 1=push충돌 4=git오류
           attempt() {
             rm -rf db_data_repo
-            git clone --depth 1 --branch db-data "$REPO_URL" db_data_repo || return 2
+            # 전체 트리를 받으면 실측 38초로 3분 예산이 터진다 — 2026-11-26
+            # 장중 80런 중 79런이 바로 이 줄에서 잘렸다.
+            git clone --depth 1 --filter=blob:none --sparse --branch db-data \
+              "$REPO_URL" db_data_repo || return 2
+            git -C db_data_repo sparse-checkout set --no-cone --stdin \
+              < "$DEPLOY_PAT" || return 4
             mkdir -p db_data_repo/data
+            # 범위를 배포 목록에서 파생시킨 뒤로 이 가드는 **생성기 버그용**이다
+            # (이름에 글롭 메타문자가 들어가는 등). 공짜라 남겨둔다 — 갈렸을 때의
+            # 모양이 둘인데 **한쪽만 조용하기** 때문이다(2026-11-26 실측):
+            #   · 원격에 이미 있는 파일 → `git add -A`가 rc=0 / staged 0건으로
+            #     지나가고 `diff --cached --quiet`가 "변경 없음"을 내 **exit 0**이다.
+            #     런은 초록인데 그 심 상태만 사라진다 ← 이 가드가 막는 경우다.
+            #   · 원격에 없는 새 파일 → `git add -A`가 "outside of your
+            #     sparse-checkout definition"으로 **exit 1**이라 시끄럽게 죽는다.
+            #     가드는 그걸 못 본다(`ls-files -v`가 빈 문자열이라 통과) — add가
+            #     대신 잡지만 원인이 "git add/commit 실패"로만 보인다.
+            # 가드가 cp 루프보다 **앞에** 있어야 한다: cp가 먼저면 skip-worktree가
+            # H로 뒤집혀 `S` 검사가 통과해 버린다.
+            while IFS= read -r name; do
+              [ -n "$name" ] || continue
+              case "$(git -C db_data_repo ls-files -v "data/$name")" in
+                S*) echo "[Deploy] '$name'이 sparse 범위 밖이다 — 올려도 무시된다"
+                    return 4 ;;
+              esac
+            done < data/.lite_deploy_manifest
             # 이 런이 도는 사이 대시보드 리셋이 들어왔으면 리셋된 심 파일은 올리지
             # 않는다 — 2026-09-17 리셋을 2분 뒤 이 스텝이 되돌렸다(dd1810e52).
             python3 scripts/reset_epoch_guard.py db_data_repo/data || return 4
-            copied=0
+            copied=0; absent=0; tolerated=0
             while IFS= read -r name; do
               [ -n "$name" ] || continue
-              [ -f "data/$name" ] || continue
+              # 매니페스트에 적혔지만 이번 사이클이 안 만든 파일은 정상이다.
+              if [ ! -f "data/$name" ]; then absent=$((absent+1)); continue; fi
               if [ "$name" = "alert_dedup.json" ]; then
                 # writer가 셋인 파일이라 덮어쓰면 남의 억제 기록을 지운다.
-                python3 scripts/merge_alert_dedup.py "db_data_repo/data/$name" "data/$name"                   && copied=$((copied+1))                   || echo "[Deploy] 쿨다운 병합 실패"
+                # 병합 실패는 **용인한다** — 원격의 옛 기록을 지키는 쪽이 안전하고,
+                # 쿨다운 파일 하나 때문에 심 상태 전체의 배포를 멈출 이유가 없다.
+                python3 scripts/merge_alert_dedup.py "db_data_repo/data/$name" "data/$name" \
+                  && copied=$((copied+1)) \
+                  || { echo "[Deploy] 쿨다운 병합 실패"; tolerated=$((tolerated+1)); }
                 continue
               fi
               cp "data/$name" "db_data_repo/data/" && copied=$((copied+1))
             done < data/.lite_deploy_manifest
-            echo "[Deploy] 배포 파일 $copied개"
+            want=$(grep -c . data/.lite_deploy_manifest || true)
+            echo "[Deploy] 배포 파일 ${copied}개 (매니페스트 ${want} · 미생성 ${absent} · 병합실패 ${tolerated})"
+            # 찍기만 하면 게이트가 아니다. 검사가 **둘**인 이유는 각자 다른 고장을
+            # 잡기 때문이다(2026-11-26 리허설로 확인):
+            #   · 셈 일치 — 로컬에 있는데 cp가 실패한 경우를 잡는다. 그 심 상태는
+            #     조용히 사라진다.
+            #   · copied > 0 — 매니페스트 이름이 **전부** 어긋난 경우를 잡는다.
+            #     이때는 전량이 "미생성"으로 흡수돼 셈이 맞아버리고, 복사 0개 →
+            #     `diff --cached --quiet` 통과 → "변경 없음" → **exit 0**이다.
+            #     런은 초록이고 그 사이클 전체가 사라진다.
+            # 매니페스트는 올릴 것이 있을 때만 쓰이므로(`if not names: return`)
+            # 0개는 정상일 수 없다.
+            [ $((copied + absent + tolerated)) -eq "$want" ] || {
+              echo "[Deploy] 복사 누락 — 매니페스트 ${want}개를 셈이 설명하지 못한다"
+              return 4; }
+            [ "$copied" -gt 0 ] || {
+              echo "[Deploy] 복사 0개 — 매니페스트 ${want}개가 전부 로컬에 없다"
+              return 4; }
             git -C db_data_repo add -A data/ || return 4
             if git -C db_data_repo diff --cached --quiet; then
               return 3

@@ -10,14 +10,14 @@
   ],
   "daily_trades": [],
   "market_index_healthy": true,
-  "last_run": "2026-11-27 11:00:29",
+  "last_run": "2026-11-27 11:11:03",
   "current_regime": "BEAR",
   "instant_regime": null,
   "regime_confidence": null,
-  "bull_score": 59.6,
+  "bull_score": 60.8,
   "metrics": {
-    "breadth_score": 76.0,
-    "momentum_score": 2.32,
+    "breadth_score": 78.0,
+    "momentum_score": 2.51,
     "trend_strength": 30.7,
     "foreign_score": null,
     "volatility_score": null
@@ -12855,7 +12855,7 @@
     "vol10": 2.793,
     "raw_level": null,
     "source": "prev_confirmed:2026-11-26",
-    "judged_at": "2026-11-27 11:00:29",
+    "judged_at": "2026-11-27 11:11:03",
     "reason": "csv last row(2026-11-26) is not previous close (72/99 match)"
   }
 }

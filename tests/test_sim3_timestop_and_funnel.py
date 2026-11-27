@@ -183,7 +183,9 @@ def test_failed_buy_is_not_counted_as_a_purchase():
     monkey = lambda *a, **k: captured.update(funnel=a[2], bought=k.get('buys', 0))
     orig, m.log_funnel = m.log_funnel, monkey
     try:
-        sim.run([_candidate('000001', sparkline_price=[100 + 3 * i for i in range(12)])],
+        # 이력은 날짜 붙은 price_history 계약으로 준다(sparkline_price는 심3가 더 읽지 않는다)
+        hist = [{'date': f'202011{10 + i:02d}', 'close': 100 + 3 * i} for i in range(12)]
+        sim.run([_candidate('000001', price_history=hist)],
                 current_prices={'999999': 10_000, '000001': 10_000})
     finally:
         m.log_funnel = orig

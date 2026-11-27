@@ -157,7 +157,11 @@ def test_sim3_value_can_buy(tmp_path):
     # 테스트에서 네트워크를 타면 안 되므로 여기서 주입한다.
     cands = [{'code': f'{i:06d}', 'name': f'가치{i}', 'price': 1000,
               'amount': 50_000_000_000, 'per_ttm': 5.0, 'pbr_ttm': 0.5,
-              'sector_name': '반도체', 'sparkline_price': list(ZIGZAG)}
+              'sector_name': '반도체',
+              # 심3는 날짜 붙은 price_history(직전 5종가)를 읽는다. 오늘가(1000)가 5거래일
+              # 전(900)보다 높아 반등 게이트를 지나고 ADX도 문턱(20)을 넘는 이력.
+              'price_history': [{'date': f'202011{10 + j:02d}', 'close': 900 + 20 * j}
+                                for j in range(5)]}
              for i in range(s.MAX_HOLDINGS + 3)]
 
     s.run(cands, {c['code']: 1000 for c in cands})

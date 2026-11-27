@@ -1,6 +1,7 @@
 from datetime import date
 
-from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH, log_funnel
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH, log_funnel, prior_closes_for
+from src.core import clock
 
 
 
@@ -57,6 +58,11 @@ class SmartRiskSimulator(BaseSimulator):
         sold_today = set()
 
         self.update_peak_prices(current_prices)
+
+        # 이력은 후보가 아니라 공급분(view['price_history'])에서도 읽는다. 날짜는 단일
+        # 시계에서 — UTC 러너에선 datetime.now()가 KST 0~9시에 하루 어긋난다.
+        view = self._view(current_prices)
+        today = clock.date_compact()
 
         # 1. 청산
         for code in portfolio_codes:
@@ -168,12 +174,27 @@ class SmartRiskSimulator(BaseSimulator):
                 continue
 
             # ADX >= 20 (추세 전환 확인)
-            sparkline = stock.get('sparkline_price', [])
-            adx = self.calculate_adx(sparkline) if sparkline else 0.0
+            # 진입은 장중 판단이라 오늘 값을 본다(당일 제외는 청산에만 적용): 직전 4개
+            # 종가 + 현재가 = 예전 sparkline 5개와 같은 입력, ADX 동작은 바뀌지 않는다.
+            # 이력이 없을 때 adx=0.0으로 메우면 'adx'(전략 탈락)로 기록돼 "못 재서 안
+            # 샀다"가 "추세가 약해 안 샀다"와 섞인다 — 결손은 별도 사유로 남기고 건너뛴다.
+            prior4 = prior_closes_for(code, candidate_map, view, today, 4)
+            if prior4 is None:
+                _fn(funnel, code, 'no_history')
+                continue
+            adx = self.calculate_adx(prior4 + [price])
             if adx < 20.0: _fn(funnel, code, 'adx', adx=adx); continue
 
             # 오늘 종가 > 5일 전 종가 (가격 반등 확인)
-            if len(sparkline) >= 6 and sparkline[-1] <= sparkline[-6]:
+            # 예전 게이트는 `len(sparkline) >= 6`을 요구했는데 sparkline이 정확히 5개라
+            # 배포 이래 한 번도 탈락시키지 못했다. 직전 5개 + 현재가 = 6값이어야
+            # [-1]이 오늘, [-6]이 5거래일 전이다. 6값을 못 만들면 통과시키지 않는다.
+            prior5 = prior_closes_for(code, candidate_map, view, today, 5)
+            if prior5 is None:
+                _fn(funnel, code, 'no_history')
+                continue
+            rebound_vals = prior5 + [price]
+            if rebound_vals[-1] <= rebound_vals[-6]:
                 _fn(funnel, code, 'no_rebound'); continue
 
             qty = int(target_amount / price)

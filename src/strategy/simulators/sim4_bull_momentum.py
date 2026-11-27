@@ -1,4 +1,5 @@
-from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, log_funnel
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, log_funnel, prior_closes_for
+from src.core import clock
 
 
 
@@ -47,6 +48,12 @@ class BullMomentumSimulator(BaseSimulator):
 
         self.update_peak_prices(current_prices)
 
+        # 이력은 후보가 아니라 공급분(view['price_history'])에서도 읽는다. 날짜는 단일
+        # 시계에서 — UTC 러너에선 datetime.now()가 KST 0~9시에 하루 어긋난다.
+        view = self._view(current_prices)
+        today = clock.date_compact()
+        exit_no_hist = []
+
         # 1. 청산 (트레일링 5/5 + ATR 3배 하드 손절, 고정 익절 없음)
         for code in portfolio_codes:
             p_item = self.state['portfolio'][code]
@@ -65,17 +72,26 @@ class BullMomentumSimulator(BaseSimulator):
                 continue
 
             # ATR 3배 하드 손절
-            sparkline = stock.get('sparkline_price', []) if stock else []
-            if sparkline and len(sparkline) >= 2:
-                atr = self.calculate_atr(sparkline)
-                atr_pct = (atr / avg_price) * 100 if avg_price > 0 else 3.0
-            else:
-                atr_pct = 3.0  # sparkline 부재 시 기본 3% (→ -9% 손절)
+            # 예전엔 '그날 후보 목록'에서만 이력을 찾았다. 심4의 유니버스는 당일 상승률
+            # 상위 30개라 손실 종목은 구조적으로 후보에 없고, 그때마다 atr_pct=3.0
+            # (-9% 고정 손절)이 걸렸다 — 적응형 손절이 가장 필요할 때 고정 비율이었다.
+            # 못 재면 이 손절만 건너뛴다. 상수로 메우지 않는다(트레일링은 위에서 이미 판정).
+            hist = prior_closes_for(code, candidate_map, view, today, 5)
+            if hist is None:
+                exit_no_hist.append(code)
+                continue
+            atr = self.calculate_atr(hist)
+            atr_pct = (atr / avg_price) * 100
             if profit_rate <= -(3.0 * atr_pct):
                 self.sell(code, current_price, reason=f"[상승모멘텀] ATR 3배 손절 ({profit_rate:.1f}%)")
                 self.add_cooldown(code, 3)
                 sold_today.add(code)
                 continue
+
+        if exit_no_hist:
+            # 깔때기는 후보 탈락 장부라 보유 종목을 넣으면 회계가 깨진다.
+            print(f"[상승모멘텀] ATR 손절 판정 불가(이력 없음) {len(exit_no_hist)}종목: "
+                  f"{', '.join(exit_no_hist)} — 트레일링만 적용")
 
         # 2. 불타기 (Pyramiding) — 보유 종목 +5% & 미증액 시 1회만
         # is_scaled_out(base)는 부분매도 플래그와 충돌하므로 sim4 전용 'pyramided' 플래그 사용
@@ -168,8 +184,16 @@ class BullMomentumSimulator(BaseSimulator):
                 _fn(funnel, code, 'amount', amount=amount)
                 continue
 
-            sparkline = stock.get('sparkline_price', [])
-            adx = self.calculate_adx(sparkline) if sparkline else 0.0
+            # 진입은 장중 판단이라 오늘 값을 본다(당일 제외는 청산에만 적용): 직전 4개
+            # 종가 + 현재가 = 예전 sparkline 5개와 같은 입력. 이력이 없을 때 adx=0.0으로
+            # 메우면 'adx_low'(전략 탈락)로 기록돼 "못 재서 안 샀다"가 "추세가 약해
+            # 안 샀다"와 섞인다 — 데이터 결손은 별도 사유로 남기고 건너뛴다.
+            prior = prior_closes_for(code, candidate_map, view, today, 4)
+            if prior is None:
+                _fn(funnel, code, 'no_history')
+                continue
+            sparkline = prior + [price]
+            adx = self.calculate_adx(sparkline)
             if adx < 15.0:
                 _fn(funnel, code, 'adx_low', adx=adx)  # 슬립 모드
                 continue

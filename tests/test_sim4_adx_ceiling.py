@@ -44,6 +44,15 @@ def test_sim4_1_still_enters_on_mid_adx():
     assert len(buys) == 1 and buys[0]['code'] == '111'
 
 
+def _cand4(code, sparkline):
+    """심4 진입은 이력 계약({date, close})을 읽는다: 마지막 값이 현재가, 앞 4개가 직전 종가."""
+    closes = sparkline[-5:]
+    c = _cand(code, [], price=closes[-1])
+    del c['sparkline_price']
+    c['price_history'] = [{'date': f'202011{10 + i:02d}', 'close': v} for i, v in enumerate(closes[:-1])]
+    return c
+
+
 def _sim4(tmp_path):
     s = BullMomentumSimulator(initial_cash=NAV)
     s.state_file = str(tmp_path / "s.json")
@@ -58,14 +67,14 @@ def _sim4(tmp_path):
 def test_sim4_rejects_overheated_adx(tmp_path):
     """[Sim4] ADX>=60(과열)이면 다른 조건이 다 맞아도 진입하지 않는다."""
     sim = _sim4(tmp_path)
-    sim.run([_cand('111', HOT_ADX_SPARKLINE)], {'111': 1000})
+    sim.run([_cand4('111', HOT_ADX_SPARKLINE)], {'111': HOT_ADX_SPARKLINE[-1]})
     assert '111' not in sim.state['portfolio']
 
 
 def test_sim4_still_enters_on_mid_adx(tmp_path):
     """[Sim4] ADX가 상한 아래(20~60)면 기존과 동일하게 진입한다 — 회귀 방지."""
     sim = _sim4(tmp_path)
-    sim.run([_cand('111', MID_ADX_SPARKLINE)], {'111': 1000})
+    sim.run([_cand4('111', MID_ADX_SPARKLINE)], {'111': MID_ADX_SPARKLINE[-1]})
     assert '111' in sim.state['portfolio']
 
 

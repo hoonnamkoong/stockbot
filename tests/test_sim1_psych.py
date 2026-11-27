@@ -288,6 +288,16 @@ def test_atr_differs_by_stock():
     assert {o['code'] for o in _sells(orders)} == {'CALM'}
 
 
+def test_atr_exit_works_when_today_is_omitted():
+    """today 인자가 비어도 ATR 청산은 판정된다 — 인자 누락은 '측정 불가'가 아니다."""
+    v = _view(_held())
+    v['price_history'] = {'T001': [{'date': f'200001{i:02d}', 'close': c}
+                                   for i, c in enumerate([1000, 1002, 1000, 1002, 1000], 1)]}
+    orders, _, _ = decide_psych(v, [], {'T001': 990})
+    sells = _sells(orders)
+    assert len(sells) == 1 and '손절' in sells[0]['reason']
+
+
 def test_no_constant_fallback_literal_in_source():
     path = os.path.join(os.path.dirname(__file__), '..', 'src', 'strategy',
                         'simulators', 'sim1_psych.py')

@@ -214,7 +214,9 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
         # 예전엔 '그날 후보 목록'에서만 찾아서, 손실로 후보에서 빠진 종목의 ATR이
         # 진입가의 1.5% 상수(익절 +4.5%·손절 -2.25%)로 바뀌었다 — 적응형 손절이
         # 가장 필요한 순간에 고정 비율이었다. 상수로 메우지 않는다.
-        hist = prior_closes_for(code, cand_by_code, view, today, 5)
+        # today가 비었다고 청산을 끄지 않는다: 측정 가능한데 인자 누락으로 안 재는 건
+        # '측정 불가'가 아니다. 시계는 clock 한 곳(KST)에서만 받는다(UTC 러너의 하루 밀림 방지).
+        hist = prior_closes_for(code, cand_by_code, view, today or clock.date_compact(), 5)
         if hist is None:
             exit_no_hist.append(code)
             continue  # 트레일링은 위에서 이미 판정했다 — 변동성을 못 재도 그 방어선은 유지된다

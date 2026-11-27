@@ -1,4 +1,5 @@
 import json
+import math
 import csv
 import os
 import datetime
@@ -146,10 +147,12 @@ def prior_closes(history, today_ymd, n):
             prev = d
         closes = []
         for r in history:
-            if r['date'] == today_ymd:
+            # 오늘 행(미완성 봉)과 아직 오지 않은 날은 '직전 종가'가 아니다.
+            # 룩어헤드 방지용 — 깨진 날짜와 달리 이력이 깨진 게 아니므로 버리고 계속.
+            if r['date'] >= today_ymd:
                 continue
             c = r.get('close')
-            if c is None or isinstance(c, bool) or not isinstance(c, (int, float)) or c <= 0:
+            if c is None or isinstance(c, bool) or not isinstance(c, (int, float)) or not math.isfinite(c) or c <= 0:
                 continue
             closes.append(float(c))
         if len(closes) < n:
@@ -177,7 +180,12 @@ def hist_fingerprint(history):
     """'<첫날짜>-<끝날짜>-<길이>-<종가합>'. 입력 해시에 넣는 창 식별자. 빈 이력은 ''."""
     if not history:
         return ''
-    total = sum(float(r.get('close') or 0) for r in history)
+    total = 0.0
+    for r in history:
+        try:
+            total += float(r.get('close') or 0)
+        except (TypeError, ValueError):
+            continue  # 지문은 식별자라 변환 불가 값은 건너뛴다 — input_hash를 죽이면 안 된다
     return f"{history[0].get('date')}-{history[-1].get('date')}-{len(history)}-{total:.4f}"
 
 

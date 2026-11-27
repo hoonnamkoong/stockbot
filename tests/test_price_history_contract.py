@@ -61,3 +61,26 @@ def test_prior_closes_for_tolerates_view_without_key():
 def test_fingerprint_changes_with_window():
     assert hist_fingerprint(H) != hist_fingerprint(H[:-1])
     assert hist_fingerprint([]) == ''
+
+
+def test_nan_and_inf_close_dropped_like_nonpositive():
+    h = [dict(r) for r in H]; h[0]['close'] = float('nan'); h[1]['close'] = float('inf')
+    assert len(prior_closes(h, '20261130', 8)) == 8
+    assert prior_closes(h, '20261130', 9) is None
+
+
+def test_future_dated_rows_are_dropped_not_fatal():
+    h = H + [{'date': '20261202', 'close': 999.0}]
+    assert prior_closes(h, '20261130', 3) == [125.0, 126.0, 127.0]
+
+
+def test_fingerprint_survives_nonnumeric_close():
+    h = [dict(r) for r in H]; h[0]['close'] = 'abc'
+    assert isinstance(hist_fingerprint(h), str)
+    assert hist_fingerprint(h) == hist_fingerprint(h)
+
+
+def test_history_of_empty_candidate_list_falls_back_to_supplied():
+    cand = {'A': {'price_history': []}}
+    supplied = {'A': [{'date': '20261127', 'close': 2.0}]}
+    assert history_of('A', cand, supplied)[0]['close'] == 2.0

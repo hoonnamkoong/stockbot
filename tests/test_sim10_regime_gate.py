@@ -199,7 +199,7 @@ _BOX = [1100, 1200, 1150, 1200, 1100, 1180, 1050, 1160, 1100, 1200,
 
 def _box_cand():
     return [{'code': '222', 'name': '레인지', 'price': 1000, 'amount': 2_000_000_000,
-             'range_history': list(_BOX), 'change_rate': '+0.5%'}]
+             'price_history': [{'date': f'202010{i + 1:02d}', 'close': c} for i, c in enumerate(_BOX)], 'change_rate': '+0.5%'}]
 
 
 @pytest.mark.parametrize('r6', sorted(ALLOWED_REGIMES6))

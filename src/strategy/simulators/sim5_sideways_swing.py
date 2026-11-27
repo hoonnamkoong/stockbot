@@ -1,7 +1,9 @@
 from datetime import datetime
 
 from ..regime_state import BEAR, STRONG_BEAR, REGIME6_LABEL_KO, read_regime6_confirmed
-from .base_simulator import BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel
+from src.core import clock
+from .base_simulator import (BaseSimulator, get_kst_now, DEFAULT_INITIAL_CASH, log_funnel,
+                             prior_closes_for)
 
 # base 순수 헬퍼(Task 3 @staticmethod) 재사용
 _parse_change_rate = BaseSimulator.parse_change_rate
@@ -85,22 +87,6 @@ def _channel(range_history):
     return low, high, (high - low) / low * 100
 
 
-def _sort_key(stock):
-    """채널 저점 대비 현재가 비율(price/low) 오름차순, 동률은 코드순(설계서 §1·§8).
-
-    채널이나 가격이 없는 후보는 맨 뒤로 보낸다 — 버리지 않고 루프에서 이유를 남긴다.
-    """
-    code = str(stock.get('code') or '')
-    ch = _channel(stock.get('range_history'))
-    try:
-        price = float(stock.get('price') or 0)
-    except (TypeError, ValueError):
-        price = 0
-    if not ch or price <= 0:
-        return (float('inf'), code)
-    return (price / ch[0], code)
-
-
 def decide_sideways(view, candidates, current_prices, funnel=None, *, allow_entry):
     """[Sim5] 레인지 저점 + RSI2 과매도 진입 / 손절·RSI2 과열·타임스탑 청산. 순수 함수.
 
@@ -116,6 +102,13 @@ def decide_sideways(view, candidates, current_prices, funnel=None, *, allow_entr
     sold = set()
     cand_by_code = {s.get('code'): s for s in candidates}
     exit_no_hist = []
+    # 채널·RSI2 이력은 날짜 붙은 price_history(계약)에서 '당일 제외' 직전 MIN_HISTORY일만 읽는다.
+    # 설계서 7절이 채널을 "직전 20거래일 종가(당일 제외)"로 못박았는데, 예전 생산자는 당일 행을
+    # 넣었다 — 하락일엔 당일 종가가 채널 저점 자체라 '저점 +3% 이내'가 저절로 통과했고 폭
+    # 게이트도 쉬워졌으며 청산 rsi2(hist+[cur])는 당일을 두 번 셌다. 날짜는 단일 시계에서
+    # 얻는다(UTC 러너에선 datetime.now()가 KST 0~9시에 하루 어긋난다). 시그니처에 today를
+    # 더하면 sim10_orchestrator 호출이 깨져 함수 안에서 얻는다.
+    today_ymd = clock.date_compact()
 
     # 1. 청산: 국면과 무관하게 항상. 손절 → RSI2 과열 → 타임스탑. 고정 익절·트레일링 없음.
     for code in list(portfolio.keys()):
@@ -134,7 +127,8 @@ def decide_sideways(view, candidates, current_prices, funnel=None, *, allow_entr
             sold.add(code); continue
 
         # 후보 밖(이력 없음)이면 RSI2는 판정 불가 — '과열 아님'과 섞지 않고 건너뛴다.
-        hist = _hist((cand_by_code.get(code) or {}).get('range_history'))
+        # 이력 20일은 후보가 아니라 view 공급분에서도 읽는다(보유가 후보 밖이어도 청산이 돈다).
+        hist = prior_closes_for(code, cand_by_code, view, today_ymd, MIN_HISTORY)
         if hist is None:
             exit_no_hist.append(code)
         else:
@@ -171,6 +165,19 @@ def decide_sideways(view, candidates, current_prices, funnel=None, *, allow_entr
     target_amount = view['nav'] * POSITION_WEIGHT
     held = len(portfolio) - len(sold)
     near_low_pcts = []  # 채널폭 통과 후보의 '저점 대비 %' — 진단용(아래 참고)
+    # 정렬 키는 채널 저점 대비 비율(price/low) 오름차순, 동률은 코드순(설계서 1·8절).
+    # 채널이나 가격이 없는 후보는 버리지 않고 맨 뒤로 보내 루프에서 이유를 남긴다.
+    def _sort_key(stock):
+        code = stock.get('code') or ''
+        prior = prior_closes_for(code, cand_by_code, view, today_ymd, MIN_HISTORY)
+        try:
+            price = float(stock.get('price') or 0)
+        except (TypeError, ValueError):
+            price = 0
+        if not prior or price <= 0:
+            return (float('inf'), str(code))
+        return (price / _channel(prior)[0], str(code))
+
     for stock in sorted(candidates, key=_sort_key):
         code = stock['code']
         if held >= MAX_HOLDINGS:
@@ -198,9 +205,9 @@ def decide_sideways(view, candidates, current_prices, funnel=None, *, allow_entr
         if amount < MIN_AMOUNT:
             _fn(funnel, code, 'amount', amount=amount)
             continue
-        hist = _hist(stock.get('range_history'))
+        hist = prior_closes_for(code, cand_by_code, view, today_ymd, MIN_HISTORY)
         if not hist:
-            # range_history가 없거나 짧다 = 채널을 못 만든다. 전략 미달이 아니라
+            # 직전 20일 종가를 못 만든다(이력 없음·짧음·날짜 깨짐) = 채널을 못 만든다. 전략 미달이 아니라
             # **입력 결손**이라 따로 센다 — 이게 후보 전량이면 배선 문제다.
             _fn(funnel, code, 'no_channel')
             continue
@@ -256,15 +263,17 @@ class SidewaysSwingSimulator(BaseSimulator):
     - 2026-09-29 재설계(docs/superpowers/specs/2026-09-29-sim5-regime-optimization.md):
       저점 근접만으로 사면 '박스 바닥'과 '하락 추세 진행 중'을 못 가려 −3% 손절에 절반이
       걸렸다. RSI2 과매도 확인을 더하고, 청산을 RSI2 과열로 바꾸고, 손절·보유기간을 넓혔다.
-    - 진입: range_history(직전 20일 종가) 채널 폭>=8% + 채널 저점 +3% 이내 + 당일 등락 > −2%
+    - 진입: price_history(직전 20일 종가, 당일 제외) 채널 폭>=8% + 채널 저점 +3% 이내 + 당일 등락 > −2%
             + RSI2(이력+현재가) < 15 + 거래대금 >= 10억. 후보는 price/low 오름차순으로 채운다.
     - 청산: 하드손절 −5% / RSI2 > 70 / 10달력일 타임스탑. 고정 익절·트레일링 없음.
     - 국면 게이트는 run()에 있다: 리베로 6단계(전일 확정)가 하락·매우하락일 때만 신규 진입(10-02 G2).
       강한횡보·상승·매우상승·판정 불가(None)면 진입만 막고 **청산은 계속한다**
       (심6와 다르다 — 심6의 비 BEAR 경로는 국면 청산이라 None에서 멈춰야 하지만,
       심5의 청산은 국면을 보지 않는 손절·타임스탑이라 멈추면 손실이 방치된다).
-    - 데이터: range_history는 5일 sparkline_price와 별개 필드(파리티 위해 양 환경 동일 채움).
-      ⚠ 장중 range_history 첫 행이 당일 미완성 봉일 수 있다(날짜가 없어 여기서 못 거른다).
+    - 데이터: 날짜 붙은 price_history를 prior_closes_for로 읽는다(후보 → view 공급분 순).
+      ⚠ 장중 이력 끝 행이 당일 미완성 봉일 수 있다 — 이제 날짜로 당일·미래 행을 계약이
+      걸러내고 직전 20일만 남긴다(이력이 25행이어도 채널은 20일). 20일을 못 채우면 진입은
+      후보 탈락(no_channel), 청산은 RSI2만 끈다(하드 손절·타임스탑은 유지).
     """
     def __init__(self, initial_cash=DEFAULT_INITIAL_CASH):
         super().__init__("Sideways", initial_cash)

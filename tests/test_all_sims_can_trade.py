@@ -70,7 +70,7 @@ def test_sim4_1_daytrade_can_buy():
 
 def _box(i):
     return {'code': f'{i:06d}', 'name': f'박스{i}', 'price': 900,
-            'amount': BIG_AMOUNT, 'range_history': list(BOX),
+            'amount': BIG_AMOUNT, 'price_history': [{'date': f'202010{i + 1:02d}', 'close': c} for i, c in enumerate(BOX)],
             'change_rate': '+0.50%'}
 
 

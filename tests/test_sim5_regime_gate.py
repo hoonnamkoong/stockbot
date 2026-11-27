@@ -63,7 +63,7 @@ def _sim(tmpdir, regime6=None, portfolio=None, raw=None, intraday=None):
 
 def _cand():
     return [{'code': '222', 'name': '레인지', 'price': 1000, 'amount': 2_000_000_000,
-             'range_history': list(BOX), 'change_rate': '+0.5%'}]
+             'price_history': [{'date': f'202010{i + 1:02d}', 'close': c} for i, c in enumerate(BOX)], 'change_rate': '+0.5%'}]
 
 
 def _held():

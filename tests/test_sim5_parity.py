@@ -42,9 +42,14 @@ def _box_to(x):
     return body + [x + 80, x + 60, x + 40, x + 20, x]
 
 
+def _ph(closes):
+    """날짜 붙은 이력 계약. 전부 오늘보다 과거라 '직전 종가'로 쓰인다."""
+    return [{'date': f'202010{i + 1:02d}', 'close': c} for i, c in enumerate(closes)]
+
+
 def _stock(code='222', price=1000, **over):
     s = {'code': code, 'name': f'레인지{code}', 'price': price, 'amount': 2_000_000_000,
-         'range_history': list(BOX), 'change_rate': '+0.5%'}
+         'price_history': _ph(BOX), 'change_rate': '+0.5%'}
     s.update(over)
     return s
 
@@ -122,7 +127,7 @@ def test_entry_rsi2_boundary(monkeypatch, r, bought):
 
 def test_min_history_is_20():
     funnel = []
-    short = _stock(range_history=BOX[1:])          # 19일
+    short = _stock(price_history=_ph(BOX[1:]))          # 19일
     assert _buys(decide_sideways(_view({}), [short], {'222': 1000}, funnel=funnel,
                                  allow_entry=True)) == []
     assert funnel[-1]['reason'] == 'no_channel'
@@ -141,7 +146,7 @@ def test_no_entry_above_low_zone():
 def test_no_entry_when_channel_too_narrow():
     funnel = []
     narrow = [1050, 1060, 1070, 1060, 1050, 1040, 1030, 1020, 1010, 1000] * 2   # 폭 7%
-    cand = [_stock(range_history=narrow)]
+    cand = [_stock(price_history=_ph(narrow))]
     assert _buys(decide_sideways(_view({}), cand, {'222': 1000}, funnel=funnel,
                                  allow_entry=True)) == []
     assert funnel[-1]['reason'] == 'narrow_channel'
@@ -157,8 +162,8 @@ def test_daily_crash_boundary(chg, bought):
 def test_entry_fills_in_price_to_low_order():
     """후보 순서가 아니라 price/low 오름차순(동률은 코드순)으로 채운다(§1·§8)."""
     held = {f'H{i}': _pos(1000) for i in range(s5.MAX_HOLDINGS - 1)}   # 빈 자리 1개
-    far = _stock(code='111', price=1025, range_history=_box_to(1025))   # 저점 대비 +2.5%
-    near = _stock(code='333', price=1002, range_history=_box_to(1002))  # +0.2%
+    far = _stock(code='111', price=1025, price_history=_ph(_box_to(1025)))   # 저점 대비 +2.5%
+    near = _stock(code='333', price=1002, price_history=_ph(_box_to(1002)))  # +0.2%
     # 두 후보 모두 조건을 통과해야 '정렬 때문에' 하나만 샀다는 뜻이 된다.
     assert len(_buys(decide_sideways(_view({}), [far, near], {'111': 1025, '333': 1002},
                                      allow_entry=True))) == 2
@@ -247,7 +252,7 @@ def test_no_fixed_take_profit(monkeypatch):
 def test_sold_code_not_rebought_same_cycle():
     """손절한 종목이 같은 사이클에 저점 조건으로 다시 사지지 않는다."""
     cand = [_stock(code='005930', price=950,
-                   range_history=[1100, 1200] * 9 + [960, 950])]
+                   price_history=_ph([1100, 1200] * 9 + [960, 950]))]
     o = decide_sideways(_view({'005930': _pos(1000)}), cand, {'005930': 950},
                         allow_entry=True)
     assert _buys(o) == [] and len(_sells(o)) == 1

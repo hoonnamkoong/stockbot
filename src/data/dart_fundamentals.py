@@ -174,7 +174,19 @@ def derive(quarter_rows: list[dict], prior_annual_rows: list[dict]) -> dict:
     return out
 
 
-def _rows(corp_code: str, year: int, rc: str, key: str) -> list[dict] | None:
+def new_session():
+    """같은 호스트를 연달아 칠 때 연결을 재사용한다. 스레드 안전이 아니다 — 스레드마다 하나.
+
+    `src/data/naver_api.py`와 같은 관례다. 세션을 **net을 쓰는 모듈에서** 만드는
+    이유는 `tests/test_core_net.py`의 가드다 — net을 안 거치면서 세션을 만드는
+    것이 위반이고, 그 가드가 2026-09-09에 실제 구멍 하나를 막았다.
+    """
+    import requests
+    return requests.Session()
+
+
+def _rows(corp_code: str, year: int, rc: str, key: str,
+          session=None) -> list[dict] | None:
     """해당 보고서의 계정 목록. 연결(CFS)이 없으면 개별(OFS)로 받는다.
 
     못 받으면 None(네트워크 실패), 응답은 왔지만 자료가 없으면 [].
@@ -184,7 +196,7 @@ def _rows(corp_code: str, year: int, rc: str, key: str) -> list[dict] | None:
         res = net.get(API_URL, params={
             'crtfc_key': key, 'corp_code': corp_code, 'bsns_year': str(year),
             'reprt_code': rc, 'fs_div': fs_div,
-        }, timeout=20)
+        }, timeout=20, session=session)
         if res is None:
             continue
         answered = True
@@ -197,16 +209,27 @@ def _rows(corp_code: str, year: int, rc: str, key: str) -> list[dict] | None:
     return [] if answered else None
 
 
-def fetch(corp_code: str, year: int, quarter: int, key: str | None = None) -> dict:
-    """한 종목의 파생 지표. 호출 2회(해당 분기 + 직전 사업보고서)."""
+def fetch(corp_code: str, year: int, quarter: int, key: str | None = None,
+          session=None) -> dict:
+    """한 종목의 파생 지표. 호출 2회(해당 분기 + 직전 사업보고서).
+
+    session: `requests.Session`. 주면 **연결을 재사용**한다 — 안 주면 호출마다
+      TCP+TLS를 새로 열고, 러너(westus)에서 OpenDART(한국)까지는 그 왕복이 길다.
+      종목당 2~4콜 × 상장사 약 4,020개면 핸드셰이크만으로 예산을 넘긴다
+      (2026-11-25 첫 채움 런이 119분에 타임아웃 취소됐다).
+
+      **모듈이 혼자 만들어 들고 있지 않는 이유**: `requests.Session`은 스레드
+      안전이 아니고(`src/core/net.py` 참고) `fetch`는 스레드에서도 불릴 수 있다.
+      소유권을 호출자에게 둔다 — 안 주면 종전대로 동작한다.
+    """
     key = key or api_key()
     if not key:
         return {}
     rc = reprt_code(quarter)
-    quarter_rows = _rows(corp_code, year, rc, key)
+    quarter_rows = _rows(corp_code, year, rc, key, session=session)
     if not quarter_rows:
         return {}
-    prior = _rows(corp_code, year - 1, reprt_code(4), key) or []
+    prior = _rows(corp_code, year - 1, reprt_code(4), key, session=session) or []
     out = derive(quarter_rows, prior)
     if out:
         out['report'] = f'{year}-{rc}'
@@ -229,12 +252,17 @@ def parse_corp_codes(xml_text: str) -> dict:
     return out
 
 
-def build_corp_code_map(key: str | None = None) -> dict:
-    """OpenDART에서 법인코드 전체(zip)를 받아 상장사만 남긴다. 호출 1회."""
+def build_corp_code_map(key: str | None = None, session=None) -> dict:
+    """OpenDART에서 법인코드 전체(zip)를 받아 상장사만 남긴다. 호출 1회.
+
+    런의 첫 호출이라 여기서 세션을 쓰면 **핸드셰이크를 한 번 열어 뒤의 1만여
+    콜이 그걸 물려받는다**.
+    """
     key = key or api_key()
     if not key:
         return {}
-    res = net.get(CORP_CODE_URL, params={'crtfc_key': key}, timeout=60)
+    res = net.get(CORP_CODE_URL, params={'crtfc_key': key}, timeout=60,
+                  session=session)
     if res is None:
         return {}
     try:
@@ -255,10 +283,38 @@ def load_corp_codes(data_dir: str = 'data') -> dict:
         return {}
 
 
+def _save_json(path: str, payload: dict) -> None:
+    """임시 파일에 쓰고 `os.replace`로 바꾼다 — 잘린 파일이 남지 않는다.
+
+    `open(..., 'w')`는 **먼저 잘라낸 뒤** 쓴다. 잡 타임아웃의 취소 신호가 그 창에
+    떨어지면 잘린 JSON이 남고, 배포 스텝은 `if: always()`라 그걸 db-data에 올린다.
+    그러면 `load_cache`가 예외를 삼켜 `{}`를 돌려주므로(아래) 다음 런이 **조용히
+    0에서 다시 시작**한다 — 한 분기 수집이 사라진다.
+
+    창은 넓지 않다: 저장 80회(`SAVE_EVERY=50` × 상장사 약 4,020) × 약 15ms =
+    총 1.2초로 런(4,800초)의 **0.025%**다. 그래도 막는 이유는 비용이 세 줄이고
+    이 잡이 **분기에 한 번**뿐이라 한 번 잃으면 다음 기회가 멀다는 것이다.
+
+    임시 파일을 같은 디렉터리에 두는 이유: `os.replace`는 같은 파일시스템에서만
+    원자적이다. 실패하면 지운다 — 남기면 `git add -A data/`가 db-data에 올린다.
+    """
+    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+    tmp = f'{path}.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False,
+                      separators=(',', ':'), sort_keys=True)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def save_corp_codes(mapping: dict, data_dir: str = 'data') -> None:
-    os.makedirs(data_dir, exist_ok=True)
-    with open(os.path.join(data_dir, CORP_CODES_FILE), 'w', encoding='utf-8') as f:
-        json.dump(mapping, f, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+    _save_json(os.path.join(data_dir, CORP_CODES_FILE), mapping)
 
 
 def load_cache(data_dir: str = 'data') -> dict:
@@ -271,9 +327,7 @@ def load_cache(data_dir: str = 'data') -> dict:
 
 
 def save_cache(cache: dict, data_dir: str = 'data') -> None:
-    os.makedirs(data_dir, exist_ok=True)
-    with open(os.path.join(data_dir, CACHE_FILE), 'w', encoding='utf-8') as f:
-        json.dump(cache, f, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+    _save_json(os.path.join(data_dir, CACHE_FILE), cache)
 
 
 def apply(candidates: list[dict], data_dir: str = 'data') -> tuple[int, int]:

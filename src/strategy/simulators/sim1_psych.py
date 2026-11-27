@@ -1,6 +1,6 @@
 from src.data import hype_dict, sim_diag
 
-from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH
+from .base_simulator import BaseSimulator, DEFAULT_INITIAL_CASH, prior_closes_for
 from src.core import clock
 
 _parse_change_rate = BaseSimulator.parse_change_rate
@@ -194,6 +194,7 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
     tick_outage = BaseSimulator.tick_power_outage(candidates)
 
     # 1. 청산 — ATR 기반 동적 익절/손절 + 트레일링 (기존 유지)
+    exit_no_hist = []
     for code in list(portfolio.keys()):
         p = portfolio[code]
         cur = current_prices.get(code, 0)
@@ -209,10 +210,15 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
                            'cooldown': 2, 'mark_partial': False})
             sold.add(code); continue
 
-        stock = cand_by_code.get(code)
-        sparkline = (stock or {}).get('sparkline_price', []) or []
-        # sparkline 부족 시 1원 fallback은 즉시 손절을 유발한다 → 진입가의 1.5%
-        atr = BaseSimulator.calculate_atr(sparkline) if len(sparkline) >= 3 else avg * 0.015
+        # 이력은 후보가 아니라 view['price_history'](보유 종목 공급분)에서도 읽는다.
+        # 예전엔 '그날 후보 목록'에서만 찾아서, 손실로 후보에서 빠진 종목의 ATR이
+        # 진입가의 1.5% 상수(익절 +4.5%·손절 -2.25%)로 바뀌었다 — 적응형 손절이
+        # 가장 필요한 순간에 고정 비율이었다. 상수로 메우지 않는다.
+        hist = prior_closes_for(code, cand_by_code, view, today, 5)
+        if hist is None:
+            exit_no_hist.append(code)
+            continue  # 트레일링은 위에서 이미 판정했다 — 변동성을 못 재도 그 방어선은 유지된다
+        atr = BaseSimulator.calculate_atr(hist)
 
         if cur >= avg + atr * TP_ATR_MULT:
             orders.append({'action': 'SELL', 'code': code, 'price': cur, 'quantity': None,
@@ -224,6 +230,11 @@ def decide_psych(view, candidates, current_prices, today=None, hhmm=None, ts=Non
                            'reason': f"[심리] 동적 손절가 이탈 (ATR 기반, {pr:+.1f}%)",
                            'cooldown': 3, 'mark_partial': False})
             sold.add(code)
+
+    if exit_no_hist:
+        # 깔때기는 후보 탈락 장부라 보유 종목을 넣으면 회계가 깨진다(심5와 같은 이유).
+        print(f"[심리] ATR 청산 판정 불가(이력 없음) {len(exit_no_hist)}종목: "
+              f"{', '.join(exit_no_hist)} — 트레일링만 적용")
 
     rows = list(feat.values())
     # 승격 판정은 run()이 이미 끝냈다. 여기서 다시 해석하지 않는다.

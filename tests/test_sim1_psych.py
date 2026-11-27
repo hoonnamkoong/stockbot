@@ -173,6 +173,15 @@ def _held(avg=1000, peak=None):
                      'peak_price': peak if peak is not None else avg}}
 
 
+TODAY = '20261128'
+
+
+def _hist_rows(code, closes):
+    """날짜가 붙은 이력 계약({code: [{date, close}]}). 마지막 행이 TODAY 직전이 되게 만든다."""
+    n = len(closes)
+    return {code: [{'date': f'202611{20 + i:02d}', 'close': c} for i, c in enumerate(closes)][:n]}
+
+
 def test_trailing_stop():
     orders, _, _ = decide_psych(_view(_held(peak=1100)), [], {'T001': 1060})
     sells = [o for o in orders if o['action'] == 'SELL']
@@ -181,14 +190,18 @@ def test_trailing_stop():
 
 def test_atr_take_profit():
     cand = [_target(price=1200)]
-    orders, _, _ = decide_psych(_view(_held()), cand, {'T001': 1200})
+    v = _view(_held())
+    v['price_history'] = _hist_rows('T001', [900, 940, 970, 990, 1000])
+    orders, _, _ = decide_psych(v, cand, {'T001': 1200}, today=TODAY)
     sells = [o for o in orders if o['action'] == 'SELL']
     assert len(sells) == 1 and '목표가' in sells[0]['reason']
 
 
 def test_atr_stop_loss():
     cand = [_target(price=900)]
-    orders, _, _ = decide_psych(_view(_held()), cand, {'T001': 900})
+    v = _view(_held())
+    v['price_history'] = _hist_rows('T001', [900, 940, 970, 990, 1000])
+    orders, _, _ = decide_psych(v, cand, {'T001': 900}, today=TODAY)
     sells = [o for o in orders if o['action'] == 'SELL']
     assert len(sells) == 1 and '손절' in sells[0]['reason']
 
@@ -227,3 +240,55 @@ def test_diag_leaves_buzz_ratio_blank_when_unmeasurable():
     row = next(d for d in diags if d['code'] == 'T001')
     assert row['buzz_ratio'] == ''
     assert row['avg_posts'] == ''
+
+
+# ── ATR 청산: 상수로 메우지 않는다 ───────────────────────────────
+# 보유 종목이 그날 후보 목록에 없으면 sparkline이 비어 `avg * 0.015`가 ATR을
+# 대신했다 — 익절 +4.5%·손절 -2.25%의 고정 비율이 하필 손실 종목에서 걸렸다.
+
+def _sells(o):
+    return [x for x in o if x['action'] == 'SELL']
+
+
+def test_no_atr_exit_without_history():
+    """이력이 없으면 ATR 익절·손절을 내지 않는다 — 상수로 메우지 않는다."""
+    orders, _, _ = decide_psych(_view(_held()), [], {'T001': 950}, today=TODAY)  # 진입가 -5%
+    assert _sells(orders) == []
+    orders, _, _ = decide_psych(_view(_held()), [], {'T001': 1060}, today=TODAY)  # +6%
+    assert _sells(orders) == []
+
+
+def test_hard_and_trailing_exits_still_fire_without_history():
+    """적응형을 못 하는 것과 손실을 방치하는 것은 다른 문제다."""
+    orders, _, _ = decide_psych(_view(_held(peak=1100)), [], {'T001': 1060}, today=TODAY)
+    sells = _sells(orders)
+    assert len(sells) == 1 and '트레일링' in sells[0]['reason']
+
+
+def test_atr_exit_uses_supplied_history():
+    """후보에는 없고 view['price_history']만 있어도 ATR 청산이 난다."""
+    v = _view(_held())
+    # ATR 2 -> 손절선 997. 상수(1.5%)였다면 977.5라 -1%에서는 안 팔렸을 것이다.
+    v['price_history'] = _hist_rows('T001', [1000, 1002, 1000, 1002, 1000])
+    orders, _, _ = decide_psych(v, [], {'T001': 990}, today=TODAY)
+    sells = _sells(orders)
+    assert len(sells) == 1 and '손절' in sells[0]['reason']
+
+
+def test_atr_differs_by_stock():
+    """같은 진입가·같은 현재가(-1%)인데 변동성이 다르면 손절 판정이 갈린다. 상수였다면 같다."""
+    port = {'CALM': {'name': 'c', 'quantity': 10, 'avg_price': 1000, 'peak_price': 1000},
+            'WILD': {'name': 'w', 'quantity': 10, 'avg_price': 1000, 'peak_price': 1000}}
+    v = _view(port)
+    v['price_history'] = {
+        **_hist_rows('CALM', [1000, 1002, 1000, 1002, 1000]),   # ATR 2 -> 손절선 997
+        **_hist_rows('WILD', [1000, 1060, 1000, 1060, 1000]),   # ATR 60 -> 손절선 910
+    }
+    orders, _, _ = decide_psych(v, [], {'CALM': 990, 'WILD': 990}, today=TODAY)
+    assert {o['code'] for o in _sells(orders)} == {'CALM'}
+
+
+def test_no_constant_fallback_literal_in_source():
+    path = os.path.join(os.path.dirname(__file__), '..', 'src', 'strategy',
+                        'simulators', 'sim1_psych.py')
+    assert '0.015' not in open(path, encoding='utf-8').read()

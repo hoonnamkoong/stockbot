@@ -3,11 +3,11 @@
     "code": "005930",
     "name": "삼성전자",
     "market": "KOSPI",
-    "price": 171400,
+    "price": 171100,
     "recent_posts_count": 800,
-    "unique_posters": 499,
-    "fact_score": 0.0,
-    "total_likes": 1933,
+    "unique_posters": 497,
+    "fact_score": 0.1,
+    "total_likes": 1829,
     "foreign_rate": 45.84,
     "foreign_change": 0.0,
     "inst_net_buy": 1862261,
@@ -16,21 +16,21 @@
     "day_high": 173200,
     "day_low": 169000,
     "prev_foreign_rate": 45.84,
-    "posts_summary": "전반적으로 정치적 언급이 주를 이루며, 특정 정치인에 대한 부정적 감정과 공매도 금지 요구 등이 포함되어 있습니다. 주가 관련 구체적인 팩트나 분석은 부족합니다.",
-    "sentiment": "-5",
+    "posts_summary": "정치적 이슈와 공매도 관련 언급이 다수. 주가 하락 및 국부 유출 우려 표출.",
+    "sentiment": "-3",
     "top_keywords": [],
     "consecutive_days": 14,
     "status": "활성",
-    "change_rate": "+0.06%",
+    "change_rate": "-0.12%",
     "signal": null,
-    "current_price": 171400,
-    "volume": 1869489,
-    "amount": 319717142250,
+    "current_price": 171100,
+    "volume": 2230730,
+    "amount": 381589003200,
     "posts": [
       {
         "nid": "433002889",
         "title": "이재명아 좋냐?",
-        "likes": 22
+        "likes": 23
       },
       {
         "nid": "432997299",
@@ -68,9 +68,9 @@
         "likes": 13
       },
       {
-        "nid": "432995811",
-        "title": "이재용이 증여세 깍아 줄려고 게열사 삼성증권",
-        "likes": 13
+        "nid": "433003045",
+        "title": "윤 탄핵 시기에",
+        "likes": 12
       },
       {
         "nid": "433001092",
@@ -98,13 +98,8 @@
         "likes": 12
       },
       {
-        "nid": "433003156",
-        "title": "폭동을 일으키자",
-        "likes": 11
-      },
-      {
-        "nid": "433003045",
-        "title": "윤 탄핵 시기에",
+        "nid": "433003163",
+        "title": "어휴 이재멍이 ",
         "likes": 11
       },
       {
@@ -136,11 +131,6 @@
         "nid": "432997332",
         "title": "오늘 17만이 깨지네요....",
         "likes": 11
-      },
-      {
-        "nid": "433003163",
-        "title": "어휴 이재멍이 ",
-        "likes": 10
       },
       {
         "nid": "433002926",
@@ -175,6 +165,16 @@
       {
         "nid": "433001349",
         "title": "이재명 🐕 세기",
+        "likes": 9
+      },
+      {
+        "nid": "433000767",
+        "title": "■■■↓→.....이재명 ...IQ...닭...",
+        "likes": 9
+      },
+      {
+        "nid": "433000210",
+        "title": "전국민 빈곤층 만들기...",
         "likes": 9
       }
     ],
@@ -229,8 +229,8 @@
       3679580711100,
       2395337413000
     ],
-    "tick_power": 81.49,
-    "bid_ask_ratio": 0.323647445762047,
+    "tick_power": 75.75,
+    "bid_ask_ratio": 0.24991981304985336,
     "frgn_fake_ntby_qty": -6000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": -6000,
@@ -244,42 +244,304 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 26.11,
-    "pbr": 2.68,
+    "per": 26.07,
+    "pbr": 2.67,
     "eps": 6564,
     "bps": 63997,
     "w52_hgpr": 374500,
     "w52_lwpr": 99900,
-    "mkt_cap": 10020522,
-    "keywords": []
+    "mkt_cap": 10002983,
+    "keywords": [
+      "정치",
+      "공매도",
+      "국부 유출"
+    ]
+  },
+  {
+    "code": "010140",
+    "name": "삼성중공업",
+    "market": "KOSPI",
+    "price": 14600,
+    "recent_posts_count": 42,
+    "unique_posters": 21,
+    "fact_score": 0.2,
+    "total_likes": 97,
+    "foreign_rate": 28.75,
+    "foreign_change": 0.0,
+    "inst_net_buy": 41261,
+    "prev_close": 13900,
+    "open_price": 13930,
+    "day_high": 14650,
+    "day_low": 13930,
+    "prev_foreign_rate": 28.75,
+    "posts_summary": "정부의 공매도 금지 가능성 언급과 함께 신영증권 목표가 상향. 다만, 부정적 시세 언급과 관망 의견도 존재.",
+    "sentiment": "-1",
+    "top_keywords": [],
+    "consecutive_days": 6,
+    "status": "활성",
+    "change_rate": "+5.04%",
+    "signal": null,
+    "current_price": 14600,
+    "volume": 1068913,
+    "amount": 15337484545,
+    "posts": [
+      {
+        "nid": "433000908",
+        "title": "정부에서 공매도 금지 카드를 내놓을 듯 합니다.",
+        "likes": 14
+      },
+      {
+        "nid": "433000008",
+        "title": "4년차 주주입니다. ",
+        "likes": 10
+      },
+      {
+        "nid": "432993432",
+        "title": "이재명 한국을 세계 1위로 만들었다 - 장하다",
+        "likes": 8
+      },
+      {
+        "nid": "432993290",
+        "title": "국가부도 사태라는 인니보더 더 하락한 한국증시",
+        "likes": 6
+      },
+      {
+        "nid": "432995026",
+        "title": "신영증권에서 어제 삼중 목표가 36,000원으로 해놨네...",
+        "likes": 5
+      },
+      {
+        "nid": "432996110",
+        "title": "💓 두근두근",
+        "likes": 4
+      },
+      {
+        "nid": "432994967",
+        "title": "아무 걱정할거 없음.외국인이 계속 사고 있다.^^",
+        "likes": 4
+      },
+      {
+        "nid": "433004742",
+        "title": "오랜만에 보는 콘탱코 시장",
+        "likes": 3
+      },
+      {
+        "nid": "433002984",
+        "title": "이제 하닉이랑 따로 움직이기로 한거야?",
+        "likes": 3
+      },
+      {
+        "nid": "432999724",
+        "title": "제발 사지마? 관망 입니다 시장에 참여 하지마?",
+        "likes": 3
+      },
+      {
+        "nid": "432998641",
+        "title": "사지마사지마",
+        "likes": 3
+      },
+      {
+        "nid": "432996445",
+        "title": "영포티 늙은 개돼지 들아 투표좀 잘해라 ",
+        "likes": 3
+      },
+      {
+        "nid": "432996176",
+        "title": "끝이다.",
+        "likes": 3
+      },
+      {
+        "nid": "432994442",
+        "title": "이제 개미신용몰량 거의 나온거  같아서....",
+        "likes": 3
+      },
+      {
+        "nid": "432994236",
+        "title": "아직 사지마라 시초가 이후가 매수 기회온다..",
+        "likes": 3
+      },
+      {
+        "nid": "433004650",
+        "title": "순환매 나올때. 되었다. ",
+        "likes": 2
+      },
+      {
+        "nid": "433003871",
+        "title": "이딴게 상승?",
+        "likes": 2
+      },
+      {
+        "nid": "433002517",
+        "title": "상승장 오후까지 버틸까?",
+        "likes": 2
+      },
+      {
+        "nid": "432996565",
+        "title": "인간의 탈을 썼다면 ....",
+        "likes": 2
+      },
+      {
+        "nid": "432996351",
+        "title": "재무상태 좋아지고,  현금 유동성 좋아져도,  신용등급 올랐어도, ",
+        "likes": 2
+      },
+      {
+        "nid": "432994433",
+        "title": "삼중 망하나요?배당도없고",
+        "likes": 2
+      },
+      {
+        "nid": "433004941",
+        "title": "삼성중공업 나왔네요",
+        "likes": 1
+      },
+      {
+        "nid": "433004030",
+        "title": "어이없네..왜올라.",
+        "likes": 1
+      },
+      {
+        "nid": "433002029",
+        "title": "12.000원 까지   관망 입니다 시장에 참여 하지마?",
+        "likes": 1
+      },
+      {
+        "nid": "432999625",
+        "title": "어제 싸게 매수한 50%는 14,400원 위에서 싹정리했다 그나마 굿....",
+        "likes": 1
+      },
+      {
+        "nid": "432996900",
+        "title": "☆ 가을 앞 똥통  앞에서 ㅡㅡㅋ",
+        "likes": 1
+      },
+      {
+        "nid": "432996535",
+        "title": "☆ 가을 앞 똥통 앞에서 VS 삼중 35100원 물린 하수 ",
+        "likes": 1
+      },
+      {
+        "nid": "432996511",
+        "title": "12월 부터 조선주들은 스타트 이달말까지 미리 미리....",
+        "likes": 1
+      },
+      {
+        "nid": "432995829",
+        "title": "오늘은 12000을 향하여",
+        "likes": 1
+      },
+      {
+        "nid": "432994667",
+        "title": "음봉  입니다   오늘도  마이너스 시세 입니다",
+        "likes": 1
+      }
+    ],
+    "sparkline_price": [
+      15030,
+      14530,
+      14650,
+      13850,
+      13980
+    ],
+    "range_history": [
+      15930,
+      17180,
+      17380,
+      17700,
+      17010,
+      16240,
+      15170,
+      16270,
+      16520,
+      16560,
+      16590,
+      16610,
+      15840,
+      15830,
+      16090,
+      15030,
+      14530,
+      14650,
+      13850,
+      13980
+    ],
+    "amount_history": [
+      84053195370,
+      106060953340,
+      69037148840,
+      87551368500,
+      51333968700,
+      77980744800,
+      79442544230,
+      81935264440,
+      46938391640,
+      71332216560,
+      95469361470,
+      42851889850,
+      33247162080,
+      41754601040,
+      33228472670,
+      41527409040,
+      47978045470,
+      45706212700,
+      49669271650,
+      38153754660
+    ],
+    "tick_power": 174.78,
+    "bid_ask_ratio": 2.9132534430334465,
+    "frgn_fake_ntby_qty": 110000,
+    "orgn_fake_ntby_qty": 0,
+    "sum_fake_ntby_qty": 110000,
+    "roe": 0.0,
+    "net_profit_rate": 0.0,
+    "debt_ratio": 999.0,
+    "current_ratio": 0.0,
+    "invest_opinion": "BUY",
+    "target_price": 24000,
+    "opinion_divergence": -41.71,
+    "consensus_buy_count": 0,
+    "consensus_avg_target": 0,
+    "consensus_summary": "",
+    "per": 23.55,
+    "pbr": 3.01,
+    "eps": 620,
+    "bps": 4857,
+    "w52_hgpr": 35350,
+    "w52_lwpr": 13530,
+    "mkt_cap": 128480,
+    "keywords": [
+      "공매도 금지",
+      "목표가",
+      "관망"
+    ]
   },
   {
     "code": "047040",
     "name": "대우건설",
     "market": "KOSPI",
-    "price": 10140,
+    "price": 10080,
     "recent_posts_count": 52,
-    "unique_posters": 29,
-    "fact_score": 0.1,
-    "total_likes": 83,
+    "unique_posters": 30,
+    "fact_score": 0.15,
+    "total_likes": 86,
     "foreign_rate": 10.27,
     "foreign_change": -0.19,
     "inst_net_buy": -232863,
     "prev_close": 9790,
     "open_price": 9790,
-    "day_high": 10150,
+    "day_high": 10160,
     "day_low": 9790,
     "prev_foreign_rate": 10.46,
-    "posts_summary": "부동산 정책 및 정부 정책에 대한 부정적 언급과 함께 공매도 관련 내용이 혼재되어 있습니다. 주가 관련 구체적 근거는 희박하며, 일부 부정적 전망이 나타납니다.",
+    "posts_summary": "정치적 이슈와 공매도 언급이 많으며, 주가 하락에 대한 우려와 함께 특정 가격대 진입 및 관망 의견이 혼재.",
     "sentiment": "-2",
     "top_keywords": [],
     "consecutive_days": 14,
     "status": "활성",
-    "change_rate": "+3.58%",
+    "change_rate": "+2.96%",
     "signal": null,
-    "current_price": 10140,
-    "volume": 627784,
-    "amount": 6297788585,
+    "current_price": 10080,
+    "volume": 724255,
+    "amount": 7274887730,
     "posts": [
       {
         "nid": "432996131",
@@ -290,6 +552,11 @@
         "nid": "432998304",
         "title": "■주식은 선수가 오면 ",
         "likes": 5
+      },
+      {
+        "nid": "433001674",
+        "title": "27층있으세요? ㅜㅜ",
+        "likes": 4
       },
       {
         "nid": "432999523",
@@ -317,11 +584,6 @@
         "likes": 4
       },
       {
-        "nid": "433001674",
-        "title": "27층있으세요? ㅜㅜ",
-        "likes": 3
-      },
-      {
         "nid": "432995236",
         "title": "이거 연예인들도 많이샀데",
         "likes": 3
@@ -340,6 +602,11 @@
         "nid": "432991877",
         "title": "[[어짜피 무차입으로 공매쳐도 정부에서 ]]",
         "likes": 3
+      },
+      {
+        "nid": "433004661",
+        "title": "■물타는 시점",
+        "likes": 2
       },
       {
         "nid": "433002660",
@@ -425,11 +692,6 @@
         "nid": "432995831",
         "title": "[거래소 마진콜 ON으로 켜라]",
         "likes": 1
-      },
-      {
-        "nid": "432995795",
-        "title": "모든 주식이",
-        "likes": 1
       }
     ],
     "sparkline_price": [
@@ -483,8 +745,8 @@
       22106400000,
       22685948250
     ],
-    "tick_power": 165.7,
-    "bid_ask_ratio": 1.682647746380675,
+    "tick_power": 155.08,
+    "bid_ask_ratio": 2.0855286738351255,
     "frgn_fake_ntby_qty": 16000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": 16000,
@@ -498,15 +760,17 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": -4.62,
+    "per": -4.59,
     "pbr": 1.24,
     "eps": -2195,
     "bps": 8148,
     "w52_hgpr": 40350,
     "w52_lwpr": 3455,
-    "mkt_cap": 41664,
+    "mkt_cap": 41417,
     "keywords": [
-      "공매도"
+      "공매도",
+      "정치",
+      "하방"
     ]
   },
   {
@@ -514,28 +778,28 @@
     "name": "두산에너빌리티",
     "market": "KOSPI",
     "price": 42450,
-    "recent_posts_count": 42,
-    "unique_posters": 32,
-    "fact_score": 0.5,
-    "total_likes": 115,
+    "recent_posts_count": 46,
+    "unique_posters": 34,
+    "fact_score": 0.4,
+    "total_likes": 123,
     "foreign_rate": 22.31,
     "foreign_change": 0.04,
     "inst_net_buy": 21190,
     "prev_close": 40500,
     "open_price": 40550,
-    "day_high": 42450,
+    "day_high": 42750,
     "day_low": 40550,
     "prev_foreign_rate": 22.27,
-    "posts_summary": "폴란드 원전 수주 기대감을 기반으로 긍정적인 전망이 나타나고 있습니다. 구체적인 뉴스 및 풍문을 바탕으로 주가 상승 가능성이 언급됩니다.",
-    "sentiment": "5",
+    "posts_summary": "폴란드 원전 수주 기대감과 함께 가스터빈 사업 관련 긍정적 언급. 공매도 감소 및 외국인 매수세 기대.",
+    "sentiment": "2",
     "top_keywords": [],
     "consecutive_days": 14,
     "status": "활성",
     "change_rate": "+4.81%",
     "signal": null,
     "current_price": 42450,
-    "volume": 527357,
-    "amount": 22035157200,
+    "volume": 617846,
+    "amount": 25885438675,
     "posts": [
       {
         "nid": "432992452",
@@ -543,19 +807,29 @@
         "likes": 13
       },
       {
+        "nid": "433001404",
+        "title": "오후장에 더 크게 말아 올립니다. 그럴수 밖에 없는게..가스터빈 건 폴란드에 수주할 예정이라는 풍문",
+        "likes": 8
+      },
+      {
         "nid": "432993400",
         "title": "미 발전소 잭팟뉴스에 반등 좀 할까?",
         "likes": 8
       },
       {
-        "nid": "433001404",
-        "title": "오후장에 더 크게 말아 올립니다. 그럴수 밖에 없는게..가스터빈 건 폴란드에 수주할 예정이라는 풍문",
-        "likes": 7
-      },
-      {
         "nid": "432992190",
         "title": "일단 3만 초반은 무조건이다",
         "likes": 6
+      },
+      {
+        "nid": "433003674",
+        "title": "반도체에게",
+        "likes": 5
+      },
+      {
+        "nid": "433002292",
+        "title": "폴란드, 내년 초 美 웨스팅하우스와 원전 계약 예정...두산에너빌 수주 기대감",
+        "likes": 5
       },
       {
         "nid": "432999179",
@@ -583,19 +857,9 @@
         "likes": 5
       },
       {
-        "nid": "433002292",
-        "title": "폴란드, 내년 초 美 웨스팅하우스와 원전 계약 예정...두산에너빌 수주 기대감",
-        "likes": 4
-      },
-      {
         "nid": "432994494",
         "title": "드디어",
         "likes": 4
-      },
-      {
-        "nid": "433003674",
-        "title": "반도체에게",
-        "likes": 3
       },
       {
         "nid": "433001498",
@@ -621,6 +885,16 @@
         "nid": "432993949",
         "title": "한국 주식시장의  주가 결정은 외국인들이 결정한다 ",
         "likes": 3
+      },
+      {
+        "nid": "433005202",
+        "title": "튀어라 개미꼬시작전",
+        "likes": 2
+      },
+      {
+        "nid": "433000082",
+        "title": "두산에너빌리티, 가스터빈 성장궤도 진입…美 법인 재편",
+        "likes": 2
       },
       {
         "nid": "432997466",
@@ -663,6 +937,11 @@
         "likes": 2
       },
       {
+        "nid": "433005331",
+        "title": "개미",
+        "likes": 1
+      },
+      {
         "nid": "433003155",
         "title": "지미~",
         "likes": 1
@@ -670,21 +949,6 @@
       {
         "nid": "433002446",
         "title": "개미",
-        "likes": 1
-      },
-      {
-        "nid": "433001416",
-        "title": "두달동안ㅋㅋ",
-        "likes": 1
-      },
-      {
-        "nid": "433001333",
-        "title": "여태내린게얼만데 10%정도는올라야되질않나 좀올라라개잡주야",
-        "likes": 1
-      },
-      {
-        "nid": "433000409",
-        "title": "역쉬.",
         "likes": 1
       }
     ],
@@ -739,8 +1003,8 @@
       75688743000,
       64275402800
     ],
-    "tick_power": 131.01,
-    "bid_ask_ratio": 1.912962962962963,
+    "tick_power": 132.6,
+    "bid_ask_ratio": 1.7434303017194765,
     "frgn_fake_ntby_qty": -48000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": -48000,
@@ -762,20 +1026,20 @@
     "w52_lwpr": 38400,
     "mkt_cap": 271918,
     "keywords": [
-      "원전",
-      "수주",
-      "기대감"
+      "원전 수주",
+      "가스터빈",
+      "공매도"
     ]
   },
   {
     "code": "000660",
     "name": "SK하이닉스",
     "market": "KOSPI",
-    "price": 1034000,
+    "price": 1042000,
     "recent_posts_count": 800,
-    "unique_posters": 518,
-    "fact_score": 0.0,
-    "total_likes": 1576,
+    "unique_posters": 512,
+    "fact_score": 0.1,
+    "total_likes": 1525,
     "foreign_rate": 49.23,
     "foreign_change": -0.02,
     "inst_net_buy": -67805,
@@ -784,22 +1048,17 @@
     "day_high": 1056000,
     "day_low": 1022000,
     "prev_foreign_rate": 49.25,
-    "posts_summary": "정치적 이슈와 공매도 금지 요구가 대부분을 차지하며, 반도체 산업 및 SK하이닉스에 대한 구체적인 분석이나 팩트는 거의 없습니다. 부정적인 전망이 지배적입니다.",
-    "sentiment": "-6",
+    "posts_summary": "정치적 이슈와 공매도 관련 불만 표출. 국민연금 손실 및 주가 하락에 대한 부정적 전망.",
+    "sentiment": "-4",
     "top_keywords": [],
     "consecutive_days": 14,
     "status": "활성",
-    "change_rate": "-1.80%",
+    "change_rate": "-1.04%",
     "signal": null,
-    "current_price": 1034000,
-    "volume": 445605,
-    "amount": 462143465500,
+    "current_price": 1042000,
+    "volume": 531994,
+    "amount": 551939466000,
     "posts": [
-      {
-        "nid": "432996993",
-        "title": "공매도 규제만이 살길이다. ",
-        "likes": 21
-      },
       {
         "nid": "433002338",
         "title": "공매도 금지 ,증안펀드 즉시 투입~서울역 광장 집회",
@@ -821,31 +1080,6 @@
         "likes": 9
       },
       {
-        "nid": "432996833",
-        "title": "선거때보자 재명아..민석아..",
-        "likes": 9
-      },
-      {
-        "nid": "432996812",
-        "title": "누가 이재명 뽑으래? 누가 민주당 뽑으래?",
-        "likes": 9
-      },
-      {
-        "nid": "432996584",
-        "title": "서울아파트시총2400조 증시폭락3900조",
-        "likes": 9
-      },
-      {
-        "nid": "432996562",
-        "title": "이재명이 말하는 주식 망친 원인",
-        "likes": 9
-      },
-      {
-        "nid": "433002091",
-        "title": "이재명 민주당찍은넘들",
-        "likes": 8
-      },
-      {
         "nid": "432998224",
         "title": "국민연금 240조 손실 기사 나오는데",
         "likes": 8
@@ -853,6 +1087,11 @@
       {
         "nid": "433001501",
         "title": "이러다 진짜 폭동일어나는거아니냐? ",
+        "likes": 7
+      },
+      {
+        "nid": "433001438",
+        "title": "올해 6월 취임식 1주년기에서 한 말 ",
         "likes": 7
       },
       {
@@ -886,23 +1125,23 @@
         "likes": 7
       },
       {
-        "nid": "432996686",
-        "title": "윤씨가 잘하긴 했다",
-        "likes": 7
+        "nid": "433005038",
+        "title": "오늘은 100만원 깨는 날 입니다",
+        "likes": 6
       },
       {
-        "nid": "432996585",
-        "title": "당장 공매도 금지시켜라",
-        "likes": 7
-      },
-      {
-        "nid": "432996512",
-        "title": "주식박살 금리인상",
-        "likes": 7
+        "nid": "433004977",
+        "title": "이제부터는 삼전 닉스만 빠지고 다른종목은 올라야 정상이다",
+        "likes": 6
       },
       {
         "nid": "433003900",
         "title": "아직",
+        "likes": 6
+      },
+      {
+        "nid": "433003139",
+        "title": "이재명 내가 저주한다",
         "likes": 6
       },
       {
@@ -913,11 +1152,6 @@
       {
         "nid": "433002157",
         "title": "대통령이 msci타령으로  국민들 수렁으로 파트려놓고 엉뚱한짓거리만하니~",
-        "likes": 6
-      },
-      {
-        "nid": "433001438",
-        "title": "올해 6월 취임식 1주년기에서 한 말 ",
         "likes": 6
       },
       {
@@ -943,6 +1177,36 @@
       {
         "nid": "432999636",
         "title": "오늘9자",
+        "likes": 6
+      },
+      {
+        "nid": "432998945",
+        "title": "불쌍하다 하이닉스",
+        "likes": 6
+      },
+      {
+        "nid": "432998894",
+        "title": "욕심버리고 배당받았음 던져라",
+        "likes": 6
+      },
+      {
+        "nid": "432998868",
+        "title": "진보당과 보수당의 차이 ",
+        "likes": 6
+      },
+      {
+        "nid": "432998649",
+        "title": "그럼그렇지 그냥 안 내리지",
+        "likes": 6
+      },
+      {
+        "nid": "432998615",
+        "title": "와 하이닉스 빨간불 ㄷㄷㄷ 개떡상이네",
+        "likes": 6
+      },
+      {
+        "nid": "432998118",
+        "title": "국장 어디까지 추락함..",
         "likes": 6
       }
     ],
@@ -997,8 +1261,8 @@
       3916173456000,
       3723509615000
     ],
-    "tick_power": 0.0,
-    "bid_ask_ratio": 0.458034830217252,
+    "tick_power": 100.55,
+    "bid_ask_ratio": 0.5300769519519519,
     "frgn_fake_ntby_qty": 5000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": 5000,
@@ -1012,27 +1276,28 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 17.54,
-    "pbr": 6.02,
+    "per": 17.67,
+    "pbr": 6.07,
     "eps": 58955,
     "bps": 171751,
     "w52_hgpr": 2987000,
     "w52_lwpr": 525000,
-    "mkt_cap": 7308303,
+    "mkt_cap": 7364847,
     "keywords": [
+      "정치",
       "공매도",
-      "반도체"
+      "주가 하락"
     ]
   },
   {
     "code": "261780",
     "name": "아리바이오랩",
     "market": "KOSDAQ",
-    "price": 4680,
-    "recent_posts_count": 66,
-    "unique_posters": 55,
-    "fact_score": 0.4,
-    "total_likes": 174,
+    "price": 4570,
+    "recent_posts_count": 70,
+    "unique_posters": 56,
+    "fact_score": 0.5,
+    "total_likes": 181,
     "foreign_rate": 0.0,
     "foreign_change": 0.0,
     "inst_net_buy": -2,
@@ -1041,16 +1306,16 @@
     "day_high": 4965,
     "day_low": 4540,
     "prev_foreign_rate": 0.0,
-    "posts_summary": "FDA 3상 임상 결과와 중국 시장 진출 기대감을 바탕으로 긍정적인 전망이 제시됩니다. 해외 제약사와의 계약 및 치매 치료제 개발 관련 내용이 포함되어 있습니다.",
+    "posts_summary": "FDA 3상 유효성 및 안정성 인증 기반의 해외 승인 기대. 중국 시장 진출 및 공동 사업 추진 관련 긍정적 전망.",
     "sentiment": "3",
     "top_keywords": [],
     "consecutive_days": 10,
     "status": "활성",
-    "change_rate": "+2.07%",
+    "change_rate": "-0.33%",
     "signal": null,
-    "current_price": 4680,
-    "volume": 3392233,
-    "amount": 16170486939,
+    "current_price": 4570,
+    "volume": 3727607,
+    "amount": 17718455465,
     "posts": [
       {
         "nid": "432994099",
@@ -1118,6 +1383,11 @@
         "likes": 5
       },
       {
+        "nid": "433003763",
+        "title": "ㅋㅋㅋㅋ",
+        "likes": 4
+      },
+      {
         "nid": "432999699",
         "title": "로봇으로 이번주에",
         "likes": 4
@@ -1133,6 +1403,16 @@
         "likes": 4
       },
       {
+        "nid": "433003524",
+        "title": "빌린 돈 갚으려면",
+        "likes": 3
+      },
+      {
+        "nid": "433003191",
+        "title": "지금 뭐하는 거야?~~",
+        "likes": 3
+      },
+      {
         "nid": "432997497",
         "title": "직상장 ",
         "likes": 3
@@ -1143,23 +1423,13 @@
         "likes": 3
       },
       {
-        "nid": "433003763",
-        "title": "ㅋㅋㅋㅋ",
-        "likes": 2
-      },
-      {
-        "nid": "433003524",
-        "title": "빌린 돈 갚으려면",
+        "nid": "433004752",
+        "title": "나가리여 4903에들어온 나의 머리를 한대친다",
         "likes": 2
       },
       {
         "nid": "433003423",
         "title": "아리 직상장 불가..아랩이본주된다..10배짜리다..홀딩해..",
-        "likes": 2
-      },
-      {
-        "nid": "433003191",
-        "title": "지금 뭐하는 거야?~~",
         "likes": 2
       },
       {
@@ -1195,11 +1465,6 @@
       {
         "nid": "432995021",
         "title": "4만원까지는바로갈것같다",
-        "likes": 2
-      },
-      {
-        "nid": "432992269",
-        "title": "직상장일 ai",
         "likes": 2
       }
     ],
@@ -1254,8 +1519,8 @@
       10466937650,
       34755180320
     ],
-    "tick_power": 88.22,
-    "bid_ask_ratio": 1.2831454643048845,
+    "tick_power": 83.32,
+    "bid_ask_ratio": 2.3212002609262883,
     "frgn_fake_ntby_qty": -6000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": -6000,
@@ -1275,22 +1540,254 @@
     "bps": 0,
     "w52_hgpr": 6720,
     "w52_lwpr": 1824,
-    "mkt_cap": 1355,
+    "mkt_cap": 1323,
     "keywords": [
-      "FDA",
-      "임상",
-      "치매"
+      "FDA 3상",
+      "해외 승인",
+      "공동 사업"
+    ]
+  },
+  {
+    "code": "471800",
+    "name": "에이엘로봇",
+    "market": "KOSDAQ",
+    "price": 10580,
+    "recent_posts_count": 53,
+    "unique_posters": 33,
+    "fact_score": 0.3,
+    "total_likes": 37,
+    "foreign_rate": 0.2,
+    "foreign_change": -0.37,
+    "inst_net_buy": 3023,
+    "prev_close": 9160,
+    "open_price": 9460,
+    "day_high": 10760,
+    "day_low": 9460,
+    "prev_foreign_rate": 0.57,
+    "posts_summary": "산업용 로봇 세계 1위 기업과의 협력 및 글로벌 고객사 확보 소식. 다만, 추격매수 경계 및 단기 변동성에 대한 언급.",
+    "sentiment": "-3",
+    "top_keywords": [],
+    "consecutive_days": 6,
+    "status": "활성",
+    "change_rate": "+15.50%",
+    "signal": null,
+    "current_price": 10580,
+    "volume": 2166289,
+    "amount": 22157351375,
+    "posts": [
+      {
+        "nid": "433000678",
+        "title": "대피하자",
+        "likes": 3
+      },
+      {
+        "nid": "432999058",
+        "title": "고점 찍고 흐물흐물",
+        "likes": 3
+      },
+      {
+        "nid": "432995003",
+        "title": "30년차 형이다 딱 찍어준다",
+        "likes": 3
+      },
+      {
+        "nid": "433004291",
+        "title": "추격매수",
+        "likes": 2
+      },
+      {
+        "nid": "433000306",
+        "title": "세력이 1만원 부근 집중 매집이다",
+        "likes": 2
+      },
+      {
+        "nid": "432998646",
+        "title": "이러다 또 쭉~ 뺀다 ",
+        "likes": 2
+      },
+      {
+        "nid": "432995549",
+        "title": "오늘은 10프로 상승후 시작",
+        "likes": 2
+      },
+      {
+        "nid": "432993761",
+        "title": "오늘 신고 다들 신고하자. 1332",
+        "likes": 2
+      },
+      {
+        "nid": "432992960",
+        "title": "▣ 하나에어로",
+        "likes": 2
+      },
+      {
+        "nid": "433005470",
+        "title": "에이엘로봇, 산업용 로봇 세계 1위 화낙 등 글로벌 고객사 확보…야스카와와도 기술 협력",
+        "likes": 1
+      },
+      {
+        "nid": "433005439",
+        "title": "누가 바나나 던져둔거냐",
+        "likes": 1
+      },
+      {
+        "nid": "433005075",
+        "title": "2차 vi까진 달려라",
+        "likes": 1
+      },
+      {
+        "nid": "433004887",
+        "title": "설마 로봇액츄에이터 토크센서 가는거냐?",
+        "likes": 1
+      },
+      {
+        "nid": "433004810",
+        "title": "야도 상한가 한번 갈때",
+        "likes": 1
+      },
+      {
+        "nid": "433004791",
+        "title": "탈출은 지능순..한두번 당하냐..",
+        "likes": 1
+      },
+      {
+        "nid": "433004529",
+        "title": "세력이 2개이상 존재해서 서로 싸우네 ㅋㅋㅋㅋ",
+        "likes": 1
+      },
+      {
+        "nid": "433004301",
+        "title": "와~",
+        "likes": 1
+      },
+      {
+        "nid": "433002603",
+        "title": "이놈..  운전하는거  잘봐.  차트에  전일 시가/종가에  정확히 터치만하고  떨구니깐..",
+        "likes": 1
+      },
+      {
+        "nid": "433002265",
+        "title": "얼능  내려",
+        "likes": 1
+      },
+      {
+        "nid": "433002129",
+        "title": "어차피..  또  빼고 안올린다.    걸려들지마라들 ~~",
+        "likes": 1
+      },
+      {
+        "nid": "433001900",
+        "title": "매수? 매도 ?",
+        "likes": 1
+      },
+      {
+        "nid": "433001869",
+        "title": "역시 단타만이 살길",
+        "likes": 1
+      },
+      {
+        "nid": "433001763",
+        "title": "오늘도  ",
+        "likes": 1
+      },
+      {
+        "nid": "433000042",
+        "title": "오늘도 vi 터치못하고 내려왔네",
+        "likes": 1
+      },
+      {
+        "nid": "432999867",
+        "title": "정신차리고 혹여나 매수하려는 호구들 주식 불매해라 ",
+        "likes": 1
+      },
+      {
+        "nid": "433005970",
+        "title": "또또또 빠지냐 2차vi 잡고",
+        "likes": 0
+      },
+      {
+        "nid": "433005835",
+        "title": "에스피시스템스 상한가",
+        "likes": 0
+      },
+      {
+        "nid": "433005814",
+        "title": "어제시외 ",
+        "likes": 0
+      },
+      {
+        "nid": "433005401",
+        "title": "야는 또 빠짐 ㅋㅋ?",
+        "likes": 0
+      },
+      {
+        "nid": "433005337",
+        "title": "또 내려온다 ",
+        "likes": 0
+      }
+    ],
+    "sparkline_price": [
+      9970,
+      11160,
+      11260,
+      9580,
+      9260
+    ],
+    "range_history": [
+      13270,
+      13490,
+      9970,
+      11160,
+      11260,
+      9580,
+      9260
+    ],
+    "amount_history": [
+      530081615280,
+      159962423480,
+      36022387660,
+      138733408440,
+      84487338160,
+      20423046360,
+      16205777840
+    ],
+    "tick_power": 120.72,
+    "bid_ask_ratio": 0.8599293503302105,
+    "frgn_fake_ntby_qty": 63000,
+    "orgn_fake_ntby_qty": 0,
+    "sum_fake_ntby_qty": 63000,
+    "roe": 0.0,
+    "net_profit_rate": 0.0,
+    "debt_ratio": 999.0,
+    "current_ratio": 0.0,
+    "invest_opinion": "",
+    "target_price": 0,
+    "opinion_divergence": 0.0,
+    "consensus_buy_count": 0,
+    "consensus_avg_target": 0,
+    "consensus_summary": "",
+    "per": 0.0,
+    "pbr": 0.0,
+    "eps": 0,
+    "bps": 0,
+    "w52_hgpr": 18690,
+    "w52_lwpr": 9160,
+    "mkt_cap": 1277,
+    "keywords": [
+      "산업용 로봇",
+      "글로벌 고객사",
+      "단기 변동성"
     ]
   },
   {
     "code": "068270",
     "name": "셀트리온",
     "market": "KOSPI",
-    "price": 220500,
-    "recent_posts_count": 86,
-    "unique_posters": 54,
+    "price": 221000,
+    "recent_posts_count": 87,
+    "unique_posters": 53,
     "fact_score": 0.2,
-    "total_likes": 463,
+    "total_likes": 479,
     "foreign_rate": 25.74,
     "foreign_change": -0.02,
     "inst_net_buy": 78248,
@@ -1304,11 +1801,11 @@
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "+2.32%",
+    "change_rate": "+2.55%",
     "signal": null,
-    "current_price": 220500,
-    "volume": 183318,
-    "amount": 40531584750,
+    "current_price": 221000,
+    "volume": 203331,
+    "amount": 44946849500,
     "posts": [
       {
         "nid": "432993471",
@@ -1323,7 +1820,7 @@
       {
         "nid": "432996424",
         "title": "한달동안 사투끝에",
-        "likes": 21
+        "likes": 22
       },
       {
         "nid": "432994791",
@@ -1512,8 +2009,8 @@
       142592730000,
       78090467500
     ],
-    "tick_power": 67.49,
-    "bid_ask_ratio": 3.69394783489491,
+    "tick_power": 69.12,
+    "bid_ask_ratio": 4.359808660122577,
     "frgn_fake_ntby_qty": -42000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": -42000,
@@ -1527,13 +2024,13 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 52.03,
+    "per": 52.15,
     "pbr": 2.95,
     "eps": 4238,
     "bps": 74822,
     "w52_hgpr": 251000,
     "w52_lwpr": 158500,
-    "mkt_cap": 511845,
+    "mkt_cap": 513006,
     "keywords": [
       "공매도",
       "거래량"
@@ -1543,11 +2040,11 @@
     "code": "278470",
     "name": "에이피알",
     "market": "KOSPI",
-    "price": 303500,
-    "recent_posts_count": 67,
-    "unique_posters": 49,
-    "fact_score": 0.3,
-    "total_likes": 223,
+    "price": 298000,
+    "recent_posts_count": 70,
+    "unique_posters": 51,
+    "fact_score": 0.35,
+    "total_likes": 233,
     "foreign_rate": 39.34,
     "foreign_change": 0.1,
     "inst_net_buy": 11748,
@@ -1556,16 +2053,16 @@
     "day_high": 322000,
     "day_low": 297000,
     "prev_foreign_rate": 39.24,
-    "posts_summary": "내부 정보 이용 의혹 및 주가 조작 가능성에 대한 부정적인 언급이 있습니다. 금감원 조사 가능성이 제기되며, 투자 주의를 요하는 내용이 포함되어 있습니다.",
-    "sentiment": "-3",
+    "posts_summary": "임원 내부 정보 이용 의혹과 금감원 조사 가능성 언급. 뷰티 시장 장악력 확대 기대와 함께 주가 변동성에 대한 주의 촉구.",
+    "sentiment": "1",
     "top_keywords": [],
     "consecutive_days": 1,
     "status": "활성",
-    "change_rate": "+1.68%",
+    "change_rate": "-0.17%",
     "signal": null,
-    "current_price": 303500,
-    "volume": 235550,
-    "amount": 72121686250,
+    "current_price": 298000,
+    "volume": 257275,
+    "amount": 78664029250,
     "posts": [
       {
         "nid": "432994375",
@@ -1578,18 +2075,18 @@
         "likes": 13
       },
       {
-        "nid": "432995625",
-        "title": "이 회사 실적 프리뷰때도 그러더니 또 사전 내부정보거래로 주가조작하네",
-        "likes": 10
-      },
-      {
         "nid": "432995268",
         "title": "임원이 사전에 내부정보 알고 며칠전에 25만에 주식 5억치 산건 금감원 조사받아야지",
-        "likes": 10
+        "likes": 11
       },
       {
         "nid": "432994043",
         "title": "멜락신 싸게 산줄 알았는데...",
+        "likes": 11
+      },
+      {
+        "nid": "432995625",
+        "title": "이 회사 실적 프리뷰때도 그러더니 또 사전 내부정보거래로 주가조작하네",
         "likes": 10
       },
       {
@@ -1668,6 +2165,11 @@
         "likes": 5
       },
       {
+        "nid": "433004711",
+        "title": "개미털기 맞다",
+        "likes": 4
+      },
+      {
         "nid": "433002622",
         "title": "에이피알 너만 믿는다 가자 ",
         "likes": 4
@@ -1711,11 +2213,6 @@
         "nid": "432994316",
         "title": "몇일째 오르는거보니 ",
         "likes": 4
-      },
-      {
-        "nid": "433002438",
-        "title": "실적 프리뷰때도 그러더니 이번엔 임원이 사전 내부정보이용해서 주식 사서 주가조작하냐?",
-        "likes": 3
       }
     ],
     "sparkline_price": [
@@ -1769,8 +2266,8 @@
       257885094500,
       185563548000
     ],
-    "tick_power": 93.22,
-    "bid_ask_ratio": 0.31167470132047786,
+    "tick_power": 92.35,
+    "bid_ask_ratio": 0.39191919191919194,
     "frgn_fake_ntby_qty": -69000,
     "orgn_fake_ntby_qty": 0,
     "sum_fake_ntby_qty": -69000,
@@ -1784,17 +2281,17 @@
     "consensus_buy_count": 0,
     "consensus_avg_target": 0,
     "consensus_summary": "",
-    "per": 39.4,
-    "pbr": 25.48,
+    "per": 38.68,
+    "pbr": 25.02,
     "eps": 7704,
     "bps": 11910,
     "w52_hgpr": 475000,
     "w52_lwpr": 210000,
-    "mkt_cap": 113625,
+    "mkt_cap": 111566,
     "keywords": [
-      "내부정보",
-      "주가조작",
-      "금감원"
+      "내부 정보 거래",
+      "주가 조작",
+      "뷰티 시장"
     ]
   }
 ]

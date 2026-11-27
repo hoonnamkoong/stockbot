@@ -49,12 +49,22 @@ jobs:
       # 직전 캐시를 복원해야 '이미 채운 종목 건너뛰기'가 작동한다. 복원하지 않으면
       # 매 런이 4,020개를 처음부터 받아 한도를 태우고, 더 나쁘게는 이번 런이
       # 실패한 종목의 **지난 분기 값까지 잃는다**.
+      #
+      # 두 파일을 받는데 `git fetch --depth 1`은 그 커밋의 **블롭 전부**를 받는다 —
+      # 2026-11-27 실측 42초 / 130MB. 2026-11-25 첫 채움 런은 119분에 타임아웃으로
+      # 잘렸고, 다음 보충 런은 11-29 05:00 KST 하나뿐이다(그 뒤는 2027-03-16).
+      # 부분 클론은 2초 / 426KB다 — 40초를 수집에 돌려준다.
       - name: Restore cache (db-data)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch --depth 1 origin db-data 2>/dev/null || echo "[Info] db-data 없음"
-          git checkout FETCH_HEAD -- data/dart_fundamentals.json 2>/dev/null \
+          mkdir -p data
+          bash scripts/fetch_db_data_files.sh \
+            data/dart_fundamentals.json data/dart_corp_codes.json \
+            || echo "[Info] db-data 복원 실패 — 아래 안내대로 진행한다"
+          [ -f data/dart_fundamentals.json ] \
             || echo "[Info] 재무 캐시 없음 — 첫 채움이다"
-          git checkout FETCH_HEAD -- data/dart_corp_codes.json 2>/dev/null \
+          [ -f data/dart_corp_codes.json ] \
             || echo "[Info] 법인코드 매핑 없음 — 새로 받는다"
 
       - name: Collect

@@ -53,10 +53,17 @@ jobs:
       # refresh_calendar는 기존 달력의 지난 날짜를 합쳐 저장한다. 이 잡은 main을
       # 체크아웃해 로컬에 달력이 없으니 db-data에서 먼저 받는다. 없으면(첫 실행)
       # 새 응답만 저장된다.
+      #
+      # 달력 한 파일을 받는데 `git fetch --depth=1`은 그 커밋의 **블롭 전부**를
+      # 받는다 — 2026-11-27 실측 42초 / 130MB. 부분 클론은 2초 / 426KB다.
       - name: Restore calendar (db-data)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch origin db-data --depth=1 || true
-          git checkout origin/db-data -- data/market_calendar.json 2>/dev/null || echo "달력 없음 — 새로 만든다"
+          mkdir -p data
+          bash scripts/fetch_db_data_files.sh data/market_calendar.json \
+            || echo "[Info] db-data 복원 실패"
+          [ -f data/market_calendar.json ] || echo "달력 없음 — 새로 만든다"
 
       # 토큰이 발급된 직후에만 달력을 받을 수 있다 (chk-holiday도 토큰이 필요).
       # 달력은 여러 날치(실측 24일)라, 이 런이 하루 실패해도 이전 저장분에 오늘이 들어있다.

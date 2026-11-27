@@ -71,11 +71,18 @@ jobs:
       # 휴장일 판정에 KIS 달력이 필요하다. 없으면 판정이 UNKNOWN이 되고
       # 알림을 보내지 않는다 — 공휴일마다 거짓 경보를 내는 것보다 낫고,
       # 달력 자체의 결손은 신선도 감사가 따로 본다.
+      # 달력 한 파일(1,982바이트)을 읽는데 `git fetch --depth 1 origin db-data`는
+      # 그 커밋의 **블롭 전부**를 받는다 — 2026-11-27 실측 42초 / 130MB. 이 잡의
+      # 예산은 5분이고, 잘리면 고장을 알려줄 사람 경로가 사라진다(11-26 MTTR 6.5시간).
+      # 부분 클론으로 받으면 2초 / 426KB다(scripts/fetch_db_data_files.sh).
       - name: Fetch market calendar (db-data)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch --depth 1 origin db-data:db-data 2>/dev/null || echo "[Info] db-data 없음"
           mkdir -p data
-          git checkout db-data -- data/market_calendar.json 2>/dev/null || echo "[Info] 달력 없음 — 판정 불가로 처리된다"
+          bash scripts/fetch_db_data_files.sh data/market_calendar.json \
+            || echo "[Info] db-data 복원 실패"
+          [ -f data/market_calendar.json ] || echo "[Info] 달력 없음 — 판정 불가로 처리된다"
 
       - name: Check heartbeat
         env:

@@ -212,61 +212,122 @@ jobs:
           fi
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git clone --branch db-data --depth 1 \
-            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_repo
-          # 오늘 봉은 선착순이다. EOD는 매 거래일 두 번 도는데(16:00 태스커 dispatch +
-          # 21~23시 지연 cron) 늦은 런은 16:01 스냅샷 이후에 붙은 시간외단일가(16~18시)·
-          # NXT 애프터마켓(~20시) 체결까지 담는다 — 20260914에 95/100 종목의 종가가
-          # 바뀌었고(중앙 -0.71%) 심11 감시목록이 GS+한화생명에서 한화생명으로 뒤집혔다.
-          # 정본은 정규장 종가이므로, 오늘 행은 먼저 쓴 값을 지키고 과거 행만 갱신한다.
-          # 병합이 실패해도 배포 자체는 막지 않는다(그 경우 종전대로 이번 런 값이 나간다).
-          if [ "$csv_ok" = 1 ]; then
-            python scripts/merge_ohlcv_bars.py output/kospi_top100_close.csv               db_repo/data/kospi_top100_close.csv               || echo "[병합] 종가 CSV 병합 실패 — 이번 런 값 그대로 배포한다"
-            python scripts/merge_ohlcv_bars.py output/ohlcv_top100.csv               db_repo/data/ohlcv_top100.csv               || echo "[병합] OHLCV 병합 실패 — 이번 런 값 그대로 배포한다"
-            cp output/kospi_top100_close.csv db_repo/data/
-            # OHLCV는 종가 CSV와 같은 호출에서 나온다. 없거나 0행이면 수집이 퇴행한
-            # 것이므로 조용히 넘기지 않고 로그를 남긴다(종가 배포 자체는 계속한다).
-            if [ -f output/ohlcv_top100.csv ] && python scripts/check_csv_rows.py output/ohlcv_top100.csv --min 1; then
-              cp output/ohlcv_top100.csv db_repo/data/
-            else
-              echo "[OHLCV] 파일 없음 또는 0행 - 종가만 배포한다"
+          # URL은 변수에 담아 재시도마다 토큰이 로그에 찍히지 않게 한다.
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+          # 푸시 경합(`! [rejected] ... fetch first`)에 재시도가 없어 즉시 exit 1이었다.
+          # db-data writer는 9개이고 전부 다른 concurrency 그룹이라 실제로 겹친다 —
+          # trading.yml·token_refresh.yml에는 이 패턴이 이미 있는데 이 자리만 빠져 있었다.
+          # 여기서 잃는 것은 이 런의 종가·OHLCV·심9-1 상태·심11 감시목록 전부이고,
+          # 분봉을 뺀 EOD 산출물이 그게 다다. 다음 런은 21~23시 지연 cron뿐이다.
+          #
+          # 재시도가 rebase가 아니라 **다시 clone**인 이유: db-data는 6,707커밋이라
+          # `fetch --unshallow` + rebase가 실측 142초다. 이 스텝이 하는 일은 "남의 최신
+          # 상태 위에 내 파일 얹기"이므로 depth 1 clone이 결과가 같고 비용은 이력
+          # 길이와 무관하다(trading.yml이 같은 이유로 그렇게 돈다).
+          #
+          # 한 번 더 도는 것이 안전한가 — 되돌릴 수 없는 세 가지를 확인했다:
+          #   · `merge_ohlcv_bars`는 **첫 인자(output/…)에 덮어쓴다.** 2회차는
+          #     merge(1회차 결과, 새 원격)인데 오늘 행 가격은 원격(먼저 쓴 쪽) 우선이라
+          #     같은 값이 나오고 거래량은 max라 뒤로 가지 않는다 → 멱등.
+          #   · `reset_epoch_guard`는 로컬 파일을 **지운다.** 2회차엔 이미 없어 cp가
+          #     건너뛴다. 1·2회차 사이에 리셋이 들어와도 새 clone의 표지로 올바르게
+          #     판정한다(오히려 그게 맞다).
+          #   · cp·git add는 같은 내용을 다시 쓴다.
+          #
+          # `attempt || rc=$?`로 부르면 함수 본문에서 `set -e`가 꺼진다. 예전에는
+          # bash -e가 cp·reset_epoch_guard·add·commit 실패를 대신 잡아 줬으므로,
+          # 그 자리마다 명시적으로 return해야 같은 수준으로 시끄럽다.
+          # 반환값: 0=성공 3=변경없음 1=push충돌(재시도) 2=clone실패 4=git오류
+          attempt() {
+            rm -rf db_repo
+            git clone --branch db-data --depth 1 \
+              "$REPO_URL" db_repo || return 2
+            # 오늘 봉은 선착순이다. EOD는 매 거래일 두 번 도는데(16:00 태스커 dispatch +
+            # 21~23시 지연 cron) 늦은 런은 16:01 스냅샷 이후에 붙은 시간외단일가(16~18시)·
+            # NXT 애프터마켓(~20시) 체결까지 담는다 — 20260914에 95/100 종목의 종가가
+            # 바뀌었고(중앙 -0.71%) 심11 감시목록이 GS+한화생명에서 한화생명으로 뒤집혔다.
+            # 정본은 정규장 종가이므로, 오늘 행은 먼저 쓴 값을 지키고 과거 행만 갱신한다.
+            # 병합이 실패해도 배포 자체는 막지 않는다(그 경우 종전대로 이번 런 값이 나간다).
+            if [ "$csv_ok" = 1 ]; then
+              python scripts/merge_ohlcv_bars.py output/kospi_top100_close.csv \
+                db_repo/data/kospi_top100_close.csv \
+                || echo "[병합] 종가 CSV 병합 실패 — 이번 런 값 그대로 배포한다"
+              python scripts/merge_ohlcv_bars.py output/ohlcv_top100.csv \
+                db_repo/data/ohlcv_top100.csv \
+                || echo "[병합] OHLCV 병합 실패 — 이번 런 값 그대로 배포한다"
+              cp output/kospi_top100_close.csv db_repo/data/ || return 4
+              # OHLCV는 종가 CSV와 같은 호출에서 나온다. 없거나 0행이면 수집이 퇴행한
+              # 것이므로 조용히 넘기지 않고 로그를 남긴다(종가 배포 자체는 계속한다).
+              if [ -f output/ohlcv_top100.csv ] && python scripts/check_csv_rows.py output/ohlcv_top100.csv --min 1; then
+                cp output/ohlcv_top100.csv db_repo/data/ || return 4
+              else
+                echo "[OHLCV] 파일 없음 또는 0행 - 종가만 배포한다"
+              fi
             fi
-          fi
-          # 이 런이 도는 사이 대시보드 리셋이 들어왔으면 리셋된 심 파일(심9-1)을
-          # 로컬에서 지워 아래 cp가 건너뛰게 한다 — 런 시작 시점 사본이 리셋을 되돌린다.
-          python scripts/reset_epoch_guard.py db_repo/data data
-          cd db_repo
-          if [ "$csv_ok" = 1 ]; then
-            git add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null || git add data/kospi_top100_close.csv
-          fi
-          # 심9-1 상태·매매기록 + 심11 감시목록. 이걸 안 올리면 매일 백지에서
-          # 시작해 보유가 사라지거나(심9-1) 내일 장중 루프가 쓸 pivot이
-          # 없어진다(심11). git add는 인자로 받은 경로 중 하나라도 없으면
-          # 전체를 원자적으로 실패시킨다. sim_donchian_log.json은 실제로
-          # 쓰인 적 없는 파일이라 이 파일들을 한 줄로 add하면 그 하나 때문에
-          # state.json·CSV까지 매번 조용히 add가 안 됐다(2026-08-05 발견,
-          # 심9-1이 매일 실행·매수까지 하고도 db-data에 한 번도 반영되지
-          # 못한 원인). 파일별로 나눠서 서로 실패가 전염되지 않게 한다.
-          for f in sim_donchian_state.json sim_donchian_log.json trade_history_sim_donchian.csv \
-                   sim11_watchlist.json sim_panicfloor_state.json \n                   sim_meltup_state.json sim_semiboom_state.json; do
-            [ -f "../data/$f" ] && cp "../data/$f" "data/$f" && git add "data/$f"
-          done
-          # 심11 감시목록 깔때기. 날짜가 파일명에 들어가 위 리터럴 목록에 못 넣는다.
-          # 이게 없으면 계측은 도는데 결과가 db-data에 도착하지 않는다 — Actions
-          # 로그는 며칠이면 사라지므로 후보 100→1의 탈락 분포를 소급할 수 없다.
-          for f in ../data/sim11_watchlist_diag_*.csv; do
-            if [ -f "$f" ]; then
+            # 이 런이 도는 사이 대시보드 리셋이 들어왔으면 리셋된 심 파일(심9-1)을
+            # 로컬에서 지워 아래 cp가 건너뛰게 한다 — 런 시작 시점 사본이 리셋을 되돌린다.
+            # 표지가 깨져 있으면 0이 아닌 코드로 끝난다. 모르고 올리면 리셋이 또 사라진다.
+            python scripts/reset_epoch_guard.py db_repo/data data || return 4
+            if [ "$csv_ok" = 1 ]; then
+              git -C db_repo add data/kospi_top100_close.csv data/ohlcv_top100.csv 2>/dev/null \
+                || git -C db_repo add data/kospi_top100_close.csv || return 4
+            fi
+            # 심9-1 상태·매매기록 + 심11 감시목록. 이걸 안 올리면 매일 백지에서
+            # 시작해 보유가 사라지거나(심9-1) 내일 장중 루프가 쓸 pivot이
+            # 없어진다(심11). git add는 인자로 받은 경로 중 하나라도 없으면
+            # 전체를 원자적으로 실패시킨다. sim_donchian_log.json은 실제로
+            # 쓰인 적 없는 파일이라 이 파일들을 한 줄로 add하면 그 하나 때문에
+            # state.json·CSV까지 매번 조용히 add가 안 됐다(2026-08-05 발견,
+            # 심9-1이 매일 실행·매수까지 하고도 db-data에 한 번도 반영되지
+            # 못한 원인). 파일별로 나눠서 서로 실패가 전염되지 않게 한다.
+            #
+            # 없는 파일은 넘기고 **실패는 멈춘다**. 예전 한 줄 AND 연쇄
+            # (`[ -f ] && cp && git add`)는 둘을 구분하지 못해 add 실패도 같이
+            # 삼켰다 — 위 2026-08-05 사고가 그 모양으로 숨어 있었다.
+            for f in sim_donchian_state.json sim_donchian_log.json \
+                     trade_history_sim_donchian.csv sim11_watchlist.json \
+                     sim_panicfloor_state.json sim_meltup_state.json \
+                     sim_semiboom_state.json; do
+              [ -f "data/$f" ] || continue
+              cp "data/$f" "db_repo/data/$f" || return 4
+              git -C db_repo add "data/$f" || return 4
+            done
+            # 심11 감시목록 깔때기. 날짜가 파일명에 들어가 위 리터럴 목록에 못 넣는다.
+            # 이게 없으면 계측은 도는데 결과가 db-data에 도착하지 않는다 — Actions
+            # 로그는 며칠이면 사라지므로 후보 100→1의 탈락 분포를 소급할 수 없다.
+            for f in data/sim11_watchlist_diag_*.csv; do
+              [ -f "$f" ] || continue
               b="$(basename "$f")"
-              cp "$f" "data/$b" && git add "data/$b"
+              cp "$f" "db_repo/data/$b" || return 4
+              git -C db_repo add "data/$b" || return 4
+            done
+            git -C db_repo diff --cached --quiet && return 3
+            git -C db_repo commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')" || return 4
+            git -C db_repo push origin db-data || return 1
+            return 0
+          }
+
+          # `break`다(`exit 0`이 아니다). 이 스텝 뒤에 종가 0행·심 실행 실패를
+          # 종료코드로 내는 블록이 남아 있고, 거기서 빠져나가면 그 두 고장이
+          # 영구히 조용해진다. trading.yml의 같은 루프와 이 점이 다르다.
+          for i in 1 2 3; do
+            rc=0
+            attempt || rc=$?
+            case "$rc" in
+              0) echo "[KOSPI CSV] db-data 배포 완료 (시도 $i)"; break ;;
+              3) echo "[KOSPI CSV] 변경사항 없음"; break ;;
+              2) echo "[KOSPI CSV] db-data clone 실패 — 이 런의 산출물이 안 올라간다"
+                 exit 1 ;;
+              4) echo "[KOSPI CSV] git 작업 실패 — 이 런의 산출물이 안 올라간다"
+                 exit 1 ;;
+            esac
+            echo "[KOSPI CSV] push 충돌 — 다시 clone해서 재시도 ($i/3)"
+            if [ "$i" = 3 ]; then
+              echo "[KOSPI CSV] push 3회 실패 — 이 런의 산출물이 안 올라간다"
+              exit 1
             fi
           done
-          if ! git diff --cached --quiet; then
-            git commit -m "data: KOSPI top100 종가·OHLCV CSV 갱신 $(date +'%Y-%m-%d KST')"
-            git push origin db-data
-            echo "[KOSPI CSV] db-data 배포 완료"
-          else
-            echo "[KOSPI CSV] 변경사항 없음"
-          fi
           # 심 상태까지 올린 뒤에 실패로 끝낸다 — 기존 실패 알림이 사람을 부른다.
           if [ "$csv_ok" = 0 ]; then
             echo "[KOSPI CSV] 종가 0행이라 배포하지 않았다. 수집 로그를 확인하라"
@@ -396,21 +457,43 @@ jobs:
           fi
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git clone --branch db-data --depth 1 \
-            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git db_repo
-          # 파일별로 나눠서 add한다 — 한 줄로 묶으면 하나가 없을 때 전체가
-          # 원자적으로 실패한다(2026-08-05 심9-1 사고와 같은 모양).
-          for f in data/minute_*.csv; do
-            cp "$f" "db_repo/data/$(basename "$f")" && (cd db_repo && git add "data/$(basename "$f")")
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          # 재시도가 없으면 푸시 충돌 한 번에 그 날 분봉이 사라진다. db-data
+          # writer가 아홉이고 전부 concurrency 그룹이 달라 동시에 돈다 —
+          # 2026-11-25에 같은 잡의 CSV 배포가 `! [rejected] (fetch first)`로
+          # 즉시 죽었다. rebase 대신 재clone인 이유는 trading.yml 주석과 같다
+          # (db-data 커밋 8,800개 → unshallow+rebase 실측 142초).
+          #
+          # 원본(`data/minute_*.csv`)이 클론 **밖**에 있어 재clone으로 잃는 것이
+          # 없고, cp·add는 멱등이다 — 재시도의 전제가 성립한다.
+          attempt() {
+            rm -rf db_repo
+            git clone --branch db-data --depth 1 "$REPO_URL" db_repo || return 2
+            mkdir -p db_repo/data
+            # 파일별로 나눠서 add한다 — 한 줄로 묶으면 하나가 없을 때 전체가
+            # 원자적으로 실패한다(2026-08-05 심9-1 사고와 같은 모양).
+            for f in data/minute_*.csv; do
+              b="$(basename "$f")"
+              cp "$f" "db_repo/data/$b" && git -C db_repo add "data/$b"
+            done
+            if git -C db_repo diff --cached --quiet; then return 3; fi
+            git -C db_repo commit -m "data: 1분봉 갱신 $(date +'%Y-%m-%d KST')" || return 4
+            git -C db_repo push origin db-data || return 1
+            return 0
+          }
+          for i in 1 2 3; do
+            rc=0
+            attempt || rc=$?
+            case "$rc" in
+              0) echo "[분봉] db-data 배포 완료 (시도 $i)"; exit 0 ;;
+              3) echo "[분봉] 변경사항 없음"; exit 0 ;;
+              1) echo "[분봉] push 충돌 — 최신 db-data 위에서 다시 시도 ($i/3)" ;;
+              2) echo "[분봉] db-data clone 실패 ($i/3)" ;;
+              *) echo "[분봉] git 오류(rc=$rc)"; exit 1 ;;
+            esac
           done
-          cd db_repo
-          if ! git diff --cached --quiet; then
-            git commit -m "data: 1분봉 갱신 $(date +'%Y-%m-%d KST')"
-            git push origin db-data
-            echo "[분봉] db-data 배포 완료"
-          else
-            echo "[분봉] 변경사항 없음"
-          fi
+          echo "[분봉] 3회 모두 실패 — 이 날 분봉이 db-data에 도달하지 못했다"
+          exit 1
 
       - name: Notify on failure
         if: always() && job.status != 'success'

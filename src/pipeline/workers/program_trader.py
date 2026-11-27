@@ -39,7 +39,8 @@ from src import alerts
 from src.pipeline.context import MARKET_CLOSE_HHMM
 from src.trade.fees import realized_pnl_after_fees, roundtrip_cost
 from src.trade.executions import UNKNOWN
-from src.trade.holding_history import supply_holding_history
+from src.trade import holding_history as _holding_history
+from src.trade.holding_history import attach_holding_history
 from src.trade.pending import register_pending
 from src.trade.realized_pnl import lookup_realized_pnl as _lookup_realized_pnl
 from src.pipeline.workers.program_turn import (
@@ -1316,16 +1317,9 @@ def run_program_trading(candidates: list[dict], is_market_hours: bool, now_kst: 
         # 반드시 _make_adapter 뒤: 어댑터가 sim.state를 실계좌 스냅샷으로 바꾼다.
         # 앞에 두면 페이퍼 포트폴리오 종목의 이력을 받아 실계좌 보유분이 빠진다(파리티 위반).
         # 보유가 없으면 공급할 것도, 공급자를 만들 이유도 없다.
-        # 이력 공급 실패가 주문 자체를 막으면 안 된다(이력은 보조 입력).
-        if sim.state.get('portfolio'):
-            try:
-                from src.trade.kis_data_provider import KISDataProvider
-                sim.price_history = supply_holding_history(
-                    sim.state['portfolio'],
-                    {s['code']: s for s in sim_candidates if s.get('code')},
-                    KISDataProvider(), log=log)
-            except Exception as e:
-                log_error(f'[Program] 보유 이력 공급 실패(무시하고 진행): {e}')
+        # 이력 공급 실패 정책은 페이퍼와 같은 함수 안에 있다(파리티).
+        attach_holding_history(sim, sim_candidates, _holding_history.make_kis_provider,
+                               log=log, log_error=log_error)
         sim.run(sim_candidates, current_prices=current_prices)
     except Exception as e:
         log_error(f'[Program] 주문 준비/심 실행 실패(무시하고 락 해제): {e}')

@@ -535,7 +535,14 @@ class TradeEngineWorker(BaseWorker):
                     if getattr(sim, 'IS_EOD', False):
                         continue
                     own_universes[i] = sim.get_universe()
-                self.log(f"  [계측] 자체 유니버스 수집 {time.monotonic() - _t:.1f}초")
+                # **심별 개수를 남긴다.** 공유 보강 비용은 유일 종목 수에 선형이고
+                # (`_pace`가 전역 직렬이라 종목당 0.35초가 상수다) 그 수를 키운 심이
+                # 누구인지가 지연의 전부다. 2026-11-26에 풀이 126→177종목으로 늘어
+                # 루프가 +15초가 되고 장중 런의 99%가 잘렸는데, 이 줄이 없어서
+                # "어느 심이 키웠나"를 심 등록부와 병합 이력 대조로 **추론**해야 했다.
+                # 다음 증가도 추론으로 때우지 않게 한다.
+                self.log(f"  [계측] 자체 유니버스 수집 {time.monotonic() - _t:.1f}초"
+                         f" — {self._universe_sizes_line(simulators, own_universes)}")
                 pool = self._merge_own_universes([u for u in own_universes if u])
                 if pool:
                     _t = time.monotonic()
@@ -910,6 +917,23 @@ class TradeEngineWorker(BaseWorker):
             print(f"[Enrich] DART 재무 적용 실패(심3·심11은 측정 불가로 거른다): {e}")
 
         return enriched
+
+    @staticmethod
+    def _universe_sizes_line(simulators, own_universes) -> str:
+        """`Sim10Orchestrator 100 · Sim4Bull 30 · …` — 많이 요청한 순.
+
+        합계도 같이 낸다. 합계와 유일 종목 수의 차가 중복 제거량이고, 그 둘이
+        벌어지면 "심을 지웠는데 풀이 커졌다" 같은 모양을 바로 읽을 수 있다
+        (2026-11-26: 요청 232건 → 유일 177종목).
+        """
+        sizes = [(sim.__class__.__name__, len(uni))
+                 for sim, uni in zip(simulators, own_universes) if uni]
+        if not sizes:
+            return '자체 유니버스 심 없음'
+        sizes.sort(key=lambda kv: -kv[1])
+        total = sum(n for _, n in sizes)
+        return (f"요청 {total}건: "
+                + ' · '.join(f'{name} {n}' for name, n in sizes))
 
     @staticmethod
     def _breadth_momentum(rates):

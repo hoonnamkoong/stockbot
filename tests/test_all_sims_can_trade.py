@@ -45,8 +45,11 @@ def _buys(orders):
 # ── 심4-1 단타 / 심4 모멘텀 ──────────────────────────────────────────
 
 def _momentum(i):
-    return {'code': f'{i:06d}', 'name': f'모멘텀{i}', 'price': 1000,
-            'amount': BIG_AMOUNT, 'sparkline_price': list(ZIGZAG),
+    # 이력 계약: 직전 4개 종가 + 현재가(ZIGZAG[-1]) = 5값. ADX 42.9(하한 20 +22.9, 상한 60 -17.1)
+    return {'code': f'{i:06d}', 'name': f'모멘텀{i}', 'price': ZIGZAG[-1],
+            'amount': BIG_AMOUNT,
+            'price_history': [{'date': f'202011{10 + k:02d}', 'close': c}
+                              for k, c in enumerate(ZIGZAG[:-1])],
             'change_rate': '+3.00%', 'tick_power': 180.0,
             'orgn_fake_ntby_qty': 100_000, 'frgn_fake_ntby_qty': 100_000}
 
@@ -60,7 +63,7 @@ def test_sim4_1_daytrade_can_buy():
     b = _buys(decide_bull_daytrade(_view(), cands, {}))
 
     assert len(b) == MAX_HOLDINGS
-    assert b[0]['quantity'] == int(NAV * POSITION_WEIGHT / 1000)
+    assert b[0]['quantity'] == int(NAV * POSITION_WEIGHT / ZIGZAG[-1])
 
 
 # ── 심5 레인지 (박스권 저점) ─────────────────────────────────────────

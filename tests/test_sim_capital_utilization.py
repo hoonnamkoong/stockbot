@@ -108,8 +108,11 @@ def _momentum_candidates(n):
 
     900→1100(기간변동 22.2%)은 예전과 같지만 잔파도를 줘서 ADX를 상한(60) 아래로 유지한다
     (2026-08-05 ADX 상한 도입 — 단조상승은 ADX=100이라 이제 거부된다)."""
-    return [{'code': f'C{i}', 'name': f'종목{i}', 'price': 1_000, 'amount': 5_000_000_000,
-             'sparkline_price': [900, 970, 920, 1010, 950, 1100], 'change_rate': '+3.0%',
+    # 이력 계약: 직전 4개 종가 + 현재가 1100 = 5값. ADX 37.1(하한 +17.1, 상한 -22.9), 기간 +13.4%.
+    return [{'code': f'C{i}', 'name': f'종목{i}', 'price': 1_100, 'amount': 5_000_000_000,
+             'price_history': [{'date': f'202011{10 + k:02d}', 'close': c}
+                               for k, c in enumerate([970, 920, 1010, 950])],
+             'change_rate': '+3.0%',
              'orgn_fake_ntby_qty': 100, 'frgn_fake_ntby_qty': 0, 'tick_power': 130.0}
             for i in range(n)]
 

@@ -15,7 +15,7 @@
 from scripts.audit_sim_fields import FIELD_RE, PORTFOLIO_KEYS, fields_read
 
 # 심6은 2026-10-01 GTAA-KR5로 재목적화돼 change_rate·sparkline_price를 더는 읽지 않는다.
-# 같은 접근 형태(헬퍼 parse_change_rate 경유 + sparkline 직접)를 가진 심4-1을 표본으로 쓴다.
+# 같은 접근 형태(헬퍼 parse_change_rate 경유 + 후보 필드 직접)를 가진 심4-1을 표본으로 쓴다.
 SPECIMEN = 'src/strategy/simulators/sim4_bull_daytrading.py'
 SPECIMEN_NAME = 'sim4_bull_daytrading'
 
@@ -23,7 +23,9 @@ SPECIMEN_NAME = 'sim4_bull_daytrading'
 def test_직접_읽는_필드는_그대로_잡는다():
     keys = fields_read(SPECIMEN, SPECIMEN_NAME)
     assert 'price' in keys
-    assert 'sparkline_price' in keys
+    # 심4-1은 sparkline_price를 이력 계약(price_history)으로 옮겨 더는 직접 읽지 않는다.
+    # 직접 접근(stock.get)의 대표 필드로 수급을 쓴다.
+    assert 'orgn_fake_ntby_qty' in keys
 
 
 def test_헬퍼를_통한_간접_접근도_잡는다():

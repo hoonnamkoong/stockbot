@@ -50,7 +50,8 @@ def test_empty_candidates_is_not_an_outage():
 # 위 단위 테스트만으로는 부족하다. 08-12 사고의 본질이 "게이트 함수는 멀쩡한데
 # 입력이 전부 0이라 무력화됐다"였으므로, 심 수준에서 진입이 실제로 막히는지 본다.
 
-MID_ADX_SPARKLINE = [90, 95, 90, 98, 93, 100]   # ADX≈38.5 — 상·하한 사이
+# 이력 계약: 직전 4개 종가 + 현재가 100 = 5값. ADX 38.5(하한 20 +18.5, 상한 60 -21.5).
+MID_ADX_HISTORY = [90, 98, 90, 98]
 
 
 def _view(nav=3_000_000):
@@ -59,8 +60,9 @@ def _view(nav=3_000_000):
 
 
 def _cand(code, tick_power):
-    return {'code': code, 'name': f'종목{code}', 'price': 1000, 'amount': 5_000_000_000,
-            'sparkline_price': MID_ADX_SPARKLINE, 'change_rate': '+3.0%',
+    return {'code': code, 'name': f'종목{code}', 'price': 100, 'amount': 5_000_000_000,
+            'price_history': [{'date': f'202011{10 + k:02d}', 'close': c}
+                              for k, c in enumerate(MID_ADX_HISTORY)], 'change_rate': '+3.0%',
             'orgn_fake_ntby_qty': 100, 'frgn_fake_ntby_qty': 0, 'tick_power': tick_power}
 
 

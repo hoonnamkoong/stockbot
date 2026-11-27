@@ -23,7 +23,9 @@ from src.strategy.simulators.sim4_bull_daytrading import decide_bull_daytrade
 BIG = 5_000_000_000
 # ADX가 20~60 안이어야 한다. 완전 단조 상승은 ADX 100이라 상한(60)에 걸린다 —
 # 픽스처를 단조로 만들면 '진입 가능한 종목'을 못 만든다.
-RISING = [100, 108, 100, 108, 112]      # 기간 +12%, ADX 42.9
+# 이력 계약 전환: 직전 4개 종가(이력) + 현재가(112) = 5값. 기간 +12%, ADX 42.9
+# (하한 20까지 +22.9, 상한 ADX_MAX 60까지 -17.1).
+RISING = [100, 108, 100, 108, 112]
 
 
 def _view(nav=3_000_000):
@@ -31,9 +33,9 @@ def _view(nav=3_000_000):
 
 
 def _stock(**kw):
-    s = {'code': '005930', 'name': '테스트', 'price': 1000, 'amount': BIG,
-         'sparkline_price': list(RISING), 'change_rate': '+2.00%',
-         'tick_power': 150.0, 'orgn_fake_ntby_qty': 1000}
+    s = {'code': '005930', 'name': '테스트', 'price': RISING[-1], 'amount': BIG,
+         'price_history': [{'date': f'202011{10 + i:02d}', 'close': c} for i, c in enumerate(RISING[:-1])],
+         'change_rate': '+2.00%', 'tick_power': 150.0, 'orgn_fake_ntby_qty': 1000}
     s.update(kw)
     return s
 
@@ -74,7 +76,9 @@ def test_tick_power_is_named():
 def test_period_change_is_named():
     """ADX는 통과하는데 기간 상승률이 상한(40%)을 넘는 경우. 이미 다 오른
     종목을 늦게 타는 걸 막는 조건이라, 여기서 얼마나 걸리는지가 중요하다."""
-    _, funnel = _run([_stock(sparkline_price=[100, 160, 100, 160, 150])])
+    # 직전 4개 [100,160,100,160] + 현재가 150: ADX 26.3(하한 +6.3), 기간 +50%(상한 40 초과)
+    _, funnel = _run([_stock(price=150, price_history=[
+        {'date': f'202011{10 + i:02d}', 'close': c} for i, c in enumerate([100, 160, 100, 160])])])
 
     assert funnel[0]['reason'] == 'period'
     assert funnel[0]['period'] > 40.0
@@ -94,4 +98,79 @@ def test_funnel_is_optional():
     """백테스트 등 운영 밖 호출은 그대로 돈다."""
     orders = decide_bull_daytrade(_view(), [_stock()], {})
 
+    assert [o['action'] for o in orders] == ['BUY']
+
+
+# ── 이력 계약 전환(sparkline_price 폐기) ─────────────────────────────────
+# 입력이 바뀐다: 예전엔 네이버 일봉 마지막 값(장중엔 전일에 멈춰 있을 수 있다)이 끝이었고,
+# 이제는 직전 4개 종가 + **현재가**다. 진입은 현재가에서 체결되므로 의도된 변경이다.
+# 픽스처 여유: 통과용 ADX 42.9(하한 20까지 +22.9, 상한 ADX_MAX 60까지 -17.1),
+# 기간 +12%(범위 5~40).
+from src.strategy.simulators import sim4_bull_daytrading as mod
+
+PRIOR4 = [100, 108, 100, 108]
+LIVE = 112
+
+
+def _hist(closes, start=10):
+    return [{'date': f'202011{start + i:02d}', 'close': c} for i, c in enumerate(closes)]
+
+
+def _cand(**kw):
+    s = {'code': '005930', 'name': '테스트', 'price': LIVE, 'amount': BIG,
+         'price_history': _hist(PRIOR4), 'change_rate': '+2.00%',
+         'tick_power': 150.0, 'orgn_fake_ntby_qty': 1000}
+    s.update(kw)
+    return s
+
+
+def _spy(monkeypatch):
+    adx_in, period_in = [], []
+    real_adx, real_period = mod._adx, mod._period_change
+    monkeypatch.setattr(mod, '_adx', lambda v: (adx_in.append(list(v)), real_adx(v))[1])
+    monkeypatch.setattr(mod, '_period_change', lambda v: (period_in.append(list(v)), real_period(v))[1])
+    return adx_in, period_in
+
+
+def test_adx_input_is_prior_four_plus_live_price_shared(monkeypatch):
+    """ADX·기간 두 소비자가 같은 5값(직전 4종가 + 현재가)을 받는다. 낡은 sparkline은 안 읽는다."""
+    monkeypatch.setattr(mod.clock, 'date_compact', lambda *a: '20261128')
+    adx_in, period_in = _spy(monkeypatch)
+    # 오늘 행(미완성 봉)과 낡은 sparkline을 일부러 섞는다 — 둘 다 입력에 들어오면 안 된다.
+    c = _cand(price_history=_hist(PRIOR4) + [{'date': '20261128', 'close': 999}],
+              sparkline_price=[1, 2, 3, 4, 5])
+    funnel = []
+    orders = decide_bull_daytrade(_view(), [c], {}, funnel=funnel)
+
+    assert adx_in == [PRIOR4 + [LIVE]]
+    assert period_in == [PRIOR4 + [LIVE]]
+    assert [o['action'] for o in orders] == ['BUY']
+
+
+def test_missing_history_is_named_no_history():
+    """이력이 없으면 'no_history'. 'adx_low'(전략 탈락)로 섞이면 안 된다."""
+    c = _cand()
+    del c['price_history']
+    _, funnel = _run([c])
+
+    assert funnel[0]['reason'] == 'no_history'
+
+
+def test_short_history_is_named_no_history():
+    """직전 종가가 3개뿐이면 4개를 지어내지 않는다."""
+    _, funnel = _run([_cand(price_history=_hist(PRIOR4[:3]))])
+
+    assert funnel[0]['reason'] == 'no_history'
+
+
+def test_history_supplied_by_view_is_used(monkeypatch):
+    """후보가 이력을 안 들고 있어도 view['price_history'] 공급분을 쓴다."""
+    adx_in, _ = _spy(monkeypatch)
+    c = _cand()
+    del c['price_history']
+    view = _view()
+    view['price_history'] = {'005930': _hist(PRIOR4)}
+    orders = decide_bull_daytrade(view, [c], {})
+
+    assert adx_in == [PRIOR4 + [LIVE]]
     assert [o['action'] for o in orders] == ['BUY']

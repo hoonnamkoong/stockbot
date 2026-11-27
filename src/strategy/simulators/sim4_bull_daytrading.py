@@ -1,4 +1,5 @@
-from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH, log_funnel
+from .base_simulator import BaseSimulator, get_kst_date, DEFAULT_INITIAL_CASH, log_funnel, prior_closes_for
+from src.core import clock
 from datetime import datetime
 
 # base의 순수 헬퍼(Task 3에서 @staticmethod로 전환됨)를 재사용 — 중복 정의 없음.
@@ -125,6 +126,11 @@ def decide_bull_daytrade(view, candidates, current_prices, funnel=None):
     held = len(portfolio) - len(sold)
     # 런당 한 번만 판정한다(종목마다 재계산하면 같은 답을 후보 수만큼 다시 낸다).
     tick_outage = BaseSimulator.tick_power_outage(candidates)
+    # 이력은 후보가 아니라 공급분(view['price_history'])에서도 읽는다. 날짜는 단일 시계에서 —
+    # UTC 러너에선 datetime.now()가 KST 0~9시에 하루 어긋난다. 시그니처에 today를 더하면
+    # sim10_orchestrator 호출이 깨지므로 함수 안에서 얻는다.
+    today_ymd = clock.date_compact()
+    cand_by_code = {s['code']: s for s in candidates if s.get('code')}
     for stock in candidates:
         # 보유 상한도 **안 산 이유**다. 2026-09-01에 실전 심이 이 갈래를 기록하지
         # 않아 "후보 30 중 23만 설명되는" 로그가 나왔고, 그날 매매 0건의 원인을
@@ -142,9 +148,14 @@ def decide_bull_daytrade(view, candidates, current_prices, funnel=None):
             _fn(funnel, code, 'no_price'); continue
         if amount < 3_000_000_000:
             _fn(funnel, code, 'amount', amount=amount); continue
-        sparkline = stock.get('sparkline_price', [])
-        if not sparkline:
-            _fn(funnel, code, 'no_sparkline'); continue
+        # 진입은 장중 판단이라 오늘 값을 본다: 직전 4개 종가 + 현재가 = 5값. 예전 끝값은
+        # 네이버 일봉 마지막 종가(장중엔 전일에 멈춰 있을 수 있음)였고 이제는 실제로 체결될
+        # 현재가다. ADX·기간 두 소비자가 같은 리스트를 쓰므로 한 번만 만든다.
+        # 이력 결손은 'adx_low'(전략 탈락)와 섞지 않고 별도 사유로 남긴다.
+        prior4 = prior_closes_for(code, cand_by_code, view, today_ymd, 4)
+        if prior4 is None:
+            _fn(funnel, code, 'no_history'); continue
+        sparkline = prior4 + [price]
         adx = _adx(sparkline)
         if adx < 20.0:
             _fn(funnel, code, 'adx_low', adx=adx); continue

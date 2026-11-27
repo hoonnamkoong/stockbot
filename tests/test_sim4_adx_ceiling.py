@@ -18,6 +18,9 @@ NAV = 3_000_000
 # 완만한 등락(direction 대비 변동폭이 큼) → 중간값. 단조 상승 → 100(과열).
 MID_ADX_SPARKLINE = [90, 95, 90, 98, 93, 100]     # direction 10, volatility 26 → ADX≈38.5
 HOT_ADX_SPARKLINE = [90, 94, 98, 102, 106, 110]   # 단조 상승 → ADX=100
+# 심4-1은 직전 4개 종가 + 현재가 5값만 본다. 5값 [90,98,90,98,100]: direction 10,
+# volatility 26 → ADX 38.5(하한 20 +18.5, 상한 60 -21.5). 옛 MID는 5값으로 줄이면 ADX가 정확히 20.0.
+MID_ADX_41 = [90, 98, 90, 98, 100]
 
 
 def _view(portfolio=None, cash=NAV, nav=NAV):
@@ -33,13 +36,16 @@ def _cand(code, sparkline, price=1000):
 
 def test_sim4_1_rejects_overheated_adx():
     """[Sim4-1] ADX>=60(과열)이면 다른 조건이 다 맞아도 진입하지 않는다."""
-    orders = decide_bull_daytrade(_view(), [_cand('111', HOT_ADX_SPARKLINE)], {'111': 1000})
+    funnel = []
+    orders = decide_bull_daytrade(_view(), [_cand4('111', HOT_ADX_SPARKLINE)], {'111': 110}, funnel=funnel)
     assert not any(o['action'] == 'BUY' for o in orders)
+    # 이력 결손(no_history)으로 우연히 거절된 게 아니라 상한에 걸려야 이 테스트가 뜻을 가진다.
+    assert [f['reason'] for f in funnel] == ['adx_high']
 
 
 def test_sim4_1_still_enters_on_mid_adx():
     """[Sim4-1] ADX가 상한 아래(20~60)면 기존과 동일하게 진입한다 — 회귀 방지."""
-    orders = decide_bull_daytrade(_view(), [_cand('111', MID_ADX_SPARKLINE)], {'111': 1000})
+    orders = decide_bull_daytrade(_view(), [_cand4('111', MID_ADX_41)], {'111': 100})
     buys = [o for o in orders if o['action'] == 'BUY']
     assert len(buys) == 1 and buys[0]['code'] == '111'
 

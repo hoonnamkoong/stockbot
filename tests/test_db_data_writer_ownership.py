@@ -59,14 +59,35 @@ def _source(name: str) -> str:
                          if not l.strip().startswith('#'))
 
 
+# 목록을 **런타임에 생성기에서 파생**하는 워크플로. 본문에는 파일명이 없으므로
+# 텍스트 파싱으로는 0건이 나온다 — 그러면 이 감사가 조용해진다(2026-11-27에
+# us_trading.yml을 그렇게 바꿨고, 아래 하한 검사가 바로 잡았다).
+# 그래서 생성기를 **실제로 불러** 이름을 얻는다. 파싱이 못 보는 자리를 메우는
+# 유일한 방법이고, 생성기가 바뀌면 여기도 자동으로 따라온다.
+_DERIVED = {
+    'us_db_data_files.py --deploy': lambda: _us_deploy_names(),
+}
+
+
+def _us_deploy_names() -> set[str]:
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from scripts.us_db_data_files import paths
+    return {p.split('data/', 1)[1] for p in paths(deploy=True)}
+
+
 def db_data_writes(name: str) -> set[str]:
     """이 워크플로가 db-data에 쓰는 `data/` 파일명(글롭 포함).
 
-    세 가지 배선을 본다 — `cp data/X db_data_repo/`, `for f in ...; do` 목록,
-    `git add data/X`. 레포에 실제로 쓰이는 형태가 이 셋이다.
+    네 가지 배선을 본다 — `cp data/X db_data_repo/`, `for f in ...; do` 목록,
+    `git add data/X`, 그리고 **생성기 파생**(`_DERIVED`). 레포에 실제로 쓰이는
+    형태가 이 넷이다.
     """
     s = _source(name)
     out: set[str] = set()
+    for marker, resolve in _DERIVED.items():
+        if marker in s:
+            out |= resolve()
     for m in re.finditer(r'cp\s+(?:-r\s+)?(?:"?[.][.]/)?data/([A-Za-z0-9_.*-]+)', s):
         out.add(m.group(1))
     for m in re.finditer(r'for\s+f\s+in\s+([^;]+?);\s*do', s, re.S):

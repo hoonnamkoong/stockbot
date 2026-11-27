@@ -36,16 +36,13 @@ _RETRY = re.compile(r'for\s+i\s+in\s+1\s+2\s+3')
 #
 # 여기 적는 것은 "괜찮다"가 아니라 "알고 남겼다"는 뜻이다 — 이유와 폭발 반경을
 # 같이 적어야 다음 사람이 판단할 수 있다.
-_KNOWN_GAP = {
-    ('eod_data.yml', 'Deploy CSV to db-data'):
-        '2026-11-27: 이 스텝만 재시도가 없다. 단순 cp가 아니라 '
-        'merge_ohlcv_bars.py(첫 인자를 덮어쓴다)·reset_epoch_guard.py(로컬 파일을 '
-        '지운다)·`cd db_repo` 상대경로(`../data/$f`)가 얽혀 있어, 재시도 루프로 '
-        '감싸려면 그 셋의 멱등성을 전제로 구조를 바꿔야 한다. 전제 자체는 확인됐다'
-        '(병합은 "오늘 행=선착순 / 과거 행=최신"이라 멱등·단조, 가드는 2차 시도에 '
-        'no-op, 원본은 output/·data/로 클론 밖). 폭발 반경: 그날 종가·OHLCV·'
-        '심9-1 상태·심11 감시목록이 db-data에 도달하지 못하고 다음 EOD 런이 복구한다. '
-        '전제를 안 가져가면 PR #60(프리마켓 2주 사망)과 같은 사고가 된다.',
+_KNOWN_GAP: dict[tuple[str, str], str] = {
+    # 2026-11-27: 마지막으로 남아 있던 `eod_data.yml` / `Deploy CSV to db-data`를
+    # 같은 날 고쳤다(재clone 3회). 구조 변경이 필요했던 이유와 멱등성 근거는
+    # 그 스텝 주석에 적혀 있다. 이제 10곳 전부 재시도가 있다.
+    #
+    # 새로 예외를 둘 때는 **이유와 폭발 반경**을 같이 적는다. 이유 없는 예외는
+    # 다음 사람에게 "여긴 원래 이래도 된다"로 읽힌다.
 }
 
 
@@ -93,3 +90,43 @@ def test_known_gaps_still_exist():
             if not _RETRY.search(body)}
     stale = set(_KNOWN_GAP) - live
     assert not stale, f'이미 고쳐진 자리가 _KNOWN_GAP에 남아 있다: {stale}'
+
+
+def _eod_deploy_step() -> str:
+    for wf, step, body in _steps_that_push():
+        if (wf, step) == ('eod_data.yml', 'Deploy CSV to db-data'):
+            return body
+    raise AssertionError('eod_data.yml의 CSV 배포 스텝을 못 찾았다')
+
+
+def test_eod_재시도_루프는_exit가_아니라_break로_끝난다():
+    """이 스텝 **뒤에** 종료코드로 내는 고장이 둘 더 있다.
+
+    종가 0행(`csv_ok=0`)과 심 실행 실패(`sims_ok=0`)는 배포를 끝낸 다음 맨 끝에서
+    `exit 1`로 낸다 — 그 순서는 2026-08-05(심9-1이 매일 매수하고도 db-data에 한
+    번도 반영되지 못함)과 2026-09-10(두 심이 다 실패했는데 런이 초록)에서 각각
+    산 교훈이다. 재시도 루프가 `exit 0`으로 빠져나오면 그 두 고장이 **영구히
+    조용해진다**. trading.yml의 같은 루프는 뒤에 아무것도 없어 `exit 0`이다.
+    """
+    body = _eod_deploy_step()
+    assert 'break ;;' in body, '재시도 루프가 break로 빠져나오지 않는다'
+    done = body.rindex('done')
+    for tail in ('if [ "$csv_ok" = 0 ]', 'sims_ok'):
+        assert body.index(tail) > done, f'{tail} 블록이 재시도 루프보다 앞에 있다'
+
+
+def test_eod_재시도가_되돌릴_수_없는_세_명령을_모두_감싼다():
+    """재시도 범위가 어긋나면 2회차가 **다른 입력**으로 돈다.
+
+    `merge_ohlcv_bars`는 첫 인자(`output/…`)를 덮어쓰고 `reset_epoch_guard`는
+    로컬 파일을 지운다. 둘이 루프 밖에 있으면 1회차가 바꿔 놓은 상태로 2회차가
+    새 원격과 합쳐지는데, 그 조합까지 멱등인지는 확인한 적이 없다. clone과 같은
+    함수 안에 있어야 "clone→병합→가드→add→push"가 한 덩어리로 다시 돈다.
+    """
+    body = _eod_deploy_step()
+    fn = body.index('attempt() {')
+    close = body.index('\n}', fn)   # YAML이 공통 들여쓰기를 벗겨 열0이다
+    inside = body[fn:close]
+    for cmd in ('git clone --branch db-data', 'merge_ohlcv_bars.py',
+                'reset_epoch_guard.py', 'git -C db_repo push'):
+        assert cmd in inside, f'{cmd}가 attempt() 밖에 있다'

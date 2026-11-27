@@ -280,6 +280,8 @@ class BaseSimulator:
     def __init__(self, name, initial_cash=DEFAULT_INITIAL_CASH):
         self.name = name
         self.initial_cash = initial_cash
+        # 보유 종목 이력(엔진이 sim.run 직전에 채운다). 안 채우면 {} = 현행 동작.
+        self.price_history = {}
         self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'data')
         os.makedirs(self.data_dir, exist_ok=True)
         
@@ -800,6 +802,7 @@ class BaseSimulator:
             'initial_cash': self.initial_cash,
             'nav': self.calc_nav(current_prices),
             'cooldown_codes': self.state.get('cooldown_codes', {}),
+            'price_history': getattr(self, 'price_history', None) or {},
         }
 
     def _apply(self, orders, current_prices=None):

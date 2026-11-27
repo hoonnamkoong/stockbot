@@ -13,6 +13,7 @@ from src.pipeline.workers.base_worker import BaseWorker
 from src.data.schemas import StockData, SyncState
 from src.data.storage_manager import StorageManager
 from src.strategy.registry import get_active_simulators
+from src.trade.holding_history import supply_holding_history
 
 
 # 체결강도 조회의 read 타임아웃(초). 이 경로는 2분 매매 루프 안에서 종목당
@@ -622,6 +623,18 @@ class TradeEngineWorker(BaseWorker):
                                      f"{len(blind)}종목 현재가 측정 불가 {blind}")
                             continue
 
+                    # 손실 중인 보유 종목은 방향성 후보 목록에서 구조적으로 빠진다.
+                    # 그 심이 실제로 보는 후보(sim_candidates) 기준으로 이력 유무를
+                    # 판정해야 심이 닿지 못하는 이력 때문에 공급을 건너뛰지 않는다.
+                    # 보유가 없으면 공급할 것도, 공급자를 만들 이유도 없다.
+                    if sim.state.get('portfolio'):
+                        if self._kis_provider is None:
+                            from src.trade.kis_data_provider import KISDataProvider
+                            self._kis_provider = KISDataProvider()
+                        sim.price_history = supply_holding_history(
+                            sim.state['portfolio'],
+                            {s['code']: s for s in sim_candidates if s.get('code')},
+                            self._kis_provider, log=self.log)
                     sim.run(sim_candidates, current_prices=sim_prices)
                     self.log(f"  {sim.__class__.__name__} 완료")
                 except Exception as e:

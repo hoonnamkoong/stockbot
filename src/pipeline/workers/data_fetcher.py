@@ -262,7 +262,7 @@ class DataFetcherWorker(BaseWorker):
         for field, note in (
             ('per', 'Sim3 가치페어 밸류에이션 판정 불가'),
             ('tick_power', '체결강도 판정 불가'),
-            ('range_history', 'Sim5 채널 산출 불가'),
+            ('price_history', '날짜 붙은 종가 이력 없음 — 심1·3·4·5 판정 불가'),
             ('amount_history', 'Sim9-1 거래대금 급증 판정 불가'),
         ):
             missing = sum(1 for s in results_raw if not s.get(field))
@@ -323,17 +323,15 @@ class DataFetcherWorker(BaseWorker):
             # 거래상위에서 빠진 종목은 시세를 여기서만 얻을 수 있다 (첫 행 = 오늘 종가/현재가)
             details['current_price'] = latest['close']
 
-            # [V50.3] sparkline_price: 최근 5영업일 종가 (오래된 날짜부터 최신순으로 정렬)
-            # [Sim5] range_history: 최근 20영업일 종가 (채널 산출용). 동일 응답이라 추가 콜 0.
+            # [구 종가 이력 제거] 날짜 없는 sparkline_price(5일)·range_history(20일)는
+            # 더 만들지 않는다 — 날짜가 없어 '오늘이 섞였는지' 알 수 없어 심들이 조용히
+            # 틀린 값을 읽었다. 대체는 아래 price_history(날짜 포함)다.
             # [Sim9-1] amount_history: 같은 행의 거래량까지 읽어 거래대금
             # 이력을 만든다. "거래대금 급증"을 종목 자신의 평균 대비로 재려면
             # 기준선이 필요한데, 2026-08-26까지 국내에는 그 이력이 아예 없어서
             # 절대 거래대금의 횡단면 z를 쓰고 있었다(= 대형주 필터로 동작).
             # 같은 응답이라 추가 호출 0이다. 거래량만 빈 행은 거래대금에서만 뺀다.
-            closes = [r['close'] for r in rows[:20]]
             amounts = [r['close'] * r['volume'] for r in rows[:20] if r['volume'] is not None]
-            details['sparkline_price'] = closes[:5][::-1]
-            details['range_history'] = closes[::-1]
             details['amount_history'] = amounts[::-1]
             # [가격 이력 계약] 종가는 25행(날짜 포함, 과거→최신)을 따로 보존한다. 위 수급·
             # 구 종가 계열은 요청이 25행이 된 뒤에도 rows[:20]에 고정해 창이 조용히

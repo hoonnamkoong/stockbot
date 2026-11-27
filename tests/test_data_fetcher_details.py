@@ -39,7 +39,7 @@ def test_current_price_is_parsed(monkeypatch):
 # 수급 표에 이미 있으므로 추가 호출 없이 만든다 — range_history와 같은 자리.
 
 def test_amount_history_is_close_times_volume_oldest_first(monkeypatch):
-    """거래대금 이력 = 종가 x 거래량, range_history와 같은 과거->최신 순서."""
+    """거래대금 이력 = 종가 x 거래량, price_history와 같은 과거->최신 순서."""
     _serve(monkeypatch, [_row('20260710', 1000, 5000), _row('20260709', 2000, 3000),
                          _row('20260708', 4000, 1000)])
 
@@ -47,7 +47,7 @@ def test_amount_history_is_close_times_volume_oldest_first(monkeypatch):
 
     assert d['amount_history'] == [4_000_000, 6_000_000, 5_000_000]
     # 종가 이력과 같은 방향이어야 짝이 맞는다.
-    assert d['range_history'] == [4000, 2000, 1000]
+    assert [r['close'] for r in d['price_history']] == [4000, 2000, 1000]
 
 
 def test_amount_history_survives_missing_volume(monkeypatch):
@@ -67,4 +67,4 @@ def test_unreachable_trend_leaves_fields_unset(monkeypatch):
     d = _worker()._get_stock_details('002990')
 
     assert d['current_price'] == 0
-    assert 'range_history' not in d and 'amount_history' not in d
+    assert 'price_history' not in d and 'amount_history' not in d

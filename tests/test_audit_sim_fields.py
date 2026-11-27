@@ -83,3 +83,21 @@ def test_감사_대상은_매니페스트에_등재된_심뿐이다():
     ghosts = sorted(names - registered)
     assert not ghosts, f'매니페스트에 없는 심이 감사 대상이다: {ghosts}'
     assert 'sim1_psych' in names, '살아 있는 심이 빠지면 안 된다'
+
+
+def test_audit_sees_history_read_through_helper():
+    """`prior_closes_for(...)`로 읽는 `price_history`가 감사에 잡힌다.
+
+    `FIELD_RE`는 `stock.get('x')` 같은 직접 접근만 잡는다. 심들이 이력을 헬퍼로
+    읽게 된 뒤로 `price_history`가 감사의 사각에 들어갔다 — 이 작업의 가장 중요한
+    필드가 "유니버스가 실제로 채우는가" 검사에서 빠진 것이다. 이 감사기는 심5가
+    `amount` 미배선으로 거래 0건이던 사고 뒤에 만들어졌다.
+    """
+    keys = fields_read(SPECIMEN, SPECIMEN_NAME)
+    assert 'price_history' in keys
+    # 헬퍼를 안 쓰는 소스에는 지어내서 붙이지 않는다.
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, 'x.py')
+        open(p, 'w', encoding='utf-8').write("x = stock.get('price')\n")
+        assert 'price_history' not in fields_read(p)

@@ -152,7 +152,7 @@ simulators:
     color: "yellow"
     active: true
     tradeable: true
-    needs_buzz: true  # range_history(20일 종가, 채널 산출용)가 버즈 경로에만 채워짐
+    needs_buzz: true  # 보수적으로 남김 — 낡은 근거(range_history가 버즈 경로에만 채워짐)는 사실이 아니다: _enrich_universe가 price_history를 채운다. 플래그를 바꾸면 워크플로 소유권이 옮겨진다
 
   - id: "sim6_bear"
     module: "src.strategy.simulators.sim6_bear_hedge"

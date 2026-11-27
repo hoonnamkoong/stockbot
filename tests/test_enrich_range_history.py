@@ -45,42 +45,43 @@ def _enrich(trend, stock=None):
             None, [stock or {'code': '005930', 'name': '테스트', 'price': 1000}])[0]
 
 
-def test_range_history_is_filled_from_the_same_page():
-    """이게 없으면 자체 유니버스 심은 채널을 못 만들어 영원히 못 산다."""
+def test_price_history_is_filled_from_the_same_page():
+    """이게 없으면 자체 유니버스 심은 채널을 못 만들어 영원히 못 산다.
+    (구 range_history를 날짜 붙은 price_history가 대체했다.)"""
     out = _enrich(_trend(20))
 
-    assert len(out.get('range_history') or []) == 20
+    assert len(out.get('price_history') or []) == 20
 
 
-def test_range_history_is_oldest_to_newest():
+def test_price_history_is_oldest_to_newest():
     """`_channel`과 돈치안이 마지막을 '최신'으로 읽는다. 순서가 뒤집히면
     채널 저점·고점이 조용히 반대가 된다."""
+    hist = _enrich(_trend(20))['price_history']
+
+    assert hist[-1]['close'] == 1000, '마지막이 가장 최근 종가여야 한다'
+    assert hist[0]['close'] == 1019
+
+
+def test_old_undated_fields_are_no_longer_produced():
+    """날짜 없는 구 필드를 다시 만들면 소비자가 되살아난다 — 만들지 않는다."""
     out = _enrich(_trend(20))
-    hist = out['range_history']
 
-    assert hist[-1] == 1000, '마지막이 가장 최근 종가여야 한다'
-    assert hist[0] == 1019
+    assert 'sparkline_price' not in out and 'range_history' not in out
 
 
-def test_sparkline_still_only_five_days():
-    """기존 소비자(ADX 근사)를 깨지 않는다."""
-    out = _enrich(_trend(20))
-
-    assert len(out['sparkline_price']) == 5
-    assert out['sparkline_price'][-1] == 1000
-
-
-def test_existing_range_history_is_not_overwritten():
+def test_existing_price_history_is_not_overwritten():
     """스크래퍼 경로로 들어온 후보는 이미 값을 갖고 있다. 덮어쓰면 그 런의
     수집분을 재조회 값으로 바꿔치기하게 된다."""
+    mine = [{'date': '20260801', 'close': 7.0}]
     out = _enrich(_trend(20), {'code': '005930', 'name': 'x', 'price': 1000,
-                               'range_history': [7, 8, 9]})
+                               'price_history': mine})
 
-    assert out['range_history'] == [7, 8, 9]
+    assert out['price_history'] == mine
 
 
 def test_unreachable_trend_leaves_fields_unset():
     """못 닿으면 채널 재료를 지어내지 않는다 — 없는 채널은 '진입 없음'이 맞다."""
     out = _enrich(None)
 
+    assert 'price_history' not in out
     assert 'range_history' not in out and 'sparkline_price' not in out

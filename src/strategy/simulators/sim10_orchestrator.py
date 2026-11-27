@@ -53,7 +53,7 @@ class Sim10OrchestratorSimulator(BaseSimulator):
 
         ⚠ 라우팅 축이 6단계로 바뀐 뒤(2026-11-24) 이 값은 **보수적으로 남겨둔
         것**이다. 세 슬롯 모두 get_universe()가 자체 유니버스를 주므로 버즈가
-        실제로 필요한 경우는 없다 — 눌림목 슬롯이 쓰는 `range_history`도
+        실제로 필요한 경우는 없다 — 눌림목 슬롯이 쓰는 `price_history`도
         `trade_engine._enrich_universe`가 채운다. 그래도 True를 돌려주는 국면을
         남긴 이유는 소유권을 옮기는 변경이 조용히 깨지는 부류이고(워크플로 간
         소유권 규칙), 이번 수정에 **필요하지 않기** 때문이다. 버즈는 수확되지만

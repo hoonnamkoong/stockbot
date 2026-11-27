@@ -61,9 +61,9 @@ def test_enrich_treats_zero_price_as_missing():
     assert out[0]['price'] == 6710
 
 
-def test_enrich_still_fills_sparkline_when_price_preserved():
-    """price는 보존해도 sparkline_price(ADX용)는 여전히 네이버에서 채워야 한다."""
+def test_enrich_still_fills_history_when_price_preserved():
+    """price는 보존해도 가격 이력(ADX·채널용 price_history)은 여전히 네이버에서 채워야 한다."""
     stocks = [{'code': '317400', 'name': '자이에스앤디', 'price': 7680}]
     out = _enrich_with_naver(stocks, naver_price=6710)
     assert out[0]['price'] == 7680
-    assert out[0]['sparkline_price'] == [6500, 6710]
+    assert [r['close'] for r in out[0]['price_history']] == [6500, 6710]

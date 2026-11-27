@@ -756,17 +756,9 @@ class TradeEngineWorker(BaseWorker):
                 if not stock.get('price'):
                     stock['price'] = rows[0]['close']
                     stock['current_price'] = stock['price']
-                # 이 표는 20행(20영업일)을 준다. 종가를 전부 뽑아 두고
-                # sparkline은 그 앞 5개만 쓴다 — 추가 호출 0.
-                closes = [r['close'] for r in rows]
-                stock['sparkline_price'] = closes[:5][::-1]   # 오래된→최신 순
-                # [Sim5] 채널 산출용 20일 종가. 이걸 안 채우면 자체
-                # 유니버스를 쓰는 심은 `_channel()`이 None을 돌려받아
-                # **진입이 구조적으로 불가능해진다.** 지금까지 이 필드는
-                # 스크래퍼 경로(data_fetcher._get_stock_details)에만
-                # 있었고, 그래서 심5에 자체 유니버스를 달면 조용히
-                # 매수 0건이 되는 함정이 있었다.
-                stock.setdefault('range_history', closes[::-1])
+                # [구 종가 이력 제거] 여기서 채우던 sparkline_price·range_history는 날짜가 없어
+                # 오늘이 섞였는지 알 수 없었다. 심5 채널 등은 위에서 채운 price_history
+                # (날짜 포함)를 prior_closes_for로 읽는다 — 자체 유니버스 심도 같은 보강을 탄다.
                 hold_now = rows[0]['foreign_hold_ratio']
                 if len(rows) >= 2 and hold_now is not None:
                     stock['foreign_rate'] = hold_now

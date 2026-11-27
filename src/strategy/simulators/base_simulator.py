@@ -529,14 +529,14 @@ class BaseSimulator:
             self.save_state()
 
     @staticmethod
-    def calculate_atr(sparkline_price: list, period: int = 5) -> float:
+    def calculate_atr(closes: list, period: int = 5) -> float:
         """[V60.1 Patch] 변동성(ATR) 계산 및 하한값(Fallback) 설정"""
-        if len(sparkline_price) < 2:
+        if len(closes) < 2:
             return 1.0 # 최소 변동폭 1원 설정 (나누기 0 방지)
         
         diffs = []
-        for i in range(1, len(sparkline_price)):
-            diffs.append(abs(sparkline_price[i] - sparkline_price[i-1]))
+        for i in range(1, len(closes)):
+            diffs.append(abs(closes[i] - closes[i-1]))
         
         if not diffs: return 1.0
         atr = sum(diffs[-period:]) / len(diffs[-period:])
@@ -569,17 +569,17 @@ class BaseSimulator:
         return tp >= threshold
 
     @staticmethod
-    def calculate_adx(sparkline_price: list) -> float:
+    def calculate_adx(closes: list) -> float:
         """
         [V2] ADX (Average Directional Index) 근사치 계산 (Efficiency Ratio 사용)
-        - sparkline_price: 최근 종가 리스트 (과거 -> 최신)
+        - closes: 최근 종가 리스트 (과거 -> 최신)
         - 반환값: 0 ~ 100 사이의 추세 강도. 20 미만은 횡보, 25 이상은 강한 추세장으로 판단.
         """
-        if len(sparkline_price) < 2:
+        if len(closes) < 2:
             return 0.0
             
-        direction = abs(sparkline_price[-1] - sparkline_price[0])
-        volatility = sum(abs(sparkline_price[i] - sparkline_price[i-1]) for i in range(1, len(sparkline_price)))
+        direction = abs(closes[-1] - closes[0])
+        volatility = sum(abs(closes[i] - closes[i-1]) for i in range(1, len(closes)))
         
         if volatility == 0:
             return 0.0
@@ -607,12 +607,12 @@ class BaseSimulator:
         return None
 
     @staticmethod
-    def calc_period_change(sparkline_price: list) -> float:
-        """[Sim4/6] 기간 변동률(%). 프로덕션 후보에 period_change_rate가 없어 sparkline 종가로 계산."""
-        if not sparkline_price or len(sparkline_price) < 2:
+    def calc_period_change(closes: list) -> float:
+        """[Sim4/6] 기간 변동률(%). 프로덕션 후보에 period_change_rate가 없어 호출부가 넘긴 종가 리스트로 계산."""
+        if not closes or len(closes) < 2:
             return 0.0
-        start = sparkline_price[0]
-        end = sparkline_price[-1]
+        start = closes[0]
+        end = closes[-1]
         if start <= 0:
             return 0.0
         return (end - start) / start * 100.0

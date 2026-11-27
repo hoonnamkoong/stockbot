@@ -88,7 +88,7 @@ def test_supply_series_still_use_first_20_rows():
     rows = _rows()
     f, _ = _run_fetcher(rows)
     assert len(f['amount_history']) == 20
-    assert len(f['range_history']) == 20
+    assert 'range_history' not in f and 'sparkline_price' not in f
     assert f['amount_history'] == [r['close'] * r['volume'] for r in rows[:20]][::-1]
 
     e, _ = _run_engine(rows)
@@ -96,7 +96,7 @@ def test_supply_series_still_use_first_20_rows():
     assert e['frgn_net_20d'] == sum(r['foreign_net'] / r['volume'] * 100 for r in first) / 20
     assert e['orgn_net_20d'] == sum(r['organ_net'] / r['volume'] * 100 for r in first) / 20
     assert e['amount_ma20'] == sum(r['close'] * r['volume'] for r in first) / 20
-    assert len(e['range_history']) == 20
+    assert 'range_history' not in e and 'sparkline_price' not in e
 
 
 def test_hist_fp_present_and_matches_history():

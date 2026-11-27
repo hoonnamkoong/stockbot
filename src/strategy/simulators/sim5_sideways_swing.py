@@ -298,7 +298,7 @@ class SidewaysSwingSimulator(BaseSimulator):
         그날 이 심이 조용히 아무것도 안 한다. None이면 호출부가 파이프라인
         후보를 그대로 쓴다.
 
-        채널(`range_history` 20일)은 `_enrich_universe`가 채운다 — 그 보강이
+        채널(`price_history` 날짜 붙은 종가)은 `_enrich_universe`가 채운다 — 그 보강이
         없던 동안에는 자체 유니버스를 달면 오히려 진입이 **구조적으로
         불가능**해졌다(같은 날 고쳤다).
         """

@@ -59,8 +59,9 @@ class StockData(BaseModel):
     volume: int = 0         # [V50.2] 당일 거래량
     amount: int = 0         # [V50.2] 당일 거래대금 (원 단위)
     posts: list = []  # 상세 게시글 목록
-    sparkline_price: list = []  # [V50.3] 최근 N일 종가 (과거->최신순)
-    range_history: list = []    # [Sim5] 최근 20영업일 종가 (채널 산출용, 과거->최신순)
+    # 날짜 없는 sparkline_price·range_history를 대체한다 — 날짜가 없으면 오늘이 섞였는지
+    # 알 수 없어 심들이 조용히 틀린 값을 읽었다. [{'date': 'YYYYMMDD', 'close': float}], 과거->최신순
+    price_history: list = []
     amount_history: list = []   # [Sim9-1] 최근 20영업일 거래대금(종가x거래량, 과거->최신순)
     tick_power: float = 0.0     # [V60.0] 체결강도 (%)
     bid_ask_ratio: float = 1.0  # [V60.0] 매도호가잔량 / 매수호가잔량 비

@@ -85,3 +85,54 @@ def test_history_of_empty_candidate_list_falls_back_to_supplied():
     cand = {'A': {'price_history': []}}
     supplied = {'A': [{'date': '20261127', 'close': 2.0}]}
     assert history_of('A', cand, supplied)[0]['close'] == 2.0
+
+
+def test_old_fields_gone_from_decision_paths():
+    """매매 판단 경로에만 적용한다 — 심9-1(EOD)과 표시용 소비자는 범위 밖이다.
+
+    **식별자가 아니라 필드 접근을 센다.** 2026-11-28 실측: 맨 식별자로 세면
+    `base_simulator.py`(세 통계 함수의 파라미터 이름)와 `sim10_orchestrator.py:56`
+    (docstring 언급)이 거짓으로 걸린다. 둘 다 결함이 아니다.
+
+    소스 텍스트 검사가 정당한 드문 경우다 — "필드가 없다"는 불변식은 동작으로는
+    표현할 수 없다. 다시 읽기 시작하는 코드가 들어오면 값이 조용히 비어 거래 0건이 된다.
+    """
+    import pathlib
+    import re
+    root = pathlib.Path(__file__).resolve().parent.parent
+    EXEMPT = {'sim9_1_donchian.py',      # EOD — 생산자(run_eod_sims)가 이미 오늘을 뺀 직전 20일
+              'sim0_libero.py',           # breadth 표시용
+              'us_sim2_donchian.py',      # 미국 심 — 별도 데이터 원천
+              'notifier.py'}              # 런마다 append하는 표시용 시계열(의미가 다르다)
+    access = re.compile(
+        r"""\.get\(\s*['"](?:range_history|sparkline_price)['"]"""
+        r"""|\[\s*['"](?:range_history|sparkline_price)['"]\s*\]"""
+        r"""|['"](?:range_history|sparkline_price)['"]\s*\]"""
+        # 쓰기·점검 목록 형태도 접근이다 — setdefault 생산과 결손 점검 튜플.
+        r"""|setdefault\(\s*['"](?:range_history|sparkline_price)['"]"""
+        r"""|^\s*\(\s*['"](?:range_history|sparkline_price)['"]\s*,""")
+    hits = []
+    for sub in ('src/strategy', 'src/pipeline'):
+        for p in (root / sub).rglob('*.py'):
+            if p.name in EXEMPT:
+                continue
+            for i, line in enumerate(p.read_text(encoding='utf-8').splitlines(), 1):
+                if access.search(line):
+                    hits.append(f'{p.relative_to(root)}:{i}')
+    assert not hits, hits
+
+
+def test_monthly_excel_sparkline_comes_from_price_history(tmp_path):
+    """구 sparkline_price 생산을 걷어도 월별 엑셀 'Sparkline' 열이 비면 안 된다 —
+    값 없는 열이 정상처럼 쌓이는 게 가장 오래 산다. 마지막 5개 종가(과거->최신)."""
+    from datetime import datetime
+    import pandas as pd
+    from src.data.storage_manager import StorageManager
+    sm = object.__new__(StorageManager)
+    sm.REPORTS_DIR = str(tmp_path)
+    sm._load_market_regime = lambda: ('', 0, 0, 0, 0, 0, 0)
+    sm.rebuild_reports_index = lambda now: None
+    hist = [{'date': f'202611{d:02d}', 'close': 100.0 + d} for d in range(1, 9)]
+    now = datetime(2026, 11, 28, 11, 0)
+    path = sm.update_monthly_excel([{'code': '005930', 'price_history': hist}], now)
+    assert pd.read_excel(path)['Sparkline'][0] == '104.0,105.0,106.0,107.0,108.0'

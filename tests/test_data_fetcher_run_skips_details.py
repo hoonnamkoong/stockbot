@@ -91,8 +91,8 @@ def test_no_passing_stocks_means_zero_detail_calls():
     assert results == []
 
 
-def test_missing_field_log_extended_to_per_tick_power_range_history():
-    """E9: 통과 종목의 결손률 로그가 open_price 외에 per·tick_power·range_history도
+def test_missing_field_log_extended_to_per_tick_power_price_history():
+    """E9: 통과 종목의 결손률 로그가 open_price 외에 per·tick_power·price_history도
     본다(Success Criteria). _get_stock_details가 이 필드들을 하나도 안 채우면
     (완전 실패를 흉내) 세 필드 모두 결손 100%로 로그돼야 한다."""
     ctx = _FakeCtx()
@@ -130,4 +130,4 @@ def test_missing_field_log_extended_to_per_tick_power_range_history():
 
     assert any('per 결손' in m for m in logged)
     assert any('tick_power 결손' in m for m in logged)
-    assert any('range_history 결손' in m for m in logged)
+    assert any('price_history 결손' in m for m in logged)

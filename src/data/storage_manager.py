@@ -219,7 +219,10 @@ class StorageManager:
         new_rows = []
         for p in picks:
             d = p.to_dict() if isinstance(p, StockData) else p
-            sparkline = d.get('sparkline_price', []) or []
+            # 구 sparkline_price(날짜 없는 5일)를 대체한다 — 엑셀 열이 빈 채로 남지 않게
+            # 날짜 붙은 price_history의 마지막 5개 종가(과거->최신)에서 만든다.
+            sparkline = [r['close'] for r in (d.get('price_history') or [])[-5:]
+                         if r.get('close') is not None]
             new_rows.append({
                 'DateTime': now_kst.strftime('%Y-%m-%d %H:%M'),
                 'Rank': d.get('rank', '-'),

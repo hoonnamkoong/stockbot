@@ -26,6 +26,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 
 FIELD_RE = re.compile(r"(?:stock|s|cand|c|item)\.get\(\s*['\"]([a-z_0-9]+)['\"]")
 
+# 심들은 가격 이력을 `prior_closes_for(...)` 헬퍼로 읽는다. FIELD_RE는 직접 `.get`만
+# 잡으므로 이 호출이 없으면 price_history가 감사의 사각에 들어간다 — 구 sparkline_price가
+# 받던 "유니버스가 실제로 채우는가" 검사를 이 필드가 잃는다. 호출을 읽기로 센다.
+# (여는 괄호까지 요구해 import 줄은 걸리지 않는다.)
+HISTORY_HELPER_RE = re.compile(r"\bprior_closes_for\(")
+
 # 후보 dict가 아니라 **보유 포지션**에서 읽는 키. 유니버스 감사 대상이 아니다.
 PORTFOLIO_KEYS = {'avg_price', 'entry_date', 'buy_date', 'peak_price', 'pyramided',
                   'is_scaled_out', 'partial_sold_date', 'quantity', 'name'}
@@ -88,6 +94,8 @@ def fields_read(path, module_name=None):
     """심이 읽는 후보 필드 이름들. 헬퍼를 통한 간접 접근까지 본다."""
     src = open(path, encoding='utf-8').read()
     found = set(FIELD_RE.findall(src))
+    if HISTORY_HELPER_RE.search(src):
+        found.add('price_history')
     if module_name:
         for helper_src, params in _helper_sources(module_name):
             found |= set(_receiver_re(params).findall(helper_src))

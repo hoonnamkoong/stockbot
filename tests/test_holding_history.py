@@ -154,13 +154,28 @@ def test_attach_swallows_infrastructure_failure_and_sets_empty():
 
 
 @pytest.mark.parametrize('exc', [TypeError, AttributeError, KeyError])
-def test_attach_reraises_programming_errors(exc):
+def test_attach_reraises_programming_errors_from_supply(monkeypatch, exc):
     sim = _held_sim({'A': {}})
 
-    def boom():
+    def boom(*a, **k):
         raise exc('bug')
+    monkeypatch.setattr(hh, 'supply_holding_history', boom)
     with pytest.raises(exc):
-        attach_holding_history(sim, [], boom, log=lambda *_: None, log_error=lambda *_: None)
+        attach_holding_history(sim, [], lambda: object(),
+                               log=lambda *_: None, log_error=lambda *_: None)
+
+
+@pytest.mark.parametrize('exc', [TypeError, AttributeError, KeyError])
+def test_provider_acquisition_failure_is_swallowed_even_for_keyerror(exc):
+    """토큰 응답에 키가 없는 인프라 실패가 심 실행을 막으면 손실 포지션이 방치된다."""
+    sim = _held_sim({'A': {}})
+    sim.price_history = {'stale': []}
+    errs = []
+
+    def boom():
+        raise exc('token')
+    attach_holding_history(sim, [], boom, log=lambda *_: None, log_error=errs.append)
+    assert sim.price_history == {} and exc.__name__ in errs[0]
 
 
 def test_attach_empty_portfolio_never_builds_provider():

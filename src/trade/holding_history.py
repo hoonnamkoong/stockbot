@@ -65,8 +65,20 @@ def attach_holding_history(sim, sim_candidates, get_provider, *, log=print, log_
     portfolio = sim.state.get('portfolio')
     if not portfolio:
         return  # 공급할 것도, 공급자를 만들 이유도 없다
+    # 두 구간을 일부러 다르게 다룬다. 합치지 말 것.
+    # 1) 공급자 조달은 인증·네트워크를 건드리는 인프라 작업이다. 토큰 응답에 키가
+    #    없는 경우처럼 KeyError 등으로도 터질 수 있으므로 모든 예외를 삼키고 이력
+    #    없이 진행한다 — 이력이 없어도 하드손절·타임스탑은 돌아야 한다.
     try:
         provider = get_provider()
+    except Exception as e:
+        sim.price_history = {}
+        log_error(f"보유 이력 공급자 조달 실패(이력 없이 진행) {type(e).__name__}: {e!r}")
+        return
+    # 2) supply_holding_history 호출은 우리 코드다. 여기서 나는 TypeError 등은
+    #    프로그래밍 오류이고, 삼키면 모든 적응형 청산이 조용히 고정 %로 퇴화하므로
+    #    올려서 상위 핸들러가 기록하게 한다.
+    try:
         sim.price_history = supply_holding_history(
             portfolio, {s['code']: s for s in sim_candidates if s.get('code')},
             provider, log=log)

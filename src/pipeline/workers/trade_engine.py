@@ -707,6 +707,7 @@ class TradeEngineWorker(BaseWorker):
         from concurrent.futures import ThreadPoolExecutor
         from src.core import net
         from src.data import naver_api
+        from src.strategy.simulators.base_simulator import hist_fingerprint
 
         # get_universe()가 자체적으로 price를 안 준 종목(Sim6 고정 리터럴 등)은
         # fetch_sparkline이 네이버 frgn(일봉) 값으로 price를 채운다 — 장중엔
@@ -722,8 +723,19 @@ class TradeEngineWorker(BaseWorker):
                 return stock
             # [2026-09-11] 옛 item/frgn 표 → 네이버 JSON API(같은 재료, 최신이 앞).
             # 표를 긁던 코드는 09-10 이관 뒤 표를 못 찾아 아래 필드를 전부 조용히 비웠다.
-            rows = naver_api.investor_trend(code, policy=net.FAST)
+            rows = naver_api.investor_trend(code, days=25, policy=net.FAST)
             if rows:
+                # [가격 이력 계약] 종가 이력은 25행(날짜 포함, 과거→최신)이어야 당일을
+                # 빼고도 20일 채널이 선다. 스크래퍼 경로가 이미 채워 온 후보는 덮지 않는다.
+                if 'price_history' not in stock:
+                    hist = [{'date': r['date'], 'close': r['close']}
+                            for r in reversed(rows) if r['close'] is not None]
+                    stock['price_history'] = hist
+                    stock['hist_fp'] = hist_fingerprint(hist)
+                # 아래 수급 계열(frgn_net_20d·orgn_net_20d·amount_ma20 등)은 이름이 20일이다.
+                # 요청을 25행으로 넓혔으니 여기서 20행으로 되돌려 놓지 않으면 값이 조용히
+                # 25일 평균이 되어 이름과 값이 어긋난다(심2 회피 게이트 분포가 바뀐다).
+                rows = rows[:20]
                 # price/current_price는 get_universe()가 이미 KIS 라이브 값으로
                 # 채워왔다면 덮어쓰지 않는다 — 이 표는 일봉이라 장중에
                 # 전일 값에서 멈춰 있을 수 있다(Sim6가 6주간 거래 0건이던 원인과 동일

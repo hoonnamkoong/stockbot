@@ -17,6 +17,7 @@ from src.data.schemas import StockData
 from src.data.storage_manager import StorageManager
 from src.data import post_archive
 from src.strategy import analyzer
+from src.strategy.simulators.base_simulator import hist_fingerprint
 
 # 동시 요청량은 게시글 임계값과 무관해야 한다. 임계값에 묶어두면 오후로 갈수록
 # 네이버에 던지는 동시 요청이 늘어 페이지가 타임아웃으로 조용히 유실된다.
@@ -305,7 +306,7 @@ class DataFetcherWorker(BaseWorker):
         }
         # [2026-09-11] 옛 item/frgn 표 → 네이버 JSON API(같은 재료, 최신이 앞).
         # 09-10 이관 뒤 옛 표는 302 끝의 빈 페이지였고, 파서는 예외 없이 아무것도 못 읽었다.
-        rows = naver_api.investor_trend(code)
+        rows = naver_api.investor_trend(code, days=25)
         if rows is None:
             print(f"   [DataFetcher] 외인비중 수집 실패 {code}")   # 못 닿았다. 지어내지 않는다.
         elif len(rows) >= 2:
@@ -334,6 +335,13 @@ class DataFetcherWorker(BaseWorker):
             details['sparkline_price'] = closes[:5][::-1]
             details['range_history'] = closes[::-1]
             details['amount_history'] = amounts[::-1]
+            # [가격 이력 계약] 종가는 25행(날짜 포함, 과거→최신)을 따로 보존한다. 위 수급·
+            # 구 종가 계열은 요청이 25행이 된 뒤에도 rows[:20]에 고정해 창이 조용히
+            # 넓어지지 않게 했다. close가 빈 행은 이력에 넣지 않는다.
+            hist = [{'date': r['date'], 'close': r['close']}
+                    for r in reversed(rows) if r['close'] is not None]
+            details['price_history'] = hist
+            details['hist_fp'] = hist_fingerprint(hist)
 
         # KIS 보강. 네이버 파싱과 같은 try에 묶지 않는다 — 2026-08-03에 둘이 한
         # 블록이라 main.naver가 타임아웃 나자 KIS 호출이 실행조차 되지 않았다.

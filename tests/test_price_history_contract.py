@@ -65,7 +65,7 @@ def test_fingerprint_changes_with_window():
 
 def test_nan_and_inf_close_dropped_like_nonpositive():
     h = [dict(r) for r in H]; h[0]['close'] = float('nan'); h[1]['close'] = float('inf')
-    assert len(prior_closes(h, '20261130', 8)) == 8
+    assert prior_closes(h, '20261130', 8) == [118.0, 119.0, 120.0, 123.0, 124.0, 125.0, 126.0, 127.0]
     assert prior_closes(h, '20261130', 9) is None
 
 
@@ -77,7 +77,8 @@ def test_future_dated_rows_are_dropped_not_fatal():
 def test_fingerprint_survives_nonnumeric_close():
     h = [dict(r) for r in H]; h[0]['close'] = 'abc'
     assert isinstance(hist_fingerprint(h), str)
-    assert hist_fingerprint(h) == hist_fingerprint(h)
+    z = [dict(r) for r in H]; z[0]['close'] = 0
+    assert hist_fingerprint(h) == hist_fingerprint(z)  # 변환 불가 값은 건너뛴다
 
 
 def test_history_of_empty_candidate_list_falls_back_to_supplied():

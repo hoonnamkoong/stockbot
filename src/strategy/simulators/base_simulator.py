@@ -128,6 +128,8 @@ def log_funnel(label, candidates, funnel, orders=None, *,
 def prior_closes(history, today_ymd, n):
     """`today_ymd` 행을 뺀 마지막 n개 종가(과거→최신). 못 만들면 None.
 
+    `today_ymd` 행뿐 아니라 그보다 미래 날짜 행도 뺀다(룩어헤드 방지).
+
     이력이 날짜 없는 float 배열이던 시절엔 오늘의 미완성 봉이 섞였는지, 길이가
     충분한지, 빈 배열이 '자료 없음'인지 '후보 밖'인지를 소비자가 알 수 없었다.
     날짜가 계약의 근거라 형식·중복·정렬이 어긋나면 일부만 쓰지 않고 통째로 None.

@@ -124,6 +124,63 @@ def log_funnel(label, candidates, funnel, orders=None, *,
         pass
 
 
+def prior_closes(history, today_ymd, n):
+    """`today_ymd` 행을 뺀 마지막 n개 종가(과거→최신). 못 만들면 None.
+
+    이력이 날짜 없는 float 배열이던 시절엔 오늘의 미완성 봉이 섞였는지, 길이가
+    충분한지, 빈 배열이 '자료 없음'인지 '후보 밖'인지를 소비자가 알 수 없었다.
+    날짜가 계약의 근거라 형식·중복·정렬이 어긋나면 일부만 쓰지 않고 통째로 None.
+    거래일 연속성은 일부러 보지 않는다 — 연휴 공백에 거짓 None이 나면 적응형
+    청산이 통째로 꺼진다. 길이가 모자라도 패딩하지 않고 None(값을 지어내지 않는다).
+    """
+    try:
+        if not history or n <= 0:
+            return None
+        prev = None
+        for r in history:
+            d = r.get('date')
+            if not (isinstance(d, str) and len(d) == 8 and d.isdigit()):
+                return None
+            if prev is not None and d <= prev:  # 중복·역순 모두 여기서 걸린다
+                return None
+            prev = d
+        closes = []
+        for r in history:
+            if r['date'] == today_ymd:
+                continue
+            c = r.get('close')
+            if c is None or isinstance(c, bool) or not isinstance(c, (int, float)) or c <= 0:
+                continue
+            closes.append(float(c))
+        if len(closes) < n:
+            return None
+        return closes[-n:]
+    except Exception:
+        return None
+
+
+def history_of(code, cand_by_code, price_history):
+    """후보가 직접 든 이력을 먼저, 없으면 공급분. 둘 다 없으면 None."""
+    ph = (cand_by_code.get(code) or {}).get('price_history')
+    if ph:
+        return ph
+    return (price_history or {}).get(code) or None
+
+
+def prior_closes_for(code, cand_by_code, view, today_ymd, n):
+    """history_of + prior_closes. view에 price_history 키가 없어도 죽지 않는다."""
+    h = history_of(code, cand_by_code, (view or {}).get('price_history') or {})
+    return prior_closes(h, today_ymd, n)
+
+
+def hist_fingerprint(history):
+    """'<첫날짜>-<끝날짜>-<길이>-<종가합>'. 입력 해시에 넣는 창 식별자. 빈 이력은 ''."""
+    if not history:
+        return ''
+    total = sum(float(r.get('close') or 0) for r in history)
+    return f"{history[0].get('date')}-{history[-1].get('date')}-{len(history)}-{total:.4f}"
+
+
 def initial_state(cash):
     """리셋 직후의 상태 shape. **이 함수가 정본이다.**
 

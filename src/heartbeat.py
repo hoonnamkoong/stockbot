@@ -38,6 +38,90 @@ UNKNOWN = 'unknown'
 SESSION_MISSED = 'session_missed'
 
 
+# 멎은 **원인**. 상태(STALE)와 분리한다 — 상태는 "지금 멎었나"이고 원인은
+# "어디를 보러 갈까"다. 2026-11-26에 그 둘이 한 문구로 합쳐져 있어서, 경보는
+# 참인데 지시문이 멀쩡한 곳(태스커)을 가리켰다. 런은 2분마다 정확히 도착하고
+# 있었고 예산을 넘겨 전부 취소됐다 — 고칠 곳은 잡 예산이었다.
+TRIGGER_MISSING = 'trigger_missing'   # 창 안에 런이 아예 없다
+RUNS_CUT = 'runs_cut'                 # 런은 도는데 전부 취소됐다(예산 초과)
+RUNS_FAILED = 'runs_failed'           # 런은 도는데 전부 실패했다
+RUNS_STUCK = 'runs_stuck'             # 생성됐는데 아무것도 안 끝났다
+RUNS_MIXED = 'runs_mixed'             # 섞여 있다 — 단정하지 않는다
+
+_HINTS = {
+    TRIGGER_MISSING:
+        '창 안에 런이 **하나도 없습니다** — 트리거가 안 오고 있습니다.\n'
+        '태스커(폰) → /api/cron 경로를 확인하세요.',
+    RUNS_CUT:
+        '런은 들어오는데 **전부 취소**됐습니다 — 잡 예산(timeout-minutes)을 '
+        '넘기고 있습니다.\n런 하나를 열어 어느 스텝에서 잘렸는지 보세요. '
+        '예산은 원장 락 리스보다 짧아야 하니 올리지 말고, 그 스텝의 비용을 줄이세요.',
+    RUNS_FAILED:
+        '런은 들어오는데 **전부 실패**했습니다 — 코드나 환경 문제입니다.\n'
+        '최근 런의 실패 스텝 로그를 보세요.',
+    RUNS_STUCK:
+        '런이 생성됐는데 **아무것도 끝나지 않았습니다** — 큐에 박혔거나 '
+        '전부 진행 중입니다.\nqueued 상태로 멈춘 런이 있는지 보세요'
+        '(좀비 런이 게이트를 잠근 이력이 있습니다).',
+    RUNS_MIXED:
+        '런 결과가 섞여 있어 **원인을 단정할 수 없습니다**.\n'
+        '최근 런 목록을 직접 보세요.',
+}
+
+
+def runs_within(runs: list[dict] | None, now: dt.datetime,
+                window_min: int = MAX_AGE_MIN) -> list[dict]:
+    """창 안에 **생성된** 런만. 알림 본문과 원인 판정이 같은 창을 보게 한다.
+
+    `created_at`을 쓰는 이유: 묻는 것이 "트리거가 왔나"이고 그건 런이 끝났는지와
+    무관하다. 40분 전 취소는 지금 멎은 원인이 아니다.
+    """
+    now = _aware(now)
+    cutoff = now - dt.timedelta(minutes=window_min)
+    out = []
+    for run in runs or []:
+        try:
+            ts = dt.datetime.fromisoformat(
+                str(run.get('created_at')).replace('Z', '+00:00'))
+        except (TypeError, ValueError):
+            continue
+        # **상한도 본다.** 하한만 보면 창이 "cutoff 이후 전부"가 되어, 지난
+        # 시점을 재현할 때 그 뒤에 일어난 런까지 들어온다 — 2026-11-26 11:00
+        # 시점으로 리허설했더니 15분 창에 442건이 들어와 판정이 `runs_mixed`로
+        # 뒤집혔다(정답은 `runs_cut`이다). 운영에서는 now가 실시간이라 티가
+        # 안 나고, 그래서 틀린 채로 오래 살 수 있는 모양이다.
+        if cutoff <= ts.astimezone(_KST) <= now:
+            out.append(run)
+    return out
+
+
+def stale_cause(runs: list[dict] | None, now: dt.datetime,
+                window_min: int = MAX_AGE_MIN) -> str:
+    """멎은 원인을 런 이력에서 가른다.
+
+    `conclusion`이 없는 런(진행 중·큐)은 결론 집계에서 빼고, 결론이 하나도 없으면
+    그 자체가 판정이다(`RUNS_STUCK`). 섞여 있으면 단정하지 않는다 — 아는 척하는
+    지시문이 바로 지금 고치는 고장이다.
+    """
+    recent = runs_within(runs, now, window_min)
+    if not recent:
+        return TRIGGER_MISSING
+    done = [r.get('conclusion') for r in recent if r.get('conclusion')]
+    if not done:
+        return RUNS_STUCK
+    kinds = set(done)
+    if kinds == {'cancelled'}:
+        return RUNS_CUT
+    if kinds == {'failure'}:
+        return RUNS_FAILED
+    return RUNS_MIXED
+
+
+def stale_hint(cause: str) -> str:
+    """원인별 지시문. 같은 문구를 돌려주면 가른 의미가 없다."""
+    return _HINTS.get(cause, _HINTS[RUNS_MIXED])
+
+
 def _aware(t: dt.datetime | None) -> dt.datetime | None:
     """naive KST(PipelineContext.now_kst)와 tz 붙은 값을 함께 받는다."""
     if t is None or t.tzinfo is not None:

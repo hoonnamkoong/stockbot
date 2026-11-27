@@ -46,6 +46,37 @@ _HEAVY = [
 ]
 
 
+# 배포 clone이 db-data에서 **읽는** 파일. 나머지는 전부 로컬 사본으로 덮으므로
+# 받을 이유가 없다 — 받는 건 `git add`가 "범위 안"이라고 인정해주게 하려는 것뿐이다.
+_DEPLOY_READS = (
+    'alert_dedup.json',      # merge_alert_dedup.py가 원격 기록과 병합한다
+    'sim_reset_epoch.json',  # reset_epoch_guard.py가 원격 마커를 읽는다
+)
+
+
+def deploy_patterns(names) -> list[str]:
+    """배포 clone이 받을 범위 — 배포 목록(매니페스트)에서 **파생**한다.
+
+    복원과 배포는 하는 일이 다르다. 복원은 **읽으려고** 받으니 무엇이 필요한지
+    미리 다 알 수 없다(그래서 위 배제 목록이다). 배포는 받은 트리를 로컬 사본으로
+    **덮으려고** 받고, 덮을 목록은 매니페스트에 이미 적혀 있다.
+
+    그래서 배포 범위는 열거할 수 있고, 열거하면 **"배포 목록 ⊄ 배포 범위"가
+    구성적으로 불가능**해진다. 그게 2026-08-05 심9-1 고장의 유형이다(배포 목록과
+    복원 목록이 갈려 매매기록 8건이 2행만 남았다). 가드가 잡는 것보다 애초에
+    생길 수 없는 쪽이 낫다.
+
+    절감은 부수효과다(2026-11-26 실측: 1,635파일/72MB·sparse set 6.36초 →
+    58파일/731KB·0.63초).
+
+    ⚠ 이름에 글롭 메타문자(`*?[`)가 들어가면 패턴이 그 파일을 못 집는다. 그
+    경우는 배포 스텝의 `ls-files -v` 가드가 `S`로 잡아 멈춘다 — 조용하지 않다.
+    (2026-11-27 등록부·국면·순위 42개 이름 전수 확인: 전부 평범한 basename)
+    """
+    out = [_ROOT + n.strip() for n in [*_DEPLOY_READS, *names] if n.strip()]
+    return list(dict.fromkeys(out))
+
+
 def patterns(today_ymd: str) -> list[str]:
     """sparse-checkout 패턴(git 비-cone 문법). `today_ymd`는 'YYYYMMDD'.
 
@@ -85,6 +116,12 @@ def keeps(name: str, today_ymd: str) -> bool:
 
 
 def main() -> int:
+    # 배포 범위는 날짜를 안 쓴다 — 매니페스트에 적힌 이름이 이미 확정값이다.
+    # 그래서 시계를 부를 이유가 없고, 복원 범위와 날짜가 갈릴 여지도 없다.
+    if len(sys.argv) > 2 and sys.argv[1] == '--deploy':
+        with open(sys.argv[2], encoding='utf-8') as f:
+            print('\n'.join(deploy_patterns(f.read().split('\n'))))
+        return 0
     # KST를 직접 만들지 않는다 — 단일 시계(src.core.clock)만 쓴다. 날짜가 하루
     # 밀리면 오늘 append 파일을 복원하지 못해 조용히 잘린다.
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

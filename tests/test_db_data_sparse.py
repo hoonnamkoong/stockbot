@@ -108,24 +108,6 @@ def _trading_yml() -> str:
         return f.read()
 
 
-def test_the_sparse_range_is_generated_exactly_once():
-    """범위를 **한 번** 만들고 배포는 그 파일을 재사용한다.
-
-    각자 만들면 둘 다 `clock.now()`를 불러 날짜를 독립으로 계산한다 — 수동
-    디스패치가 자정을 넘으면 범위가 갈려 매니페스트의 `decisions_<전날>_*`가
-    배포 범위 밖이 된다(fail-closed라 데이터는 안 깨지지만 force_run은 사람의
-    유일한 복구 경로다). 한 번만 만들면 드리프트가 구조적으로 불가능하다.
-    """
-    body = _trading_yml()
-    # 주석에도 파일 이름이 나오므로 **실행 형태**만 센다.
-    calls = body.count('python3 scripts/db_data_sparse.py')
-    assert calls == 1, (
-        f'범위 생성이 {calls}회 — 두 번 만들면 날짜가 갈릴 수 있다. '
-        '한 번 만들어 파일로 넘길 것')
-    assert '$SPARSE_PATTERNS' in body, (
-        '배포 스텝이 복원 스텝이 만든 패턴 파일을 쓰지 않으면 범위가 갈린다')
-
-
 def test_restore_failure_stops_the_run():
     """복원 실패가 빈 data/로 흘러가면 전 심이 백지로 리셋돼 db-data를 덮는다.
 
@@ -165,3 +147,71 @@ def test_first_pattern_opens_the_range():
     이게 뒤로 밀리면 모든 배제가 무효가 되고 절감이 조용히 0이 된다.
     """
     assert sparse.patterns(TODAY)[0] == '/data/*'
+
+
+# ── 배포 범위는 매니페스트에서 파생한다 ──────────────────────────────────
+# 복원과 배포는 하는 일이 다르다. 복원은 **읽으려고** 받아서 무엇이 필요한지
+# 미리 다 알 수 없다(그래서 배제 목록이다). 배포는 받은 트리를 로컬 사본으로
+# **덮으려고** 받고, 덮을 목록이 매니페스트에 이미 적혀 있다 — 읽는 건
+# `alert_dedup.json`·`sim_reset_epoch.json` 둘뿐이다.
+#
+# 그래서 배포 범위는 열거할 수 있고, 열거하면 "배포 목록 ⊄ 배포 범위"가
+# **구성적으로 불가능**해진다. 그게 2026-08-05 심9-1 고장의 유형이다.
+
+def test_배포_범위는_매니페스트_전체를_담는다(tmp_path, monkeypatch):
+    names = _all_manifest_names(tmp_path, monkeypatch)
+    pats = set(sparse.deploy_patterns(names))
+    missed = [n for n in names if f'/data/{n}' not in pats]
+    assert not missed, f'배포하는데 범위 밖인 파일: {missed}'
+
+
+@pytest.mark.parametrize('name', ['alert_dedup.json', 'sim_reset_epoch.json'])
+def test_배포_clone이_읽는_파일은_매니페스트와_무관하게_들어온다(name):
+    """둘은 **원격본을 읽어야** 한다 — 매니페스트에 없는 사이클도 있다.
+
+    `sim_reset_epoch.json`이 범위 밖이면 clone에 그 파일이 없고,
+    `reset_epoch_guard.guard()`는 원격 None·로컬 값에서 `remote.get('files')`로
+    터진다 → 매 런 `return 4`다. `alert_dedup.json`이 없으면 병합이 원격의
+    억제 기록을 통째로 지운다(알림 도배).
+    """
+    assert f'/data/{name}' in sparse.deploy_patterns([])
+
+
+def test_배포_범위에_여는_패턴이_없다(tmp_path, monkeypatch):
+    """와일드카드 하나라도 섞이면 '열거했다'는 전제가 깨진다."""
+    for pat in sparse.deploy_patterns(_all_manifest_names(tmp_path, monkeypatch)):
+        assert not any(c in pat for c in '*?['), f'열거가 아닌 패턴: {pat}'
+        assert pat.startswith('/data/'), f'범위를 벗어난 패턴: {pat}'
+
+
+def test_배포_범위가_복원_범위보다_훨씬_좁다(tmp_path, monkeypatch):
+    """절감은 부수효과고 목적은 파생이지만, 좁아지지 않으면 파생이 틀린 것이다.
+
+    2026-11-26 실측: 공유 범위 1,635파일/72MB·sparse set 6.36초 →
+    매니페스트 파생 58파일/731KB·0.63초.
+    """
+    pats = sparse.deploy_patterns(_all_manifest_names(tmp_path, monkeypatch))
+    assert len(pats) < 100, f'파생 범위가 {len(pats)}줄 — 매니페스트 크기가 아니다'
+
+
+def test_각_스텝이_자기_범위를_한_번씩_만든다():
+    """복원은 날짜 기반(배제 목록), 배포는 매니페스트 파생이다.
+
+    예전에는 복원이 만든 파일을 배포가 **재사용**했다 — 각자 만들면 둘 다
+    `clock.now()`를 불러 자정을 넘는 수동 런에서 날짜가 갈렸기 때문이다.
+    배포 범위에는 날짜가 아예 없으니(매니페스트에 적힌 이름이 이미 확정값이다)
+    그 드리프트는 구조적으로 사라졌다.
+    """
+    body = _trading_yml()
+    total = body.count('python3 scripts/db_data_sparse.py')
+    deploy = body.count('python3 scripts/db_data_sparse.py --deploy')
+    assert deploy == 1, f'배포 범위 생성이 {deploy}회'
+    assert total - deploy == 1, f'복원 범위 생성이 {total - deploy}회'
+
+
+def test_배포_범위_생성_실패가_런을_멈춘다():
+    """빈 패턴이 들어가면 매니페스트 전부가 범위 밖이 되고, 원격에 이미 있는
+    파일은 `git add`가 **말없이** 무시한다 — 런은 초록이고 심 상태만 사라진다.
+    """
+    body = _trading_yml()
+    assert '[Deploy] 배포 범위 생성 실패' in body

@@ -137,3 +137,42 @@ def test_unknown_entry_date_sold_immediately():
     orders = decide_gap_fade(_view(pos), [], {'222': 1005}, now=datetime(2026, 7, 28, 10, 0))
     sells = [o for o in orders if o['action'] == 'SELL']
     assert len(sells) == 1 and '진입일 불명' in sells[0]['reason']
+
+
+# ── 보유 상한 ────────────────────────────────────────────
+def test_max_holdings_gate_records_and_does_not_raise():
+    """보유 5종목에서 상한 갈래가 실제로 실행된다.
+
+    2026-11-27까지 이 자리는 **정의되지 않은 `_fn`**을 불렀다. 호출되는 순간
+    NameError가 나고, 그러면 그 사이클의 청산 주문까지 통째로 사라진다(이 함수가
+    반환하기 전에 터지므로 앞에서 만든 SELL도 같이 날아간다). 조건이
+    "만석 + 진입창 + 후보 존재"라서 배포 이래 한 번도 안 불렸을 뿐이다.
+
+    기존 테스트는 전부 portfolio가 비었거나 1종목이라 이 갈래를 못 지났다.
+    """
+    port = {f'10{i}': _pos(1000, NOW_LATE) for i in range(5)}  # 당일 진입 = 청산 안 됨
+    prices = {c: 1000 for c in port}
+    prices['222'] = 1000
+    funnel = []
+    orders = decide_gap_fade(_view(port), _cand(), prices, now=NOW_LATE, funnel=funnel)
+    assert [o for o in orders if o['action'] == 'BUY'] == []
+    assert any(r['reason'] == 'max_holdings' and r['held'] == 5 for r in funnel), funnel
+
+
+def test_max_holdings_gate_preserves_exit_orders():
+    """상한에 걸려도 **앞에서 만든 청산 주문이 살아 돌아온다** — 회귀의 진짜 비용.
+
+    보유가 6인 경우가 있다: 실전에서는 `_make_adapter`가 심 상태를 실계좌
+    스냅샷으로 갈아끼우고, 그 계좌는 다른 심·수동 매매와 공유되므로 이 심의
+    상한을 넘길 수 있다. 그때 당일 진입분 5개가 상한을 채우고, 어제 진입분
+    1개는 타임스탑 청산 대상이 된다 — 그 SELL이 날아가면 돈이 묶인다.
+    """
+    port = {f'10{i}': _pos(1000, NOW_LATE) for i in range(5)}
+    port['999'] = _pos(1000, NOW_LATE - timedelta(days=1))
+    prices = {c: 1000 for c in port}
+    prices['222'] = 1000
+    funnel = []
+    orders = decide_gap_fade(_view(port), _cand(), prices, now=NOW_LATE, funnel=funnel)
+    sells = [o for o in orders if o['action'] == 'SELL']
+    assert len(sells) == 1 and sells[0]['code'] == '999'
+    assert any(r['reason'] == 'max_holdings' for r in funnel), funnel

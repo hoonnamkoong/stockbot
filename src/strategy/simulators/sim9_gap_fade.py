@@ -118,7 +118,7 @@ def decide_gap_fade(view, candidates, current_prices, now=None, funnel=None):
         # 소급 추론해야 했다. 여기서 끊기면 뒤 후보는 평가조차 안 되므로,
         # 몇 개를 안 봤는지가 남아야 후보 수와 탈락 수의 합이 맞는다.
         if held >= MAX_HOLDINGS:
-            _fn(funnel, '_gate', 'max_holdings', held=held)
+            _skip(funnel, '_gate', 'max_holdings', held=held)
             break
         code = stock.get('code')
         if not code or code in portfolio or code in sold or _cooldown_active(view['cooldown_codes'], code):

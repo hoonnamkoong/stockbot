@@ -39,6 +39,51 @@ REQUESTS_PER_CODE = 4
 SLEEP_SEC = 0.12
 SAVE_EVERY = 50
 
+# 심이 실제로 판정하는 유니버스 — 이 종목부터 받는다.
+#
+# **왜 순서가 전부인가.** 2026-11-28 실측: 종목당 8.5초(호출 4회 × 왕복 ~2초)라
+# 상장사 4,022개는 **9.5시간**이다. 잡 타임아웃이 120분이므로 한 런에 약 800개가
+# 한계다 — 위 독스트링의 "첫 채움이 한 런에 끝난다"는 **API 한도만 보고 쓴 것이고
+# 벽시계를 보지 않았다.** 그날 114분을 써서 800개를 받았는데, 번호순(`000010`부터)
+# 이어서 정작 심이 보는 top100 중 **38개만** 들어왔다. LG에너지솔루션(373220)·
+# 삼성바이오(207940)는 번호가 뒤라 토요일 보충 cron으로 5주를 기다려야 했다.
+#
+# 유니버스를 앞세우면 **한 런 15분**에 그 100개가 끝난다(100 × 8.5초). 번호순
+# 나머지는 그 뒤로 밀려 보충 cron이 천천히 채운다 — 아무도 안 기다리는 쪽이다.
+#
+# 파일은 eod_data.yml이 매일 db-data에 올린다. 없으면 빈 집합이라 **종전 동작**이다
+# (유니버스를 못 읽었다고 수집을 멈추지 않는다).
+UNIVERSE_CSV = 'ohlcv_top100.csv'
+
+
+def order_todo(todo, cache, target, universe):
+    """수집 순서. 2단 키이고 **순서가 중요하다.**
+
+    1차 `tried == target`: 자료 없음으로 이미 확인된 종목을 뒤로 보낸다. 예산·
+    데드라인의 절단이 **새 작업이 아니라 재시도에** 떨어지게 하려는 것이다.
+    2차 `code not in universe`: 그 안에서 **심이 보는 유니버스를 앞세운다**.
+
+    두 키를 뒤집으면 안 된다 — 유니버스를 1차로 두면 "자료 없는 유니버스 종목"이
+    자료 있는 신규 종목을 밀어낸다. 1차를 유지하면 절단 규칙이 보존되면서도
+    유니버스가 각 묶음의 앞에 온다.
+
+    `sorted`가 안정 정렬이라 같은 키 안에서는 종목코드 순서가 유지된다.
+    """
+    return sorted(todo, key=lambda t: ((cache.get(t[0]) or {}).get('tried') == target,
+                                       t[0] not in universe))
+
+
+def load_universe_codes(data_dir: str) -> set[str]:
+    """심이 판정하는 종목코드. 못 읽으면 빈 집합(종전 순서로 돈다)."""
+    import csv
+    path = os.path.join(data_dir, UNIVERSE_CSV)
+    try:
+        with open(path, encoding='utf-8-sig', newline='') as f:
+            return {(r.get('code') or '').strip()
+                    for r in csv.DictReader(f) if (r.get('code') or '').strip()}
+    except OSError:
+        return set()
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description='OpenDART 재무 수집 (분기 1회)')
@@ -92,11 +137,24 @@ def main() -> int:
     # 재시도를 없애지 않는 이유: 늦게 제출하는 회사가 있다. 대신 순서만 바꿔
     # 예산·데드라인의 절단이 **새 작업이 아니라 재시도에** 떨어지게 한다.
     # `sorted`가 안정 정렬이라 각 묶음 안에서는 종목코드 순서가 유지된다.
-    todo.sort(key=lambda t: (cache.get(t[0]) or {}).get('tried') == target)
+    #
+    # 2단 키다. 1차는 위 재시도 규칙 그대로고, 2차로 **심이 보는 유니버스를
+    # 앞세운다**(위 `UNIVERSE_CSV` 주석의 실측 근거). 순서가 중요하다 —
+    # 재시도를 1차로 둬야 "절단은 재시도에 떨어진다"가 유지되고, 유니버스를
+    # 2차로 둬야 "자료 없는 유니버스 종목"이 자료 있는 신규 종목을 밀어내지 않는다.
+    universe = load_universe_codes(args.data_dir)
+    todo = order_todo(todo, cache, target, universe)
     if args.limit:
         todo = todo[:args.limit]
     budget = MAX_REQUESTS // REQUESTS_PER_CODE
-    print(f'[dart] 갱신 대상 {len(todo)}개 (이번 실행 예산 {budget}개)')
+    # 유니버스 몫을 따로 찍는다 — 전체 진행률(800/4022)만 보면 "심이 쓸 수 있게
+    # 됐는가"를 알 수 없다. 그날 800개를 받고도 top100은 38개였다.
+    uni_todo = sum(1 for c, _ in todo if c in universe)
+    print(f'[dart] 갱신 대상 {len(todo)}개 (이번 실행 예산 {budget}개) · '
+          f'유니버스 {uni_todo}/{len(universe)}개 선순위'
+          if universe else
+          f'[dart] 갱신 대상 {len(todo)}개 (이번 실행 예산 {budget}개) · '
+          f'유니버스 파일 없음 — 종목코드 순서로 돈다')
 
     ok = empty = 0
     started = time.time()

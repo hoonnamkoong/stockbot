@@ -59,8 +59,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p data
+          # ohlcv_top100.csv를 같이 받는 이유: 수집 순서를 **심이 보는 유니버스
+          # 우선**으로 돌리는 재료다(collect_dart_fundamentals.py의 UNIVERSE_CSV).
+          # 없으면 종목코드 순서로 돌아 top100이 5주에 걸쳐 채워진다.
           bash scripts/fetch_db_data_files.sh \
             data/dart_fundamentals.json data/dart_corp_codes.json \
+            data/ohlcv_top100.csv \
             || echo "[Info] db-data 복원 실패 — 아래 안내대로 진행한다"
           [ -f data/dart_fundamentals.json ] \
             || echo "[Info] 재무 캐시 없음 — 첫 채움이다"

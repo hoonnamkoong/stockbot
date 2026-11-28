@@ -133,3 +133,18 @@ def test_호출_스텝이_토큰을_받는다():
                 if 'GITHUB_TOKEN' not in (step.get('env') or {}):
                     missing.append((os.path.basename(path), step.get('name')))
     assert not missing, f'GITHUB_TOKEN을 안 받는 호출 스텝: {missing}'
+
+
+def test_script_disables_msys_path_translation():
+    """`/data/...` sparse 패턴이 Git Bash에서 윈도우 경로로 번역되지 않아야 한다.
+
+    MSYS는 네이티브 git에 넘기는 인자의 선두 `/`를 `C:/Program Files/Git/...`로
+    바꾼다. 그러면 sparse 범위가 아무것도 안 집고, **클론은 성공하는데 파일만
+    0개**가 되어 스크립트가 "db-data에 없음"을 찍는다 — 2026-11-27에 실제로
+    12,098바이트로 존재하는 파일을 그렇게 보고했다.
+
+    CI(리눅스)에서는 생기지 않으므로 이 한 줄이 지우기 쉽고, 지워도 CI는 초록이다.
+    고장은 **로컬 리허설만** 거짓 음성이 되는 쪽으로 나타난다. 그래서 테스트로 박는다.
+    """
+    src = open(os.path.join(ROOT, 'scripts', 'fetch_db_data_files.sh'), encoding='utf-8').read()
+    assert 'MSYS_NO_PATHCONV=1' in src

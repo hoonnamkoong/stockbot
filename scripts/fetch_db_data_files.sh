@@ -39,6 +39,13 @@
 # "받기에 실패했다"가 로그에서 같은 모양이 된다.
 set -uo pipefail
 
+# 아래 sparse 패턴(`/data/...`)은 네이티브 git에 인자로 넘어간다. Git Bash(MSYS)는
+# 선두 `/`를 윈도우 경로로 번역해 `C:/Program Files/Git/data/...`로 바꿔 보내고,
+# git은 그걸 아무것도 안 집는 패턴으로 받아 **클론은 성공하는데 파일만 0개**가 된다.
+# CI(리눅스)에서는 안 생기므로 로컬 리허설만 조용히 거짓 음성이 됐다
+# (2026-11-27: db-data에 12,098바이트로 있는 파일을 "없음"으로 보고).
+export MSYS_NO_PATHCONV=1
+
 if [ "$#" -eq 0 ]; then
   echo "[db-data] 받을 파일을 하나 이상 적어야 한다" >&2
   exit 1

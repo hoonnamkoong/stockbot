@@ -87,6 +87,21 @@ def test_history_of_empty_candidate_list_falls_back_to_supplied():
     assert history_of('A', cand, supplied)[0]['close'] == 2.0
 
 
+import re as _re
+
+# 필드 접근 형태 전부. 딕셔너리 리터럴 키(`'x': ...`)도 생산 형태다 —
+# scripts/run_eod_sims.py가 정확히 그 형태로 만든다. 빠지면 그 줄을 판단 경로로
+# 복사해도 가드가 통과한다.
+FIELD_ACCESS = _re.compile(
+    r"""\.get\(\s*['"](?:range_history|sparkline_price)['"]"""
+    r"""|\[\s*['"](?:range_history|sparkline_price)['"]\s*\]"""
+    r"""|['"](?:range_history|sparkline_price)['"]\s*\]"""
+    # 쓰기·점검 목록 형태도 접근이다 — setdefault 생산과 결손 점검 튜플.
+    r"""|setdefault\(\s*['"](?:range_history|sparkline_price)['"]"""
+    r"""|^\s*\(\s*['"](?:range_history|sparkline_price)['"]\s*,"""
+    r"""|['"](?:range_history|sparkline_price)['"]\s*:""")
+
+
 def test_old_fields_gone_from_decision_paths():
     """매매 판단 경로에만 적용한다 — 심9-1(EOD)과 표시용 소비자는 범위 밖이다.
 
@@ -104,13 +119,7 @@ def test_old_fields_gone_from_decision_paths():
               'sim0_libero.py',           # breadth 표시용
               'us_sim2_donchian.py',      # 미국 심 — 별도 데이터 원천
               'notifier.py'}              # 런마다 append하는 표시용 시계열(의미가 다르다)
-    access = re.compile(
-        r"""\.get\(\s*['"](?:range_history|sparkline_price)['"]"""
-        r"""|\[\s*['"](?:range_history|sparkline_price)['"]\s*\]"""
-        r"""|['"](?:range_history|sparkline_price)['"]\s*\]"""
-        # 쓰기·점검 목록 형태도 접근이다 — setdefault 생산과 결손 점검 튜플.
-        r"""|setdefault\(\s*['"](?:range_history|sparkline_price)['"]"""
-        r"""|^\s*\(\s*['"](?:range_history|sparkline_price)['"]\s*,""")
+    access = FIELD_ACCESS
     hits = []
     for sub in ('src/strategy', 'src/pipeline'):
         for p in (root / sub).rglob('*.py'):
@@ -136,3 +145,13 @@ def test_monthly_excel_sparkline_comes_from_price_history(tmp_path):
     now = datetime(2026, 11, 28, 11, 0)
     path = sm.update_monthly_excel([{'code': '005930', 'price_history': hist}], now)
     assert pd.read_excel(path)['Sparkline'][0] == '104.0,105.0,106.0,107.0,108.0'
+
+
+def test_field_guard_catches_dict_literal_key():
+    """딕셔너리 리터럴 키 `'range_history': ...`도 생산 형태다. 이 형태를 놓치면
+    run_eod_sims의 그 줄을 판단 경로로 복사해도 가드가 통과한다."""
+    pat = FIELD_ACCESS
+    assert pat.search("    'range_history': [x for x in y],")
+    assert pat.search('{"sparkline_price" : 1}')
+    assert not pat.search("# range_history 는 제거됨")
+    assert not pat.search("x = {'price_history': h}")

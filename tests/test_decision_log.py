@@ -164,3 +164,26 @@ def test_기록_실패는_심을_죽이지_않는다(tmp_path):
                   log=said.append)
     assert n == 0
     assert said, '조용히 삼켰다 — 실패가 안 보이면 파일 0개를 못 찾는다'
+
+
+def test_input_hash_changes_when_history_window_changes():
+    """이력이 청산 임계값을 정하는데 해시가 그걸 안 보면, 폰/그림자 비교가
+    '같은 입력, 다른 결정'(또는 그 반대)을 거짓으로 보고한다 — 그 해시가 유일한 파리티 증거다."""
+    a = {'price': 100, 'hist_fp': 'aaaa'}
+    b = {'price': 100, 'hist_fp': 'bbbb'}
+    assert dl.input_hash(a) != dl.input_hash(b)
+
+
+def test_input_hash_unchanged_when_history_absent():
+    """hist_fp가 없는 stock은 옛 공식 그대로의 해시를 낸다 — 이미 쌓인 행과 비교가 깨지지 않는다.
+    기대값은 현행 INPUT_FIELDS 규칙을 손으로 재현해 고정한다(구현을 되부르지 않는다)."""
+    import hashlib
+    stock = {'price': 100, 'amount': 5}
+    raw = "price=100|amount=5".encode('utf-8')
+    assert dl.input_hash(stock) == hashlib.sha256(raw).hexdigest()[:12]
+
+
+def test_hist_fp_is_the_only_field_added():
+    """INPUT_FIELDS는 짧은 명시 목록이어야 한다 — 무관한 필드 하나가 모든 불일치를 면제시킨다."""
+    assert dl.INPUT_FIELDS[-1] == 'hist_fp'
+    assert len(dl.INPUT_FIELDS) == 15

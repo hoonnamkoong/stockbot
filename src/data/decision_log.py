@@ -49,6 +49,10 @@ INPUT_FIELDS = (
     'per', 'pbr', 'w52_hgpr', 'w52_lwpr',
     'open_price', 'day_high', 'day_low', 'prev_close',
     'frgn_fake_ntby_qty', 'orgn_fake_ntby_qty',
+    # 가격 이력 지문 — 청산 임계값(ATR·채널)이 이력으로 정해지므로 해시가 이걸 못 보면
+    # 폰/그림자 비교가 '같은 입력, 다른 결정'을 양쪽으로 거짓 보고한다. 없는 필드는
+    # 해시에 기여하지 않아 이 이름을 더해도 옛 행의 해시는 그대로다.
+    'hist_fp',
 )
 
 

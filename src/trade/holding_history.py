@@ -7,9 +7,16 @@
 """
 import time
 
+from src.core import clock
+
 # 소비자 중 최대 필요량이 직전 종가 20개(심5 MIN_HISTORY). 휴장·결손 여유 5일.
 # KIS는 한 번 호출에 최대 100행을 주므로 종목당 1콜이면 충분하다.
 HISTORY_DAYS = 25
+
+# 같은 종목의 공급 실패 알림 반복 억제(분). 사이클이 2분이라 억제가 없으면 한 종목이
+# 하루 수백 건을 쏟고, 그 도배는 알림이 없는 것과 같다. 별도 상태 파일을 만들지 않고
+# src/alerts.py의 기존 alert_dedup.json(배포 배선이 있는 것)을 쓴다.
+SUPPLY_ALERT_COOLDOWN_MIN = 60
 
 # 후보가 이미 가진 이력이 이보다 짧으면 조회한다. 소비자 최대 요구는 심5의 직전
 # 종가 20개이고 당일 행이 하나 더 붙으므로 21행이다. 존재 여부만 보면 2행짜리
@@ -21,6 +28,27 @@ def make_kis_provider():
     """공급자 생성 지점. 생성 시 인증·네트워크를 건드리므로 테스트가 여기를 막는다."""
     from src.trade.kis_data_provider import KISDataProvider
     return KISDataProvider()
+
+
+def _alert_supply_failed(code, log):
+    """(a) 공급 실패 — KIS가 이 보유 종목의 일봉을 주지 않았다 — 만 알린다.
+
+    (b) 공급은 됐으나 이력이 짧아 prior_closes_for가 None을 주는 경우는 여기서 알리지
+    않는다(심1·심4가 로그 한 줄만 남긴다). 문구에 그 구분을 박아 두어, 무음 심을
+    진단하는 사람이 이 알림이 없다고 (b)까지 없다고 읽지 않게 한다.
+    알림 경로의 어떤 실패도 매매 경로로 올리지 않는다 — 알리려던 문제보다 나빠진다.
+    """
+    try:
+        from src import alerts
+        alerts.send_alert_once(
+            key=f'hist_missing_{code}',
+            text=(f"보유 종목 {code}의 일봉 공급 실패 — KIS가 이력을 주지 않아 적응형 청산이 "
+                  f"고정 %로 퇴화합니다.\n"
+                  f"참고: 공급은 됐지만 이력이 짧아 못 쓰는 경우는 이 알림과 별개이며 "
+                  f"여기서 알리지 않습니다(심1·심4 로그 확인)."),
+            now=clock.now(), cooldown_min=SUPPLY_ALERT_COOLDOWN_MIN, log=log)
+    except Exception as e:
+        log(f"  [계측] 보유 이력 공급 실패 알림 자체가 실패 {type(e).__name__}: {e!r}")
 
 
 def supply_holding_history(codes, cand_by_code, provider, *, log=print):
@@ -48,6 +76,7 @@ def supply_holding_history(codes, cand_by_code, provider, *, log=print):
             out[code] = hist
         else:
             failed += 1
+            _alert_supply_failed(code, log)
     log(f"  [계측] 보유 이력 공급 {len(out)}종목 · 실패 {failed} · "
         f"{time.monotonic() - t0:.1f}초 (조회 {fetched})")
     return out
@@ -60,6 +89,8 @@ def attach_holding_history(sim, sim_candidates, get_provider, *, log=print, log_
     삼키고 이력 없이 sim.run을 계속한다 — 심을 건너뛰면 손실 포지션이 방치된다.
     단 TypeError·AttributeError·KeyError는 프로그래밍 오류라 그대로 올려 상위
     핸들러가 기록하게 한다. 삼키면 모든 적응형 청산이 조용히 고정 %로 퇴화한다.
+    **재던지기는 공급 호출에만 적용된다.** 공급자 조달은 KeyError를 포함해 모든 예외를
+    삼킨다(토큰 응답에 키가 없어도 이력 없이 진행). 조달 구간은 재던지지 않는다.
     """
     sim.price_history = {}  # 이전 값 승계에 기대지 않고 매번 명시한다
     portfolio = sim.state.get('portfolio')

@@ -222,3 +222,66 @@ def test_engine_with_holdings_never_builds_real_kis_provider(monkeypatch):
     w._run_simulators([], only_sim_id='x', allow_price_fallback=True,
                       universe_override=[{'code': 'Z', 'price': 1}])
     assert fake.calls == ['A'] and 'A' in (sim.seen or {})
+
+
+# --- 연속 결손 알림 -----------------------------------------------------
+
+class _FakeTelegram:
+    def __init__(self):
+        self.sent = []
+
+    def send_message(self, text):
+        self.sent.append(text)
+        return True
+
+
+@pytest.fixture(autouse=True)
+def telegram(monkeypatch):
+    """실제 텔레그램은 절대 부르지 않는다. 쿨다운 상태 파일은 conftest가 tmp로 격리한다."""
+    fake = _FakeTelegram()
+    monkeypatch.setattr('src.alerts._telegram_manager', lambda: fake)
+    return fake
+
+
+def test_repeated_supply_failure_alerts_once(telegram):
+    """같은 종목이 사이클마다 연속 실패해도 60분 안에는 한 번만 사람에게 간다."""
+    p = FakeProvider({}, raises=['X'])
+    for _ in range(3):
+        supply_holding_history(['X'], {}, p, log=lambda *_: None)
+    assert len(telegram.sent) == 1
+
+
+def test_supply_failure_alert_is_per_stock(telegram):
+    p = FakeProvider({}, raises=['X', 'Y'])
+    supply_holding_history(['X', 'Y'], {}, p, log=lambda *_: None)
+    assert len(telegram.sent) == 2
+
+
+def test_no_alert_when_supply_succeeds(telegram):
+    supply_holding_history(['B'], {}, FakeProvider({'B': _rows()}), log=lambda *_: None)
+    assert telegram.sent == []
+
+
+def test_alert_text_names_supply_failure_and_not_unusable_history(telegram):
+    """(a) 공급 실패만 알린다. (b) 공급은 됐지만 이력이 짧아 못 쓰는 경우는 이 알림이 아니다 —
+    무음 심을 진단하는 사람이 어느 쪽이 울렸는지 오해하면 안 된다."""
+    supply_holding_history(['X'], {}, FakeProvider({}, raises=['X']), log=lambda *_: None)
+    text = telegram.sent[0]
+    assert 'X' in text and '공급 실패' in text
+    assert '짧' in text and '별개' in text  # (b)는 따로라는 단서가 있다
+
+
+def test_alert_failure_never_breaks_supply(monkeypatch):
+    """알림 경로가 터져도 매매 경로(이력 공급)는 계속된다."""
+    def boom(*a, **k):
+        raise RuntimeError('alert down')
+    monkeypatch.setattr('src.alerts.send_alert_once', boom)
+    out = supply_holding_history(['X', 'B'], {}, FakeProvider({'B': _rows()}, raises=['X']),
+                                 log=lambda *_: None)
+    assert set(out) == {'B'}
+
+
+def test_docstring_scopes_reraise_to_supply_call_only():
+    """attach_holding_history 독스트링이 재던지기 범위를 '공급 호출에만'으로 한정한다."""
+    doc = attach_holding_history.__doc__
+    assert '공급 호출' in doc and '조달' in doc and '재던지지 않' in doc

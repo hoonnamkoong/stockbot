@@ -54,7 +54,7 @@ H = [{'date': f'202611{d:02d}', 'close': 100.0 + d} for d in (16,17,18,19,20,23,
 
 def test_excludes_today_by_date():
     out = prior_closes(H + [{'date': '20261130', 'close': 999.0}], '20261130', 3)
-    assert out == [124.0, 125.0, 127.0]        # 11/24, 11/25, 11/27 — 999는 없다
+    assert out == [125.0, 126.0, 127.0]        # 11/25, 11/26, 11/27 — 999는 없다
 
 def test_returns_last_n_not_all():
     assert len(prior_closes(H, '20261130', 5)) == 5
@@ -532,11 +532,54 @@ git commit -m "fix: 심5 채널·RSI2에서 당일 제거 — 설계서 7절과 
 
 ```python
 def test_old_fields_gone_from_decision_paths():
-    """매매 판단 경로에만 적용한다 — 심9-1(EOD)과 표시용 소비자는 범위 밖이다."""
-    EXEMPT = {'sim9_1_donchian.py', 'sim0_libero.py', 'us_sim2_donchian.py'}
+    """매매 판단 경로에만 적용한다 — 심9-1(EOD)과 표시용 소비자는 범위 밖이다.
+
+    **식별자가 아니라 필드 접근을 센다.** 2026-11-28 실측: 맨 식별자로 세면
+    `base_simulator.py`(세 통계 함수의 **파라미터 이름**)와
+    `sim10_orchestrator.py:56`(**docstring 언급**)이 거짓으로 걸린다. 둘 다
+    결함이 아니다.
+    """
+    EXEMPT = {'sim9_1_donchian.py',      # EOD — 생산자가 이미 직전 20일
+              'sim0_libero.py',           # breadth 표시용 ⚠ 아래 참조
+              'us_sim2_donchian.py',      # 미국 심
+              'notifier.py'}              # 런마다 append하는 표시용 5일 시계열
     # src/strategy/ · src/pipeline/ 아래 .py 중 EXEMPT 제외 파일에
-    # 'range_history'·'sparkline_price' 식별자가 없다
+    # 아래 **필드 접근 형태**가 없다:
+    #   .get('range_history'  ·  ['range_history']  ·  'range_history']
+    #   .get('sparkline_price' · ['sparkline_price'] · 'sparkline_price']
 ```
+
+- [ ] **Step 1b: 감사기가 헬퍼 경로를 보게 한다 (실패하는 테스트 먼저)**
+
+```python
+def test_audit_sees_history_read_through_helper():
+    """`prior_closes_for(...)`로 읽는 `price_history`가 감사에 잡힌다.
+
+    `scripts/audit_sim_fields.py:27`의 `FIELD_RE`는 `stock.get('x')` 같은 **직접
+    접근만** 잡는다. 심들이 이력을 헬퍼로 읽게 된 뒤로는 `price_history`가 감사의
+    사각에 들어갔다 — **이 작업의 가장 중요한 필드가 "유니버스가 실제로 채우는가"
+    검사에서 빠진 것이다.** 그 감사기는 심5가 `amount` 미배선으로 배포 이래 거래
+    0건이던 사고 뒤에 만들어졌다. 같은 고장이 다시 들어올 문을 열어 두면 안 된다.
+    """
+    # prior_closes_for(code, cand_by_code, view, today, n)를 부르는 심 소스에서
+    # 감사기가 'price_history'를 읽은 필드로 보고한다
+```
+
+⚠ **이 EXEMPT 목록은 최종 리뷰에서 틀린 것으로 판정됐다.** `sim0_libero.py`를 면제한
+것은 "표시용이니 손대지 말라"는 뜻이었는데, **그 소비자의 생산자를 이 태스크가 지웠다** —
+그래서 `sparkline_price`가 항상 `[]`가 되고 `momentum`·`trend`가 **조용히 0.0**이 됐다
+(`regime_observations.py:44`가 "0은 '최악의 장'"이라고 금지하는 값이다). 면제의 뜻은
+"구 필드를 의도적으로 **남긴다**"이지 "소비자의 생산자가 사라져도 된다"가 아니다.
+수정 웨이브에서 `sim0_libero`를 `price_history`로 전환하고 **EXEMPT에서 뺐다.**
+같은 고장을 엑셀 열에서는 이 태스크가 잡아 고쳤다 — 기준이 일관되지 않았던 것이 원인이다.
+
+추가로 이 태스크에서 둘을 같이 정리한다 — 필드가 사라진 뒤에도 남으면 **이름과
+값이 어긋난 채 영구히 사는** 자리다:
+
+- `base_simulator.py:528,568,606` — `calculate_atr`·`calculate_adx`·
+  `calc_period_change`의 파라미터 이름 `sparkline_price`를 `closes`로 바꾼다.
+  2026-11-28 실측: 전 호출부가 **위치 인자**라(키워드 사용 0건) 호출부 변경이 없다.
+- `sim10_orchestrator.py:56` — docstring의 `range_history` 언급을 새 필드명으로 고친다.
 
 - [ ] **Step 2: Run to verify it fails**
 

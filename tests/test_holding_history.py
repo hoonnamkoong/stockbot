@@ -271,6 +271,24 @@ def test_alert_is_sent_after_loop_not_inside(monkeypatch):
     assert seen == [['X', 'Y']]
 
 
+def test_failures_across_sims_in_one_process_send_once(telegram, monkeypatch):
+    """attach는 심마다 불린다. 두 심이 같은 사이클에서 실패해도 발송은 1회 — 쿨다운이
+    기록되지 않는 발송 장애에서도 뒤 심들이 동기 재시도로 사이클을 잡아먹지 않는다."""
+    calls = []
+    monkeypatch.setattr('src.alerts.send_alert_once', lambda **k: calls.append(1) or False)
+    for _ in range(2):
+        supply_holding_history(['X'], {}, FakeProvider({}, raises=['X']), log=lambda *_: None)
+    assert len(calls) == 1
+
+
+def test_log_line_names_failed_codes():
+    logs = []
+    supply_holding_history(['X', 'B'], {}, FakeProvider({'B': _rows()}, raises=['X']),
+                           log=logs.append, label='SimA')
+    line = [m for m in logs if '[계측] 보유 이력 공급' in m][-1]
+    assert "'X'" in line and 'SimA' in line
+
+
 def test_no_alert_when_supply_succeeds(telegram):
     supply_holding_history(['B'], {}, FakeProvider({'B': _rows()}), log=lambda *_: None)
     assert telegram.sent == []

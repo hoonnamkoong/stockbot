@@ -934,7 +934,8 @@ class LiberoSimulator(BaseSimulator):
 
         libero_breadth = predicted if predicted is not None \
             else self.state.get('metrics', {}).get('breadth_score', 0.0)
-        bull_score = self.state.get('bull_score', 0.0)
+        # 측정 불가(None)를 0.0으로 바꾸지 않는다 — 0점은 '최악의 장'이다(regime_observations와 같은 계약).
+        bull_score = self.state.get('bull_score')
         regime = self.state.get('current_regime', 'SIDEWAYS')
 
         entry = {
@@ -942,7 +943,7 @@ class LiberoSimulator(BaseSimulator):
             'libero_breadth':       round(libero_breadth, 1),
             'actual_kospi_breadth': round(actual_kospi_breadth, 1),
             'gap':                  round(libero_breadth - actual_kospi_breadth, 1),
-            'bull_score':           round(bull_score, 1),
+            'bull_score':           None if bull_score is None else round(bull_score, 1),
             'regime':               regime,
         }
         if predicted is not None:

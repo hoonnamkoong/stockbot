@@ -33,6 +33,13 @@ def make_kis_provider():
     return KISDataProvider(persist_disk_cache=False)
 
 
+# 이 프로세스에서 이미 공급 실패를 알리려 했는가. attach_holding_history는 심마다 불리므로
+# 종목 루프 밖으로 올려도 사이클당 최대 심 개수(17)만큼 발송을 시도한다 — 텔레그램 장애면
+# 쿨다운이 기록되지 않아 매 심이 15초x2를 다시 쓰고, SYNC_STAGE_DEADLINE_SEC(심 사이에서만
+# 검사)가 뒤 심들을 잘라 상태가 안 올라간다. 시도했으면(성공 여부와 무관) 프로세스당 한 번.
+_alert_attempted = False
+
+
 def _alert_supply_failed(codes, log):
     """(a) 공급 실패 — KIS가 이 보유 종목들의 일봉을 주지 않았다 — 만 알린다.
 
@@ -47,6 +54,10 @@ def _alert_supply_failed(codes, log):
     진단하는 사람이 이 알림이 없다고 (b)까지 없다고 읽지 않게 한다.
     알림 경로의 어떤 실패도 매매 경로로 올리지 않는다 — 알리려던 문제보다 나빠진다.
     """
+    global _alert_attempted
+    if _alert_attempted:
+        return
+    _alert_attempted = True
     try:
         from src import alerts
         alerts.send_alert_once(
@@ -91,7 +102,7 @@ def supply_holding_history(codes, cand_by_code, provider, *, log=print, label=''
     # 이 줄은 사이클당 한 번이 아니라 심마다 한 번 나온다. 첫 심이 조회를 전부 떠안고
     # 나머지는 ≈0초라, 어느 심 줄인지 알아야 최댓값을 고를 수 있다.
     log(f"  [계측] 보유 이력 공급{f'({label})' if label else ''} {len(out)}종목 · "
-        f"실패 {len(failed_codes)} · {elapsed:.1f}초 (조회 {fetched})")
+        f"실패 {len(failed_codes)}{failed_codes if failed_codes else ''} · {elapsed:.1f}초 (조회 {fetched})")
     return out
 
 

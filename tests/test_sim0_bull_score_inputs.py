@@ -66,3 +66,15 @@ def test_live_metrics_trend_missing_and_no_history_is_not_zero(tmp_path):
                          {'breadth': 60.0, 'momentum': 2.0, 'sample': 100})
     assert s.state['metrics']['trend_strength'] is None
     assert s.state['bull_score'] is None
+
+
+def test_record_calibration_survives_unmeasurable_bull_score(tmp_path):
+    """bull_score가 None(측정 불가)이어도 갭 기록이 예외 없이 끝나고 행의 bull_score도 None.
+    round(None)이 터지면 호출자(trade_engine)가 예외를 삼켜 calibration_log와 save_state가
+    조용히 멈춘다 — 네이버 전면 실패로 후보에 이력이 없는 날이 그 트리거다."""
+    s = _sim(tmp_path)
+    s.state['bull_score'] = None
+    s.record_calibration(55.0, predicted=50.0)
+    row = s.state['calibration_log'][-1]
+    assert row['bull_score'] is None
+    assert row['gap'] == -5.0

@@ -61,6 +61,9 @@ def _no_real_telegram(monkeypatch):
     `src.alerts._telegram_manager`가 아니라 그 안에서 import하는 **클래스**를 바꾼다 —
     휴장 판정 알림 테스트들이 `src.telegram_manager.TelegramManager`를 직접 갈아끼우는데,
     `_telegram_manager`를 통째로 바꾸면 그 테스트들의 fake가 우회돼 깨진다.
+    **범위**: 이 클래스 교체는 alerts 경로(함수 안 import)만 막는다. `notifier.py`처럼
+    TelegramManager를 모듈 레벨로 바인딩한 곳은 못 막으므로, 모든 발송의 단일 HTTP 관문인
+    `src.core.notify._post`도 같이 막는다(아래 `_no_real_http_post`).
     기본 동작은 자격증명이 없는 CI와 같다: send_message가 False를 돌려준다(True면
     "알림이 나갔다"가 기록돼 쿨다운 파일이 배포 목록에 들어간다). 개별 테스트가
     자기 fake를 setattr하면 이 기본값을 덮어쓴다.
@@ -73,6 +76,23 @@ def _no_real_telegram(monkeypatch):
             return False
 
     monkeypatch.setattr('src.telegram_manager.TelegramManager', _NullTelegramManager)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_http_post(monkeypatch):
+    """텔레그램 발송의 단일 HTTP 관문을 막는다. 연결 실패와 같은 OSError라 send는 False를
+    돌려주고(자격증명 없는 CI와 동일), 알림은 예외를 올리지 않는다. notify 자체 테스트는
+    `_post`를 스스로 덮으므로 영향이 없다."""
+    def _blocked(*a, **k):
+        raise OSError('테스트에서 실제 HTTP 발송 차단')
+    monkeypatch.setattr('src.core.notify._post', _blocked)
+
+
+@pytest.fixture(autouse=True)
+def _reset_holding_alert_flag(monkeypatch):
+    """보유 이력 공급 실패 알림의 '프로세스당 한 번' 플래그도 프로세스 상태다 — 앞 테스트가
+    켜 두면 뒤 테스트의 알림이 억제된다."""
+    monkeypatch.setattr('src.trade.holding_history._alert_attempted', False)
 
 
 @pytest.fixture(autouse=True)

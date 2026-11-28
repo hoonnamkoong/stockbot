@@ -140,7 +140,6 @@ def test_old_fields_gone_from_decision_paths():
     import re
     root = pathlib.Path(__file__).resolve().parent.parent
     EXEMPT = {'sim9_1_donchian.py',      # EOD — 생산자(run_eod_sims)가 이미 오늘을 뺀 직전 20일
-              'sim0_libero.py',           # breadth 표시용
               'us_sim2_donchian.py',      # 미국 심 — 별도 데이터 원천
               'notifier.py'}              # 런마다 append하는 표시용 시계열(의미가 다르다)
     access = FIELD_ACCESS

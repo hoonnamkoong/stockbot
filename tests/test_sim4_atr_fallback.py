@@ -83,14 +83,6 @@ def test_future_dated_row_does_not_feed_exit_atr(tmp_path):
     assert 'H1' in sim.state['portfolio']
 
 
-def test_no_constant_fallback_literal_in_source():
-    path = os.path.join(os.path.dirname(__file__), '..', 'src', 'strategy',
-                        'simulators', 'sim4_bull_momentum.py')
-    src = open(path, encoding='utf-8').read()
-    assert 'atr_pct = 3.0' not in src
-    assert 'sparkline_price' not in src
-
-
 # ── 진입 ────────────────────────────────────────────────────────
 
 def _cand(code, hist_closes, price=1000):

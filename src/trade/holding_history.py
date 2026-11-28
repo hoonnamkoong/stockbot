@@ -18,20 +18,29 @@ HISTORY_DAYS = 25
 # src/alerts.py의 기존 alert_dedup.json(배포 배선이 있는 것)을 쓴다.
 SUPPLY_ALERT_COOLDOWN_MIN = 60
 
-# 후보가 이미 가진 이력이 이보다 짧으면 조회한다. 소비자 최대 요구는 심5의 직전
-# 종가 20개이고 당일 행이 하나 더 붙으므로 21행이다. 존재 여부만 보면 2행짜리
-# 이력이 공급을 막아 prior_closes가 None을 주고 적응형 청산이 다시 퇴화한다.
-MIN_CAND_HISTORY = 21
+# 후보가 이미 가진 이력이 MIN_CAND_HISTORY행보다 짧으면 조회한다. 존재 여부만 보면
+# 2행짜리 이력이 공급을 막아 prior_closes가 None을 주고 적응형 청산이 다시 퇴화한다.
+# 상수는 소비자 쪽(history_of)과 공유해야 해서 base_simulator에 정의하고 가져온다.
+from src.strategy.simulators.base_simulator import MIN_CAND_HISTORY  # noqa: E402
 
 
 def make_kis_provider():
     """공급자 생성 지점. 생성 시 인증·네트워크를 건드리므로 테스트가 여기를 막는다."""
     from src.trade.kis_data_provider import KISDataProvider
-    return KISDataProvider()
+    # 디스크 캐시는 런 사이에 살아남지 않는다(어떤 워크플로도 kis_financial_cache.json을
+    # 복원·배포하지 않는다). 그런데 persist면 조회마다 전체 파일을 다시 쓴다
+    # (최대 15회/사이클). 같은 런 안의 중복 조회는 클래스 레벨 _disk_cache가 막는다.
+    return KISDataProvider(persist_disk_cache=False)
 
 
-def _alert_supply_failed(code, log):
-    """(a) 공급 실패 — KIS가 이 보유 종목의 일봉을 주지 않았다 — 만 알린다.
+def _alert_supply_failed(codes, log):
+    """(a) 공급 실패 — KIS가 이 보유 종목들의 일봉을 주지 않았다 — 만 알린다.
+
+    종목 루프가 끝난 뒤 **한 통**으로만 보낸다(키 하나, 본문에 종목 목록). 루프 안에서
+    종목마다 동기 발송하면 텔레그램 장애 때 종목당 최대 ~30초(타임아웃 15초 x 재시도)가
+    쌓이고, 발송 실패는 쿨다운을 기록하지 않아 매 사이클 반복된다. 매매 루프 안에서
+    잘리면 주문은 나가고 심 상태가 안 올라간다. 키를 하나로 두면 종목별 키가
+    alert_dedup.json에 쌓이는 문제도 같이 사라진다.
 
     (b) 공급은 됐으나 이력이 짧아 prior_closes_for가 None을 주는 경우는 여기서 알리지
     않는다(심1·심4가 로그 한 줄만 남긴다). 문구에 그 구분을 박아 두어, 무음 심을
@@ -41,9 +50,9 @@ def _alert_supply_failed(code, log):
     try:
         from src import alerts
         alerts.send_alert_once(
-            key=f'hist_missing_{code}',
-            text=(f"보유 종목 {code}의 일봉 공급 실패 — KIS가 이력을 주지 않아 적응형 청산이 "
-                  f"고정 %로 퇴화합니다.\n"
+            key='hist_missing',
+            text=(f"보유 종목 {len(codes)}개({', '.join(codes)})의 일봉 공급 실패 — KIS가 "
+                  f"이력을 주지 않아 적응형 청산이 고정 %로 퇴화합니다.\n"
                   f"참고: 공급은 됐지만 이력이 짧아 못 쓰는 경우는 이 알림과 별개이며 "
                   f"여기서 알리지 않습니다(심1·심4 로그 확인)."),
             now=clock.now(), cooldown_min=SUPPLY_ALERT_COOLDOWN_MIN, log=log)
@@ -51,7 +60,7 @@ def _alert_supply_failed(code, log):
         log(f"  [계측] 보유 이력 공급 실패 알림 자체가 실패 {type(e).__name__}: {e!r}")
 
 
-def supply_holding_history(codes, cand_by_code, provider, *, log=print):
+def supply_holding_history(codes, cand_by_code, provider, *, log=print, label=''):
     """후보에 이력이 없는 보유 종목만 KIS 일봉으로 받아 {code: [{date, close}]}로 돌려준다.
 
     조회에 실패한 종목은 결과에 키 자체가 없다. 빈 리스트로 채우면 '측정 불가'가
@@ -59,7 +68,7 @@ def supply_holding_history(codes, cand_by_code, provider, *, log=print):
     """
     t0 = time.monotonic()
     out = {}
-    failed = 0
+    failed_codes = []
     fetched = 0
     cand_by_code = cand_by_code or {}
     for code in list(codes or []):
@@ -75,10 +84,14 @@ def supply_holding_history(codes, cand_by_code, provider, *, log=print):
         if hist:
             out[code] = hist
         else:
-            failed += 1
-            _alert_supply_failed(code, log)
-    log(f"  [계측] 보유 이력 공급 {len(out)}종목 · 실패 {failed} · "
-        f"{time.monotonic() - t0:.1f}초 (조회 {fetched})")
+            failed_codes.append(code)  # 루프 안에서는 모으기만 한다 — 발송은 루프 뒤
+    if failed_codes:
+        _alert_supply_failed(failed_codes, log)
+    elapsed = time.monotonic() - t0  # 알림 소요도 포함해 잰다
+    # 이 줄은 사이클당 한 번이 아니라 심마다 한 번 나온다. 첫 심이 조회를 전부 떠안고
+    # 나머지는 ≈0초라, 어느 심 줄인지 알아야 최댓값을 고를 수 있다.
+    log(f"  [계측] 보유 이력 공급{f'({label})' if label else ''} {len(out)}종목 · "
+        f"실패 {len(failed_codes)} · {elapsed:.1f}초 (조회 {fetched})")
     return out
 
 
@@ -112,7 +125,7 @@ def attach_holding_history(sim, sim_candidates, get_provider, *, log=print, log_
     try:
         sim.price_history = supply_holding_history(
             portfolio, {s['code']: s for s in sim_candidates if s.get('code')},
-            provider, log=log)
+            provider, log=log, label=sim.__class__.__name__)
     except (TypeError, AttributeError, KeyError):
         raise
     except Exception as e:

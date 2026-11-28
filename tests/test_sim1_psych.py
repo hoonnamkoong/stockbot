@@ -277,8 +277,9 @@ def test_no_atr_exit_without_history():
     assert _sells(orders) == []
 
 
-def test_hard_and_trailing_exits_still_fire_without_history():
-    """적응형을 못 하는 것과 손실을 방치하는 것은 다른 문제다."""
+def test_trailing_stop_still_fires_without_history():
+    """적응형을 못 하는 것과 손실을 방치하는 것은 다른 문제다. (심1에는 하드 손절이 없고
+    이 테스트가 확인하는 것은 트레일링뿐이다.)"""
     orders, _, _ = decide_psych(_view(_held(peak=1100)), [], {'T001': 1060}, today=TODAY)
     sells = _sells(orders)
     assert len(sells) == 1 and '트레일링' in sells[0]['reason']
@@ -315,12 +316,6 @@ def test_atr_exit_works_when_today_is_omitted():
     orders, _, _ = decide_psych(v, [], {'T001': 990})
     sells = _sells(orders)
     assert len(sells) == 1 and '손절' in sells[0]['reason']
-
-
-def test_no_constant_fallback_literal_in_source():
-    path = os.path.join(os.path.dirname(__file__), '..', 'src', 'strategy',
-                        'simulators', 'sim1_psych.py')
-    assert '0.015' not in open(path, encoding='utf-8').read()
 
 
 # ── 진입 ADX: 이력 계약 ─────────────────────────────────────

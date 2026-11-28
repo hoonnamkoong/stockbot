@@ -164,12 +164,24 @@ def prior_closes(history, today_ymd, n):
         return None
 
 
+# 후보가 이미 가진 이력이 이보다 짧으면 공급기(holding_history)가 KIS에서 다시 받고,
+# history_of는 그때 공급분을 쓴다. 소비자 최대 요구는 심5의 직전 종가 20개이고 당일 행이
+# 하나 더 붙으므로 21행이다. 두 곳이 같은 숫자를 봐야 해서 한 곳(여기)에만 둔다.
+MIN_CAND_HISTORY = 21
+
+
 def history_of(code, cand_by_code, price_history):
-    """후보가 직접 든 이력을 먼저, 없으면 공급분. 둘 다 없으면 None."""
+    """후보 이력이 충분(MIN_CAND_HISTORY행 이상)하면 그것을, 아니면 공급분을 쓴다.
+
+    존재 여부만 보면 2행짜리 후보 이력이 공급분(KIS 25행)을 가려, 콜은 쓰고도
+    prior_closes가 None을 줘 적응형 청산이 꺼진다. 공급분이 없으면 짧아도 후보 것을
+    돌려준다(없는 것보다 낫고, 길이 판정은 prior_closes가 한다). 둘 다 없으면 None.
+    """
     ph = (cand_by_code.get(code) or {}).get('price_history')
-    if ph:
+    supplied = (price_history or {}).get(code) or None
+    if ph and (len(ph) >= MIN_CAND_HISTORY or not supplied):
         return ph
-    return (price_history or {}).get(code) or None
+    return supplied or ph or None
 
 
 def prior_closes_for(code, cand_by_code, view, today_ymd, n):

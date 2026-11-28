@@ -47,16 +47,22 @@ def test_injected_metrics_with_none_trend_falls_back_to_buzz_adx(tmp_path):
     # trend CSV 파싱 실패(None)라도 breadth/momentum은 라이브 실측을 그대로 써야 함
     # (trend를 breadth/momentum과 묶어서 통째로 버즈풀로 되돌리면 안 됨)
     sim.live_market_metrics = {'breadth': 65, 'momentum': 1.5, 'trend': None, 'sample': 100}
+    # 이력(price_history)이 있는 후보만 ADX 폴백에 들어간다. 예전엔 이력이 없어도 ADX 0.0이
+    # 들어가 이 테스트가 0.0을 정답으로 못 박고 있었다 — 위조된 값이다.
+    ph = lambda cs: [{'date': f'2026112{i}', 'close': c} for i, c in enumerate(cs)]
+    closes = [100, 101, 102, 104, 105]
     candidates = [
-        {'code': '1', 'change_rate': '+1.0%', 'sparkline_price': [100]},
-        {'code': '2', 'change_rate': '+2.0%', 'sparkline_price': [100]},
+        {'code': '1', 'change_rate': '+1.0%', 'price_history': ph(closes)},
+        {'code': '2', 'change_rate': '+2.0%', 'price_history': ph(closes)},
+        {'code': '3', 'change_rate': '+2.0%'},   # 이력 없음 — 평균에서 빠진다(0.0 아님)
     ]
     sim.run(candidates)
     assert sim.state['breadth_source'] == 'top100_live'
     assert sim.state['metrics']['breadth_score'] == 65.0
     assert sim.state['metrics']['momentum_score'] == 1.5
     # trend는 None이 아니라 버즈 후보 ADX median으로 폴백되어야 함 (크래시 금지)
-    assert sim.state['metrics']['trend_strength'] == 0.0
+    assert sim.state['metrics']['trend_strength'] == round(sim.calculate_adx(closes), 1)
+    assert sim.state['metrics']['trend_strength'] > 0
 
 
 def test_no_injection_falls_back_to_buzz(tmp_path):

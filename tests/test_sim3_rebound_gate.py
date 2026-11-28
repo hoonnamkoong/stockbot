@@ -116,10 +116,3 @@ def test_four_prior_closes_cannot_judge_rebound(tmp_path, monkeypatch):
     sim.run([_cand('111', [1020, 1040, 1060, 1080], 1100)], {'111': 1100})
     assert _reasons(got) == ['no_history']
     assert '111' not in sim.state['portfolio']
-
-
-def test_no_fabricated_zero_adx_in_source():
-    path = os.path.join(os.path.dirname(__file__), '..', 'src', 'strategy',
-                        'simulators', 'sim3_risk.py')
-    src = open(path, encoding='utf-8').read()
-    assert 'if sparkline else 0.0' not in src

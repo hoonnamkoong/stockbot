@@ -714,9 +714,15 @@ class LiberoSimulator(BaseSimulator):
             dailies.append(daily)
             if daily > 0:
                 ups += 1
-            sp = s.get('sparkline_price', []) or []
-            period_changes.append(self.calc_period_change(sp))
-            adxs.append(self.calculate_adx(sp) if len(sp) >= 2 else 0.0)
+            # 구 sparkline_price(생산자가 제거돼 항상 [])를 대신해 날짜 붙은 price_history의
+            # 마지막 5개 종가를 쓴다(storage_manager 엑셀 열과 같은 방식). 종가가 2개 미만이면
+            # 이 후보는 기간 변동·ADX 평균에서 **뺀다** — calc_period_change([])·ADX 0.0을
+            # 넣으면 '측정 불가'가 '변동 0·추세 0'으로 위조돼 중앙값을 끌어내린다.
+            sp = [r['close'] for r in (s.get('price_history') or [])[-5:]
+                  if r.get('close') is not None]
+            if len(sp) >= 2:
+                period_changes.append(self.calc_period_change(sp))
+                adxs.append(self.calculate_adx(sp))
             foreigns.append(float(s.get('foreign_change', 0) or 0))
 
         total = len(candidates)
@@ -728,13 +734,14 @@ class LiberoSimulator(BaseSimulator):
             breadth = round(float(metrics['breadth']), 1)
             momentum = round(float(metrics['momentum']), 2)
             trend = round(float(metrics['trend']), 1) if metrics.get('trend') is not None \
-                else (round(_median(adxs), 1) if adxs else 0.0)
+                else (round(_median(adxs), 1) if adxs else None)
             breadth_sample = int(metrics.get('sample', 0))
             breadth_source = 'top100_live'
         else:
             breadth = round(ups / total * 100, 1) if total else 0.0
-            momentum = round(_median(period_changes), 2) if period_changes else 0.0
-            trend = round(_median(adxs), 1) if adxs else 0.0
+            # 이력이 있는 후보가 하나도 없으면 측정 불가(None) — 0.0이 아니다.
+            momentum = round(_median(period_changes), 2) if period_changes else None
+            trend = round(_median(adxs), 1) if adxs else None
             breadth_sample = total
             breadth_source = 'candidates'
         if candidates:
@@ -748,7 +755,9 @@ class LiberoSimulator(BaseSimulator):
             volatility = None
 
         self.state.update({
-            'bull_score': self.calc_bull_score(breadth, momentum, trend),
+            # momentum·trend 중 하나라도 측정 불가면 점수도 측정 불가. 0점은 '최악의 장'이다.
+            'bull_score': (self.calc_bull_score(breadth, momentum, trend)
+                           if momentum is not None and trend is not None else None),
             'metrics': {
                 'breadth_score': breadth,
                 'momentum_score': momentum,

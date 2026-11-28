@@ -47,3 +47,44 @@ def _reset_net_breaker(monkeypatch):
     from src.core import net
     monkeypatch.setattr(net, '_STREAKS', {})
     monkeypatch.setattr(net, '_OPENED_AT', {})
+
+
+@pytest.fixture(autouse=True)
+def _no_real_telegram(monkeypatch):
+    """실제 텔레그램 발송을 전 테스트에서 막는다.
+
+    attach_holding_history가 보유 종목이 있는 모든 비-EOD 심에서 돌고, 공급 실패 시
+    알림을 보낸다. 이 개발 머신에는 운영 환경변수가 있을 수 있어서, 막지 않으면
+    엔진 경로를 타는 테스트 하나가 진짜 메시지를 쏜다(CI는 시크릿이 없어 조용히
+    통과하므로 초록이어도 안전하다는 증거가 못 된다).
+
+    `src.alerts._telegram_manager`가 아니라 그 안에서 import하는 **클래스**를 바꾼다 —
+    휴장 판정 알림 테스트들이 `src.telegram_manager.TelegramManager`를 직접 갈아끼우는데,
+    `_telegram_manager`를 통째로 바꾸면 그 테스트들의 fake가 우회돼 깨진다.
+    기본 동작은 자격증명이 없는 CI와 같다: send_message가 False를 돌려준다(True면
+    "알림이 나갔다"가 기록돼 쿨다운 파일이 배포 목록에 들어간다). 개별 테스트가
+    자기 fake를 setattr하면 이 기본값을 덮어쓴다.
+    """
+    class _NullTelegramManager:
+        def __init__(self, *a, **k):
+            pass
+
+        def send_message(self, *a, **k):
+            return False
+
+    monkeypatch.setattr('src.telegram_manager.TelegramManager', _NullTelegramManager)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_kis_provider(monkeypatch):
+    """보유 이력 공급자 생성 지점에서 실제 KISDataProvider(인증·토큰 호출)를 막는다.
+
+    엔진 경로 테스트가 보유 종목을 가진 fake 심을 돌리면 make_kis_provider가
+    실제 공급자를 만들어 get_access_token까지 간다. 개별 테스트가 덮어쓸 수 있다.
+    """
+    class _NullProvider:
+        def get_daily_history(self, code, days=25):
+            return []
+
+    monkeypatch.setattr('src.trade.holding_history.make_kis_provider',
+                        lambda: _NullProvider())

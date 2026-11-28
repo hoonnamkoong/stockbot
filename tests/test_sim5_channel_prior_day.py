@@ -163,3 +163,16 @@ def test_exit_rsi2_skipped_without_history_but_hard_stop_fires(monkeypatch, caps
     o = decide_sideways(_view({'005930': _pos(1000)}), short, {'005930': 990}, allow_entry=False)
     assert _sells(o) == []
     assert calls == []        # RSI2는 한 번도 계산되지 않았다
+
+
+def test_time_stop_still_fires_without_history(monkeypatch):
+    """이력이 없어도 10일 타임 스탑은 난다(설계서 5.4는 하드 손절과 타임 스탑 둘을 든다).
+    손실이 -5% 미만(-1%)이라 하드 손절이 아니라 타임 스탑이 판 것임을 사유로 확인한다."""
+    calls = _spy_rsi2(monkeypatch)
+    pos = {'005930': _pos(1000, days_ago=s5.TIMEOUT_DAYS)}
+    o = decide_sideways(_view(pos), [], {'005930': 990}, allow_entry=False)
+    assert len(_sells(o)) == 1 and '타임 스탑' in _sells(o)[0]['reason']
+    assert calls == []        # 이력이 없으니 RSI2는 계산되지 않았다
+    # 하루 모자라면 아무것도 하지 않는다(경계가 실제로 걸려 있다는 증거).
+    young = {'005930': _pos(1000, days_ago=s5.TIMEOUT_DAYS - 1)}
+    assert _sells(decide_sideways(_view(young), [], {'005930': 990}, allow_entry=False)) == []

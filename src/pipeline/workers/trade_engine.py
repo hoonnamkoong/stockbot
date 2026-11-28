@@ -555,6 +555,13 @@ class TradeEngineWorker(BaseWorker):
                              f"[계측] {time.monotonic() - _t:.1f}초")
 
             sim_secs: dict[str, float] = {}
+
+            # 보유 이력 공급자 지연 생성. 루프 밖에 둔다 — 반복마다 재정의할 이유가 없다.
+            def _provider():
+                if getattr(self, '_kis_provider', None) is None:
+                    self._kis_provider = _holding_history.make_kis_provider()
+                return self._kis_provider
+
             for i, sim in enumerate(simulators):
                 # 잘리는 것과 스스로 비켜주는 것은 다르다. 잘리면 잡이 cancelled가
                 # 되고 뒤에 있는 배포 스텝이 통째로 죽어 그 사이클의 심 상태가
@@ -627,10 +634,6 @@ class TradeEngineWorker(BaseWorker):
                     # 손실 중인 보유 종목은 방향성 후보 목록에서 구조적으로 빠진다.
                     # 그 심이 실제로 보는 후보(sim_candidates) 기준으로 이력 유무를
                     # 판정해야 심이 닿지 못하는 이력 때문에 공급을 건너뛰지 않는다.
-                    def _provider():
-                        if getattr(self, '_kis_provider', None) is None:
-                            self._kis_provider = _holding_history.make_kis_provider()
-                        return self._kis_provider
                     attach_holding_history(sim, sim_candidates, _provider,
                                            log=self.log, log_error=self.log_error)
                     sim.run(sim_candidates, current_prices=sim_prices)

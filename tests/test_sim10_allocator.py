@@ -28,12 +28,12 @@ def _sim(tmp_path, regime6, regime3='SIDEWAYS'):
 
 def test_bull_regime_enters_via_daytrade_logic(tmp_path):
     s = _sim(tmp_path, 'BULL')
-    # 90→110(기간변동 22.2%)은 유지하되 잔파도를 줘서 ADX를 상한(60) 아래로 유지한다
+    # 970→1100(기간변동 +13.4%, 직전 4개 종가 + 현재가 5값)에 잔파도를 줘서 ADX(37.1)를 상한(60) 아래로 유지한다
     # (2026-08-05 Sim4-1 ADX 상한 도입 — 단조상승은 ADX=100이라 이제 거부된다).
-    cand = [{'code': '111', 'name': '진입주', 'price': 110, 'amount': 5_000_000_000,
-             'price_history': [{'date': f'202011{10 + i:02d}', 'close': c} for i, c in enumerate([97, 92, 101, 95])], 'change_rate': '+3.0%',
+    cand = [{'code': '111', 'name': '진입주', 'price': 1100, 'amount': 5_000_000_000,
+             'price_history': [{'date': f'202011{10 + i:02d}', 'close': c} for i, c in enumerate([970, 920, 1010, 950])], 'change_rate': '+3.0%',
              'orgn_fake_ntby_qty': 100, 'frgn_fake_ntby_qty': 0, 'tick_power': 130.0}]
-    s.run(cand, {'111': 1000})
+    s.run(cand, {'111': 1100})
     assert '111' in s.state['portfolio']
 
 

@@ -1,5 +1,5 @@
 from src.strategy.simulators.base_simulator import (
-    prior_closes, history_of, prior_closes_for, hist_fingerprint)
+    prior_closes, history_of, prior_closes_for, hist_fingerprint, MIN_CAND_HISTORY)
 
 H = [{'date': f'202611{d:02d}', 'close': 100.0 + d} for d in (16,17,18,19,20,23,24,25,26,27)]
 
@@ -40,10 +40,34 @@ def test_holiday_gap_is_not_an_error():
 def test_none_when_unsorted():
     assert prior_closes(list(reversed(H)), '20261130', 3) is None
 
+def _days(n, close, end=20261127):
+    return [{'date': str(end - (n - 1 - i)), 'close': close} for i in range(n)]
+
 def test_history_of_prefers_candidate_over_supplied():
-    cand = {'A': {'price_history': [{'date': '20261127', 'close': 1.0}]}}
-    supplied = {'A': [{'date': '20261127', 'close': 2.0}]}
+    """후보 이력이 충분(MIN_CAND_HISTORY행 이상)하면 후보가 우선한다."""
+    cand = {'A': {'price_history': _days(MIN_CAND_HISTORY, 1.0)}}
+    supplied = {'A': _days(25, 2.0)}
     assert history_of('A', cand, supplied)[0]['close'] == 1.0
+
+def test_history_of_uses_supplied_when_candidate_is_short():
+    """공급기는 후보 이력이 짧으면 KIS에서 다시 받는다. 소비자가 그걸 버리면 콜만
+    쓰고 적응형 청산이 꺼진다 — 후보 10행 + 공급 25행이면 공급분이 이겨야 한다."""
+    cand = {'A': {'price_history': _days(10, 1.0)}}
+    supplied = {'A': _days(25, 2.0)}
+    assert history_of('A', cand, supplied)[0]['close'] == 2.0
+    assert prior_closes_for('A', cand, {'price_history': supplied}, '20261128', 20) is not None
+
+def test_history_of_short_candidate_without_supply_still_returned():
+    cand = {'A': {'price_history': _days(10, 1.0)}}
+    assert len(history_of('A', cand, {})) == 10
+
+def test_history_of_malformed_candidate_date_falls_to_supplied_via_length():
+    """후보에 깨진 날짜가 하나 있어도(prior_closes가 통째로 거부) 짧으면 공급분이 쓰인다."""
+    bad = _days(10, 1.0)
+    bad[3] = {'date': 'oops', 'close': 1.0}
+    cand = {'A': {'price_history': bad}}
+    supplied = {'A': _days(25, 2.0)}
+    assert prior_closes_for('A', cand, {'price_history': supplied}, '20261128', 20) is not None
 
 def test_history_of_falls_back_to_supplied():
     assert history_of('A', {}, {'A': [{'date': '20261127', 'close': 2.0}]})[0]['close'] == 2.0

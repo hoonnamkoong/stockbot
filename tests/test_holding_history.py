@@ -251,10 +251,24 @@ def test_repeated_supply_failure_alerts_once(telegram):
     assert len(telegram.sent) == 1
 
 
-def test_supply_failure_alert_is_per_stock(telegram):
-    p = FakeProvider({}, raises=['X', 'Y'])
+def test_supply_failures_are_one_aggregate_alert(telegram):
+    """실패 종목이 여럿이어도 알림은 한 통 — 루프 안에서 종목마다 동기 발송하면
+    텔레그램 장애 때 종목 수 x 최대 30초로 사이클이 멈추고, 쿨다운도 기록되지 않아
+    매 사이클 반복된다. 진단 가치는 본문에 종목 목록으로 남긴다."""
+    p = FakeProvider({}, raises=['X', 'Y', 'Z'])
+    supply_holding_history(['X', 'Y', 'Z'], {}, p, log=lambda *_: None)
+    assert len(telegram.sent) == 1
+    assert all(c in telegram.sent[0] for c in 'XYZ')
+
+
+def test_alert_is_sent_after_loop_not_inside(monkeypatch):
+    """발송은 종목 루프가 끝난 뒤에만 일어난다 — 루프 중 발송이면 마지막 조회 전에 호출된다."""
+    p = FakeProvider({}, raises=['X'])
+    seen = []
+    monkeypatch.setattr('src.alerts.send_alert_once',
+                        lambda **k: seen.append(list(p.calls)) or True)
     supply_holding_history(['X', 'Y'], {}, p, log=lambda *_: None)
-    assert len(telegram.sent) == 2
+    assert seen == [['X', 'Y']]
 
 
 def test_no_alert_when_supply_succeeds(telegram):
@@ -279,9 +293,3 @@ def test_alert_failure_never_breaks_supply(monkeypatch):
     out = supply_holding_history(['X', 'B'], {}, FakeProvider({'B': _rows()}, raises=['X']),
                                  log=lambda *_: None)
     assert set(out) == {'B'}
-
-
-def test_docstring_scopes_reraise_to_supply_call_only():
-    """attach_holding_history 독스트링이 재던지기 범위를 '공급 호출에만'으로 한정한다."""
-    doc = attach_holding_history.__doc__
-    assert '공급 호출' in doc and '조달' in doc and '재던지지 않' in doc

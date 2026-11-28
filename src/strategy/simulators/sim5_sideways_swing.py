@@ -72,15 +72,17 @@ def _fn(funnel, code, reason, **vals):
     funnel.append({'code': code, 'reason': reason, **vals})
 
 
-def _hist(range_history):
-    """range_history(직전 20일 종가, 과거→최신)에서 양수만. 부족하면 None."""
-    hist = [h for h in (range_history or []) if h and h > 0]
+def _hist(closes):
+    """직전 종가 배열(prior_closes_for가 준 과거→최신)에서 양수만. 부족하면 None.
+
+    예전엔 range_history 필드를 받았다. 지금은 `_channel`을 거쳐서만 닿는다."""
+    hist = [h for h in (closes or []) if h and h > 0]
     return hist if len(hist) >= MIN_HISTORY else None
 
 
-def _channel(range_history):
-    """range_history(20일 종가) → (low, high, width_pct). 이력 부족 시 None."""
-    hist = _hist(range_history)
+def _channel(closes):
+    """직전 20일 종가 배열(이력 계약의 prior_closes) → (low, high, width_pct). 이력 부족 시 None."""
+    hist = _hist(closes)
     if not hist:
         return None
     low, high = min(hist), max(hist)
